@@ -1,0 +1,84 @@
+name: Test Linux
+
+#------------------------------------------------
+# Workflow Triggers
+#------------------------------------------------
+on:
+  workflow_run:
+    workflows: ["Build Linux"]
+    types:
+      - completed
+
+#------------------------------------------------
+# Environment Variables
+#------------------------------------------------
+env:
+  MAIN_PROJECT_NAME: ${{ github.event.repository.name }}
+  BUILD_TYPE: Debug
+  THIRD_PARTY_INCLUDE_DIR: ${{ github.workspace }}/ThirdPartyDir
+  QT_VERSION: "6.8.0"
+
+#------------------------------------------------
+# Workflow jobs
+#------------------------------------------------
+jobs:
+  test-linux:
+    name: Test on Ubuntu Latest
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: Checkout repository (with submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-build
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.PAT_TOKEN }}
+          path: ${{ github.workspace }}/
+
+      - name: Install Qt if not cached
+        uses: jurplel/install-qt-action@v4
+        with:
+          aqtversion: '==3.1.*'
+          version: ${{ env.QT_VERSION }}
+          host: 'linux'
+          target: 'desktop'
+          arch: 'linux_gcc_64'
+
+      - name: Set QT6_DIR
+        run: echo "QT6_DIR=${{ github.workspace }}/../Qt/${{ env.QT_VERSION }}/gcc_64" >> $GITHUB_ENV
+
+      - name: Install test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libgl1-mesa-dev \
+            libxcb-cursor0 libxcb-cursor-dev libx11-xcb-dev gcovr
+
+      - name: Make test binary executable
+        run: chmod +x ./build/QML_Project_Tests/${{ env.MAIN_PROJECT_NAME }}_Tests
+
+      - name: Run tests
+        run: |
+          Xvfb :99 &>/dev/null &
+          export DISPLAY=:99
+          sleep 3
+          ./build/QML_Project_Tests/${{ env.MAIN_PROJECT_NAME }}_Tests
+
+      - name: Generate coverage report
+        run: |
+          cd build
+          gcovr --root ${{ github.workspace }} -r ${{ github.workspace }} --xml-pretty -o coverage.xml
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: build/coverage.xml
+          flags: linux
+          name: linux-coverage
+          fail_ci_if_error: true
+          token: ${{ secrets.CODECOV_TOKEN || '' }}

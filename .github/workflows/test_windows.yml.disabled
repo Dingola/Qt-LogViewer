@@ -1,0 +1,64 @@
+name: Test Windows
+
+#------------------------------------------------
+# Workflow Triggers
+#------------------------------------------------
+on:
+  workflow_run:
+    workflows: ["Build Windows"]
+    types:
+      - completed
+
+#------------------------------------------------
+# Environment Variables
+#------------------------------------------------
+env:
+  MAIN_PROJECT_NAME: ${{ github.event.repository.name }}
+  BUILD_TYPE: Debug
+  THIRD_PARTY_INCLUDE_DIR: ${{ github.workspace }}\\ThirdPartyDir
+  QT_VERSION: "6.8.0"
+
+#------------------------------------------------
+# Workflow jobs
+#------------------------------------------------
+jobs:
+  test-windows:
+    name: Test on Windows Latest
+    runs-on: windows-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: Checkout repository (with submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-build
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.PAT_TOKEN }}
+          path: build/
+
+      - name: Install Qt if not cached
+        uses: jurplel/install-qt-action@v3
+        with:
+          aqtversion: '==3.1.*'
+          version: ${{ env.QT_VERSION }}
+          host: 'windows'
+          target: 'desktop'
+          arch: 'win64_msvc2022_64'
+
+      - name: Set QT6_DIR
+        run: echo "QT6_DIR=C:\\Qt\\${{ env.QT_VERSION }}\\msvc2022_64" >> $env:GITHUB_ENV
+
+      - name: Make test binary executable
+        run: |
+          icacls ".\build\QML_Project_Tests\${{ env.BUILD_TYPE }}\${{ env.MAIN_PROJECT_NAME }}_Tests.exe" /grant "Everyone:(RX)"
+
+      - name: Run Tests
+        env:
+          PATH: C:\Qt\${{ env.QT_VERSION }}\msvc2022_64\bin;${{ env.PATH }}
+        run: |
+          .\build\QML_Project_Tests\${{ env.BUILD_TYPE }}\${{ env.MAIN_PROJECT_NAME }}_Tests.exe

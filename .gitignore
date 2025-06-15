@@ -1,0 +1,51 @@
+# Prerequisites
+*.d
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# Docs
+*/Docs/*
+
+# Directories
+**/_build*/*
+**/_deploy*/*
+**/install*/*
+**/ThirdPartyDir*/*
+
+# Ignore compiled translation files
+*.qm
+
+# Ignore log files
+*.log
+
+# Ignore Qt 6.x folders
+Scripts/*/Qt*/
+**/6*/

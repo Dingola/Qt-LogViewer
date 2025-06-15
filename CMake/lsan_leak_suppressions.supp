@@ -1,0 +1,8 @@
+leak:FcValueSave
+leak:FcConfigSubstituteWithPat
+leak:pango_layout_get_unknown_glyphs_count
+leak:libfontconfig.so
+leak:libglib-2.0.so
+leak:libpangoft2-1.0.so
+leak:QGenericUnixServices::QGenericUnixServices
+leak:libdbus-1.so

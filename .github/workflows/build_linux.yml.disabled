@@ -1,0 +1,81 @@
+name: Build Linux
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  MAIN_PROJECT_NAME: ${{ github.event.repository.name }}
+  BUILD_TYPE: Debug
+  BUILD_TARGET_TYPE: static_library
+  BUILD_TEST_PROJECT: true
+  THIRD_PARTY_INCLUDE_DIR: ${{ github.workspace }}/ThirdPartyDir
+  QT_VERSION: "6.8.0"
+
+jobs:
+  build-linux:
+    name: Ubuntu Latest
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository (and submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Prepare third-party directory
+        run: mkdir -p ${{ env.THIRD_PARTY_INCLUDE_DIR }}
+
+      - name: Restore third-party cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.THIRD_PARTY_INCLUDE_DIR }}
+          key: ${{ runner.os }}-3rdparty-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-3rdparty-
+
+      - name: Install Qt if not cached
+        uses: jurplel/install-qt-action@v4
+        with:
+          aqtversion: '==3.1.*'
+          version: ${{ env.QT_VERSION }}
+          host: 'linux'
+          target: 'desktop'
+          arch: 'linux_gcc_64'
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libpthread-stubs0-dev libgl1-mesa-dev \
+            libxcb-cursor0 libxcb-cursor-dev libx11-xcb-dev xvfb
+
+      - name: Set QT6_DIR
+        run: echo "QT6_DIR=${{ github.workspace }}/../Qt/${{ env.QT_VERSION }}/gcc_64" >> $GITHUB_ENV
+
+      - name: Configure CMake
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+                -DMAIN_PROJECT_NAME=${{ env.MAIN_PROJECT_NAME }} \
+                -D${{ env.MAIN_PROJECT_NAME }}_BUILD_TARGET_TYPE=${{ env.BUILD_TARGET_TYPE }} \
+                -D${{ env.MAIN_PROJECT_NAME }}_BUILD_TEST_PROJECT=${{ env.BUILD_TEST_PROJECT }} \
+                -DTHIRD_PARTY_INCLUDE_DIR=${{ env.THIRD_PARTY_INCLUDE_DIR }} \
+                -DCMAKE_CXX_FLAGS="--coverage" -DCMAKE_C_FLAGS="--coverage"
+
+      - name: Save updated third-party cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.THIRD_PARTY_INCLUDE_DIR }}
+          key: ${{ runner.os }}-3rdparty-${{ github.sha }}
+
+      - name: Build
+        run: cmake --build build --config ${{ env.BUILD_TYPE }}
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-build
+          path: |
+            build/
+            ${{ env.THIRD_PARTY_INCLUDE_DIR }}

@@ -1,0 +1,63 @@
+name: Test macOS
+
+#------------------------------------------------
+# Workflow Triggers
+#------------------------------------------------
+on:
+  workflow_run:
+    workflows: ["Build macOS"]
+    types:
+      - completed
+
+#------------------------------------------------
+# Environment Variables
+#------------------------------------------------
+env:
+  MAIN_PROJECT_NAME: ${{ github.event.repository.name }}
+  BUILD_TYPE: Debug
+  THIRD_PARTY_INCLUDE_DIR: ${{ github.workspace }}/ThirdPartyDir
+  QT_VERSION: "6.8.0"
+
+#------------------------------------------------
+# Workflow jobs
+#------------------------------------------------
+jobs:
+  test-macos:
+    name: Test on macOS Latest
+    runs-on: macos-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: Checkout repository (with submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-build
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.PAT_TOKEN }}
+          path: build/
+
+      - name: Install Qt if not cached
+        uses: jurplel/install-qt-action@v4
+        with:
+          aqtversion: '==3.1.*'
+          version: ${{ env.QT_VERSION }}
+          host: 'mac'
+          target: 'desktop'
+          arch: 'clang_64'
+
+      - name: Set QT6_DIR
+        run: echo "QT6_DIR=${{ github.workspace }}/../Qt/${{ env.QT_VERSION }}/clang_64" >> $GITHUB_ENV
+
+      - name: Make test binary executable
+        run: chmod +x ./build/QML_Project_Tests/${{ env.MAIN_PROJECT_NAME }}_Tests.app/Contents/MacOS/${{ env.MAIN_PROJECT_NAME }}_Tests
+
+      - name: Run Tests
+        env:
+          DYLD_LIBRARY_PATH: ${{ github.workspace }}/../Qt/${{ env.QT_VERSION }}/clang_64/lib
+        run: |
+          ./build/QML_Project_Tests/${{ env.MAIN_PROJECT_NAME }}_Tests.app/Contents/MacOS/${{ env.MAIN_PROJECT_NAME }}_Tests
