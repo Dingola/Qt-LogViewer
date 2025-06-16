@@ -49,6 +49,11 @@ file(GLOB_RECURSE Sources
      "Headers/*/*.cpp"
 )
 
+file(GLOB_RECURSE Forms
+    "Forms/*.ui"
+    "Forms/*/*.ui"
+)
+
 include_directories(Headers Sources)
 
 ############################################
@@ -69,8 +74,13 @@ endif()
 
 find_package(Qt6 REQUIRED COMPONENTS Widgets LinguistTools)
 qt_standard_project_setup()
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTOUIC OFF)
+set(CMAKE_AUTORCC ON)
 qt6_add_resources(RSCS resources.qrc)
 add_custom_target(gen_qrc DEPENDS ${RSCS})
+
+qt6_wrap_ui(UI_HEADERS ${Forms})
 
 ############################################
 ### Translation Configuration            ###
@@ -230,9 +240,10 @@ target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_20)
 
 target_sources(${PROJECT_NAME}
     PRIVATE
-		${Headers}
+        ${Headers}
         ${Sources}
-		${RSCS}
+        ${RSCS}
+        ${UI_HEADERS}
 )
 
 if (WIN32)
@@ -269,6 +280,8 @@ endif()
 
 group_files("${Sources}" "Source Files")
 group_files("${Headers}" "Header Files")
+group_files("${Forms}" "UI Files")
+group_files("${UI_HEADERS}" "Auto-Generated UI Headers")
 
 # Specifies include directories to use when compiling a given target
 target_include_directories(${PROJECT_NAME}
