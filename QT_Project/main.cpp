@@ -5,6 +5,7 @@
 
 #include <QApplication>
 
+#include "SimpleQtLogger/QtLoggerAdapter.h"
 #include "Headers/Qt-LogViewer/MainWindow.h"
 
 /**
@@ -27,6 +28,8 @@ auto main(int argc, char* argv[]) -> int
     app.setApplicationName(QStringLiteral("QtApp"));
     app.setOrganizationName(QStringLiteral("QtTemplate"));
     app.setOrganizationDomain(QStringLiteral("AdrianHelbig.de"));
+
+    SimpleQtLogger::install_as_qt_message_handler();
 
     MainWindow main_window;
     main_window.show();

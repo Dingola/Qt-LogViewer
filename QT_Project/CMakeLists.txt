@@ -220,6 +220,7 @@ endif()
 
 target_link_libraries(${PROJECT_NAME} PRIVATE Qt6::Widgets)
 include(${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/Doxygen.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/SimpleQtLogger.cmake)
 
 if (WIN32)
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
