@@ -1,0 +1,199 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>544</width>
+    <height>524</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>MainWindow</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QVBoxLayout" name="verticalLayout">
+    <item>
+     <widget class="QWidget" name="FilterBar" native="true">
+      <property name="layoutDirection">
+       <enum>Qt::LeftToRight</enum>
+      </property>
+      <layout class="QGridLayout" name="gridLayout">
+       <property name="sizeConstraint">
+        <enum>QLayout::SetDefaultConstraint</enum>
+       </property>
+       <item row="0" column="0">
+        <widget class="QComboBox" name="comboBoxApp">
+         <property name="sizeAdjustPolicy">
+          <enum>QComboBox::AdjustToMinimumContentsLengthWithIcon</enum>
+         </property>
+         <property name="minimumContentsLength">
+          <number>1</number>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="1">
+        <spacer name="horizontalSpacer">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>40</width>
+           <height>20</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item row="0" column="2">
+        <layout class="QHBoxLayout" name="horizontalLayoutLogLevels" stretch="0,0,0,0,0,0,0">
+         <property name="sizeConstraint">
+          <enum>QLayout::SetDefaultConstraint</enum>
+         </property>
+         <item>
+          <widget class="QLabel" name="labelLevel">
+           <property name="text">
+            <string>Level:</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="checkBoxTrace">
+           <property name="text">
+            <string>Trace</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="checkBoxDebug">
+           <property name="text">
+            <string>Debug</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="checkBoxInfo">
+           <property name="text">
+            <string>Info</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="checkBoxWarning">
+           <property name="text">
+            <string>Warning</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="checkBoxError">
+           <property name="text">
+            <string>Error</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="checkBoxFatal">
+           <property name="text">
+            <string>Fatal</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item row="1" column="0" colspan="3">
+        <layout class="QHBoxLayout" name="horizontalLayoutSearch">
+         <property name="sizeConstraint">
+          <enum>QLayout::SetDefaultConstraint</enum>
+         </property>
+         <item>
+          <widget class="QLabel" name="labelSearchArea">
+           <property name="text">
+            <string>Search area:</string>
+           </property>
+           <property name="buddy">
+            <cstring>comboBoxSearchArea</cstring>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QComboBox" name="comboBoxSearchArea"/>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="checkBoxRegEx">
+           <property name="text">
+            <string>Regex</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLineEdit" name="lineEditSearch"/>
+         </item>
+         <item>
+          <widget class="QPushButton" name="pushButtonSearch">
+           <property name="text">
+            <string>Search</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+      </layout>
+     </widget>
+    </item>
+    <item>
+     <widget class="QSplitter" name="splitterLogView">
+      <property name="orientation">
+       <enum>Qt::Vertical</enum>
+      </property>
+      <widget class="QTableView" name="tableViewLog"/>
+      <widget class="QPlainTextEdit" name="plainTextEditLogDetails">
+       <property name="enabled">
+        <bool>true</bool>
+       </property>
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+       <property name="acceptDrops">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>544</width>
+     <height>22</height>
+    </rect>
+   </property>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+ </widget>
+ <tabstops>
+  <tabstop>comboBoxApp</tabstop>
+  <tabstop>checkBoxTrace</tabstop>
+  <tabstop>checkBoxDebug</tabstop>
+  <tabstop>checkBoxInfo</tabstop>
+  <tabstop>checkBoxWarning</tabstop>
+  <tabstop>checkBoxError</tabstop>
+  <tabstop>checkBoxFatal</tabstop>
+  <tabstop>comboBoxSearchArea</tabstop>
+  <tabstop>checkBoxRegEx</tabstop>
+  <tabstop>lineEditSearch</tabstop>
+  <tabstop>pushButtonSearch</tabstop>
+  <tabstop>tableViewLog</tabstop>
+  <tabstop>plainTextEditLogDetails</tabstop>
+ </tabstops>
+ <resources/>
+ <connections/>
+</ui>
