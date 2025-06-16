@@ -6,7 +6,7 @@
 #include <QApplication>
 
 #include "SimpleQtLogger/QtLoggerAdapter.h"
-#include "Headers/Qt-LogViewer/MainWindow.h"
+#include "Qt-LogViewer/Views/MainWindow.h"
 
 /**
  * @brief The main function initializes the Qt application and executes the application event loop.
