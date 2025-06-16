@@ -1,12 +1,12 @@
-# Qt Template
+# Qt-LogViewer
 
 ## 🚀 [Build Status]
 
 ### 🛠 Build and ✅ Test
 
-[![Linux Build and Test](https://github.com/Dingola/QtTemplate/actions/workflows/build_and_test_linux.yml/badge.svg)](https://github.com/Dingola/QtTemplate/actions/workflows/build_and_test_linux.yml)
-[![macOS Build and Test](https://github.com/Dingola/QtTemplate/actions/workflows/build_and_test_macos.yml/badge.svg)](https://github.com/Dingola/QtTemplate/actions/workflows/build_and_test_macos.yml)
-[![Windows Build and Test](https://github.com/Dingola/QtTemplate/actions/workflows/build_and_test_windows.yml/badge.svg)](https://github.com/Dingola/QtTemplate/actions/workflows/build_and_test_windows.yml)
+[![Linux Build and Test](https://github.com/Dingola/Qt-LogViewer/actions/workflows/build_and_test_linux.yml/badge.svg)](https://github.com/Dingola/Qt-LogViewer/actions/workflows/build_and_test_linux.yml)
+[![macOS Build and Test](https://github.com/Dingola/Qt-LogViewer/actions/workflows/build_and_test_macos.yml/badge.svg)](https://github.com/Dingola/Qt-LogViewer/actions/workflows/build_and_test_macos.yml)
+[![Windows Build and Test](https://github.com/Dingola/Qt-LogViewer/actions/workflows/build_and_test_windows.yml/badge.svg)](https://github.com/Dingola/Qt-LogViewer/actions/workflows/build_and_test_windows.yml)
 
 ### Code Coverage
 
