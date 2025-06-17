@@ -1,9 +1,9 @@
-#ifdef APP_USE_DLL
-#ifdef APP_BUILDING_PROJECT
-#define API __declspec(dllexport)
+#ifdef QT_LOGVIEWER_USE_DLL
+#ifdef QT_LOGVIEWER_BUILDING_PROJECT
+#define QT_LOGVIEWER_API __declspec(dllexport)
 #else
-#define API __declspec(dllimport)
+#define QT_LOGVIEWER_API __declspec(dllimport)
 #endif
 #else
-#define API
+#define QT_LOGVIEWER_API
 #endif
