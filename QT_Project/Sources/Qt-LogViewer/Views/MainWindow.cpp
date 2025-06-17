@@ -1,4 +1,4 @@
-#include "Headers/Qt-LogViewer/MainWindow.h"
+#include "Qt-LogViewer/Views/MainWindow.h"
 
 #include "ui_MainWindow.h"
 
