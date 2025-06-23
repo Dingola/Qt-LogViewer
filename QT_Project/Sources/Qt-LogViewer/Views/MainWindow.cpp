@@ -32,6 +32,15 @@ MainWindow::MainWindow(QWidget* parent): QMainWindow(parent), ui(new Ui::MainWin
 {
     // Initialize the user interface
     ui->setupUi(this);
+
+    // Load and apply application stylesheet from Qt resource
+    QFile style_file(":/Resources/style.qss");
+    if (style_file.open(QFile::ReadOnly | QFile::Text))
+    {
+        QString style_sheet = QString::fromUtf8(style_file.readAll());
+        qApp->setStyleSheet(style_sheet);
+    }
+
     ui->splitterLogView->setStretchFactor(0, 3);
     ui->splitterLogView->setStretchFactor(1, 1);
 

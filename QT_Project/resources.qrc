@@ -1,4 +1,6 @@
 <RCC>
 	<qresource prefix="/">
+		<file>Resources/style.qss</file>
+		<file>Resources/down-arrow.svg</file>
 	</qresource>
 </RCC>

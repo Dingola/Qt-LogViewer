@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>541</width>
-    <height>523</height>
+    <width>624</width>
+    <height>545</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -20,42 +20,87 @@
       <property name="layoutDirection">
        <enum>Qt::LeftToRight</enum>
       </property>
-      <layout class="QGridLayout" name="gridLayout">
+      <layout class="QGridLayout" name="gridLayout" columnstretch="0,0,0,0,0">
        <property name="sizeConstraint">
         <enum>QLayout::SetDefaultConstraint</enum>
        </property>
-       <item row="0" column="0">
-        <widget class="QComboBox" name="comboBoxApp">
-         <property name="sizeAdjustPolicy">
-          <enum>QComboBox::AdjustToContents</enum>
+       <property name="leftMargin">
+        <number>24</number>
+       </property>
+       <property name="topMargin">
+        <number>16</number>
+       </property>
+       <property name="rightMargin">
+        <number>24</number>
+       </property>
+       <property name="bottomMargin">
+        <number>16</number>
+       </property>
+       <property name="verticalSpacing">
+        <number>12</number>
+       </property>
+       <item row="1" column="1" colspan="4">
+        <layout class="QHBoxLayout" name="horizontalLayoutSearch">
+         <property name="spacing">
+          <number>12</number>
          </property>
-         <property name="minimumContentsLength">
-          <number>1</number>
-         </property>
-        </widget>
-       </item>
-       <item row="0" column="1">
-        <spacer name="horizontalSpacer">
-         <property name="orientation">
-          <enum>Qt::Horizontal</enum>
-         </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>40</width>
-           <height>20</height>
-          </size>
-         </property>
-        </spacer>
-       </item>
-       <item row="0" column="2">
-        <layout class="QHBoxLayout" name="horizontalLayoutLogLevels" stretch="0,0,0,0,0,0,0">
          <property name="sizeConstraint">
           <enum>QLayout::SetDefaultConstraint</enum>
          </property>
          <item>
-          <widget class="QLabel" name="labelLevel">
+          <widget class="QLabel" name="labelSearchArea">
            <property name="text">
-            <string>Level:</string>
+            <string>Search area:</string>
+           </property>
+           <property name="buddy">
+            <cstring>comboBoxSearchArea</cstring>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QComboBox" name="comboBoxSearchArea"/>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="checkBoxRegEx">
+           <property name="text">
+            <string>Regex</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLineEdit" name="lineEditSearch"/>
+         </item>
+         <item>
+          <widget class="QPushButton" name="pushButtonSearch">
+           <property name="text">
+            <string>Search</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item row="0" column="4">
+        <layout class="QHBoxLayout" name="horizontalLayoutLogLevels" stretch="0,0,0,0,0,0,0,0">
+         <property name="spacing">
+          <number>12</number>
+         </property>
+         <property name="sizeConstraint">
+          <enum>QLayout::SetDefaultConstraint</enum>
+         </property>
+         <item>
+          <widget class="QLabel" name="labelFilter">
+           <property name="text">
+            <string>Filter:</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QComboBox" name="comboBoxApp">
+           <property name="sizeAdjustPolicy">
+            <enum>QComboBox::AdjustToContents</enum>
+           </property>
+           <property name="minimumContentsLength">
+            <number>1</number>
            </property>
           </widget>
          </item>
@@ -103,42 +148,18 @@
          </item>
         </layout>
        </item>
-       <item row="1" column="0" colspan="3">
-        <layout class="QHBoxLayout" name="horizontalLayoutSearch">
-         <property name="sizeConstraint">
-          <enum>QLayout::SetDefaultConstraint</enum>
+       <item row="0" column="1">
+        <spacer name="horizontalSpacer">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
          </property>
-         <item>
-          <widget class="QLabel" name="labelSearchArea">
-           <property name="text">
-            <string>Search area:</string>
-           </property>
-           <property name="buddy">
-            <cstring>comboBoxSearchArea</cstring>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QComboBox" name="comboBoxSearchArea"/>
-         </item>
-         <item>
-          <widget class="QCheckBox" name="checkBoxRegEx">
-           <property name="text">
-            <string>Regex</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QLineEdit" name="lineEditSearch"/>
-         </item>
-         <item>
-          <widget class="QPushButton" name="pushButtonSearch">
-           <property name="text">
-            <string>Search</string>
-           </property>
-          </widget>
-         </item>
-        </layout>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>40</width>
+           <height>20</height>
+          </size>
+         </property>
+        </spacer>
        </item>
       </layout>
      </widget>
@@ -172,7 +193,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>541</width>
+     <width>624</width>
      <height>22</height>
     </rect>
    </property>
@@ -180,7 +201,6 @@
   <widget class="QStatusBar" name="statusbar"/>
  </widget>
  <tabstops>
-  <tabstop>comboBoxApp</tabstop>
   <tabstop>checkBoxTrace</tabstop>
   <tabstop>checkBoxDebug</tabstop>
   <tabstop>checkBoxInfo</tabstop>
