@@ -10,7 +10,7 @@
 
 ### Code Coverage
 
-[![codecov](https://codecov.io/gh/Dingola/QtTemplate/graph/badge.svg?token=2JLLHLTQYN)](https://codecov.io/gh/Dingola/QtTemplate)
+[![codecov](https://codecov.io/gh/Dingola/Qt-LogViewer/graph/badge.svg?token=T25AFRCT8R)](https://codecov.io/gh/Dingola/Qt-LogViewer)
 
 <br><br>
 
@@ -84,9 +84,9 @@ Once you have generated the required tokens, add them as secrets in your GitHub 
 
 | Graph     | Description                                                                                                                                                                                                                     | Visualization                                                                 |
 |-----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------|
-| **Sunburst** | The inner-most circle represents the entire project. Moving outward are folders, and finally individual files. The size and color of each slice represent the number of statements and the coverage, respectively. | <img src="https://codecov.io/gh/Dingola/QtTemplate/graphs/sunburst.svg?token=2JLLHLTQYN" alt="Sunburst" height="100" width="200"> |
-| **Grid**     | Each block represents a single file in the project. The size and color of each block represent the number of statements and the coverage, respectively.                                                                      | <img src="https://codecov.io/gh/Dingola/QtTemplate/graphs/tree.svg?token=2JLLHLTQYN" alt="Grid" height="100" width="200">         |
-| **Icicle**   | The top section represents the entire project, followed by folders and individual files. The size and color of each slice represent the number of statements and the coverage, respectively.                                 | <img src="https://codecov.io/gh/Dingola/QtTemplate/graphs/icicle.svg?token=2JLLHLTQYN" alt="Icicle" height="150" width="400">     |
+| **Sunburst** | The inner-most circle represents the entire project. Moving outward are folders, and finally individual files. The size and color of each slice represent the number of statements and the coverage, respectively. | <img src="https://codecov.io/gh/Dingola/Qt-LogViewer/graphs/sunburst.svg?token=T25AFRCT8R" alt="Sunburst" height="100" width="200"> |
+| **Grid**     | Each block represents a single file in the project. The size and color of each block represent the number of statements and the coverage, respectively.                                                                      | <img src="https://codecov.io/gh/Dingola/Qt-LogViewer/graphs/tree.svg?token=T25AFRCT8R" alt="Grid" height="100" width="200">         |
+| **Icicle**   | The top section represents the entire project, followed by folders and individual files. The size and color of each slice represent the number of statements and the coverage, respectively.                                 | <img src="https://codecov.io/gh/Dingola/Qt-LogViewer/graphs/icicle.svg?token=T25AFRCT8R" alt="Icicle" height="150" width="400">     |
 
 <br><br>
 
