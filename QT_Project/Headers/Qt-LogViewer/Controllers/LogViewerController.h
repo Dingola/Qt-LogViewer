@@ -49,7 +49,8 @@ class LogViewerController: public QObject
          * @param field The field to search in.
          * @param use_regex Whether to use regex.
          */
-        auto set_search_filter(const QString& search_text, const QString& field, bool use_regex) -> void;
+        auto set_search_filter(const QString& search_text, const QString& field,
+                               bool use_regex) -> void;
 
         /**
          * @brief Returns the LogModel.

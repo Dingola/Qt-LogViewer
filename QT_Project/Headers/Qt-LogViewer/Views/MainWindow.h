@@ -2,6 +2,8 @@
 
 #include <QMainWindow>
 
+#include "Qt-LogViewer/Controllers/LogViewerController.h"
+
 namespace Ui
 {
 class MainWindow;
@@ -37,7 +39,29 @@ class MainWindow: public QMainWindow
 
     private:
         /**
+         * @brief Updates the log level filter in the controller.
+         */
+        auto update_level_filter() -> void;
+
+        /**
+         * @brief Updates the search filter in the controller.
+         */
+        auto update_search_filter() -> void;
+
+        /**
+         * @brief Updates the log details view when a row is selected.
+         * @param current The current selected index.
+         */
+        auto update_log_details(const QModelIndex& current) -> void;
+
+    private:
+        /**
          * @brief Pointer to the UI definition generated from the .ui file.
          */
         Ui::MainWindow* ui;
+
+        /**
+         * @brief Controller for log loading and filtering.
+         */
+        LogViewerController* m_controller = nullptr;
 };
