@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>544</width>
-    <height>524</height>
+    <width>541</width>
+    <height>523</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -27,7 +27,7 @@
        <item row="0" column="0">
         <widget class="QComboBox" name="comboBoxApp">
          <property name="sizeAdjustPolicy">
-          <enum>QComboBox::AdjustToMinimumContentsLengthWithIcon</enum>
+          <enum>QComboBox::AdjustToContents</enum>
          </property>
          <property name="minimumContentsLength">
           <number>1</number>
@@ -172,7 +172,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>544</width>
+     <width>541</width>
      <height>22</height>
     </rect>
    </property>

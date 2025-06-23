@@ -1,6 +1,8 @@
 #pragma once
 
+#include <QAction>
 #include <QMainWindow>
+#include <QModelIndex>
 
 #include "Qt-LogViewer/Controllers/LogViewerController.h"
 
@@ -37,6 +39,12 @@ class MainWindow: public QMainWindow
          */
         ~MainWindow() override;
 
+    private slots:
+        /**
+         * @brief Opens log files using a file dialog.
+         */
+        void open_log_files();
+
     private:
         /**
          * @brief Updates the log level filter in the controller.
@@ -54,6 +62,12 @@ class MainWindow: public QMainWindow
          */
         auto update_log_details(const QModelIndex& current) -> void;
 
+        /**
+         * @brief Updates the application combo box with the given application names.
+         * @param app_names The set of application names to populate the combo box.
+         */
+        auto update_app_combo_box(const QSet<QString>& app_names) -> void;
+
     private:
         /**
          * @brief Pointer to the UI definition generated from the .ui file.
@@ -64,4 +78,9 @@ class MainWindow: public QMainWindow
          * @brief Controller for log loading and filtering.
          */
         LogViewerController* m_controller = nullptr;
+
+        /**
+         * @brief Action for opening log files (appears in the File menu).
+         */
+        QAction* m_action_open_log_file = nullptr;
 };

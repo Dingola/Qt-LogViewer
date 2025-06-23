@@ -1,27 +1,56 @@
 #include "Qt-LogViewer/Views/MainWindow.h"
 
-#include <QDir>
+#include <QAction>
+#include <QFileDialog>
 #include <QItemSelectionModel>
+#include <QMenu>
 #include <QSet>
 #include <QStringList>
 
 #include "ui_MainWindow.h"
 
+namespace
+{
+constexpr auto k_show_all_apps_text = QT_TRANSLATE_NOOP("MainWindow", "Show All Apps");
+constexpr auto k_show_all_apps_tooltip =
+    QT_TRANSLATE_NOOP("MainWindow", "Show logs from all applications");
+constexpr auto k_open_log_files_text = QT_TRANSLATE_NOOP("MainWindow", "Open Log Files");
+constexpr auto k_open_log_file_text = QT_TRANSLATE_NOOP("MainWindow", "Open Log File...");
+constexpr auto k_file_menu_text = QT_TRANSLATE_NOOP("MainWindow", "&File");
+constexpr auto k_loaded_log_files_status = QT_TRANSLATE_NOOP("MainWindow", "Loaded %1 log file(s)");
+}  // namespace
+
 /**
  * @brief Constructs a MainWindow object.
  *
- * Initializes the main window and sets up the user interface.
+ * Initializes the main window, sets up the user interface, menu, status bar, and connects all
+ * signals/slots.
  *
  * @param parent The parent widget, or nullptr if this is a top-level window.
  */
 MainWindow::MainWindow(QWidget* parent): QMainWindow(parent), ui(new Ui::MainWindow)
 {
+    // Initialize the user interface
     ui->setupUi(this);
+    ui->splitterLogView->setStretchFactor(0, 3);
+    ui->splitterLogView->setStretchFactor(1, 1);
+
+    // Init combo box for app names
+    update_app_combo_box({});
+
+    // Create File menu and Open Log File action
+    auto file_menu = new QMenu(tr(k_file_menu_text), this);
+    m_action_open_log_file = new QAction(tr(k_open_log_file_text), this);
+    file_menu->addAction(m_action_open_log_file);
+    ui->menubar->addMenu(file_menu);
+
+    // Connect menu action to file open slot
+    connect(m_action_open_log_file, &QAction::triggered, this, &MainWindow::open_log_files);
 
     // Initialize controller with a default log format string
     m_controller = new LogViewerController("{timestamp} {level} {message} {app_name}", this);
 
-    // Set up the model/view
+    // Set up the model/view for the log table
     ui->tableViewLog->setModel(m_controller->get_proxy_model());
     ui->tableViewLog->setSelectionBehavior(QAbstractItemView::SelectRows);
     ui->tableViewLog->setSelectionMode(QAbstractItemView::SingleSelection);
@@ -30,9 +59,11 @@ MainWindow::MainWindow(QWidget* parent): QMainWindow(parent), ui(new Ui::MainWin
     // Populate search area combo box
     ui->comboBoxSearchArea->addItems(QStringList() << "Message" << "Level" << "AppName");
 
-    // Connect filter controls
-    connect(ui->comboBoxApp, &QComboBox::currentTextChanged, m_controller,
-            &LogViewerController::set_app_name_filter);
+    // Connect filter controls to controller
+    connect(ui->comboBoxApp, &QComboBox::currentTextChanged, this, [this](const QString& app_name) {
+        m_controller->set_app_name_filter(
+            (app_name == tr(k_show_all_apps_text) ? QString() : app_name));
+    });
 
     connect(ui->checkBoxTrace, &QCheckBox::toggled, this, &MainWindow::update_level_filter);
     connect(ui->checkBoxDebug, &QCheckBox::toggled, this, &MainWindow::update_level_filter);
@@ -41,29 +72,14 @@ MainWindow::MainWindow(QWidget* parent): QMainWindow(parent), ui(new Ui::MainWin
     connect(ui->checkBoxError, &QCheckBox::toggled, this, &MainWindow::update_level_filter);
     connect(ui->checkBoxFatal, &QCheckBox::toggled, this, &MainWindow::update_level_filter);
 
-    connect(ui->lineEditSearch, &QLineEdit::textChanged, this, &MainWindow::update_level_filter);
+    connect(ui->lineEditSearch, &QLineEdit::textChanged, this, &MainWindow::update_search_filter);
     connect(ui->comboBoxSearchArea, &QComboBox::currentTextChanged, this,
-            &MainWindow::update_level_filter);
-    connect(ui->checkBoxRegEx, &QCheckBox::toggled, this, &MainWindow::update_level_filter);
+            &MainWindow::update_search_filter);
+    connect(ui->checkBoxRegEx, &QCheckBox::toggled, this, &MainWindow::update_search_filter);
 
     // Connect table selection to log details view
     connect(ui->tableViewLog->selectionModel(), &QItemSelectionModel::currentRowChanged, this,
             &MainWindow::update_log_details);
-
-    /*
-    QString log_dir = R"(C:\Users\Adrian\Desktop\Logs)";
-    QDir dir(log_dir);
-    QStringList log_files = dir.entryList(QStringList() << "*.log" << "*.txt", QDir::Files);
-    QVector<QString> file_paths;
-    for (const QString& file: log_files)
-    {
-        file_paths.append(dir.absoluteFilePath(file));
-    }
-    if (!file_paths.isEmpty())
-    {
-        m_controller->load_logs(file_paths);
-    }
-    */
 }
 
 /**
@@ -75,6 +91,34 @@ MainWindow::~MainWindow()
 {
     delete m_controller;
     delete ui;
+}
+
+/**
+ * @brief Opens log files using a file dialog and loads them into the controller.
+ */
+void MainWindow::open_log_files()
+{
+    QStringList files = QFileDialog::getOpenFileNames(this, tr(k_open_log_files_text), QString(),
+                                                      tr("Log Files (*.log *.txt);;All Files (*)"));
+
+    if (!files.isEmpty())
+    {
+        QVector<QString> file_paths = files.toVector();
+        QSet<QString> app_names;
+        m_controller->load_logs(file_paths);
+
+        for (const LogEntry& entry: m_controller->get_log_model()->get_entries())
+        {
+            app_names.insert(entry.get_app_name());
+        }
+
+        update_app_combo_box(app_names);
+        statusBar()->showMessage(tr(k_loaded_log_files_status).arg(files.size()), 3000);
+    }
+    else
+    {
+        update_app_combo_box({});
+    }
 }
 
 /**
@@ -145,4 +189,33 @@ auto MainWindow::update_log_details(const QModelIndex& current) -> void
     }
 
     ui->plainTextEditLogDetails->setPlainText(details);
+}
+
+/**
+ * @brief Updates the application combo box with the given application names.
+ *
+ * This method clears the combo box, adds a default entry and populates it
+ * with the provided application names. It also disables the combo box if no application
+ * names are provided.
+ *
+ * @param app_names A set of application names to populate the combo box.
+ */
+auto MainWindow::update_app_combo_box(const QSet<QString>& app_names) -> void
+{
+    ui->comboBoxApp->blockSignals(true);
+    ui->comboBoxApp->clear();
+    ui->comboBoxApp->addItem(tr(k_show_all_apps_text));
+    ui->comboBoxApp->setItemData(0, tr(k_show_all_apps_tooltip), Qt::ToolTipRole);
+
+    for (const QString& app: app_names)
+    {
+        if (!app.isEmpty())
+        {
+            ui->comboBoxApp->addItem(app);
+        }
+    }
+
+    ui->comboBoxApp->setCurrentIndex(0);
+    ui->comboBoxApp->setEnabled(!app_names.isEmpty());
+    ui->comboBoxApp->blockSignals(false);
 }
