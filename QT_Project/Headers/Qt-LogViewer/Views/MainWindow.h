@@ -3,6 +3,8 @@
 #include <QAction>
 #include <QMainWindow>
 #include <QModelIndex>
+#include <QPlainTextEdit>
+#include <QDockWidget>
 
 #include "Qt-LogViewer/Controllers/LogViewerController.h"
 
@@ -83,4 +85,14 @@ class MainWindow: public QMainWindow
          * @brief Action for opening log files (appears in the File menu).
          */
         QAction* m_action_open_log_file = nullptr;
+
+        /**
+         * @brief Dock widget for displaying log details.
+         */
+        QDockWidget* m_log_details_dock_widget = nullptr;
+
+        /**
+         * @brief Text edit widget for showing detailed log information.
+         */
+        QPlainTextEdit* m_log_details_text_edit = nullptr;
 };

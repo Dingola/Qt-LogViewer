@@ -41,9 +41,6 @@ MainWindow::MainWindow(QWidget* parent): QMainWindow(parent), ui(new Ui::MainWin
         qApp->setStyleSheet(style_sheet);
     }
 
-    ui->splitterLogView->setStretchFactor(0, 3);
-    ui->splitterLogView->setStretchFactor(1, 1);
-
     // Init combo box for app names
     update_app_combo_box({});
 
@@ -67,6 +64,13 @@ MainWindow::MainWindow(QWidget* parent): QMainWindow(parent), ui(new Ui::MainWin
 
     // Populate search area combo box
     ui->comboBoxSearchArea->addItems(QStringList() << "Message" << "Level" << "AppName");
+
+    // Create and set up the dock widget for log details
+    m_log_details_dock_widget = new QDockWidget(tr("Log Details"), this);
+    m_log_details_text_edit = new QPlainTextEdit(m_log_details_dock_widget);
+    m_log_details_text_edit->setReadOnly(true);
+    m_log_details_dock_widget->setWidget(m_log_details_text_edit);
+    addDockWidget(Qt::BottomDockWidgetArea, m_log_details_dock_widget);
 
     // Connect filter controls to controller
     connect(ui->comboBoxApp, &QComboBox::currentTextChanged, this, [this](const QString& app_name) {
@@ -197,7 +201,7 @@ auto MainWindow::update_log_details(const QModelIndex& current) -> void
                       .arg(entry.get_message());
     }
 
-    ui->plainTextEditLogDetails->setPlainText(details);
+    m_log_details_text_edit->setPlainText(details);
 }
 
 /**

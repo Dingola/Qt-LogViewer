@@ -32,6 +32,7 @@ auto main(int argc, char* argv[]) -> int
     SimpleQtLogger::install_as_qt_message_handler();
 
     MainWindow main_window;
+    main_window.resize(1100, 750);
     main_window.show();
 
     return app.exec();
