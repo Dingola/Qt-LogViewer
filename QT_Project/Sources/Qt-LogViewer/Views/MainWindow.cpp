@@ -4,6 +4,7 @@
 #include <QFileDialog>
 #include <QItemSelectionModel>
 #include <QMenu>
+#include <QMessageBox>
 #include <QSet>
 #include <QStringList>
 
@@ -44,14 +45,7 @@ MainWindow::MainWindow(QWidget* parent): QMainWindow(parent), ui(new Ui::MainWin
     // Init combo box for app names
     update_app_combo_box({});
 
-    // Create File menu and Open Log File action
-    auto file_menu = new QMenu(tr(k_file_menu_text), this);
-    m_action_open_log_file = new QAction(tr(k_open_log_file_text), this);
-    file_menu->addAction(m_action_open_log_file);
-    ui->menubar->addMenu(file_menu);
-
-    // Connect menu action to file open slot
-    connect(m_action_open_log_file, &QAction::triggered, this, &MainWindow::open_log_files);
+    initialize_menu();
 
     // Initialize controller with a default log format string
     m_controller = new LogViewerController("{timestamp} {level} {message} {app_name}", this);
@@ -132,6 +126,40 @@ void MainWindow::open_log_files()
     {
         update_app_combo_box({});
     }
+}
+
+/**
+ * @brief Initializes the main menu bar and its actions.
+ */
+auto MainWindow::initialize_menu() -> void
+{
+    // File menu
+    auto file_menu = new QMenu(tr(k_file_menu_text), this);
+    m_action_open_log_file = new QAction(tr(k_open_log_file_text), this);
+    file_menu->addAction(m_action_open_log_file);
+    ui->menubar->addMenu(file_menu);
+
+    connect(m_action_open_log_file, &QAction::triggered, this, &MainWindow::open_log_files);
+
+    // Help menu
+    auto help_menu = new QMenu(tr("&Help"), this);
+    auto about_action = new QAction(tr("About %1").arg(QCoreApplication::applicationName()), this);
+    auto about_qt_action = new QAction(tr("About Qt"), this);
+
+    help_menu->addAction(about_action);
+    help_menu->addAction(about_qt_action);
+    ui->menubar->addMenu(help_menu);
+
+    connect(about_action, &QAction::triggered, this, [this] {
+        QMessageBox::about(this, tr("About %1").arg(QCoreApplication::applicationName()),
+                           tr("<b>%1</b><br>"
+                              "Version 1.0<br>"
+                              "&copy; 2025 Adrian Helbig<br>"
+                              "Built with Qt %2<br>"
+                              "<a href=\"https://AdrianHelbig.de\">AdrianHelbig.de</a>")
+                               .arg(QCoreApplication::applicationName(), QT_VERSION_STR));
+    });
+    connect(about_qt_action, &QAction::triggered, this, [this] { QMessageBox::aboutQt(this); });
 }
 
 /**

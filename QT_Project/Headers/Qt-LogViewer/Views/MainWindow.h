@@ -1,10 +1,10 @@
 #pragma once
 
 #include <QAction>
+#include <QDockWidget>
 #include <QMainWindow>
 #include <QModelIndex>
 #include <QPlainTextEdit>
-#include <QDockWidget>
 
 #include "Qt-LogViewer/Controllers/LogViewerController.h"
 
@@ -48,6 +48,11 @@ class MainWindow: public QMainWindow
         void open_log_files();
 
     private:
+        /**
+         * @brief Initializes the main menu bar and its actions.
+         */
+        auto initialize_menu() -> void;
+
         /**
          * @brief Updates the log level filter in the controller.
          */

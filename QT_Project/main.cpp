@@ -25,8 +25,8 @@ auto main(int argc, char* argv[]) -> int
     QCoreApplication::setAttribute(Qt::AA_UseOpenGLES);
 
     QApplication app(argc, argv);
-    app.setApplicationName(QStringLiteral("QtApp"));
-    app.setOrganizationName(QStringLiteral("QtTemplate"));
+    app.setApplicationName(QStringLiteral("Qt-LogViewer"));
+    app.setOrganizationName(QStringLiteral("AdrianHelbig"));
     app.setOrganizationDomain(QStringLiteral("AdrianHelbig.de"));
 
     SimpleQtLogger::install_as_qt_message_handler();
