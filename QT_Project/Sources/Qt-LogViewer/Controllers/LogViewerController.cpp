@@ -26,7 +26,7 @@ auto LogViewerController::load_logs(const QVector<QString>& file_paths) -> void
         entries += entry_list;
     }
 
-    m_log_model.set_entries(entries);
+    m_log_model.add_entries(entries);
 }
 
 /**

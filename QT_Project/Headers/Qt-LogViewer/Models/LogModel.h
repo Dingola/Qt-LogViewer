@@ -49,6 +49,7 @@ class LogModel: public QAbstractTableModel
         auto clear() -> void;
         [[nodiscard]] auto get_entry(int row) const -> LogEntry;
         [[nodiscard]] auto get_entries() const -> QVector<LogEntry>;
+        auto add_entries(const QVector<LogEntry>& entries) -> void;
         auto set_entries(const QVector<LogEntry>& entries) -> void;
 
     private:

@@ -229,6 +229,24 @@ auto LogModel::get_entries() const -> QVector<LogEntry>
 }
 
 /**
+ * @brief Adds multiple log entries to the model.
+ *
+ * Inserts a list of LogEntry objects into the model, notifying any attached views
+ * about the new rows.
+ *
+ * @param entries The list of LogEntry objects to add.
+ */
+auto LogModel::add_entries(const QVector<LogEntry>& entries) -> void
+{
+    if (!entries.isEmpty())
+    {
+        beginInsertRows(QModelIndex(), m_entries.size(), m_entries.size() + entries.size() - 1);
+        m_entries += entries;
+        endInsertRows();
+    }
+}
+
+/**
  * @brief Sets all log entries, replacing the current data.
  *
  * Replaces the current list of log entries with a new list and resets the model.
