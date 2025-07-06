@@ -1,12 +1,16 @@
 #include "Qt-LogViewer/Views/MainWindow.h"
 
 #include <QAction>
+#include <QDragEnterEvent>
+#include <QDropEvent>
 #include <QFileDialog>
 #include <QItemSelectionModel>
 #include <QMenu>
 #include <QMessageBox>
+#include <QMimeData>
 #include <QSet>
 #include <QStringList>
+#include <QUrl>
 
 #include "ui_MainWindow.h"
 
@@ -259,4 +263,45 @@ auto MainWindow::update_app_combo_box(const QSet<QString>& app_names) -> void
     ui->comboBoxApp->setCurrentIndex(0);
     ui->comboBoxApp->setEnabled(!app_names.isEmpty());
     ui->comboBoxApp->blockSignals(false);
+}
+
+/**
+ * @brief Handles drag enter events to allow dropping log files.
+ * @param event The drag enter event.
+ */
+void MainWindow::dragEnterEvent(QDragEnterEvent* event)
+{
+    if (event->mimeData()->hasUrls())
+    {
+        event->acceptProposedAction();
+    }
+}
+
+/**
+ * @brief Handles drop events to load log files via drag and drop.
+ * @param event The drop event.
+ */
+void MainWindow::dropEvent(QDropEvent* event)
+{
+    QStringList files;
+
+    for (const QUrl& url: event->mimeData()->urls())
+    {
+        files << url.toLocalFile();
+    }
+
+    if (!files.isEmpty())
+    {
+        QVector<QString> file_paths = files.toVector();
+        QSet<QString> app_names;
+        m_controller->load_logs(file_paths);
+
+        for (const LogEntry& entry: m_controller->get_log_model()->get_entries())
+        {
+            app_names.insert(entry.get_app_name());
+        }
+
+        update_app_combo_box(app_names);
+        statusBar()->showMessage(tr(k_loaded_log_files_status).arg(files.size()), 3000);
+    }
 }
