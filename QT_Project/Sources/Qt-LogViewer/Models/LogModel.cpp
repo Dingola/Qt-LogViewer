@@ -5,6 +5,9 @@
 
 #include "Qt-LogViewer/Models/LogModel.h"
 
+#include <QBrush>
+#include <QColor>
+
 /**
  * @brief Constructs a LogModel object.
  * @param parent The parent QObject.
@@ -68,6 +71,34 @@ auto LogModel::data(const QModelIndex& index, int role) const -> QVariant
     }
 
     const LogEntry& entry = m_entries.at(index.row());
+
+    if (role == Qt::ForegroundRole && index.column() == Level)
+    {
+        switch (map_log_level(entry.get_level()))
+        {
+        case SimpleCppLogger::LogLevel::Info: {
+            return QBrush(QColor("#42a5f5"));
+        }
+        case SimpleCppLogger::LogLevel::Debug: {
+            return QBrush(QColor("#66bb6a"));
+        }
+        case SimpleCppLogger::LogLevel::Trace: {
+            return QBrush(QColor("#b0bec5"));
+        }
+        case SimpleCppLogger::LogLevel::Warning: {
+            return QBrush(QColor("#ffb300"));
+        }
+        case SimpleCppLogger::LogLevel::Error: {
+            return QBrush(QColor("#ef5350"));
+        }
+        case SimpleCppLogger::LogLevel::Fatal: {
+            return QBrush(QColor("#ff1744"));
+        }
+        default: {
+            break;
+        }
+        }
+    }
 
     if (role == Qt::DisplayRole || role == Qt::EditRole)
     {
@@ -258,4 +289,46 @@ auto LogModel::set_entries(const QVector<LogEntry>& entries) -> void
     beginResetModel();
     m_entries = entries;
     endResetModel();
+}
+
+/**
+ * @brief Maps a log level string to the corresponding SimpleCppLogger::LogLevel.
+ *        Handles various spellings, cases, and substrings (e.g. "critical", "trace_info").
+ * @param level_str The log level as string.
+ * @return The mapped LogLevel enum value.
+ */
+auto LogModel::map_log_level(const QString& level_str) -> SimpleCppLogger::LogLevel
+{
+    QString lvl = level_str.trimmed().toLower();
+
+    if (lvl.contains("fatal"))
+    {
+        return SimpleCppLogger::LogLevel::Fatal;
+    }
+    if (lvl.contains("critical"))
+    {
+        return SimpleCppLogger::LogLevel::Error;
+    }
+    if (lvl.contains("error") || lvl.contains("err"))
+    {
+        return SimpleCppLogger::LogLevel::Error;
+    }
+    if (lvl.contains("warn"))
+    {
+        return SimpleCppLogger::LogLevel::Warning;
+    }
+    if (lvl.contains("debug"))
+    {
+        return SimpleCppLogger::LogLevel::Debug;
+    }
+    if (lvl.contains("trace"))
+    {
+        return SimpleCppLogger::LogLevel::Trace;
+    }
+    if (lvl.contains("info"))
+    {
+        return SimpleCppLogger::LogLevel::Info;
+    }
+
+    return SimpleCppLogger::LogLevel::Info;
 }

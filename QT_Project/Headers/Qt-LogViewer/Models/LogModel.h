@@ -4,6 +4,7 @@
 #include <QVector>
 
 #include "Qt-LogViewer/Models/LogEntry.h"
+#include "SimpleCppLogger/LogLevel.h"
 
 // LogModel: Model for displaying and managing log entries in a QTableView.
 class LogModel: public QAbstractTableModel
@@ -51,6 +52,9 @@ class LogModel: public QAbstractTableModel
         [[nodiscard]] auto get_entries() const -> QVector<LogEntry>;
         auto add_entries(const QVector<LogEntry>& entries) -> void;
         auto set_entries(const QVector<LogEntry>& entries) -> void;
+
+    private:
+        static auto map_log_level(const QString& level_str) -> SimpleCppLogger::LogLevel;
 
     private:
         QVector<LogEntry> m_entries;
