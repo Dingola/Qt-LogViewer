@@ -42,6 +42,8 @@ QComboBox {
     border: 1px solid #282e34;
     border-radius: 6px;
     padding: 4px;
+	padding-left: 8px;
+	padding-right: 8px;
     color: #ffffff;
 }
 QComboBox:hover {
@@ -99,6 +101,63 @@ QCheckBox:disabled {
 QCheckBox::indicator:disabled {
     background-color: #1a1f24;
     border: 1px solid #444444;
+}
+
+/* === Log Level CheckBoxes === */
+#checkBoxTrace {
+	color: #b0bec5;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 4px 12px;
+}
+#checkBoxDebug {
+	color: #66bb6a;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 4px 12px;
+}
+#checkBoxInfo {
+	color: #42a5f5;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 4px 12px;
+}
+#checkBoxWarning {
+	color: #ffb300;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 4px 12px;
+}
+#checkBoxError {
+	color: #ef5350;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 4px 12px;
+}
+#checkBoxFatal {
+	color: #ff1744;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 4px 12px;
+}
+
+#checkBoxTrace:hover {
+    border-color: #78909c;
+}
+#checkBoxDebug:hover {
+    border-color: #388e3c;
+}
+#checkBoxInfo:hover {
+    border-color: #1976d2;
+}
+#checkBoxWarning:hover {
+    border-color: #ff8f00;
+}
+#checkBoxError:hover {
+    border-color: #b71c1c;
+}
+#checkBoxFatal:hover {
+    border-color: #b71c1c;
 }
 
 /* === PushButton === */
