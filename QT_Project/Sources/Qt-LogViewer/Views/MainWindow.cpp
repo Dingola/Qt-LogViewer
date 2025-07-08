@@ -10,6 +10,7 @@
 #include <QMimeData>
 #include <QSet>
 #include <QStringList>
+#include <QTimer>
 #include <QUrl>
 
 #include "ui_MainWindow.h"
@@ -23,6 +24,7 @@ constexpr auto k_open_log_files_text = QT_TRANSLATE_NOOP("MainWindow", "Open Log
 constexpr auto k_open_log_file_text = QT_TRANSLATE_NOOP("MainWindow", "Open Log File...");
 constexpr auto k_file_menu_text = QT_TRANSLATE_NOOP("MainWindow", "&File");
 constexpr auto k_loaded_log_files_status = QT_TRANSLATE_NOOP("MainWindow", "Loaded %1 log file(s)");
+constexpr auto k_search_placeholder_text = QT_TRANSLATE_NOOP("MainWindow", "Enter search text...");
 }  // namespace
 
 /**
@@ -54,14 +56,30 @@ MainWindow::MainWindow(QWidget* parent): QMainWindow(parent), ui(new Ui::MainWin
     // Initialize controller with a default log format string
     m_controller = new LogViewerController("{timestamp} {level} {message} {app_name}", this);
 
+    ui->lineEditSearch->setPlaceholderText(tr(k_search_placeholder_text));
+
     // Set up the model/view for the log table
     ui->tableViewLog->setModel(m_controller->get_proxy_model());
     ui->tableViewLog->setSelectionBehavior(QAbstractItemView::SelectRows);
     ui->tableViewLog->setSelectionMode(QAbstractItemView::SingleSelection);
-    ui->tableViewLog->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+    auto* header = ui->tableViewLog->horizontalHeader();
+    int column_count = ui->tableViewLog->model()->columnCount();
+    for (int i = 0; i < column_count; ++i)
+    {
+        if (i == (column_count - 1))
+        {
+            header->setSectionResizeMode(i, QHeaderView::Stretch);
+        }
+        else
+        {
+            header->setSectionResizeMode(i, QHeaderView::Interactive);
+        }
+    }
 
     // Populate search area combo box
     ui->comboBoxSearchArea->addItems(QStringList() << "Message" << "Level" << "AppName");
+
+    ui->comboBoxApp->setFixedWidth(140);
 
     // Create and set up the dock widget for log details
     m_log_details_dock_widget = new QDockWidget(tr("Log Details"), this);
@@ -83,6 +101,8 @@ MainWindow::MainWindow(QWidget* parent): QMainWindow(parent), ui(new Ui::MainWin
     connect(ui->checkBoxError, &QCheckBox::toggled, this, &MainWindow::update_level_filter);
     connect(ui->checkBoxFatal, &QCheckBox::toggled, this, &MainWindow::update_level_filter);
 
+    connect(ui->lineEditSearch, &QLineEdit::textChanged,
+            [=] { style()->polish(ui->lineEditSearch); });
     connect(ui->lineEditSearch, &QLineEdit::textChanged, this, &MainWindow::update_search_filter);
     connect(ui->comboBoxSearchArea, &QComboBox::currentTextChanged, this,
             &MainWindow::update_search_filter);
@@ -91,6 +111,8 @@ MainWindow::MainWindow(QWidget* parent): QMainWindow(parent), ui(new Ui::MainWin
     // Connect table selection to log details view
     connect(ui->tableViewLog->selectionModel(), &QItemSelectionModel::currentRowChanged, this,
             &MainWindow::update_log_details);
+
+    QTimer::singleShot(0, this, [this] { this->resizeEvent(nullptr); });
 }
 
 /**
@@ -111,25 +133,7 @@ void MainWindow::open_log_files()
 {
     QStringList files = QFileDialog::getOpenFileNames(this, tr(k_open_log_files_text), QString(),
                                                       tr("Log Files (*.log *.txt);;All Files (*)"));
-
-    if (!files.isEmpty())
-    {
-        QVector<QString> file_paths = files.toVector();
-        QSet<QString> app_names;
-        m_controller->load_logs(file_paths);
-
-        for (const LogEntry& entry: m_controller->get_log_model()->get_entries())
-        {
-            app_names.insert(entry.get_app_name());
-        }
-
-        update_app_combo_box(app_names);
-        statusBar()->showMessage(tr(k_loaded_log_files_status).arg(files.size()), 3000);
-    }
-    else
-    {
-        update_app_combo_box({});
-    }
+    load_files_and_update_ui(files);
 }
 
 /**
@@ -266,6 +270,32 @@ auto MainWindow::update_app_combo_box(const QSet<QString>& app_names) -> void
 }
 
 /**
+ * @brief Loads log files and updates the UI.
+ * @param files The list of log file paths to load.
+ *
+ * This method loads the specified log files into the controller, extracts unique application names
+ * from the loaded logs, updates the application combo box, and shows a status message indicating
+ * how many files were loaded.
+ */
+auto MainWindow::load_files_and_update_ui(const QStringList& files) -> void
+{
+    if (!files.isEmpty())
+    {
+        QVector<QString> file_paths = files.toVector();
+        QSet<QString> app_names;
+        m_controller->load_logs(file_paths);
+
+        for (const LogEntry& entry: m_controller->get_log_model()->get_entries())
+        {
+            app_names.insert(entry.get_app_name());
+        }
+
+        update_app_combo_box(app_names);
+        statusBar()->showMessage(tr(k_loaded_log_files_status).arg(files.size()), 3000);
+    }
+}
+
+/**
  * @brief Handles drag enter events to allow dropping log files.
  * @param event The drag enter event.
  */
@@ -290,18 +320,33 @@ void MainWindow::dropEvent(QDropEvent* event)
         files << url.toLocalFile();
     }
 
-    if (!files.isEmpty())
+    load_files_and_update_ui(files);
+}
+
+/**
+ * @brief Resizes the table columns based on the window size.
+ *
+ * This method adjusts the column widths of the log table view when the window is resized.
+ * It calculates the widths based on a percentage of the total width of the viewport.
+ *
+ * @param event The resize event containing the new size of the window.
+ */
+void MainWindow::resizeEvent(QResizeEvent* event)
+{
+    QMainWindow::resizeEvent(event);
+    bool valid_model = ui->tableViewLog->model() && ui->tableViewLog->model()->columnCount() >= 4;
+
+    if (valid_model)
     {
-        QVector<QString> file_paths = files.toVector();
-        QSet<QString> app_names;
-        m_controller->load_logs(file_paths);
+        int total_width = ui->tableViewLog->viewport()->width();
+        int col_0_width = static_cast<int>(total_width * 0.15);
+        int col_1_width = static_cast<int>(total_width * 0.10);
+        int col_2_width = static_cast<int>(total_width * 0.50);
+        int col_3_width = static_cast<int>(total_width * 0.15);
 
-        for (const LogEntry& entry: m_controller->get_log_model()->get_entries())
-        {
-            app_names.insert(entry.get_app_name());
-        }
-
-        update_app_combo_box(app_names);
-        statusBar()->showMessage(tr(k_loaded_log_files_status).arg(files.size()), 3000);
+        ui->tableViewLog->setColumnWidth(LogModel::Timestamp, col_0_width);
+        ui->tableViewLog->setColumnWidth(LogModel::Level, col_1_width);
+        ui->tableViewLog->setColumnWidth(LogModel::Message, col_2_width);
+        ui->tableViewLog->setColumnWidth(LogModel::AppName, col_3_width);
     }
 }

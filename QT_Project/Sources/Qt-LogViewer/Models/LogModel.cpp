@@ -112,6 +112,8 @@ auto LogModel::data(const QModelIndex& index, int role) const -> QVariant
             return entry.get_message();
         case AppName:
             return entry.get_app_name();
+        case Spacer:
+            return QVariant();
         default:
             return QVariant();
         }
@@ -159,6 +161,8 @@ auto LogModel::headerData(int section, Qt::Orientation orientation, int role) co
         return QStringLiteral("Message");
     case AppName:
         return QStringLiteral("App Name");
+    case Spacer:
+        return QVariant();
     default:
         return QVariant();
     }

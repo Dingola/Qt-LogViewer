@@ -35,6 +35,9 @@ QLineEdit:disabled {
     background-color: #1a1f24;
     color: #777777;
 }
+QLineEdit[text=""] { 
+	color: #cccccc;
+}
 
 /* === ComboBox === */
 QComboBox {
@@ -189,6 +192,17 @@ QTableView {
     border-radius: 8px;
     selection-background-color: #1d3d5a;
     selection-color: white;
+	outline:none;
+}
+QTableView::item {
+	border: 0px;
+    padding: 8px;
+}
+QTableView::item:selected:focus { 
+	background: #1d3d5a; /* background color for the selected cell when focused */
+}
+QTableView::item:!selected:focus { 
+	background: transparent;
 }
 QHeaderView::section {
     background-color: #283035;

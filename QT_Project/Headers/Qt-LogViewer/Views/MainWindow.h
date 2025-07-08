@@ -76,6 +76,12 @@ class MainWindow: public QMainWindow
         auto update_app_combo_box(const QSet<QString>& app_names) -> void;
 
         /**
+         * @brief Loads log files and updates the UI.
+         * @param files The list of log file paths to load.
+         */
+        auto load_files_and_update_ui(const QStringList& files) -> void;
+
+        /**
          * @brief Handles drag enter events to allow dropping log files.
          * @param event The drag enter event.
          */
@@ -86,6 +92,12 @@ class MainWindow: public QMainWindow
          * @param event The drop event.
          */
         void dropEvent(QDropEvent* event) override;
+
+        /**
+         * @brief Handles resize events to adjust the layout.
+         * @param event The resize event.
+         */
+        void resizeEvent(QResizeEvent* event) override;
 
     private:
         /**

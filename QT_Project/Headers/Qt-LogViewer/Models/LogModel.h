@@ -19,6 +19,7 @@ class LogModel: public QAbstractTableModel
             Level,
             Message,
             AppName,
+            Spacer,
             ColumnCount
         };
 
