@@ -37,6 +37,8 @@ constexpr auto k_search_placeholder_text = QT_TRANSLATE_NOOP("MainWindow", "Ente
  */
 MainWindow::MainWindow(QWidget* parent): QMainWindow(parent), ui(new Ui::MainWindow)
 {
+    qDebug() << "MainWindow constructor started";
+
     // Initialize the user interface
     ui->setupUi(this);
 
@@ -46,6 +48,7 @@ MainWindow::MainWindow(QWidget* parent): QMainWindow(parent), ui(new Ui::MainWin
     {
         QString style_sheet = QString::fromUtf8(style_file.readAll());
         qApp->setStyleSheet(style_sheet);
+        qDebug() << "Loaded stylesheet from resource";
     }
 
     // Init combo box for app names
@@ -113,6 +116,7 @@ MainWindow::MainWindow(QWidget* parent): QMainWindow(parent), ui(new Ui::MainWin
             &MainWindow::update_log_details);
 
     QTimer::singleShot(0, this, [this] { this->resizeEvent(nullptr); });
+    qDebug() << "MainWindow constructor finished";
 }
 
 /**
@@ -122,6 +126,7 @@ MainWindow::MainWindow(QWidget* parent): QMainWindow(parent), ui(new Ui::MainWin
  */
 MainWindow::~MainWindow()
 {
+    qDebug() << "MainWindow destructor called";
     delete m_controller;
     delete ui;
 }
@@ -131,8 +136,10 @@ MainWindow::~MainWindow()
  */
 void MainWindow::open_log_files()
 {
+    qDebug() << "Opening log file dialog";
     QStringList files = QFileDialog::getOpenFileNames(this, tr(k_open_log_files_text), QString(),
                                                       tr("Log Files (*.log *.txt);;All Files (*)"));
+    qDebug() << "Files selected:" << files;
     load_files_and_update_ui(files);
 }
 
@@ -202,6 +209,7 @@ auto MainWindow::update_level_filter() -> void
         levels.insert("FATAL");
     }
 
+    qDebug() << "Level filter set to:" << levels;
     m_controller->set_level_filter(levels);
 }
 
@@ -213,6 +221,7 @@ auto MainWindow::update_search_filter() -> void
     QString search_text = ui->lineEditSearch->text();
     QString field = ui->comboBoxSearchArea->currentText();
     bool use_regex = ui->checkBoxRegEx->isChecked();
+    qDebug() << "Search filter:" << search_text << "Field:" << field << "Regex:" << use_regex;
     m_controller->set_search_filter(search_text, field, use_regex);
 }
 
@@ -238,6 +247,7 @@ auto MainWindow::update_log_details(const QModelIndex& current) -> void
     }
 
     m_log_details_text_edit->setPlainText(details);
+    qDebug() << "Log details updated for row:" << current.row();
 }
 
 /**
@@ -267,6 +277,7 @@ auto MainWindow::update_app_combo_box(const QSet<QString>& app_names) -> void
     ui->comboBoxApp->setCurrentIndex(0);
     ui->comboBoxApp->setEnabled(!app_names.isEmpty());
     ui->comboBoxApp->blockSignals(false);
+    qDebug() << "App combo box updated with" << app_names.size() << "apps.";
 }
 
 /**
@@ -279,6 +290,8 @@ auto MainWindow::update_app_combo_box(const QSet<QString>& app_names) -> void
  */
 auto MainWindow::load_files_and_update_ui(const QStringList& files) -> void
 {
+    qDebug() << "Requested to load files:" << files;
+
     if (!files.isEmpty())
     {
         QVector<QString> file_paths = files.toVector();
@@ -290,8 +303,13 @@ auto MainWindow::load_files_and_update_ui(const QStringList& files) -> void
             app_names.insert(entry.get_app_name());
         }
 
+        qDebug() << "Loaded" << app_names.size() << "apps from" << files.size() << "files.";
         update_app_combo_box(app_names);
         statusBar()->showMessage(tr(k_loaded_log_files_status).arg(files.size()), 3000);
+    }
+    else
+    {
+        qWarning() << "No files provided to load_files_and_update_ui.";
     }
 }
 
@@ -301,6 +319,8 @@ auto MainWindow::load_files_and_update_ui(const QStringList& files) -> void
  */
 void MainWindow::dragEnterEvent(QDragEnterEvent* event)
 {
+    qDebug() << "Drag enter event with URLs:" << event->mimeData()->urls();
+
     if (event->mimeData()->hasUrls())
     {
         event->acceptProposedAction();
@@ -320,6 +340,7 @@ void MainWindow::dropEvent(QDropEvent* event)
         files << url.toLocalFile();
     }
 
+    qDebug() << "Files dropped:" << files;
     load_files_and_update_ui(files);
 }
 
@@ -348,5 +369,13 @@ void MainWindow::resizeEvent(QResizeEvent* event)
         ui->tableViewLog->setColumnWidth(LogModel::Level, col_1_width);
         ui->tableViewLog->setColumnWidth(LogModel::Message, col_2_width);
         ui->tableViewLog->setColumnWidth(LogModel::AppName, col_3_width);
+#ifdef QT_DEBUG_VERBOSE
+        qDebug() << "Resizing columns to widths:" << col_0_width << col_1_width << col_2_width
+                 << col_3_width;
+#endif
+    }
+    else
+    {
+        qWarning() << "Table model invalid or has too few columns!";
     }
 }
