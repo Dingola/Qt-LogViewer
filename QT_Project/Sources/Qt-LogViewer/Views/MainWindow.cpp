@@ -13,6 +13,8 @@
 #include <QTimer>
 #include <QUrl>
 
+#include "Qt-LogViewer/Views/HoverRowDelegate.h"
+#include "Qt-LogViewer/Views/TableView.h"
 #include "ui_MainWindow.h"
 
 namespace
@@ -50,6 +52,23 @@ MainWindow::MainWindow(QWidget* parent): QMainWindow(parent), ui(new Ui::MainWin
         qApp->setStyleSheet(style_sheet);
         qDebug() << "Loaded stylesheet from resource";
     }
+    else
+    {
+        qWarning() << "Failed to load stylesheet from resource:" << style_file.errorString();
+    }
+
+    auto hover_delegate = new HoverRowDelegate(ui->tableViewLog);
+    ui->tableViewLog->setItemDelegate(hover_delegate);
+    ui->tableViewLog->setMouseTracking(true);
+
+    connect(ui->tableViewLog, &TableView::hover_index_changed, hover_delegate,
+            [hover_delegate](const QModelIndex& index) {
+                hover_delegate->set_hovered_row(index.isValid() ? index.row() : -1);
+                if (auto* view = qobject_cast<QAbstractItemView*>(hover_delegate->parent()))
+                {
+                    view->viewport()->update();
+                }
+            });
 
     // Init combo box for app names
     update_app_combo_box({});

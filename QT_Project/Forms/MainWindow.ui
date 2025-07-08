@@ -165,7 +165,7 @@
      </widget>
     </item>
     <item>
-     <widget class="QTableView" name="tableViewLog"/>
+     <widget class="TableView" name="tableViewLog"/>
     </item>
    </layout>
   </widget>
@@ -181,6 +181,13 @@
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>TableView</class>
+   <extends>QTableView</extends>
+   <header>Qt-LogViewer/Views/TableView.h</header>
+  </customwidget>
+ </customwidgets>
  <tabstops>
   <tabstop>checkBoxTrace</tabstop>
   <tabstop>checkBoxDebug</tabstop>

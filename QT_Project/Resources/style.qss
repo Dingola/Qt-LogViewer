@@ -193,6 +193,7 @@ QTableView {
     selection-background-color: #1d3d5a;
     selection-color: white;
 	outline:none;
+	qproperty-hover_row_color: #25384a;
 }
 QTableView::item {
 	border: 0px;
