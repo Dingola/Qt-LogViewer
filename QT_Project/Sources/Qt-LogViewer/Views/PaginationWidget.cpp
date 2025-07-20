@@ -264,7 +264,8 @@ auto PaginationWidget::clear_page_buttons_layout() -> void
     {
         if (auto* button = qobject_cast<QToolButton*>(child->widget()))
         {
-            button->deleteLater();
+            delete button;
+            button = nullptr;
         }
 
         delete child;
