@@ -1,6 +1,8 @@
 #pragma once
 
+#include <QHBoxLayout>
 #include <QWidget>
+#include <utility>
 
 namespace Ui
 {
@@ -67,18 +69,82 @@ class PaginationWidget: public QWidget
         /**
          * @brief Helper to create a single page button.
          */
-        [[nodiscard]] auto create_page_button(int page, bool enabled, bool checked) -> QToolButton*;
+        [[nodiscard]] auto create_page_button(int page, bool enabled,
+                                              bool checked) const -> QToolButton*;
+
+        /**
+         * @brief Updates the buttons and layout according to the current pagination state.
+         */
+        auto update_pagination() -> void;
 
         /**
          * @brief Updates the enabled/disabled state of controls.
          */
         auto update_controls_state() -> void;
 
-    protected:
         /**
-         * @brief Updates the buttons and layout according to the current pagination state.
+         * @brief Creates the "..." button for pagination.
+         * @return The created QToolButton.
          */
-        auto update_pagination() -> void;
+        [[nodiscard]] auto create_ellipsis_button() -> QToolButton*;
+
+        /**
+         * @brief Clears the page buttons layout.
+         * Deletes all buttons and layout items in the page buttons widget.
+         */
+        auto clear_page_buttons_layout() -> void;
+
+        /**
+         * @brief Adds a single page button for the case of only one page.
+         * @param layout The layout to add the button to.
+         */
+        auto add_single_page_button(QHBoxLayout* layout) -> void;
+
+        /**
+         * @brief Adds page buttons for the case where all pages fit without ellipsis.
+         * @param layout The layout to add the buttons to.
+         */
+        auto add_simple_page_buttons(QHBoxLayout* layout) -> void;
+
+        /**
+         * @brief Adds page buttons for the case of max_page_buttons == 3.
+         * @param layout The layout to add the buttons to.
+         */
+        auto add_three_page_buttons(QHBoxLayout* layout) -> void;
+
+        /**
+         * @brief Adds page buttons for the case of max_page_buttons == 4.
+         * @param layout The layout to add the buttons to.
+         */
+        auto add_four_page_buttons(QHBoxLayout* layout) -> void;
+
+        /**
+         * @brief Adds page buttons for the general case (max_page_buttons > 4).
+         * @param layout The layout to add the buttons to.
+         */
+        auto add_complex_page_buttons(QHBoxLayout* layout) -> void;
+
+        /**
+         * @brief Calculates the range of middle page buttons for complex pagination.
+         * @param total_pages The total number of pages.
+         * @param max_btns The maximum number of buttons to display.
+         * @param current_page The current page (1-based).
+         * @return A pair containing the start and end indices for the middle buttons.
+         */
+        [[nodiscard]] auto calculate_middle_range(int total_pages, int max_btns,
+                                                  int current_page) const -> std::pair<int, int>;
+
+        /**
+         * @brief Checks if the current page is the last page.
+         * @return true if current page is the last page, false otherwise.
+         */
+        [[nodiscard]] auto is_last_page() const -> bool;
+
+        /**
+         * @brief Creates the last page button.
+         * @return The created QToolButton for the last page.
+         */
+        [[nodiscard]] auto create_last_page_button() const -> QToolButton*;
 
     signals:
         /**
