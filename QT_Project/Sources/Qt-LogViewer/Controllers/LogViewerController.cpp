@@ -74,3 +74,19 @@ auto LogViewerController::get_proxy_model() -> LogFilterProxyModel*
 {
     return &m_proxy_model;
 }
+
+/**
+ * @brief Returns the set of unique application names from the loaded logs.
+ * @return A set of application names.
+ */
+auto LogViewerController::get_app_names() const -> QSet<QString>
+{
+    QSet<QString> app_names;
+
+    for (const LogEntry& entry: m_log_model.get_entries())
+    {
+        app_names.insert(entry.get_app_name());
+    }
+
+    return app_names;
+}

@@ -57,19 +57,6 @@ MainWindow::MainWindow(QWidget* parent): QMainWindow(parent), ui(new Ui::MainWin
         qWarning() << "Failed to load stylesheet from resource:" << style_file.errorString();
     }
 
-    auto hover_delegate = new HoverRowDelegate(ui->tableViewLog);
-    ui->tableViewLog->setItemDelegate(hover_delegate);
-    ui->tableViewLog->setMouseTracking(true);
-
-    connect(ui->tableViewLog, &TableView::hover_index_changed, hover_delegate,
-            [hover_delegate](const QModelIndex& index) {
-                hover_delegate->set_hovered_row(index.isValid() ? index.row() : -1);
-                if (auto* view = qobject_cast<QAbstractItemView*>(hover_delegate->parent()))
-                {
-                    view->viewport()->update();
-                }
-            });
-
     // Init combo box for app names
     update_app_combo_box({});
 
@@ -81,7 +68,8 @@ MainWindow::MainWindow(QWidget* parent): QMainWindow(parent), ui(new Ui::MainWin
     ui->lineEditSearch->setPlaceholderText(tr(k_search_placeholder_text));
 
     // Set up the model/view for the log table
-    ui->tableViewLog->setModel(m_controller->get_proxy_model());
+    auto log_filter_proxy_model = m_controller->get_proxy_model();
+    ui->tableViewLog->setModel(log_filter_proxy_model);
     ui->tableViewLog->setSelectionBehavior(QAbstractItemView::SelectRows);
     ui->tableViewLog->setSelectionMode(QAbstractItemView::SingleSelection);
     auto* header = ui->tableViewLog->horizontalHeader();
@@ -97,6 +85,33 @@ MainWindow::MainWindow(QWidget* parent): QMainWindow(parent), ui(new Ui::MainWin
             header->setSectionResizeMode(i, QHeaderView::Interactive);
         }
     }
+
+    auto hover_delegate = new HoverRowDelegate(ui->tableViewLog);
+    ui->tableViewLog->setItemDelegate(hover_delegate);
+    ui->tableViewLog->setMouseTracking(true);
+    connect(ui->tableViewLog, &TableView::hover_index_changed, hover_delegate,
+            [hover_delegate](const QModelIndex& index) {
+                hover_delegate->set_hovered_row(index.isValid() ? index.row() : -1);
+                if (auto* view = qobject_cast<QAbstractItemView*>(hover_delegate->parent()))
+                {
+                    view->viewport()->update();
+                }
+            });
+
+    ui->paginationWidget->set_max_page_buttons(7);
+    int items_per_page = 25;
+    log_filter_proxy_model->set_page_size(items_per_page);
+    log_filter_proxy_model->set_current_page(1);
+
+    connect(ui->paginationWidget, &PaginationWidget::page_changed, this,
+            [this](int page) { m_controller->get_proxy_model()->set_current_page(page); });
+    connect(ui->paginationWidget, &PaginationWidget::items_per_page_changed, this,
+            [this](int items_per_page) {
+                auto* proxy = m_controller->get_proxy_model();
+                proxy->set_page_size(items_per_page);
+                proxy->set_current_page(1);
+                update_pagination_widget();
+            });
 
     // Populate search area combo box
     ui->comboBoxSearchArea->addItems(QStringList() << "Message" << "Level" << "AppName");
@@ -114,6 +129,7 @@ MainWindow::MainWindow(QWidget* parent): QMainWindow(parent), ui(new Ui::MainWin
     connect(ui->comboBoxApp, &QComboBox::currentTextChanged, this, [this](const QString& app_name) {
         m_controller->set_app_name_filter(
             (app_name == tr(k_show_all_apps_text) ? QString() : app_name));
+        update_pagination_widget();
     });
 
     connect(ui->checkBoxTrace, &QCheckBox::toggled, this, &MainWindow::update_level_filter);
@@ -230,6 +246,7 @@ auto MainWindow::update_level_filter() -> void
 
     qDebug() << "Level filter set to:" << levels;
     m_controller->set_level_filter(levels);
+    update_pagination_widget();
 }
 
 /**
@@ -242,6 +259,7 @@ auto MainWindow::update_search_filter() -> void
     bool use_regex = ui->checkBoxRegEx->isChecked();
     qDebug() << "Search filter:" << search_text << "Field:" << field << "Regex:" << use_regex;
     m_controller->set_search_filter(search_text, field, use_regex);
+    update_pagination_widget();
 }
 
 /**
@@ -300,6 +318,34 @@ auto MainWindow::update_app_combo_box(const QSet<QString>& app_names) -> void
 }
 
 /**
+ * @brief Updates the pagination widget based on the current page and total pages.
+ *
+ * This method retrieves the current page and total pages from the proxy model,
+ * ensures they are within valid ranges, and updates the pagination widget accordingly.
+ */
+auto MainWindow::update_pagination_widget() -> void
+{
+    auto* proxy = m_controller->get_proxy_model();
+    int total_pages = proxy->get_total_pages();
+    int current_page = proxy->get_current_page();
+
+    if (total_pages < 1)
+    {
+        total_pages = 1;
+    }
+    if (current_page < 1)
+    {
+        current_page = 1;
+    }
+    if (current_page > total_pages)
+    {
+        current_page = total_pages;
+    }
+
+    ui->paginationWidget->set_pagination(current_page, total_pages);
+}
+
+/**
  * @brief Loads log files and updates the UI.
  * @param files The list of log file paths to load.
  *
@@ -314,16 +360,13 @@ auto MainWindow::load_files_and_update_ui(const QStringList& files) -> void
     if (!files.isEmpty())
     {
         QVector<QString> file_paths = files.toVector();
-        QSet<QString> app_names;
         m_controller->load_logs(file_paths);
-
-        for (const LogEntry& entry: m_controller->get_log_model()->get_entries())
-        {
-            app_names.insert(entry.get_app_name());
-        }
+        QSet<QString> app_names = m_controller->get_app_names();
+        update_app_combo_box(app_names);
 
         qDebug() << "Loaded" << app_names.size() << "apps from" << files.size() << "files.";
         update_app_combo_box(app_names);
+        update_pagination_widget();
         statusBar()->showMessage(tr(k_loaded_log_files_status).arg(files.size()), 3000);
     }
     else

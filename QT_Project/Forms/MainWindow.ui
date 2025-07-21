@@ -167,6 +167,9 @@
     <item>
      <widget class="TableView" name="tableViewLog"/>
     </item>
+    <item>
+     <widget class="PaginationWidget" name="paginationWidget" native="true"/>
+    </item>
    </layout>
   </widget>
   <widget class="QMenuBar" name="menubar">
@@ -186,6 +189,12 @@
    <class>TableView</class>
    <extends>QTableView</extends>
    <header>Qt-LogViewer/Views/TableView.h</header>
+  </customwidget>
+  <customwidget>
+   <class>PaginationWidget</class>
+   <extends>QWidget</extends>
+   <header>Qt-LogViewer/Views/PaginationWidget.h</header>
+   <container>1</container>
   </customwidget>
  </customwidgets>
  <tabstops>

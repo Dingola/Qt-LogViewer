@@ -76,6 +76,14 @@ class MainWindow: public QMainWindow
         auto update_app_combo_box(const QSet<QString>& app_names) -> void;
 
         /**
+         * @brief Updates the pagination widget based on the current page and total pages.
+         *
+         * This method retrieves the current page and total pages from the proxy model,
+         * ensures they are within valid ranges, and updates the pagination widget accordingly.
+         */
+        auto update_pagination_widget() -> void;
+
+        /**
          * @brief Loads log files and updates the UI.
          * @param files The list of log file paths to load.
          */

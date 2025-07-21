@@ -62,6 +62,12 @@ class LogViewerController: public QObject
          */
         [[nodiscard]] auto get_proxy_model() -> LogFilterProxyModel*;
 
+        /**
+         * @brief Returns the set of unique application names from the loaded logs.
+         * @return A set of application names.
+         */
+        [[nodiscard]] auto get_app_names() const -> QSet<QString>;
+
     private:
         LogModel m_log_model;
         LogFilterProxyModel m_proxy_model;
