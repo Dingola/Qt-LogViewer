@@ -286,7 +286,13 @@ auto LogFilterProxyModel::row_passes_filter(int row, const QModelIndex& parent) 
     {
         QString value;
 
-        if (m_search_field.compare("Message", Qt::CaseInsensitive) == 0)
+        if (m_search_field.compare("All Fields", Qt::CaseInsensitive) == 0)
+        {
+            value = sourceModel()->data(index_message, Qt::DisplayRole).toString() + " " +
+                    sourceModel()->data(index_level, Qt::DisplayRole).toString() + " " +
+                    sourceModel()->data(index_app, Qt::DisplayRole).toString();
+        }
+        else if (m_search_field.compare("Message", Qt::CaseInsensitive) == 0)
         {
             value = sourceModel()->data(index_message, Qt::DisplayRole).toString();
         }

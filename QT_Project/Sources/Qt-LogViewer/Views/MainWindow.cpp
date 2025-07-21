@@ -114,7 +114,8 @@ MainWindow::MainWindow(QWidget* parent): QMainWindow(parent), ui(new Ui::MainWin
             });
 
     // Populate search area combo box
-    ui->comboBoxSearchArea->addItems(QStringList() << "Message" << "Level" << "AppName");
+    ui->comboBoxSearchArea->addItems(QStringList()
+                                     << "All Fields" << "Message" << "Level" << "AppName");
 
     ui->comboBoxApp->setFixedWidth(140);
 
