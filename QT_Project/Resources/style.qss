@@ -39,6 +39,14 @@ QLineEdit[text=""] {
 	color: #cccccc;
 }
 
+QLineEdit#lineEditJumpTo {
+    border-radius: 10px;
+    min-height: 26px;
+    max-height: 26px;
+    min-width: 40px;
+    max-width: 40px;
+}
+
 /* === ComboBox === */
 QComboBox {
     background-color: #283035;
@@ -163,6 +171,12 @@ QCheckBox::indicator:disabled {
     border-color: #b71c1c;
 }
 
+/* === PaginationWidget CheckBoxes === */
+#comboBoxItemsPerPage {
+    min-height: 26px;
+    max-height: 26px;
+}
+
 /* === PushButton === */
 QPushButton {
     background-color: #2e5a7a;
@@ -180,6 +194,40 @@ QPushButton:pressed {
 QPushButton:disabled {
     background-color: #1a2f40;
     color: #777777;
+}
+
+/* === ToolButton (Pagination) === */
+QToolButton {
+    background-color: #283035;
+    border: 2px solid #252e35;
+    border-radius: 10px;
+    color: #ffffff;
+    min-width: 32px;
+    min-height: 32px;
+    max-width: 32px;
+    max-height: 32px;
+    padding: 0;
+}
+QToolButton:hover {
+    border: 2px solid #42a5f5;
+    background-color: #3e6c8d;
+}
+QToolButton:disabled {
+    background-color: #1a1f24;
+    color: #777777;
+    border: 2px solid #444444;
+}
+
+/* Active (current) page button */
+QToolButton[isCurrentPage="true"] {
+    background-color: #2e5a7a;
+    border: 2px solid #42a5f5;
+    color: #fff;
+    font-weight: bold;
+}
+QToolButton[isCurrentPage="true"]:hover {
+    background-color: #3e6c8d;
+    border: 2px solid #42a5f5;
 }
 
 /* === TableView === */
