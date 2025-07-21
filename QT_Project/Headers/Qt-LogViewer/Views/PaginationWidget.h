@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QHBoxLayout>
+#include <QToolButton>
 #include <QWidget>
 #include <utility>
 
