@@ -5,6 +5,7 @@
 #include <QIntValidator>
 #include <QLabel>
 #include <QLineEdit>
+#include <QStyleOption>
 #include <QToolButton>
 
 #include "ui_PaginationWidget.h"
@@ -486,6 +487,20 @@ auto PaginationWidget::is_last_page() const -> bool
 auto PaginationWidget::create_last_page_button() const -> QToolButton*
 {
     return create_page_button(m_total_pages, !is_last_page(), is_last_page());
+}
+
+/**
+ * @brief Handles the paint event to enable QSS background and border styling.
+ *        This ensures that custom QSS (e.g. background-color) is rendered.
+ * @param event The paint event.
+ */
+void PaginationWidget::paintEvent(QPaintEvent* event)
+{
+    QStyleOption opt;
+    opt.initFrom(this);
+    QPainter p(this);
+    style()->drawPrimitive(QStyle::PE_Widget, &opt, &p, this);
+    QWidget::paintEvent(event);
 }
 
 /**

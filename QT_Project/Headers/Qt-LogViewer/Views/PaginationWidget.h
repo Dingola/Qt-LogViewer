@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QHBoxLayout>
+#include <QPainter>
 #include <QToolButton>
 #include <QWidget>
 #include <utility>
@@ -146,6 +147,12 @@ class PaginationWidget: public QWidget
          * @return The created QToolButton for the last page.
          */
         [[nodiscard]] auto create_last_page_button() const -> QToolButton*;
+
+        /**
+         * @brief Handles the paint event to enable QSS background and border styling.
+         * @param event The paint event.
+         */
+        void paintEvent(QPaintEvent* event) override;
 
     signals:
         /**

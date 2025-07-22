@@ -7,6 +7,7 @@
 #include <QPlainTextEdit>
 
 #include "Qt-LogViewer/Controllers/LogViewerController.h"
+#include "Qt-LogViewer/Services/StylesheetLoader.h"
 
 namespace Ui
 {
@@ -132,4 +133,10 @@ class MainWindow: public QMainWindow
          * @brief Text edit widget for showing detailed log information.
          */
         QPlainTextEdit* m_log_details_text_edit = nullptr;
+
+        /**
+         * @brief Loader for application stylesheets, allowing dynamic loading and variable
+         * substitution.
+         */
+        StylesheetLoader* m_stylesheet_loader;
 };

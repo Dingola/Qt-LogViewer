@@ -7,16 +7,19 @@
     <x>0</x>
     <y>0</y>
     <width>624</width>
-    <height>353</height>
+    <height>371</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>MainWindow</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <layout class="QVBoxLayout" name="verticalLayout">
+   <layout class="QVBoxLayout" name="verticalLayout_2">
+    <property name="spacing">
+     <number>12</number>
+    </property>
     <item>
-     <widget class="QWidget" name="FilterBar" native="true">
+     <widget class="QWidget" name="filterBar" native="true">
       <property name="layoutDirection">
        <enum>Qt::LeftToRight</enum>
       </property>
@@ -82,7 +85,7 @@
        <item row="0" column="4">
         <layout class="QHBoxLayout" name="horizontalLayoutLogLevels" stretch="0,0,0,0,0,0,0,0">
          <property name="spacing">
-          <number>12</number>
+          <number>10</number>
          </property>
          <property name="sizeConstraint">
           <enum>QLayout::SetDefaultConstraint</enum>
@@ -165,10 +168,24 @@
      </widget>
     </item>
     <item>
-     <widget class="TableView" name="tableViewLog"/>
-    </item>
-    <item>
-     <widget class="PaginationWidget" name="paginationWidget" native="true"/>
+     <layout class="QVBoxLayout" name="verticalLayoutViewLog">
+      <property name="spacing">
+       <number>0</number>
+      </property>
+      <item>
+       <widget class="TableView" name="tableViewLog"/>
+      </item>
+      <item>
+       <widget class="PaginationWidget" name="paginationWidget" native="true">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Minimum" vsizetype="Minimum">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+       </widget>
+      </item>
+     </layout>
     </item>
    </layout>
   </widget>

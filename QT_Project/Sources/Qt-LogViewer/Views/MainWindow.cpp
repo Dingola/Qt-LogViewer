@@ -37,25 +37,13 @@ constexpr auto k_search_placeholder_text = QT_TRANSLATE_NOOP("MainWindow", "Ente
  *
  * @param parent The parent widget, or nullptr if this is a top-level window.
  */
-MainWindow::MainWindow(QWidget* parent): QMainWindow(parent), ui(new Ui::MainWindow)
+MainWindow::MainWindow(QWidget* parent)
+    : QMainWindow(parent), m_stylesheet_loader(new StylesheetLoader(this)), ui(new Ui::MainWindow)
 {
     qDebug() << "MainWindow constructor started";
 
     // Initialize the user interface
     ui->setupUi(this);
-
-    // Load and apply application stylesheet from Qt resource
-    QFile style_file(":/Resources/style.qss");
-    if (style_file.open(QFile::ReadOnly | QFile::Text))
-    {
-        QString style_sheet = QString::fromUtf8(style_file.readAll());
-        qApp->setStyleSheet(style_sheet);
-        qDebug() << "Loaded stylesheet from resource";
-    }
-    else
-    {
-        qWarning() << "Failed to load stylesheet from resource:" << style_file.errorString();
-    }
 
     // Init combo box for app names
     update_app_combo_box({});
@@ -122,8 +110,15 @@ MainWindow::MainWindow(QWidget* parent): QMainWindow(parent), ui(new Ui::MainWin
     // Create and set up the dock widget for log details
     m_log_details_dock_widget = new QDockWidget(tr("Log Details"), this);
     m_log_details_text_edit = new QPlainTextEdit(m_log_details_dock_widget);
+    m_log_details_text_edit->setObjectName("logDetailsTextEdit");
     m_log_details_text_edit->setReadOnly(true);
-    m_log_details_dock_widget->setWidget(m_log_details_text_edit);
+    auto* container = new QWidget(m_log_details_dock_widget);
+    auto* layout = new QVBoxLayout(container);
+    layout->setContentsMargins(8, 0, 8, 8);
+    layout->addWidget(m_log_details_text_edit);
+    container->setLayout(layout);
+    m_log_details_dock_widget->setWidget(container);
+
     addDockWidget(Qt::BottomDockWidgetArea, m_log_details_dock_widget);
 
     // Connect filter controls to controller
@@ -150,6 +145,9 @@ MainWindow::MainWindow(QWidget* parent): QMainWindow(parent), ui(new Ui::MainWin
     // Connect table selection to log details view
     connect(ui->tableViewLog->selectionModel(), &QItemSelectionModel::currentRowChanged, this,
             &MainWindow::update_log_details);
+
+    // Load and apply application stylesheet from Qt resource
+    m_stylesheet_loader->load_stylesheet(":/Resources/style.qss", "Dark");
 
     QTimer::singleShot(0, this, [this] { this->resizeEvent(nullptr); });
     qDebug() << "MainWindow constructor finished";
