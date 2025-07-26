@@ -65,6 +65,31 @@ class StylesheetLoader: public QObject
          */
         auto apply_stylesheet(const QString& stylesheet) -> void;
 
+        /**
+         * @brief Extracts the @Variables block for a given theme name, or the default block if not
+         * found.
+         * @param stylesheet The full QSS stylesheet.
+         * @param theme_name The theme name to look for.
+         * @return The content of the variables block, or an empty string if not found.
+         */
+        static auto extract_variables_block(const QString& stylesheet,
+                                            const QString& theme_name) -> QString;
+
+        /**
+         * @brief Parses variables from a variables block and fills the variables map.
+         * @param variables_block The content of the variables block.
+         * @param variables The map to fill with variable name/value pairs.
+         */
+        static void parse_variables_block(const QString& variables_block,
+                                          QMap<QString, QString>& variables);
+
+        /**
+         * @brief Removes all @Variables blocks from the given stylesheet string.
+         * @param stylesheet The stylesheet string to process.
+         * @return The stylesheet with all @Variables blocks removed.
+         */
+        static auto remove_variables_blocks(const QString& stylesheet) -> QString;
+
     private:
         QMap<QString, QString> m_variables;
         QString m_raw_stylesheet;

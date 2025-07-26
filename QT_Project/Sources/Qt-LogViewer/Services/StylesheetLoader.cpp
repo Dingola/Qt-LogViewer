@@ -29,54 +29,16 @@ auto StylesheetLoader::load_stylesheet(const QString& file_path, const QString& 
         m_variables.clear();
 
         // 1. Extract the correct @Variables block (by theme name or default)
-        QString variables_block;
-        QRegularExpression block_regex;
-
-        if (!theme_name.isEmpty())
-        {
-            // Look for a named theme block (non-greedy, multiline)
-            block_regex = QRegularExpression(QString(R"(@Variables\[Name="%1"\]\s*\{([\s\S]*?)\})")
-                                                 .arg(QRegularExpression::escape(theme_name)),
-                                             QRegularExpression::DotMatchesEverythingOption);
-            QRegularExpressionMatch match = block_regex.match(m_raw_stylesheet);
-
-            if (match.hasMatch())
-            {
-                variables_block = match.captured(1);
-            }
-        }
-        if (variables_block.isEmpty())
-        {
-            // Fallback: default block without a name
-            block_regex = QRegularExpression(R"(@Variables\s*\{([\s\S]*?)\})",
-                                             QRegularExpression::DotMatchesEverythingOption);
-            QRegularExpressionMatch match = block_regex.match(m_raw_stylesheet);
-            if (match.hasMatch())
-            {
-                variables_block = match.captured(1);
-            }
-        }
+        QString variables_block = extract_variables_block(m_raw_stylesheet, theme_name);
 
         // 2. Parse variables from the selected block
         if (!variables_block.isEmpty())
         {
-            QRegularExpression var_regex(R"(@([A-Za-z0-9_]+)\s*:\s*([^;]+);)");
-            QRegularExpressionMatchIterator match_iterator = var_regex.globalMatch(variables_block);
-
-            while (match_iterator.hasNext())
-            {
-                QRegularExpressionMatch match = match_iterator.next();
-                QString name = match.captured(1);
-                QString value = match.captured(2).trimmed();
-                m_variables[name] = value;
-            }
+            parse_variables_block(variables_block, m_variables);
         }
 
         // 3. Remove all @Variables blocks from the stylesheet (non-greedy, multiline)
-        QRegularExpression remove_blocks(R"(@Variables(\[Name="[^"]*"\])?\s*\{[\s\S]*?\})",
-                                         QRegularExpression::DotMatchesEverythingOption);
-        QString stylesheet = m_raw_stylesheet;
-        stylesheet.replace(remove_blocks, "");
+        QString stylesheet = remove_variables_blocks(m_raw_stylesheet);
 
         // 4. Substitute variables and apply the stylesheet
         QString final_stylesheet = substitute_variables(stylesheet);
@@ -108,7 +70,8 @@ auto StylesheetLoader::load_stylesheet(const QString& file_path, const QString& 
  */
 auto StylesheetLoader::get_current_stylesheet() const -> QString
 {
-    return substitute_variables(m_raw_stylesheet);
+    QString stylesheet = remove_variables_blocks(m_raw_stylesheet);
+    return substitute_variables(stylesheet);
 }
 
 /**
@@ -119,8 +82,7 @@ auto StylesheetLoader::get_current_stylesheet() const -> QString
 auto StylesheetLoader::set_variable(const QString& name, const QString& value) -> void
 {
     m_variables[name] = value;
-    QString stylesheet = m_raw_stylesheet;
-    QString final_stylesheet = substitute_variables(stylesheet);
+    QString final_stylesheet = get_current_stylesheet();
     apply_stylesheet(final_stylesheet);
 }
 
@@ -178,4 +140,78 @@ auto StylesheetLoader::substitute_variables(const QString& stylesheet) const -> 
 auto StylesheetLoader::apply_stylesheet(const QString& stylesheet) -> void
 {
     qApp->setStyleSheet(stylesheet);
+}
+
+/**
+ * @brief Extracts the @Variables block for a given theme name, or the default block if not found.
+ * @param stylesheet The full QSS stylesheet.
+ * @param theme_name The theme name to look for.
+ * @return The content of the variables block, or an empty string if not found.
+ */
+auto StylesheetLoader::extract_variables_block(const QString& stylesheet,
+                                               const QString& theme_name) -> QString
+{
+    QString result;
+    QRegularExpression block_regex;
+
+    if (!theme_name.isEmpty())
+    {
+        block_regex = QRegularExpression(QString(R"(@Variables\[Name="%1"\]\s*\{([\s\S]*?)\})")
+                                             .arg(QRegularExpression::escape(theme_name)),
+                                         QRegularExpression::DotMatchesEverythingOption);
+        QRegularExpressionMatch match = block_regex.match(stylesheet);
+
+        if (match.hasMatch())
+        {
+            result = match.captured(1);
+        }
+    }
+
+    if (result.isEmpty())
+    {
+        block_regex = QRegularExpression(R"(@Variables\s*\{([\s\S]*?)\})",
+                                         QRegularExpression::DotMatchesEverythingOption);
+        QRegularExpressionMatch match = block_regex.match(stylesheet);
+
+        if (match.hasMatch())
+        {
+            result = match.captured(1);
+        }
+    }
+
+    return result;
+}
+
+/**
+ * @brief Parses variables from a variables block and fills the variables map.
+ * @param variables_block The content of the variables block.
+ * @param variables The map to fill with variable name/value pairs.
+ */
+void StylesheetLoader::parse_variables_block(const QString& variables_block,
+                                             QMap<QString, QString>& variables)
+{
+    QRegularExpression var_regex(R"(@([A-Za-z0-9_]+)\s*:\s*([^;]+);)");
+    QRegularExpressionMatchIterator match_iterator = var_regex.globalMatch(variables_block);
+
+    while (match_iterator.hasNext())
+    {
+        QRegularExpressionMatch match = match_iterator.next();
+        QString name = match.captured(1);
+        QString value = match.captured(2).trimmed();
+        variables[name] = value;
+    }
+}
+
+/**
+ * @brief Removes all @Variables blocks from the given stylesheet string.
+ * @param stylesheet The stylesheet string to process.
+ * @return The stylesheet with all @Variables blocks removed.
+ */
+auto StylesheetLoader::remove_variables_blocks(const QString& stylesheet) -> QString
+{
+    QString result = stylesheet;
+    QRegularExpression remove_blocks(R"(@Variables(\[Name="[^"]*"\])?\s*\{[\s\S]*?\})",
+                                     QRegularExpression::DotMatchesEverythingOption);
+    result.replace(remove_blocks, "");
+    return result;
 }
