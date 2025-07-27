@@ -28,6 +28,9 @@ auto StylesheetLoader::load_stylesheet(const QString& file_path, const QString& 
         m_current_stylesheet_path = file_path;
         m_variables.clear();
 
+        // Parse and store available themes
+        m_available_themes = parse_available_themes(m_raw_stylesheet);
+
         // 1. Extract the correct @Variables block (by theme name or default)
         QString variables_block = extract_variables_block(m_raw_stylesheet, theme_name);
 
@@ -50,6 +53,7 @@ auto StylesheetLoader::load_stylesheet(const QString& file_path, const QString& 
         }
 
         apply_stylesheet(final_stylesheet);
+        m_current_theme_name = theme_name;
 
         qDebug() << "[StylesheetLoader] Loaded stylesheet from" << file_path
                  << "with theme:" << theme_name;
@@ -72,6 +76,24 @@ auto StylesheetLoader::get_current_stylesheet() const -> QString
 {
     QString stylesheet = remove_variables_blocks(m_raw_stylesheet);
     return substitute_variables(stylesheet);
+}
+
+/**
+ * @brief Returns a list of available themes based on the loaded stylesheet.
+ * @return A QStringList of theme names.
+ */
+auto StylesheetLoader::get_available_themes() const -> QStringList
+{
+    return m_available_themes;
+}
+
+/**
+ * @brief Returns the current theme name.
+ * @return The current theme name, or an empty string if not set.
+ */
+auto StylesheetLoader::get_current_theme_name() const -> QString
+{
+    return m_current_theme_name;
 }
 
 /**
@@ -200,6 +222,40 @@ void StylesheetLoader::parse_variables_block(const QString& variables_block,
         QString value = match.captured(2).trimmed();
         variables[name] = value;
     }
+}
+
+/**
+ * @brief Parses all available theme names from the raw stylesheet.
+ * @param stylesheet The raw QSS stylesheet.
+ * @return A QStringList of theme names.
+ */
+auto StylesheetLoader::parse_available_themes(const QString& stylesheet) -> QStringList
+{
+    QStringList themes;
+    QRegularExpression theme_regex("@Variables\\[Name=\"([^\"]+)\"\\]");
+    QRegularExpressionMatchIterator it = theme_regex.globalMatch(stylesheet);
+
+    while (it.hasNext())
+    {
+        QRegularExpressionMatch match = it.next();
+        QString theme = match.captured(1);
+
+        if (!theme.isEmpty())
+        {
+            themes << theme;
+        }
+    }
+
+    // Fallback: Add "Default" if there is an ungrouped @Variables block
+    QRegularExpression default_block(R"(@Variables\s*\{)");
+
+    if (default_block.match(stylesheet).hasMatch())
+    {
+        themes << "Default";
+    }
+
+    themes.removeDuplicates();
+    return themes;
 }
 
 /**

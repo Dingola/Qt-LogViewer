@@ -3,6 +3,7 @@
 #include <QMap>
 #include <QObject>
 #include <QString>
+#include <QStringList>
 
 /**
  * @class StylesheetLoader
@@ -36,6 +37,18 @@ class StylesheetLoader: public QObject
          * @return The current stylesheet with variables replaced.
          */
         [[nodiscard]] auto get_current_stylesheet() const -> QString;
+
+        /**
+         * @brief Returns a list of available themes based on the loaded stylesheet.
+         * @return A QStringList of theme names.
+         */
+        [[nodiscard]] auto get_available_themes() const -> QStringList;
+
+        /**
+         * @brief Returns the current theme name.
+         * @return The current theme name, or an empty string if not set.
+         */
+        [[nodiscard]] auto get_current_theme_name() const -> QString;
 
         /**
          * @brief Sets or overrides a variable and reapplies the stylesheet.
@@ -84,6 +97,13 @@ class StylesheetLoader: public QObject
                                           QMap<QString, QString>& variables);
 
         /**
+         * @brief Parses all available theme names from the raw stylesheet.
+         * @param stylesheet The raw QSS stylesheet.
+         * @return A QStringList of theme names.
+         */
+        static auto parse_available_themes(const QString& stylesheet) -> QStringList;
+
+        /**
          * @brief Removes all @Variables blocks from the given stylesheet string.
          * @param stylesheet The stylesheet string to process.
          * @return The stylesheet with all @Variables blocks removed.
@@ -94,4 +114,6 @@ class StylesheetLoader: public QObject
         QMap<QString, QString> m_variables;
         QString m_raw_stylesheet;
         QString m_current_stylesheet_path;
+        QStringList m_available_themes;
+        QString m_current_theme_name;
 };

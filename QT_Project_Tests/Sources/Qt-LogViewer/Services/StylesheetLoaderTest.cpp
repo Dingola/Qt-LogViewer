@@ -327,3 +327,85 @@ QWidget { background: @MyVar; }
 
     QFile::remove(file_path);
 }
+
+/**
+ * @brief Tests that get_available_themes returns all theme names from the stylesheet.
+ */
+TEST_F(StylesheetLoaderTest, GetAvailableThemesListsAllThemes)
+{
+    QString qss = R"(
+@Variables[Name="Dark"] {
+    @Color: #111;
+}
+@Variables[Name="Light"] {
+    @Color: #eee;
+}
+@Variables {
+    @Color: #abc;
+}
+QWidget { background: @Color; }
+)";
+    QString file_path = create_temp_qss(qss);
+    ASSERT_FALSE(file_path.isEmpty());
+
+    ASSERT_TRUE(m_loader->load_stylesheet(file_path, "Dark"));
+    QStringList themes = m_loader->get_available_themes();
+    EXPECT_TRUE(themes.contains("Dark"));
+    EXPECT_TRUE(themes.contains("Light"));
+    EXPECT_TRUE(themes.contains("Default"));
+    EXPECT_EQ(themes.size(), 3);
+
+    QFile::remove(file_path);
+}
+
+/**
+ * @brief Tests that get_available_themes returns only named themes if no unnamed @Variables block
+ * exists.
+ */
+TEST_F(StylesheetLoaderTest, GetAvailableThemesWithoutDefaultBlock)
+{
+    QString qss = R"(
+@Variables[Name="Dark"] {
+    @Color: #111;
+}
+@Variables[Name="Light"] {
+    @Color: #eee;
+}
+QWidget { background: @Color; }
+)";
+    QString file_path = create_temp_qss(qss);
+    ASSERT_FALSE(file_path.isEmpty());
+
+    ASSERT_TRUE(m_loader->load_stylesheet(file_path, "Dark"));
+    QStringList themes = m_loader->get_available_themes();
+    EXPECT_TRUE(themes.contains("Dark"));
+    EXPECT_TRUE(themes.contains("Light"));
+    EXPECT_FALSE(themes.contains("Default"));
+    EXPECT_EQ(themes.size(), 2);
+
+    QFile::remove(file_path);
+}
+
+/**
+ * @brief Tests that get_current_theme_name returns the last loaded theme.
+ */
+TEST_F(StylesheetLoaderTest, GetCurrentThemeNameReturnsCorrectTheme)
+{
+    QString qss = R"(
+@Variables[Name="Blue"] {
+    @Color: #00f;
+}
+QWidget { background: @Color; }
+)";
+    QString file_path = create_temp_qss(qss);
+    ASSERT_FALSE(file_path.isEmpty());
+
+    ASSERT_TRUE(m_loader->load_stylesheet(file_path, "Blue"));
+    EXPECT_EQ(m_loader->get_current_theme_name(), "Blue");
+
+    // Load with a different theme name
+    ASSERT_TRUE(m_loader->load_stylesheet(file_path, "NonExistent"));
+    EXPECT_EQ(m_loader->get_current_theme_name(), "NonExistent");
+
+    QFile::remove(file_path);
+}
