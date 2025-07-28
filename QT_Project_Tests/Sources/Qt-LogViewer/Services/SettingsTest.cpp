@@ -2,7 +2,7 @@
 
 #include <QCoreApplication>
 #include <QFile>
-#include <QStandardPaths>
+#include <QDir>
 #include <QTemporaryFile>
 #include <QTextStream>
 
@@ -12,8 +12,7 @@
 void SettingsTest::SetUp()
 {
 #ifdef Q_OS_MAC
-    QString settings_path = QStandardPaths::writableLocation(QStandardPaths::PreferencesLocation) +
-                            "/com.adrianhelbig.Qt-LogViewer_Tests.plist";
+    QString settings_path = QDir::homePath() + "/Library/Preferences/com.adrianhelbig.Qt-LogViewer_Tests.plist";
     QFile::remove(settings_path);
 #endif
     m_settings = new Settings();
