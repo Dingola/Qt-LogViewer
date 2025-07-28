@@ -46,7 +46,7 @@ QVariant Settings::get_value(const QString& key, const QVariant& default_value) 
  * @return The value associated with the key, or the default value if the key does not exist.
  */
 QVariant Settings::get_value(const QString& group, const QString& key,
-                             const QVariant& default_value)
+                             const QVariant& default_value) const
 {
     m_settings.beginGroup(group);
     QVariant value = m_settings.value(key, default_value);
@@ -95,7 +95,7 @@ QStringList Settings::child_groups() const
  * @param group The group to retrieve the child groups from.
  * @return A list of child groups in the specified group.
  */
-QStringList Settings::child_groups(const QString& group)
+QStringList Settings::child_groups(const QString& group) const
 {
     m_settings.beginGroup(group);
     QStringList groups = m_settings.childGroups();
@@ -109,7 +109,7 @@ QStringList Settings::child_groups(const QString& group)
  * @param group The group to retrieve the child keys from.
  * @return A list of child keys in the specified group.
  */
-QStringList Settings::child_keys(const QString& group)
+QStringList Settings::child_keys(const QString& group) const
 {
     m_settings.beginGroup(group);
     QStringList keys = m_settings.childKeys();
@@ -145,7 +145,7 @@ bool Settings::contains(const QString& key) const
  * @param key The key to check.
  * @return True if the key exists, false otherwise.
  */
-bool Settings::contains(const QString& group, const QString& key)
+bool Settings::contains(const QString& group, const QString& key) const
 {
     m_settings.beginGroup(group);
     bool exists = m_settings.contains(key);

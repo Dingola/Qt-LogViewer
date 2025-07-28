@@ -62,7 +62,7 @@ TEST_F(SettingsTest, GetValue)
     QString group = "General";
     key = "key2";
     m_settings->set_value(group, key, value);
-    EXPECT_EQ(m_settings->get_value(group, key), value);
+    EXPECT_EQ(m_settings->get_value(group, key, QVariant()), value);
 
     // Key does not exist
     key = "key3";
@@ -70,7 +70,7 @@ TEST_F(SettingsTest, GetValue)
 
     // Key does not exist in group
     key = "key4";
-    EXPECT_EQ(m_settings->get_value(group, key), QVariant());
+    EXPECT_EQ(m_settings->get_value(group, key, QVariant()), QVariant());
 
     // Key does not exist, default value provided
     key = "key5";
@@ -108,7 +108,7 @@ TEST_F(SettingsTest, SetValue)
     // Same key exists in group
     value = "updated value 2";
     m_settings->set_value(group, key_2, value);
-    EXPECT_EQ(m_settings->get_value(group, key_2), value);
+    EXPECT_EQ(m_settings->get_value(group, key_2, QVariant()), value);
 }
 
 /**
@@ -222,9 +222,10 @@ TEST_F(SettingsTest, LoadFromFile)
 
     EXPECT_EQ(m_settings->get_value("key1"), QVariant("value1"));
     EXPECT_EQ(m_settings->get_value("key2"), QVariant("value2"));
-    EXPECT_EQ(m_settings->get_value("General", "key3"), QVariant("value3"));
-    EXPECT_EQ(m_settings->get_value("TestGroup", "Group/key4"), QVariant("value4"));
-    EXPECT_EQ(m_settings->get_value("TestGroup_2", "Group_2/Group/key5"), QVariant("value5"));
+    EXPECT_EQ(m_settings->get_value("General", "key3", QVariant()), QVariant("value3"));
+    EXPECT_EQ(m_settings->get_value("TestGroup", "Group/key4", QVariant()), QVariant("value4"));
+    EXPECT_EQ(m_settings->get_value("TestGroup_2", "Group_2/Group/key5", QVariant()),
+              QVariant("value5"));
 
     QFile::remove(file_path);
 }
@@ -249,9 +250,10 @@ TEST_F(SettingsTest, SaveToFile)
 
     EXPECT_EQ(loaded_settings.get_value("key1"), QVariant("value1"));
     EXPECT_EQ(loaded_settings.get_value("key2"), QVariant("value2"));
-    EXPECT_EQ(loaded_settings.get_value("General", "key3"), QVariant("value3"));
-    EXPECT_EQ(loaded_settings.get_value("TestGroup", "Group/key4"), QVariant("value4"));
-    EXPECT_EQ(loaded_settings.get_value("TestGroup_2", "Group_2/Group/key5"), QVariant("value5"));
+    EXPECT_EQ(loaded_settings.get_value("General", "key3", QVariant()), QVariant("value3"));
+    EXPECT_EQ(loaded_settings.get_value("TestGroup", "Group/key4", QVariant()), QVariant("value4"));
+    EXPECT_EQ(loaded_settings.get_value("TestGroup_2", "Group_2/Group/key5", QVariant()),
+              QVariant("value5"));
 
     QFile::remove(file_path);
 }

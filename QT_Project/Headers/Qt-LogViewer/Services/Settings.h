@@ -46,7 +46,7 @@ class Settings: public QObject
          * @return The value for the key, or default_value if not found.
          */
         [[nodiscard]] Q_INVOKABLE QVariant get_value(const QString& group, const QString& key,
-                                                     const QVariant& default_value = QVariant());
+                                                     const QVariant& default_value) const;
 
         /**
          * @brief Sets the value for a key.
@@ -74,14 +74,14 @@ class Settings: public QObject
          * @param group The group name.
          * @return List of group names.
          */
-        [[nodiscard]] Q_INVOKABLE QStringList child_groups(const QString& group);
+        [[nodiscard]] Q_INVOKABLE QStringList child_groups(const QString& group) const;
 
         /**
          * @brief Returns a list of child keys in a group.
          * @param group The group name.
          * @return List of key names.
          */
-        [[nodiscard]] Q_INVOKABLE QStringList child_keys(const QString& group);
+        [[nodiscard]] Q_INVOKABLE QStringList child_keys(const QString& group) const;
 
         /**
          * @brief Returns a list of all keys.
@@ -102,7 +102,7 @@ class Settings: public QObject
          * @param key The key name.
          * @return True if the key exists, false otherwise.
          */
-        [[nodiscard]] Q_INVOKABLE bool contains(const QString& group, const QString& key);
+        [[nodiscard]] Q_INVOKABLE bool contains(const QString& group, const QString& key) const;
 
         /**
          * @brief Loads settings from a file (overwrites current settings).
@@ -136,5 +136,5 @@ class Settings: public QObject
         auto copy_settings(QSettings& source, QSettings& destination) -> void;
 
     private:
-        QSettings m_settings;
+        mutable QSettings m_settings;
 };
