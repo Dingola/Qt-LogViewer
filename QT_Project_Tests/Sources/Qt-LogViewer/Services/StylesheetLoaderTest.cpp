@@ -136,6 +136,7 @@ QWidget { background: @Color; color: @MissingVar; }
     QString file_path = create_temp_qss(qss);
     ASSERT_FALSE(file_path.isEmpty());
 
+    qInstallMessageHandler(nullptr);
     testing::internal::CaptureStderr();
     m_loader->load_stylesheet(file_path, "Test");
     std::string output = testing::internal::GetCapturedStderr();

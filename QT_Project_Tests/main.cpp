@@ -14,9 +14,10 @@
 auto main(int argc, char* argv[]) -> int
 {
     testing::InitGoogleTest(&argc, argv);
+
     QApplication app(argc, argv);
-    app.setApplicationName(QStringLiteral("QtTest"));
-    app.setOrganizationName(QStringLiteral("QtTemplate_Tests"));
+    app.setApplicationName(QStringLiteral("Qt-LogViewer_Tests"));
+    app.setOrganizationName(QStringLiteral("AdrianHelbig"));
     app.setOrganizationDomain(QStringLiteral("AdrianHelbig.de"));
 
     return RUN_ALL_TESTS();
