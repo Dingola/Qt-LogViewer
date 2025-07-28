@@ -14,6 +14,7 @@
 #include <QUrl>
 
 #include "Qt-LogViewer/Views/HoverRowDelegate.h"
+#include "Qt-LogViewer/Views/SettingsDialog.h"
 #include "Qt-LogViewer/Views/TableView.h"
 #include "ui_MainWindow.h"
 
@@ -38,7 +39,10 @@ constexpr auto k_search_placeholder_text = QT_TRANSLATE_NOOP("MainWindow", "Ente
  * @param parent The parent widget, or nullptr if this is a top-level window.
  */
 MainWindow::MainWindow(QWidget* parent)
-    : QMainWindow(parent), m_stylesheet_loader(new StylesheetLoader(this)), ui(new Ui::MainWindow)
+    : QMainWindow(parent),
+      m_app_settings(new AppSettings(this)),
+      m_stylesheet_loader(new StylesheetLoader(this)),
+      ui(new Ui::MainWindow)
 {
     qDebug() << "MainWindow constructor started";
 
@@ -64,14 +68,8 @@ MainWindow::MainWindow(QWidget* parent)
     int column_count = ui->tableViewLog->model()->columnCount();
     for (int i = 0; i < column_count; ++i)
     {
-        if (i == (column_count - 1))
-        {
-            header->setSectionResizeMode(i, QHeaderView::Stretch);
-        }
-        else
-        {
-            header->setSectionResizeMode(i, QHeaderView::Interactive);
-        }
+        header->setSectionResizeMode(
+            i, ((i == (column_count - 1)) ? QHeaderView::Stretch : QHeaderView::Interactive));
     }
 
     auto hover_delegate = new HoverRowDelegate(ui->tableViewLog);
@@ -166,18 +164,6 @@ MainWindow::~MainWindow()
 }
 
 /**
- * @brief Opens log files using a file dialog and loads them into the controller.
- */
-void MainWindow::open_log_files()
-{
-    qDebug() << "Opening log file dialog";
-    QStringList files = QFileDialog::getOpenFileNames(this, tr(k_open_log_files_text), QString(),
-                                                      tr("Log Files (*.log *.txt);;All Files (*)"));
-    qDebug() << "Files selected:" << files;
-    load_files_and_update_ui(files);
-}
-
-/**
  * @brief Initializes the main menu bar and its actions.
  */
 auto MainWindow::initialize_menu() -> void
@@ -189,6 +175,14 @@ auto MainWindow::initialize_menu() -> void
     ui->menubar->addMenu(file_menu);
 
     connect(m_action_open_log_file, &QAction::triggered, this, &MainWindow::open_log_files);
+
+    // Settings menu
+    auto settings_menu = new QMenu(tr("&Settings"), this);
+    m_action_settings = new QAction(tr("Settings..."), this);
+    settings_menu->addAction(m_action_settings);
+    ui->menubar->addMenu(settings_menu);
+
+    connect(m_action_settings, &QAction::triggered, this, &MainWindow::show_settings_dialog);
 
     // Help menu
     auto help_menu = new QMenu(tr("&Help"), this);
@@ -439,4 +433,57 @@ void MainWindow::resizeEvent(QResizeEvent* event)
     {
         qWarning() << "Table model invalid or has too few columns!";
     }
+}
+
+/**
+ * @brief Opens the settings dialog for changing application settings.
+ */
+void MainWindow::show_settings_dialog()
+{
+    SettingsDialog dialog(m_app_settings, this);
+    dialog.setWindowTitle("SettingsDialog");
+    dialog.resize(440, 300);
+
+    if (m_stylesheet_loader != nullptr)
+    {
+        dialog.set_available_themes(m_stylesheet_loader->get_available_themes());
+    }
+    else
+    {
+        qWarning() << "Stylesheet loader is null, cannot change theme.";
+    }
+
+    connect(&dialog, &SettingsDialog::theme_changed, this, &MainWindow::onThemeChanged);
+    dialog.exec();
+}
+
+/**
+ * @brief Slot: Handles theme changes.
+ *
+ * This slot is called when the application theme is changed.
+ * It updates the UI to reflect the new theme.
+ * @param theme_name The name of the new theme (e.g. "Dark", "Light").
+ */
+void MainWindow::onThemeChanged(const QString& theme_name)
+{
+    if (m_stylesheet_loader)
+    {
+        m_stylesheet_loader->load_stylesheet(":/Resources/style.qss", theme_name);
+    }
+    else
+    {
+        qWarning() << "Stylesheet loader is null, cannot change theme.";
+    }
+}
+
+/**
+ * @brief Opens log files using a file dialog and loads them into the controller.
+ */
+void MainWindow::open_log_files()
+{
+    qDebug() << "Opening log file dialog";
+    QStringList files = QFileDialog::getOpenFileNames(this, tr(k_open_log_files_text), QString(),
+                                                      tr("Log Files (*.log *.txt);;All Files (*)"));
+    qDebug() << "Files selected:" << files;
+    load_files_and_update_ui(files);
 }

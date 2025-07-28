@@ -7,6 +7,7 @@
 #include <QPlainTextEdit>
 
 #include "Qt-LogViewer/Controllers/LogViewerController.h"
+#include "Qt-LogViewer/Services/AppSettings.h"
 #include "Qt-LogViewer/Services/StylesheetLoader.h"
 
 namespace Ui
@@ -41,12 +42,6 @@ class MainWindow: public QMainWindow
          * Cleans up any resources used by the main window.
          */
         ~MainWindow() override;
-
-    private slots:
-        /**
-         * @brief Opens log files using a file dialog.
-         */
-        void open_log_files();
 
     private:
         /**
@@ -108,6 +103,26 @@ class MainWindow: public QMainWindow
          */
         void resizeEvent(QResizeEvent* event) override;
 
+    private slots:
+        /**
+         * @brief Opens log files using a file dialog.
+         */
+        void open_log_files();
+
+        /**
+         * @brief Shows the settings dialog for changing application settings.
+         */
+        void show_settings_dialog();
+
+        /**
+         * @brief Slot: Handles theme changes.
+         *
+         * This slot is called when the application theme is changed.
+         * It updates the UI to reflect the new theme.
+         * @param theme_name The name of the new theme (e.g. "Dark", "Light").
+         */
+        void onThemeChanged(const QString& theme_name);
+
     private:
         /**
          * @brief Pointer to the UI definition generated from the .ui file.
@@ -125,6 +140,11 @@ class MainWindow: public QMainWindow
         QAction* m_action_open_log_file = nullptr;
 
         /**
+         * @brief Action for opening log files (appears in the Settings menu).
+         */
+        QAction* m_action_settings = nullptr;
+
+        /**
          * @brief Dock widget for displaying log details.
          */
         QDockWidget* m_log_details_dock_widget = nullptr;
@@ -139,4 +159,11 @@ class MainWindow: public QMainWindow
          * substitution.
          */
         StylesheetLoader* m_stylesheet_loader;
+
+        /**
+         * @brief Pointer to the application settings service.
+         *
+         * This is used to access and modify application-specific settings.
+         */
+        AppSettings* m_app_settings = nullptr;
 };
