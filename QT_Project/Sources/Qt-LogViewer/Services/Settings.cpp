@@ -197,6 +197,7 @@ void Settings::clear()
 {
     qInfo() << "Clearing current session settings";
     m_settings.clear();
+    m_settings.sync();
 }
 
 /**

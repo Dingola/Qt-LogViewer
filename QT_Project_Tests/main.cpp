@@ -17,7 +17,7 @@ auto main(int argc, char* argv[]) -> int
 
     QApplication app(argc, argv);
     app.setApplicationName(QStringLiteral("Qt-LogViewer_Tests"));
-    app.setOrganizationName(QStringLiteral("AdrianHelbig"));
+    app.setOrganizationName(QStringLiteral("AdrianHelbig_Tests"));
     app.setOrganizationDomain(QStringLiteral("AdrianHelbig.de"));
 
     return RUN_ALL_TESTS();
