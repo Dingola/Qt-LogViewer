@@ -142,6 +142,11 @@ QLabel {
     font-weight: bold;
 }
 
+QLabel#labelSettings {
+    font-weight: 900;
+    font-size: 16pt;
+}
+
 /* === LineEdit === */
 QLineEdit {
     background-color: @ColorLineEditBackground;
@@ -482,6 +487,9 @@ QTabWidget::pane {
     border: 1px solid @ColorBorder;
     background: @ColorTableBackground;
     border-radius: 6px;
+}
+QTabWidget > QWidget {
+    padding: 6px;
 }
 QTabBar::tab {
     background: @ColorFilterBarBackground;
