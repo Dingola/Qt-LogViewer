@@ -1,4 +1,4 @@
-# Qt-LogViewer
+# <img src="QT_Project/Resources/Icons/App/AppIcon.png" alt="Qt-LogViewer Icon" width="32"/> Qt-LogViewer
 
 ## 🚀 [Build Status]
 
@@ -37,14 +37,13 @@
 ## [Description]
 A Qt-based desktop application for viewing, searching and filtering log files with a user-friendly interface.
 
-![App Icon](QT_Project/Resources/Icons/App/AppIcon.png)
-
 This solution is divided into two parts: the main project and a test project. By default, only the main project is built. 
 The test project can be built if desired, controlled by a CMake boolean variable `<PROJECT_NAME>_BUILD_TEST_PROJECT`. 
 Additionally, the CMake variable `<PROJECT_NAME>_BUILD_TARGET_TYPE` must be set to `static_library` for the test project to be executed.
 
-<img src="QT_Project/Resources/Images/Qt-LogViewer.png" alt="Qt-LogViewer Screenshot" width="600"/>
+<br>
 
+![Qt-LogViewer Screenshot](QT_Project/Resources/Images/Qt-LogViewer.png)
 <br><br>
 
 ## 📊 [Code Coverage Graphs]
