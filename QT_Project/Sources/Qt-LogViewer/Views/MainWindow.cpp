@@ -12,6 +12,7 @@
 #include <QStringList>
 #include <QTimer>
 #include <QUrl>
+#include <QIcon>
 
 #include "Qt-LogViewer/Views/HoverRowDelegate.h"
 #include "Qt-LogViewer/Views/SettingsDialog.h"
@@ -48,6 +49,8 @@ MainWindow::MainWindow(QWidget* parent)
 
     // Initialize the user interface
     ui->setupUi(this);
+
+    setWindowIcon(QIcon(":/Resources/Icons/App/AppIcon.svg"));
 
     // Init combo box for app names
     update_app_combo_box({});

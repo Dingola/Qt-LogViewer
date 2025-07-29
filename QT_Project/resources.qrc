@@ -1,6 +1,7 @@
 <RCC>
 	<qresource prefix="/">
 		<file>Resources/style.qss</file>
+		<file>Resources/Icons/App/AppIcon.svg</file>
 		<file>Resources/down-arrow.svg</file>
 		<file>Resources/left-arrow.svg</file>
 		<file>Resources/right-arrow.svg</file>

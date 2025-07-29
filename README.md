@@ -14,6 +14,49 @@
 
 <br><br>
 
+## 📖 [Table of Contents]
+- [Description](#description)
+- [Code Coverage Graphs](#-code-coverage-graphs)
+- [Solution Folder Structure](#solution-folder-structure)
+- [Configuration](#configuration)
+  - [CMake Options](#cmake-options)
+  - [Environment Variables](#environment-variables)
+- [Supported Platforms](#supported-platforms)
+- [How to Install and Run](#how-to-install-and-run)
+  - [1) Prerequisites](#1-prerequisites)
+  - [2) Setting up](#2-setting-up)
+  - [3) Configuring and Building](#3-configuring-and-building)
+  - [4) Run the project](#4-run-the-project)
+  - [5) Deployment](#5-deployment)
+  - [6) Using Docker](#6-using-docker)
+- [Translations](#translations)
+- [Code Style and Linting](#code-style-and-linting)
+
+<br><br>
+
+## [Description]
+A Qt-based desktop application for viewing, searching and filtering log files with a user-friendly interface.
+
+![App Icon](QT_Project/Resources/Icons/App/AppIcon.png)
+
+This solution is divided into two parts: the main project and a test project. By default, only the main project is built. 
+The test project can be built if desired, controlled by a CMake boolean variable `<PROJECT_NAME>_BUILD_TEST_PROJECT`. 
+Additionally, the CMake variable `<PROJECT_NAME>_BUILD_TARGET_TYPE` must be set to `static_library` for the test project to be executed.
+
+<img src="QT_Project/Resources/Images/Qt-LogViewer.png" alt="Qt-LogViewer Screenshot" width="600"/>
+
+<br><br>
+
+## 📊 [Code Coverage Graphs]
+
+| Graph     | Description                                                                                                                                                                                                                     | Visualization                                                                 |
+|-----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------|
+| **Sunburst** | The inner-most circle represents the entire project. Moving outward are folders, and finally individual files. The size and color of each slice represent the number of statements and the coverage, respectively. | <img src="https://codecov.io/gh/Dingola/Qt-LogViewer/graphs/sunburst.svg?token=T25AFRCT8R" alt="Sunburst" height="100" width="200"> |
+| **Grid**     | Each block represents a single file in the project. The size and color of each block represent the number of statements and the coverage, respectively.                                                                      | <img src="https://codecov.io/gh/Dingola/Qt-LogViewer/graphs/tree.svg?token=T25AFRCT8R" alt="Grid" height="100" width="200">         |
+| **Icicle**   | The top section represents the entire project, followed by folders and individual files. The size and color of each slice represent the number of statements and the coverage, respectively.                                 | <img src="https://codecov.io/gh/Dingola/Qt-LogViewer/graphs/icicle.svg?token=T25AFRCT8R" alt="Icicle" height="150" width="400">     |
+
+<br><br>
+
 ## 🔐 Tokens for GitHub Actions
 
 Some workflows in this repository require tokens to function correctly. Below are the details for the required tokens and how to configure them.
@@ -58,49 +101,6 @@ Once you have generated the required tokens, add them as secrets in your GitHub 
 
 > **Note**: The `CODECOV_TOKEN` is required for the `build_and_test_linux.yml` workflow to upload coverage reports. The `PAT_TOKEN` is only needed for the disabled workflows.
 
-<br><br>
-
-## 📖 [Table of Contents]
-- [Code Coverage Graphs](#-code-coverage-graphs)
-- [Description](#description)
-- [Solution Folder Structure](#solution-folder-structure)
-- [Configuration](#configuration)
-  - [CMake Options](#cmake-options)
-  - [Environment Variables](#environment-variables)
-- [Supported Platforms](#supported-platforms)
-- [How to Install and Run](#how-to-install-and-run)
-  - [1) Prerequisites](#1-prerequisites)
-  - [2) Setting up](#2-setting-up)
-  - [3) Configuring and Building](#3-configuring-and-building)
-  - [4) Run the project](#4-run-the-project)
-  - [5) Deployment](#5-deployment)
-  - [6) Using Docker](#6-using-docker)
-- [Translations](#translations)
-- [Code Style and Linting](#code-style-and-linting)
-
-<br><br>
-
-## 📊 [Code Coverage Graphs]
-
-| Graph     | Description                                                                                                                                                                                                                     | Visualization                                                                 |
-|-----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------|
-| **Sunburst** | The inner-most circle represents the entire project. Moving outward are folders, and finally individual files. The size and color of each slice represent the number of statements and the coverage, respectively. | <img src="https://codecov.io/gh/Dingola/Qt-LogViewer/graphs/sunburst.svg?token=T25AFRCT8R" alt="Sunburst" height="100" width="200"> |
-| **Grid**     | Each block represents a single file in the project. The size and color of each block represent the number of statements and the coverage, respectively.                                                                      | <img src="https://codecov.io/gh/Dingola/Qt-LogViewer/graphs/tree.svg?token=T25AFRCT8R" alt="Grid" height="100" width="200">         |
-| **Icicle**   | The top section represents the entire project, followed by folders and individual files. The size and color of each slice represent the number of statements and the coverage, respectively.                                 | <img src="https://codecov.io/gh/Dingola/Qt-LogViewer/graphs/icicle.svg?token=T25AFRCT8R" alt="Icicle" height="150" width="400">     |
-
-<br><br>
-
-
-## [Description]
-This project is a template for creating Qt-based applications. The solution 
-is divided into two parts: the main project and a test project. By default, only the 
-main project is built. The test project can be built if desired, controlled by a CMake 
-boolean variable `<PROJECT_NAME>_BUILD_TEST_PROJECT`. Additionally, the CMake variable 
-`<PROJECT_NAME>_BUILD_TARGET_TYPE` must be set to `static_library` for the test project 
-to be executed.
-
-The template provides a minimal starting point for Qt applications, supports documentation 
-generation with Doxygen, and includes GitHub workflows (CI builds) for both Linux and Windows.
 <br><br>
 
 ## [Solution Folder Structure]
@@ -217,8 +217,8 @@ generation with Doxygen, and includes GitHub workflows (CI builds) for both Linu
 
 ### 2) Setting up
 ```
-git clone https://github.com/Dingola/QtTemplate.git
-cd QtTemplate/
+git clone https://github.com/Dingola/Qt-LogViewer.git
+cd Qt-LogViewer/
 ```
 <br>
 
@@ -240,8 +240,8 @@ cmake --build . --config Release
 
 ### 4) Run the project
 ```
-cd QtTemplate/Release/
-./QtTemplate.exe
+cd Qt-LogViewer/Release/
+./Qt-LogViewer.exe
 ```
 <br>
 
@@ -268,29 +268,29 @@ To create an NSIS installer (Windows only), set `BUILD_NSIS_INSTALLER` to `true`
 #### 1. Build the Docker Image
 Build the Docker image using the following command:
 ```
-docker build -t qttemplate-dockerimage .
+docker build -t qt-logviewer-dockerimage .
 ```
 <br>
 
 #### 2. Ways to Run the Docker Image
 - **Run directly:**
 ```
-docker run qttemplate-dockerimage
+docker run qt-logviewer-dockerimage
 ```
 - **Start an interactive Bash shell:**
 ```
-docker run -it qttemplate-dockerimage bash
+docker run -it qt-logviewer-dockerimage bash
 ```
 <br>
 
 #### 3. Run the App or Tests in the Container
 - **Start the app (virtual display with Xvfb):**
 ```
-Xvfb :99 -screen 0 1920x1080x24 -nolisten tcp & export DISPLAY=:99 "./_build_app_release/QT_Project/QtTemplate"
+Xvfb :99 -screen 0 1920x1080x24 -nolisten tcp & export DISPLAY=:99 "./_build_app_release/QT_Project/Qt-LogViewer"
 ```
 - **Run the tests (virtual display with Xvfb):**
 ```
-Xvfb :99 -screen 0 1920x1080x24 -nolisten tcp & export DISPLAY=:99 "./_build_tests_release/QT_Project_Tests/QtTemplate_Tests"
+Xvfb :99 -screen 0 1920x1080x24 -nolisten tcp & export DISPLAY=:99 "./_build_tests_release/QT_Project_Tests/Qt-LogViewer_Tests"
 ```
 <br>
 
@@ -303,7 +303,7 @@ Xvfb :99 -screen 0 1920x1080x24 -nolisten tcp & export DISPLAY=:99 "./_build_tes
    - Alternatively, use the preconfigured `config.xlaunch` file located in the `Configs` folder of this project. Double-click the file to launch VcXsrv with the correct settings.
 3. Start the Docker container:
 ```
-docker run -it --name QtTemplate-Container --network host -e DISPLAY=<IP-ADDRESS>:99.0 -e TERM=xterm-256color -e QT_X11_NO_MITSHM=1 QtTemplate-DockerImage bash
+docker run -it --name Qt-LogViewer-Container --network host -e DISPLAY=<IP-ADDRESS>:99.0 -e TERM=xterm-256color -e QT_X11_NO_MITSHM=1 Qt-LogViewer-DockerImage bash
 ```
 > [!NOTE]
 > Replace `<IP-ADDRESS>` with the host's IP address (e.g., `192.168.1.2`). Do not use `127.0.0.1` or `localhost`.
@@ -311,11 +311,11 @@ docker run -it --name QtTemplate-Container --network host -e DISPLAY=<IP-ADDRESS
 4. Inside the container:
 - **Start the app:**
 ```
-"./_build_app_release/QT_Project/QtTemplate"
+"./_build_app_release/QT_Project/Qt-LogViewer"
 ```
 - **Run the tests:**
 ```
-"./_build_tests_release/QT_Project_Tests/QtTemplate_Tests"
+"./_build_tests_release/QT_Project_Tests/Qt-LogViewer_Tests"
 ```
 <br>
 
@@ -337,7 +337,7 @@ export DISPLAY=192.168.1.2:99.0
 <br><br><br>
 
 ## [Translations]
-The project includes custom targets for updating and compiling translation files. These targets are defined in the CMake file located in `QtTemplate/QT_Project` and can be used to manage translation files located in the `QtTemplate/QT_Project/resources/Translations` directory.
+The project includes custom targets for updating and compiling translation files. These targets are defined in the CMake file located in `Qt-LogViewer/QT_Project` and can be used to manage translation files located in the `Qt-LogViewer/QT_Project/resources/Translations` directory.
 
 > [!NOTE]
 > The translation files are specified in the CMake file. Initially, only `app_de.ts` and `app_en.ts` are included. To support additional languages, you will need to add the corresponding `.ts` files to the CMake configuration.

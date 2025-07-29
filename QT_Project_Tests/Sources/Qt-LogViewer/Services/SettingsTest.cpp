@@ -13,9 +13,11 @@ void SettingsTest::SetUp()
 {
 #ifdef Q_OS_MAC
     QString settings_path = QDir::homePath() + "/Library/Preferences/com.adrianhelbig_tests.Qt-LogViewer_Tests.plist";
+    qDebug() << "MacOs - SettingsPath:" << settings_path;
     QFile::remove(settings_path);
 #endif
     m_settings = new Settings();
+    m_settings->clear();
 }
 
 /**
