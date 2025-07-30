@@ -114,6 +114,7 @@ MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
 
     // Create and set up the dock widget for log details
     m_log_details_dock_widget = new QDockWidget(tr("Log Details"), this);
+    m_log_details_dock_widget->setObjectName("logDetailsDockWidget");
     m_log_details_text_edit = new QPlainTextEdit(m_log_details_dock_widget);
     m_log_details_text_edit->setObjectName("logDetailsTextEdit");
     m_log_details_text_edit->setReadOnly(true);
@@ -432,28 +433,33 @@ void MainWindow::dropEvent(QDropEvent* event)
 void MainWindow::resizeEvent(QResizeEvent* event)
 {
     QMainWindow::resizeEvent(event);
-    bool valid_model = ui->tableViewLog->model() && ui->tableViewLog->model()->columnCount() >= 4;
 
-    if (valid_model)
+    if (ui != nullptr)
     {
-        int total_width = ui->tableViewLog->viewport()->width();
-        int col_0_width = static_cast<int>(total_width * 0.15);
-        int col_1_width = static_cast<int>(total_width * 0.10);
-        int col_2_width = static_cast<int>(total_width * 0.50);
-        int col_3_width = static_cast<int>(total_width * 0.15);
+        bool valid_model =
+            ui->tableViewLog->model() && ui->tableViewLog->model()->columnCount() >= 4;
 
-        ui->tableViewLog->setColumnWidth(LogModel::Timestamp, col_0_width);
-        ui->tableViewLog->setColumnWidth(LogModel::Level, col_1_width);
-        ui->tableViewLog->setColumnWidth(LogModel::Message, col_2_width);
-        ui->tableViewLog->setColumnWidth(LogModel::AppName, col_3_width);
+        if (valid_model)
+        {
+            int total_width = ui->tableViewLog->viewport()->width();
+            int col_0_width = static_cast<int>(total_width * 0.15);
+            int col_1_width = static_cast<int>(total_width * 0.10);
+            int col_2_width = static_cast<int>(total_width * 0.50);
+            int col_3_width = static_cast<int>(total_width * 0.15);
+
+            ui->tableViewLog->setColumnWidth(LogModel::Timestamp, col_0_width);
+            ui->tableViewLog->setColumnWidth(LogModel::Level, col_1_width);
+            ui->tableViewLog->setColumnWidth(LogModel::Message, col_2_width);
+            ui->tableViewLog->setColumnWidth(LogModel::AppName, col_3_width);
 #ifdef QT_DEBUG_VERBOSE
-        qDebug() << "Resizing columns to widths:" << col_0_width << col_1_width << col_2_width
-                 << col_3_width;
+            qDebug() << "Resizing columns to widths:" << col_0_width << col_1_width << col_2_width
+                     << col_3_width;
 #endif
-    }
-    else
-    {
-        qWarning() << "Table model invalid or has too few columns!";
+        }
+        else
+        {
+            qWarning() << "Table model invalid or has too few columns!";
+        }
     }
 }
 

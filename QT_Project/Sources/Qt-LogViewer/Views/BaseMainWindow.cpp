@@ -54,6 +54,63 @@ auto BaseMainWindow::get_stylesheet_loader() const -> StylesheetLoader*
 }
 
 /**
+ * @brief Saves the main window geometry, state, and window state to preferences.
+ *
+ * This method saves the current geometry, state, and window state of the main window to the
+ * preferences object if it is not null.
+ */
+auto BaseMainWindow::save_window_settings() -> void
+{
+    if (m_preferences != nullptr)
+    {
+        m_preferences->set_mainwindow_geometry(saveGeometry());
+        m_preferences->set_mainwindow_state(saveState());
+        m_preferences->set_mainwindow_windowstate(windowState());
+    }
+    else
+    {
+        qWarning() << "[BaseMainWindow] Preferences object is null, cannot save window settings.";
+    }
+}
+
+/**
+ * @brief Restores the main window geometry, state, and window state from preferences.
+ *
+ * This method restores the main window's geometry, state, and window state from the preferences
+ * object if it is not null. It checks if the geometry and state are not empty before restoring
+ * them. If the window state is maximized, it shows the window maximized.
+ */
+auto BaseMainWindow::restore_window_settings() -> void
+{
+    if (m_preferences)
+    {
+        const QByteArray geometry = m_preferences->get_mainwindow_geometry();
+        const QByteArray state = m_preferences->get_mainwindow_state();
+        int window_state = m_preferences->get_mainwindow_windowstate();
+
+        if (!geometry.isEmpty())
+        {
+            restoreGeometry(geometry);
+        }
+
+        if (!state.isEmpty())
+        {
+            restoreState(state);
+        }
+
+        if (window_state == Qt::WindowMaximized)
+        {
+            showMaximized();
+        }
+    }
+    else
+    {
+        qWarning()
+            << "[BaseMainWindow] Preferences object is null, cannot restore window settings.";
+    }
+}
+
+/**
  * @brief Handles the show event of the main window.
  *
  * This method is called when the main window is shown. It checks if the theme has been applied
@@ -65,6 +122,12 @@ void BaseMainWindow::showEvent(QShowEvent* event)
 {
     QMainWindow::showEvent(event);
 
+    if (!m_window_restored)
+    {
+        restore_window_settings();
+        m_window_restored = true;
+    }
+
     if (!m_theme_applied && m_preferences != nullptr)
     {
         const QString theme = m_preferences->get_theme();
@@ -72,6 +135,20 @@ void BaseMainWindow::showEvent(QShowEvent* event)
         m_theme_applied = true;
         qInfo() << "[BaseMainWindow] Loaded theme from preferences (showEvent):" << theme;
     }
+}
+
+/**
+ * @brief Handles the close event of the main window.
+ *
+ * This method is called when the main window is closed. It saves the current window geometry,
+ * state, and window state to preferences.
+ *
+ * @param event The close event.
+ */
+void BaseMainWindow::closeEvent(QCloseEvent* event)
+{
+    save_window_settings();
+    QMainWindow::closeEvent(event);
 }
 
 /**

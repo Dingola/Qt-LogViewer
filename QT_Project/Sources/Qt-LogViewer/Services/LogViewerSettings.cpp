@@ -37,3 +37,59 @@ auto LogViewerSettings::set_language(const QString& value) -> void
     set_value("General", "language", value);
     emit languageChanged(value);
 }
+
+/**
+ * @brief Returns the last saved main window geometry (position and size).
+ * @return The geometry data as QByteArray.
+ */
+auto LogViewerSettings::get_mainwindow_geometry() -> QByteArray
+{
+    return get_value("MainWindow", "geometry", QByteArray()).toByteArray();
+}
+
+/**
+ * @brief Sets the main window geometry (position and size).
+ * @param geometry The geometry data to save as QByteArray.
+ */
+auto LogViewerSettings::set_mainwindow_geometry(const QByteArray& geometry) -> void
+{
+    set_value("MainWindow", "geometry", geometry);
+}
+
+/**
+ * @brief Returns the last saved main window state.
+ * @return The state data as a QByteArray.
+ */
+auto LogViewerSettings::get_mainwindow_state() -> QByteArray
+{
+    return get_value("MainWindow", "state", QByteArray()).toByteArray();
+}
+
+/**
+ * @brief Sets the main window state.
+ * @param state The state data to save as a QByteArray.
+ */
+auto LogViewerSettings::set_mainwindow_state(const QByteArray& state) -> void
+{
+    set_value("MainWindow", "state", state);
+}
+
+/**
+ * @brief Returns the last saved main window window state.
+ * @return The window state as an integer.
+ */
+auto LogViewerSettings::get_mainwindow_windowstate() -> int
+{
+    // 0 = normal, 1 = minimized, 2 = maximized
+    return get_value("MainWindow", "windowState", Qt::WindowNoState).toInt();
+}
+
+/**
+ * @brief Sets the main window window state.
+ * @param state The window state to save as an integer (e.g. Qt::WindowNoState, Qt::WindowMinimized,
+ * etc.).
+ */
+auto LogViewerSettings::set_mainwindow_windowstate(int state) -> void
+{
+    set_value("MainWindow", "windowState", state);
+}

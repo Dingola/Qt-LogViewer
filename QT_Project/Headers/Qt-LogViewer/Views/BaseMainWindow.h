@@ -47,6 +47,16 @@ class BaseMainWindow: public QMainWindow
 
     protected:
         /**
+         * @brief Saves the main window geometry, state, and window state to preferences.
+         */
+        auto save_window_settings() -> void;
+
+        /**
+         * @brief Restores the main window geometry, state, and window state from preferences.
+         */
+        auto restore_window_settings() -> void;
+
+        /**
          * @brief Handles the show event to apply the current theme.
          *
          * This method is called when the main window is shown. It applies the current theme if it
@@ -55,6 +65,16 @@ class BaseMainWindow: public QMainWindow
          * @param event The show event.
          */
         void showEvent(QShowEvent* event) override;
+
+        /**
+         * @brief Handles the close event to save window settings.
+         *
+         * This method is called when the main window is closed. It saves the current window
+         * geometry, state, and window state to preferences.
+         *
+         * @param event The close event.
+         */
+        void closeEvent(QCloseEvent* event) override;
 
     private slots:
         /**
@@ -81,4 +101,9 @@ class BaseMainWindow: public QMainWindow
          * @brief Indicates whether the theme has been applied.
          */
         bool m_theme_applied = false;
+
+        /**
+         * @brief Indicates whether the window settings have been restored.
+         */
+        bool m_window_restored = false;
 };
