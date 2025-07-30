@@ -7,13 +7,15 @@
 #include <QPlainTextEdit>
 
 #include "Qt-LogViewer/Controllers/LogViewerController.h"
-#include "Qt-LogViewer/Services/AppSettings.h"
 #include "Qt-LogViewer/Services/StylesheetLoader.h"
+#include "Qt-LogViewer/Views/BaseMainWindow.h"
 
 namespace Ui
 {
 class MainWindow;
 }
+
+class LogViewerSettings;
 
 /**
  * @class MainWindow
@@ -22,7 +24,7 @@ class MainWindow;
  * This class represents the main window of the application, providing
  * the central user interface and handling main window events.
  */
-class MainWindow: public QMainWindow
+class MainWindow: public BaseMainWindow
 {
         Q_OBJECT
 
@@ -34,7 +36,7 @@ class MainWindow: public QMainWindow
          *
          * @param parent The parent widget, or nullptr if this is a top-level window.
          */
-        explicit MainWindow(QWidget* parent = nullptr);
+        explicit MainWindow(LogViewerSettings* settings = nullptr, QWidget* parent = nullptr);
 
         /**
          * @brief Destroys the MainWindow object.
@@ -114,20 +116,16 @@ class MainWindow: public QMainWindow
          */
         void show_settings_dialog();
 
-        /**
-         * @brief Slot: Handles theme changes.
-         *
-         * This slot is called when the application theme is changed.
-         * It updates the UI to reflect the new theme.
-         * @param theme_name The name of the new theme (e.g. "Dark", "Light").
-         */
-        void onThemeChanged(const QString& theme_name);
-
     private:
         /**
          * @brief Pointer to the UI definition generated from the .ui file.
          */
         Ui::MainWindow* ui;
+
+        /**
+         * @brief Settings object for managing application settings.
+         */
+        LogViewerSettings* m_log_viewer_settings = nullptr;
 
         /**
          * @brief Controller for log loading and filtering.
@@ -153,17 +151,4 @@ class MainWindow: public QMainWindow
          * @brief Text edit widget for showing detailed log information.
          */
         QPlainTextEdit* m_log_details_text_edit = nullptr;
-
-        /**
-         * @brief Loader for application stylesheets, allowing dynamic loading and variable
-         * substitution.
-         */
-        StylesheetLoader* m_stylesheet_loader;
-
-        /**
-         * @brief Pointer to the application settings service.
-         *
-         * This is used to access and modify application-specific settings.
-         */
-        AppSettings* m_app_settings = nullptr;
 };

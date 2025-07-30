@@ -9,7 +9,7 @@ namespace Ui
 class SettingsDialog;
 }
 
-class AppSettings;
+class LogViewerSettings;
 
 /**
  * @class SettingsDialog
@@ -27,7 +27,7 @@ class SettingsDialog: public QDialog
          * @brief Constructs a SettingsDialog.
          * @param parent The parent widget, or nullptr.
          */
-        explicit SettingsDialog(AppSettings* settings, QWidget* parent = nullptr);
+        explicit SettingsDialog(LogViewerSettings* settings, QWidget* parent = nullptr);
 
         /**
          * @brief Destroys the SettingsDialog.
@@ -110,7 +110,7 @@ class SettingsDialog: public QDialog
     private:
         Ui::SettingsDialog* ui = nullptr;
 
-        AppSettings* m_settings = nullptr;
+        LogViewerSettings* m_settings = nullptr;
         QString m_applied_language;
         QString m_applied_theme;
         QStringList m_available_themes;

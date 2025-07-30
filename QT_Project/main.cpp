@@ -5,6 +5,7 @@
 
 #include <QApplication>
 
+#include "Qt-LogViewer/Services/LogViewerSettings.h"
 #include "Qt-LogViewer/Views/MainWindow.h"
 #include "SimpleQtLogger/QtLoggerAdapter.h"
 
@@ -31,7 +32,9 @@ auto main(int argc, char* argv[]) -> int
 
     SimpleQtLogger::install_as_qt_message_handler();
 
-    MainWindow main_window;
+    auto settings = LogViewerSettings(Settings::default_settings_file_path(), QSettings::IniFormat);
+
+    MainWindow main_window(&settings);
     main_window.resize(1100, 750);
     main_window.show();
 

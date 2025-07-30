@@ -4,6 +4,7 @@
 #include <QDragEnterEvent>
 #include <QDropEvent>
 #include <QFileDialog>
+#include <QIcon>
 #include <QItemSelectionModel>
 #include <QMenu>
 #include <QMessageBox>
@@ -12,8 +13,8 @@
 #include <QStringList>
 #include <QTimer>
 #include <QUrl>
-#include <QIcon>
 
+#include "Qt-LogViewer/Services/LogViewerSettings.h"
 #include "Qt-LogViewer/Views/HoverRowDelegate.h"
 #include "Qt-LogViewer/Views/SettingsDialog.h"
 #include "Qt-LogViewer/Views/TableView.h"
@@ -39,13 +40,15 @@ constexpr auto k_search_placeholder_text = QT_TRANSLATE_NOOP("MainWindow", "Ente
  *
  * @param parent The parent widget, or nullptr if this is a top-level window.
  */
-MainWindow::MainWindow(QWidget* parent)
-    : QMainWindow(parent),
-      m_app_settings(new AppSettings(this)),
-      m_stylesheet_loader(new StylesheetLoader(this)),
-      ui(new Ui::MainWindow)
+MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
+    : BaseMainWindow(settings, parent), m_log_viewer_settings(settings), ui(new Ui::MainWindow)
 {
     qDebug() << "MainWindow constructor started";
+    qInfo() << "Settings file:" << m_log_viewer_settings->fileName()
+            << "| Format:" << m_log_viewer_settings->format()
+            << "| Scope:" << m_log_viewer_settings->scope()
+            << "| Organization:" << m_log_viewer_settings->organizationName()
+            << "| Application:" << m_log_viewer_settings->applicationName();
 
     // Initialize the user interface
     ui->setupUi(this);
@@ -147,9 +150,6 @@ MainWindow::MainWindow(QWidget* parent)
     connect(ui->tableViewLog->selectionModel(), &QItemSelectionModel::currentRowChanged, this,
             &MainWindow::update_log_details);
 
-    // Load and apply application stylesheet from Qt resource
-    m_stylesheet_loader->load_stylesheet(":/Resources/style.qss", "Dark");
-
     QTimer::singleShot(0, this, [this] { this->resizeEvent(nullptr); });
     qDebug() << "MainWindow constructor finished";
 }
@@ -162,7 +162,6 @@ MainWindow::MainWindow(QWidget* parent)
 MainWindow::~MainWindow()
 {
     qDebug() << "MainWindow destructor called";
-    delete m_controller;
     delete ui;
 }
 
@@ -443,40 +442,12 @@ void MainWindow::resizeEvent(QResizeEvent* event)
  */
 void MainWindow::show_settings_dialog()
 {
-    SettingsDialog dialog(m_app_settings, this);
+    SettingsDialog dialog(m_log_viewer_settings, this);
     dialog.setWindowTitle("SettingsDialog");
     dialog.resize(440, 300);
+    dialog.set_available_themes(BaseMainWindow::get_stylesheet_loader()->get_available_themes());
 
-    if (m_stylesheet_loader != nullptr)
-    {
-        dialog.set_available_themes(m_stylesheet_loader->get_available_themes());
-    }
-    else
-    {
-        qWarning() << "Stylesheet loader is null, cannot change theme.";
-    }
-
-    connect(&dialog, &SettingsDialog::theme_changed, this, &MainWindow::onThemeChanged);
     dialog.exec();
-}
-
-/**
- * @brief Slot: Handles theme changes.
- *
- * This slot is called when the application theme is changed.
- * It updates the UI to reflect the new theme.
- * @param theme_name The name of the new theme (e.g. "Dark", "Light").
- */
-void MainWindow::onThemeChanged(const QString& theme_name)
-{
-    if (m_stylesheet_loader)
-    {
-        m_stylesheet_loader->load_stylesheet(":/Resources/style.qss", theme_name);
-    }
-    else
-    {
-        qWarning() << "Stylesheet loader is null, cannot change theme.";
-    }
 }
 
 /**

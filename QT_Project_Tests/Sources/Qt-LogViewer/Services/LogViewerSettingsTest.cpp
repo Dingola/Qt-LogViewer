@@ -1,4 +1,4 @@
-#include "Qt-LogViewer/Services/AppSettingsTest.h"
+#include "Qt-LogViewer/Services/LogViewerSettingsTest.h"
 
 #include <QCoreApplication>
 #include <QFile>
@@ -7,15 +7,15 @@
 /**
  * @brief Sets up the test fixture for each test.
  */
-void AppSettingsTest::SetUp()
+void LogViewerSettingsTest::SetUp()
 {
-    m_app_settings = new AppSettings();
+    m_app_settings = new LogViewerSettings();
 }
 
 /**
  * @brief Tears down the test fixture after each test.
  */
-void AppSettingsTest::TearDown()
+void LogViewerSettingsTest::TearDown()
 {
     if (m_app_settings != nullptr)
     {
@@ -28,7 +28,7 @@ void AppSettingsTest::TearDown()
 /**
  * @brief Tests get_theme() and set_theme() methods.
  */
-TEST_F(AppSettingsTest, Theme)
+TEST_F(LogViewerSettingsTest, Theme)
 {
     // Default theme
     EXPECT_EQ(m_app_settings->get_theme(), QString("Dark"));
@@ -45,7 +45,7 @@ TEST_F(AppSettingsTest, Theme)
 /**
  * @brief Tests get_language() and set_language() methods.
  */
-TEST_F(AppSettingsTest, Language)
+TEST_F(LogViewerSettingsTest, Language)
 {
     // Default language
     EXPECT_EQ(m_app_settings->get_language(), QString("en"));
@@ -57,26 +57,4 @@ TEST_F(AppSettingsTest, Language)
     // Set language to "en"
     m_app_settings->set_language("en");
     EXPECT_EQ(m_app_settings->get_language(), QString("en"));
-}
-
-/**
- * @brief Tests persistence of theme and language settings.
- */
-TEST_F(AppSettingsTest, Persistence)
-{
-    QString file_path = QCoreApplication::applicationDirPath() + "/appsettings_test.ini";
-
-    // Set values
-    m_app_settings->set_theme("Light");
-    m_app_settings->set_language("de");
-    m_app_settings->save_to_file(file_path);
-
-    // Load into a new instance
-    AppSettings loaded_settings;
-    loaded_settings.load_from_file(file_path);
-
-    EXPECT_EQ(loaded_settings.get_theme(), QString("Light"));
-    EXPECT_EQ(loaded_settings.get_language(), QString("de"));
-
-    QFile::remove(file_path);
 }

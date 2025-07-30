@@ -2,20 +2,17 @@
 
 #include <QDebug>
 
-#include "Qt-LogViewer/Services/AppSettings.h"
+#include "Qt-LogViewer/Services/LogViewerSettings.h"
 #include "ui_SettingsDialog.h"
 
 /**
  * @brief Constructs a SettingsDialog and initializes the UI.
  * @param parent The parent widget, or nullptr.
  */
-SettingsDialog::SettingsDialog(AppSettings* settings, QWidget* parent)
+SettingsDialog::SettingsDialog(LogViewerSettings* settings, QWidget* parent)
     : QDialog(parent), ui(new Ui::SettingsDialog), m_settings(settings)
 {
     ui->setupUi(this);
-
-    load_available_languages();
-    load_available_themes();
 
     connect(ui->pushButtonApply, &QPushButton::clicked, this, &SettingsDialog::onApply);
     connect(ui->pushButtonOk, &QPushButton::clicked, this, &SettingsDialog::onOk);
@@ -25,6 +22,12 @@ SettingsDialog::SettingsDialog(AppSettings* settings, QWidget* parent)
     {
         set_current_language(m_settings->get_language());
         set_current_theme(m_settings->get_theme());
+    }
+    else
+    {
+        set_current_language("en");
+        set_current_theme("Dark");
+        qWarning() << "No LogViewerSettings provided, using defaults.";
     }
 
     m_applied_language = selected_language();
@@ -47,6 +50,11 @@ auto SettingsDialog::set_current_language(const QString& language_code) -> void
 {
     int index = ui->comboBoxLang->findData(language_code);
 
+    if (ui->comboBoxLang->count() == 0)
+    {
+        ui->comboBoxLang->addItem(language_code);
+    }
+
     if (index >= 0)
     {
         ui->comboBoxLang->setCurrentIndex(index);
@@ -66,6 +74,11 @@ auto SettingsDialog::set_current_language(const QString& language_code) -> void
 auto SettingsDialog::set_current_theme(const QString& theme_name) -> void
 {
     int index = ui->comboBoxTheme->findText(theme_name);
+
+    if (ui->comboBoxTheme->count() == 0)
+    {
+        ui->comboBoxTheme->addItem(theme_name);
+    }
 
     if (index >= 0)
     {
@@ -119,6 +132,7 @@ auto SettingsDialog::load_available_languages() -> void
     ui->comboBoxLang->clear();
     ui->comboBoxLang->addItem(tr("English"), "en");
     ui->comboBoxLang->addItem(tr("German"), "de");
+    set_current_language(m_applied_language);
 }
 
 /**
@@ -128,6 +142,7 @@ auto SettingsDialog::load_available_themes() -> void
 {
     ui->comboBoxTheme->clear();
     ui->comboBoxTheme->addItems(m_available_themes);
+    set_current_theme(m_applied_theme);
 }
 
 /**
@@ -170,6 +185,10 @@ auto SettingsDialog::apply_changes() -> void
             m_settings->set_language(selected_language());
             emit language_changed(selected_language());
         }
+        else
+        {
+            qWarning() << "No LogViewerSettings provided, cannot apply language change.";
+        }
     }
 
     if (selected_theme() != m_applied_theme)
@@ -178,6 +197,10 @@ auto SettingsDialog::apply_changes() -> void
         {
             m_settings->set_theme(selected_theme());
             emit theme_changed(selected_theme());
+        }
+        else
+        {
+            qWarning() << "No LogViewerSettings provided, cannot apply theme change.";
         }
     }
 }

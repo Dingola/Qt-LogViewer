@@ -2,41 +2,27 @@
 
 #include <QObject>
 #include <QSettings>
+#include <QStandardPaths>
 #include <QStringList>
 #include <QVariant>
 
 /**
  * @class Settings
- * @brief Wrapper class for QSettings.
+ * @brief A class for managing application settings with a simple interface.
  *
- * Encapsulates basic methods for reading, writing, and managing application settings
- * using QSettings.
- * Can be used directly or as a base class for application-specific settings.
+ * This class extends QSettings to provide a more convenient API for getting and setting
+ * values in groups, checking for key existence, and listing child groups and keys.
  */
-class Settings: public QObject
+class Settings: public QSettings
 {
         Q_OBJECT
 
     public:
-        /**
-         * @brief Constructs a Settings object with the given parent.
-         *        Uses QCoreApplication::organizationName() and applicationName() for QSettings.
-         * @param parent The parent QObject, or nullptr.
-         */
-        explicit Settings(QObject* parent = nullptr);
+        using QSettings::QSettings;
 
         ~Settings() override = default;
 
         // NOLINTBEGIN(modernize-use-trailing-return-type)
-
-        /**
-         * @brief Gets the value for a key.
-         * @param key The key to look up.
-         * @param default_value The value to return if the key does not exist.
-         * @return The value for the key, or default_value if not found.
-         */
-        [[nodiscard]] Q_INVOKABLE QVariant
-        get_value(const QString& key, const QVariant& default_value = QVariant()) const;
 
         /**
          * @brief Gets the value for a key in a group.
@@ -46,14 +32,7 @@ class Settings: public QObject
          * @return The value for the key, or default_value if not found.
          */
         [[nodiscard]] Q_INVOKABLE QVariant get_value(const QString& group, const QString& key,
-                                                     const QVariant& default_value) const;
-
-        /**
-         * @brief Sets the value for a key.
-         * @param key The key to set.
-         * @param value The value to set.
-         */
-        Q_INVOKABLE void set_value(const QString& key, const QVariant& value);
+                                                     const QVariant& default_value);
 
         /**
          * @brief Sets the value for a key in a group.
@@ -64,37 +43,18 @@ class Settings: public QObject
         Q_INVOKABLE void set_value(const QString& group, const QString& key, const QVariant& value);
 
         /**
-         * @brief Returns a list of all child groups.
-         * @return List of group names.
-         */
-        [[nodiscard]] Q_INVOKABLE QStringList child_groups() const;
-
-        /**
          * @brief Returns a list of child groups in a group.
          * @param group The group name.
          * @return List of group names.
          */
-        [[nodiscard]] Q_INVOKABLE QStringList child_groups(const QString& group) const;
+        [[nodiscard]] Q_INVOKABLE QStringList child_groups(const QString& group);
 
         /**
          * @brief Returns a list of child keys in a group.
          * @param group The group name.
          * @return List of key names.
          */
-        [[nodiscard]] Q_INVOKABLE QStringList child_keys(const QString& group) const;
-
-        /**
-         * @brief Returns a list of all keys.
-         * @return List of all keys.
-         */
-        [[nodiscard]] Q_INVOKABLE QStringList all_keys() const;
-
-        /**
-         * @brief Checks if a key exists.
-         * @param key The key to check.
-         * @return True if the key exists, false otherwise.
-         */
-        [[nodiscard]] Q_INVOKABLE bool contains(const QString& key) const;
+        [[nodiscard]] Q_INVOKABLE QStringList child_keys(const QString& group);
 
         /**
          * @brief Checks if a key exists in a group.
@@ -102,39 +62,29 @@ class Settings: public QObject
          * @param key The key name.
          * @return True if the key exists, false otherwise.
          */
-        [[nodiscard]] Q_INVOKABLE bool contains(const QString& group, const QString& key) const;
-
-        /**
-         * @brief Loads settings from a file (overwrites current settings).
-         * @param file_path The file to load from.
-         * @param format The QSettings format (default: IniFormat).
-         */
-        Q_INVOKABLE void load_from_file(const QString& file_path,
-                                        QSettings::Format format = QSettings::IniFormat);
-
-        /**
-         * @brief Saves current settings to a file.
-         * @param file_path The file to save to.
-         * @param format The QSettings format (default: IniFormat).
-         */
-        Q_INVOKABLE void save_to_file(const QString& file_path,
-                                      QSettings::Format format = QSettings::IniFormat);
-
-        /**
-         * @brief Clears all settings.
-         */
-        Q_INVOKABLE void clear();
+        [[nodiscard]] Q_INVOKABLE bool contains(const QString& group, const QString& key);
 
         // NOLINTEND(modernize-use-trailing-return-type)
 
-    protected:
         /**
-         * @brief Copies all settings from source to destination (recursive).
-         * @param source The source QSettings.
-         * @param destination The destination QSettings.
+         * @brief Returns a settings file path in the given standard location with the specified
+         * file name.
+         *
+         * Ensures the directory exists and returns the full path.
+         *
+         * @param location The QStandardPaths::StandardLocation (e.g. AppConfigLocation).
+         * @param file_name The name of the settings file (e.g. "settings.ini").
+         * @return The full file path as a QString.
          */
-        auto copy_settings(QSettings& source, QSettings& destination) -> void;
+        [[nodiscard]] static auto settings_file_path(QStandardPaths::StandardLocation location,
+                                                     const QString& file_name) -> QString;
 
-    private:
-        mutable QSettings m_settings;
+        /**
+         * @brief Returns the default settings file path ("settings.ini" in AppConfigLocation).
+         *
+         * Ensures the directory exists and returns the full path.
+         *
+         * @return The full file path as a QString.
+         */
+        [[nodiscard]] static auto default_settings_file_path() -> QString;
 };
