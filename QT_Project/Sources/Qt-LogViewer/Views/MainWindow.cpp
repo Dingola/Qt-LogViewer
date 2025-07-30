@@ -30,6 +30,7 @@ constexpr auto k_open_log_file_text = QT_TRANSLATE_NOOP("MainWindow", "Open Log 
 constexpr auto k_file_menu_text = QT_TRANSLATE_NOOP("MainWindow", "&File");
 constexpr auto k_loaded_log_files_status = QT_TRANSLATE_NOOP("MainWindow", "Loaded %1 log file(s)");
 constexpr auto k_search_placeholder_text = QT_TRANSLATE_NOOP("MainWindow", "Enter search text...");
+constexpr auto k_quit_text = QT_TRANSLATE_NOOP("MainWindow", "&Quit");
 }  // namespace
 
 /**
@@ -172,15 +173,34 @@ auto MainWindow::initialize_menu() -> void
 {
     // File menu
     auto file_menu = new QMenu(tr(k_file_menu_text), this);
+
+    // Action to open log files
     m_action_open_log_file = new QAction(tr(k_open_log_file_text), this);
+    m_action_open_log_file->setShortcut(QKeySequence::Open);
     file_menu->addAction(m_action_open_log_file);
     ui->menubar->addMenu(file_menu);
 
     connect(m_action_open_log_file, &QAction::triggered, this, &MainWindow::open_log_files);
 
+    // Separator before the quit action
+    file_menu->addSeparator();
+    // Action to quit the application
+    m_action_quit = new QAction(tr(k_quit_text), this);
+#ifdef Q_OS_WIN
+    m_action_quit->setShortcut(QKeySequence(QStringLiteral("Ctrl+Q")));
+#else
+    m_action_quit->setShortcut(QKeySequence::Quit);
+#endif
+    file_menu->addAction(m_action_quit);
+    ui->menubar->addMenu(file_menu);
+
+    connect(m_action_quit, &QAction::triggered, this, &QWidget::close);
+
     // Settings menu
     auto settings_menu = new QMenu(tr("&Settings"), this);
+
     m_action_settings = new QAction(tr("Settings..."), this);
+    m_action_settings->setShortcut(QKeySequence(QStringLiteral("Ctrl+,")));
     settings_menu->addAction(m_action_settings);
     ui->menubar->addMenu(settings_menu);
 

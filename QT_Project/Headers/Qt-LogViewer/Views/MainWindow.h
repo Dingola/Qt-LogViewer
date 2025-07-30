@@ -138,6 +138,11 @@ class MainWindow: public BaseMainWindow
         QAction* m_action_open_log_file = nullptr;
 
         /**
+         * @brief Action for quitting the application (appears in the File menu).
+         */
+        QAction* m_action_quit = nullptr;
+
+        /**
          * @brief Action for opening log files (appears in the Settings menu).
          */
         QAction* m_action_settings = nullptr;
