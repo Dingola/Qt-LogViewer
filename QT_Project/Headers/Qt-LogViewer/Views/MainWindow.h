@@ -9,6 +9,7 @@
 #include "Qt-LogViewer/Controllers/LogViewerController.h"
 #include "Qt-LogViewer/Services/StylesheetLoader.h"
 #include "Qt-LogViewer/Views/BaseMainWindow.h"
+#include "Qt-LogViewer/Views/LogFileExplorer.h"
 
 namespace Ui
 {
@@ -153,7 +154,17 @@ class MainWindow: public BaseMainWindow
         QDockWidget* m_log_details_dock_widget = nullptr;
 
         /**
+         * @brief Dock widget for the log file explorer.
+         */
+        QDockWidget* m_log_file_explorer_dock_widget = nullptr;
+
+        /**
          * @brief Text edit widget for showing detailed log information.
          */
         QPlainTextEdit* m_log_details_text_edit = nullptr;
+
+        /**
+         * @brief Pointer to the log file explorer widget.
+         */
+        LogFileExplorer* m_log_file_explorer = nullptr;
 };

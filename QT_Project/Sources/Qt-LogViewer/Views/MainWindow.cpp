@@ -14,6 +14,8 @@
 #include <QTimer>
 #include <QUrl>
 
+#include "Qt-LogViewer/Models/LogFilterProxyModel.h"
+#include "Qt-LogViewer/Models/LogModel.h"
 #include "Qt-LogViewer/Services/LogViewerSettings.h"
 #include "Qt-LogViewer/Views/HoverRowDelegate.h"
 #include "Qt-LogViewer/Views/SettingsDialog.h"
@@ -42,7 +44,10 @@ constexpr auto k_quit_text = QT_TRANSLATE_NOOP("MainWindow", "&Quit");
  * @param parent The parent widget, or nullptr if this is a top-level window.
  */
 MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
-    : BaseMainWindow(settings, parent), m_log_viewer_settings(settings), ui(new Ui::MainWindow)
+    : BaseMainWindow(settings, parent),
+      m_log_viewer_settings(settings),
+      m_controller(new LogViewerController("{timestamp} {level} {message} {app_name}", this)),
+      ui(new Ui::MainWindow)
 {
     qDebug() << "MainWindow constructor started";
     qInfo() << "Settings file:" << m_log_viewer_settings->fileName()
@@ -53,18 +58,18 @@ MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
 
     // Initialize the user interface
     ui->setupUi(this);
-
     setWindowIcon(QIcon(":/Resources/Icons/App/AppIcon.svg"));
-
     // Init combo box for app names
     update_app_combo_box({});
-
     initialize_menu();
-
-    // Initialize controller with a default log format string
-    m_controller = new LogViewerController("{timestamp} {level} {message} {app_name}", this);
-
     ui->lineEditSearch->setPlaceholderText(tr(k_search_placeholder_text));
+
+    // Set up the log file explorer
+    m_log_file_explorer = new LogFileExplorer(m_controller->get_log_file_tree_model(), this);
+    m_log_file_explorer_dock_widget = new QDockWidget(tr("Log File Explorer"), this);
+    m_log_file_explorer_dock_widget->setObjectName("logFileExplorerDockWidget");
+    m_log_file_explorer_dock_widget->setWidget(m_log_file_explorer);
+    addDockWidget(Qt::LeftDockWidgetArea, m_log_file_explorer_dock_widget);
 
     // Set up the model/view for the log table
     auto log_filter_proxy_model = m_controller->get_proxy_model();
@@ -376,6 +381,18 @@ auto MainWindow::load_files_and_update_ui(const QStringList& files) -> void
     if (!files.isEmpty())
     {
         QVector<QString> file_paths = files.toVector();
+
+        // TODO: Determine the correct application name for each log file (replace "Unknown" with
+        // actual app name).
+        QList<LogFileInfo> log_file_infos;
+        for (const QString& file_path: file_paths)
+        {
+            // Dummy-App-Name: "Unknown"
+            log_file_infos.append(LogFileInfo(file_path, QStringLiteral("Unknown")));
+        }
+
+        m_controller->add_log_files(log_file_infos);
+
         m_controller->load_logs(file_paths);
         QSet<QString> app_names = m_controller->get_app_names();
         update_app_combo_box(app_names);

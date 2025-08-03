@@ -1,10 +1,13 @@
 #pragma once
 
+#include <QList>
 #include <QObject>
 #include <QSet>
 #include <QString>
 #include <QVector>
 
+#include "Qt-LogViewer/Models/LogFileInfo.h"
+#include "Qt-LogViewer/Models/LogFileTreeModel.h"
 #include "Qt-LogViewer/Models/LogFilterProxyModel.h"
 #include "Qt-LogViewer/Models/LogModel.h"
 #include "Qt-LogViewer/Services/LogLoader.h"
@@ -24,6 +27,18 @@ class LogViewerController: public QObject
          * @param parent The parent QObject.
          */
         explicit LogViewerController(const QString& log_format, QObject* parent = nullptr);
+
+        /**
+         * @brief Fügt ein einzelnes LogFileInfo dem LogFileTreeModel hinzu.
+         * @param file Das LogFileInfo-Objekt, das hinzugefügt werden soll.
+         */
+        auto add_log_file(const LogFileInfo& file) -> void;
+
+        /**
+         * @brief Fügt mehrere LogFileInfo-Objekte dem LogFileTreeModel hinzu.
+         * @param files Die Liste der LogFileInfo-Objekte, die hinzugefügt werden sollen.
+         */
+        auto add_log_files(const QList<LogFileInfo>& files) -> void;
 
         /**
          * @brief Loads log files and updates the model.
@@ -68,8 +83,16 @@ class LogViewerController: public QObject
          */
         [[nodiscard]] auto get_app_names() const -> QSet<QString>;
 
+        /**
+         * @brief Returns the LogFileTreeModel.
+         *
+         * This model provides a hierarchical view of log files and their applications.
+         */
+        [[nodiscard]] auto get_log_file_tree_model() -> LogFileTreeModel*;
+
     private:
-        LogModel m_log_model;
-        LogFilterProxyModel m_proxy_model;
+        LogModel* m_log_model;
+        LogFileTreeModel* m_file_tree_model;
+        LogFilterProxyModel* m_proxy_model;
         LogLoader m_loader;
 };
