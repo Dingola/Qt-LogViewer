@@ -48,13 +48,13 @@ TEST_F(LogViewerSettingsTest, Theme)
 TEST_F(LogViewerSettingsTest, Language)
 {
     // Default language
-    EXPECT_EQ(m_app_settings->get_language(), QString("en"));
+    EXPECT_EQ(m_app_settings->get_language_code(), QString("en"));
 
     // Set language to "de"
-    m_app_settings->set_language("de");
-    EXPECT_EQ(m_app_settings->get_language(), QString("de"));
+    m_app_settings->set_language_code("de");
+    EXPECT_EQ(m_app_settings->get_language_code(), QString("de"));
 
     // Set language to "en"
-    m_app_settings->set_language("en");
-    EXPECT_EQ(m_app_settings->get_language(), QString("en"));
+    m_app_settings->set_language_code("en");
+    EXPECT_EQ(m_app_settings->get_language_code(), QString("en"));
 }

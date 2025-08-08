@@ -20,8 +20,10 @@ class MockPreferences: public QObject, public AppPreferencesInterface
     public:
         MOCK_METHOD(QString, get_theme, (), (override));
         MOCK_METHOD(void, set_theme, (const QString& value), (override));
-        MOCK_METHOD(QString, get_language, (), (override));
-        MOCK_METHOD(void, set_language, (const QString& value), (override));
+        MOCK_METHOD(QString, get_language_code, (), (override));
+        MOCK_METHOD(void, set_language_code, (const QString& language_code), (override));
+        MOCK_METHOD(QString, get_language_name, (), (override));
+        MOCK_METHOD(void, set_language_name, (const QString& language_name), (override));
         MOCK_METHOD(QByteArray, get_mainwindow_geometry, (), (override));
         MOCK_METHOD(void, set_mainwindow_geometry, (const QByteArray& geometry), (override));
         MOCK_METHOD(QByteArray, get_mainwindow_state, (), (override));
@@ -30,7 +32,8 @@ class MockPreferences: public QObject, public AppPreferencesInterface
         MOCK_METHOD(void, set_mainwindow_windowstate, (int state), (override));
 
     signals:
-        void languageChanged(const QString& language_code) override;
+        void languageCodeChanged(const QString& language_code) override;
+        void languageNameChanged(const QString& language_name) override;
         void themeChanged(const QString& theme_name) override;
 };
 
