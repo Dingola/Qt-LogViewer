@@ -154,6 +154,13 @@ class PaginationWidget: public QWidget
          */
         void paintEvent(QPaintEvent* event) override;
 
+    protected:
+        /**
+         * @brief Handles change events to update the UI.
+         * @param event The change event.
+         */
+        auto changeEvent(QEvent* event) -> void override;
+
     signals:
         /**
          * @brief Emitted when a new page is selected.

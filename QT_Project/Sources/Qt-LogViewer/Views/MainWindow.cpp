@@ -17,6 +17,7 @@
 #include "Qt-LogViewer/Models/LogFilterProxyModel.h"
 #include "Qt-LogViewer/Models/LogModel.h"
 #include "Qt-LogViewer/Services/LogViewerSettings.h"
+#include "Qt-LogViewer/Services/Translator.h"
 #include "Qt-LogViewer/Views/HoverRowDelegate.h"
 #include "Qt-LogViewer/Views/SettingsDialog.h"
 #include "Qt-LogViewer/Views/TableView.h"
@@ -481,6 +482,27 @@ void MainWindow::resizeEvent(QResizeEvent* event)
 }
 
 /**
+ * @brief Handles change events to update the UI.
+ * @param event The change event.
+ */
+auto MainWindow::changeEvent(QEvent* event) -> void
+{
+    if (event != nullptr && event->type() == QEvent::LanguageChange)
+    {
+        ui->retranslateUi(this);
+        ui->menubar->clear();
+        initialize_menu();
+        ui->lineEditSearch->setPlaceholderText(tr(k_search_placeholder_text));
+        m_log_file_explorer_dock_widget->setWindowTitle(tr("Log File Explorer"));
+        m_log_details_dock_widget->setWindowTitle(tr("Log Details"));
+        update_app_combo_box(m_controller->get_app_names());
+        update_pagination_widget();
+    }
+
+    BaseMainWindow::changeEvent(event);
+}
+
+/**
  * @brief Opens the settings dialog for changing application settings.
  */
 void MainWindow::show_settings_dialog()
@@ -489,6 +511,8 @@ void MainWindow::show_settings_dialog()
     dialog.setWindowTitle("SettingsDialog");
     dialog.resize(440, 300);
     dialog.set_available_themes(BaseMainWindow::get_stylesheet_loader()->get_available_themes());
+    dialog.set_available_language_names(
+        BaseMainWindow::get_translator()->get_available_language_names());
 
     dialog.exec();
 }

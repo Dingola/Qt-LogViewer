@@ -38,13 +38,24 @@ class LogViewerSettings: public Settings, public AppPreferencesInterface
          * @brief Returns the current language code.
          * @return The language code (e.g. "en", "de"). Default is "en".
          */
-        [[nodiscard]] auto get_language() -> QString override;
+        [[nodiscard]] auto get_language_code() -> QString override;
 
         /**
          * @brief Sets the language code.
          * @param value The language code to set (e.g. "en", "de").
          */
-        auto set_language(const QString& value) -> void override;
+        auto set_language_code(const QString& language_code) -> void override;
+
+        /**
+         * @brief Returns the current language name (e.g. "English", "Deutsch").
+         */
+        [[nodiscard]] auto get_language_name() -> QString override;
+
+        /**
+         * @brief Sets the language name.
+         * @param language_name The language name to set (e.g. "English", "Deutsch").
+         */
+        auto set_language_name(const QString& language_name) -> void override;
 
         /**
          * @brief Returns the last saved main window geometry (position and size).
@@ -88,7 +99,13 @@ class LogViewerSettings: public Settings, public AppPreferencesInterface
          * @brief Emitted when the language is changed.
          * @param language_code The new language code.
          */
-        void languageChanged(const QString& language_code) override;
+        void languageCodeChanged(const QString& language_code) override;
+
+        /**
+         * @brief Emitted when the language name is changed.
+         * @param language_name The new language name.
+         */
+        void languageNameChanged(const QString& language_name) override;
 
         /**
          * @brief Emitted when the theme is changed.

@@ -106,6 +106,13 @@ class MainWindow: public BaseMainWindow
          */
         void resizeEvent(QResizeEvent* event) override;
 
+    protected:
+        /**
+         * @brief Handles change events to update the UI.
+         * @param event The change event.
+         */
+        auto changeEvent(QEvent* event) -> void override;
+
     private slots:
         /**
          * @brief Opens log files using a file dialog.

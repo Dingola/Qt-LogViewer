@@ -4,6 +4,7 @@
 
 class AppPreferencesInterface;
 class StylesheetLoader;
+class Translator;
 
 /**
  * @class BaseMainWindow
@@ -44,6 +45,16 @@ class BaseMainWindow: public QMainWindow
          * @return Pointer to the StylesheetLoader object.
          */
         [[nodiscard]] auto get_stylesheet_loader() const -> StylesheetLoader*;
+
+        /**
+         * @brief Gets the translator object.
+         *
+         * This method provides access to the Translator object used for managing translations in
+         * the application.
+         *
+         * @return Pointer to the Translator object.
+         */
+        [[nodiscard]] auto get_translator() const -> Translator*;
 
     protected:
         /**
@@ -86,6 +97,24 @@ class BaseMainWindow: public QMainWindow
          */
         void onThemeChanged(const QString& theme_name);
 
+        /**
+         * @brief Slot: Handles language code changes.
+         *
+         * This slot is called when the application language code is changed.
+         * It updates the UI to reflect the new language.
+         * @param language_code The new language code (e.g. "en", "de").
+         */
+        void onLanguageCodeChanged(const QString& language_code);
+
+        /**
+         * @brief Slot: Handles language name changes.
+         *
+         * This slot is called when the application language name is changed.
+         * It updates the UI to reflect the new language name.
+         * @param language_name The new language name (e.g. "English", "Deutsch").
+         */
+        void onLanguageNameChanged(const QString& language_name);
+
     private:
         /**
          * @brief Pointer to the Settings object used for managing application settings.
@@ -106,4 +135,14 @@ class BaseMainWindow: public QMainWindow
          * @brief Indicates whether the window settings have been restored.
          */
         bool m_window_restored = false;
+
+        /**
+         * @brief Pointer to the Translator object used for managing translations.
+         */
+        Translator* m_translator = nullptr;
+
+        /**
+         * @brief Indicates whether the language has been applied.
+         */
+        bool m_language_applied = false;
 };

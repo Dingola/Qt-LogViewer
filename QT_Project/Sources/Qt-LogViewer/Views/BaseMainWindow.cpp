@@ -3,6 +3,7 @@
 #include "Qt-LogViewer/Services/AppPreferencesInterface.h"
 #include "Qt-LogViewer/Services/Settings.h"
 #include "Qt-LogViewer/Services/StylesheetLoader.h"
+#include "Qt-LogViewer/Services/Translator.h"
 
 /**
  * @brief Constructs a BaseMainWindow object.
@@ -17,7 +18,8 @@
 BaseMainWindow::BaseMainWindow(AppPreferencesInterface* preferences, QWidget* parent)
     : QMainWindow(parent),
       m_preferences(preferences),
-      m_stylesheet_loader(new StylesheetLoader(this))
+      m_stylesheet_loader(new StylesheetLoader(this)),
+      m_translator(new Translator(this))
 {
     qDebug() << "BaseMainWindow constructor started";
 
@@ -26,6 +28,10 @@ BaseMainWindow::BaseMainWindow(AppPreferencesInterface* preferences, QWidget* pa
     // syntax only works with signals declared in QObject-based classes using Q_OBJECT.
     connect(dynamic_cast<QObject*>(m_preferences), SIGNAL(themeChanged(QString)), this,
             SLOT(onThemeChanged(QString)));
+    connect(dynamic_cast<QObject*>(m_preferences), SIGNAL(languageNameChanged(QString)), this,
+            SLOT(onLanguageNameChanged(QString)));
+    connect(dynamic_cast<QObject*>(m_preferences), SIGNAL(languageCodeChanged(QString)), this,
+            SLOT(onLanguageCodeChanged(QString)));
 
     qDebug() << "BaseMainWindow constructor finished";
 }
@@ -51,6 +57,19 @@ BaseMainWindow::~BaseMainWindow()
 auto BaseMainWindow::get_stylesheet_loader() const -> StylesheetLoader*
 {
     return m_stylesheet_loader;
+}
+
+/**
+ * @brief Gets the translator object.
+ *
+ * This method provides access to the Translator object used for managing translations in the
+ * application.
+ *
+ * @return Pointer to the Translator object.
+ */
+auto BaseMainWindow::get_translator() const -> Translator*
+{
+    return m_translator;
 }
 
 /**
@@ -128,12 +147,24 @@ void BaseMainWindow::showEvent(QShowEvent* event)
         m_window_restored = true;
     }
 
-    if (!m_theme_applied && m_preferences != nullptr)
+    if (m_preferences != nullptr)
     {
-        const QString theme = m_preferences->get_theme();
-        m_stylesheet_loader->load_stylesheet(":/Resources/style.qss", theme);
-        m_theme_applied = true;
-        qInfo() << "[BaseMainWindow] Loaded theme from preferences (showEvent):" << theme;
+        if (!m_theme_applied)
+        {
+            const QString theme = m_preferences->get_theme();
+            m_stylesheet_loader->load_stylesheet(":/Resources/style.qss", theme);
+            m_theme_applied = true;
+            qInfo() << "[BaseMainWindow] Loaded theme from preferences (showEvent):" << theme;
+        }
+
+        if (!m_language_applied)
+        {
+            const QString language_code = m_preferences->get_language_code();
+            m_translator->load_translation(language_code);
+            m_language_applied = true;
+            qInfo() << "[BaseMainWindow] Loaded language from preferences (showEvent):"
+                    << language_code;
+        }
     }
 }
 
@@ -149,6 +180,78 @@ void BaseMainWindow::closeEvent(QCloseEvent* event)
 {
     save_window_settings();
     QMainWindow::closeEvent(event);
+}
+
+/**
+ * @brief Slot: Handles language code changes.
+ *
+ * This slot is called when the application language code is changed. It can be used to update the
+ * UI or perform other actions based on the new language code.
+ *
+ * @param language_code The new language code (e.g. "en", "de").
+ */
+void BaseMainWindow::onLanguageCodeChanged(const QString& language_code)
+{
+    QMap<QString, QString> code_name_map = m_translator->get_language_code_name_map();
+    QString language_name = code_name_map.value(language_code);
+
+    if (!language_name.isEmpty())
+    {
+        if (m_preferences != nullptr && m_preferences->get_language_name() != language_name)
+        {
+            QObject* obj = dynamic_cast<QObject*>(m_preferences);
+            obj->blockSignals(true);
+            m_preferences->set_language_name(language_name);
+            obj->blockSignals(false);
+        }
+    }
+    else
+    {
+        qWarning() << "[BaseMainWindow] Language name for language code not found:"
+                   << language_code;
+    }
+
+    m_translator->load_translation(language_code);
+}
+
+/**
+ * @brief Slot: Handles language name changes.
+ *
+ * This slot is called when the application language name is changed. It can be used to update the
+ * UI or perform other actions based on the new language name.
+ *
+ * @param language_name The new language name (e.g. "English", "Deutsch").
+ */
+void BaseMainWindow::onLanguageNameChanged(const QString& language_name)
+{
+    QMap<QString, QString> code_name_map = m_translator->get_language_code_name_map();
+    QString found_code;
+
+    for (auto it = code_name_map.begin(); it != code_name_map.end(); ++it)
+    {
+        if (it.value().compare(language_name, Qt::CaseInsensitive) == 0)
+        {
+            found_code = it.key();
+            break;
+        }
+    }
+
+    if (!found_code.isEmpty())
+    {
+        if (m_preferences != nullptr && m_preferences->get_language_code() != found_code)
+        {
+            QObject* obj = dynamic_cast<QObject*>(m_preferences);
+            obj->blockSignals(true);
+            m_preferences->set_language_code(found_code);
+            obj->blockSignals(false);
+        }
+
+        m_translator->load_translation(found_code);
+    }
+    else
+    {
+        qWarning() << "[BaseMainWindow] Language name not found:" << language_name;
+    }
 }
 
 /**

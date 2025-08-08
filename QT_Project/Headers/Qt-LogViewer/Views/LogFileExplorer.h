@@ -66,6 +66,13 @@ class LogFileExplorer: public QWidget
          */
         auto setup_connections() -> void;
 
+    protected:
+        /**
+         * @brief Handles change events to update the UI.
+         * @param event The change event.
+         */
+        auto changeEvent(QEvent* event) -> void override;
+
     public slots:
         /**
          * @brief Adds a single log file to the tree view.

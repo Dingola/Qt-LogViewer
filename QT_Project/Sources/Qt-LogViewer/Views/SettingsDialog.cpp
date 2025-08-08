@@ -20,12 +20,16 @@ SettingsDialog::SettingsDialog(LogViewerSettings* settings, QWidget* parent)
 
     if (m_settings != nullptr)
     {
-        set_current_language(m_settings->get_language());
+        set_current_language(m_settings->get_language_name());
         set_current_theme(m_settings->get_theme());
+        connect(m_settings, &LogViewerSettings::languageCodeChanged, this,
+                &SettingsDialog::set_current_language);
+        connect(m_settings, &LogViewerSettings::themeChanged, this,
+                &SettingsDialog::set_current_theme);
     }
     else
     {
-        set_current_language("en");
+        set_current_language("English");
         set_current_theme("Dark");
         qWarning() << "No LogViewerSettings provided, using defaults.";
     }
@@ -44,15 +48,15 @@ SettingsDialog::~SettingsDialog()
 
 /**
  * @brief Sets the current language selection.
- * @param language_code The language code (e.g. "en", "de").
+ * @param language_name The language name (e.g. "English").
  */
-auto SettingsDialog::set_current_language(const QString& language_code) -> void
+auto SettingsDialog::set_current_language(const QString& language_name) -> void
 {
-    int index = ui->comboBoxLang->findData(language_code);
+    int index = ui->comboBoxLang->findText(language_name);
 
     if (ui->comboBoxLang->count() == 0)
     {
-        ui->comboBoxLang->addItem(language_code);
+        ui->comboBoxLang->addItem(language_name);
     }
 
     if (index >= 0)
@@ -107,12 +111,22 @@ auto SettingsDialog::set_available_themes(const QStringList& themes) -> void
 }
 
 /**
+ * @brief Sets the language code to name mapping.
+ * @param language_code_name_map The map of language codes to names.
+ */
+auto SettingsDialog::set_available_language_names(const QStringList& language_names) -> void
+{
+    m_available_language_names = language_names;
+    load_available_languages();
+}
+
+/**
  * @brief Returns the selected language code.
  * @return The selected language code.
  */
 auto SettingsDialog::selected_language() const -> QString
 {
-    return ui->comboBoxLang->currentData().toString();
+    return ui->comboBoxLang->currentText();
 }
 
 /**
@@ -130,8 +144,12 @@ auto SettingsDialog::selected_theme() const -> QString
 auto SettingsDialog::load_available_languages() -> void
 {
     ui->comboBoxLang->clear();
-    ui->comboBoxLang->addItem(tr("English"), "en");
-    ui->comboBoxLang->addItem(tr("German"), "de");
+
+    for (auto& language_name: m_available_language_names)
+    {
+        ui->comboBoxLang->addItem(language_name);
+    }
+
     set_current_language(m_applied_language);
 }
 
@@ -182,8 +200,8 @@ auto SettingsDialog::apply_changes() -> void
     {
         if (m_settings != nullptr)
         {
-            m_settings->set_language(selected_language());
-            emit language_changed(selected_language());
+            m_settings->set_language_name(selected_language());
+            emit language_name_changed(selected_language());
         }
         else
         {
@@ -212,4 +230,20 @@ auto SettingsDialog::revert_changes() -> void
 {
     set_current_language(m_applied_language);
     set_current_theme(m_applied_theme);
+}
+
+/**
+ * @brief Handles change events to update the UI.
+ * @param event The change event.
+ */
+auto SettingsDialog::changeEvent(QEvent* event) -> void
+{
+    if (event != nullptr && event->type() == QEvent::LanguageChange)
+    {
+        ui->retranslateUi(this);
+        load_available_languages();
+        load_available_themes();
+    }
+
+    QDialog::changeEvent(event);
 }

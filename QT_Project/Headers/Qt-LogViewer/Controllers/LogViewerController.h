@@ -29,14 +29,19 @@ class LogViewerController: public QObject
         explicit LogViewerController(const QString& log_format, QObject* parent = nullptr);
 
         /**
-         * @brief Fügt ein einzelnes LogFileInfo dem LogFileTreeModel hinzu.
-         * @param file Das LogFileInfo-Objekt, das hinzugefügt werden soll.
+         * @brief Destroys the LogViewerController.
+         */
+        ~LogViewerController() override = default;
+
+        /**
+         * @brief Adds a single log file to the model.
+         * @param file The LogFileInfo object to add.
          */
         auto add_log_file(const LogFileInfo& file) -> void;
 
         /**
-         * @brief Fügt mehrere LogFileInfo-Objekte dem LogFileTreeModel hinzu.
-         * @param files Die Liste der LogFileInfo-Objekte, die hinzugefügt werden sollen.
+         * @brief Adds multiple log files to the model.
+         * @param files The list of LogFileInfo objects to add.
          */
         auto add_log_files(const QList<LogFileInfo>& files) -> void;
 

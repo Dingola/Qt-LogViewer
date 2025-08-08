@@ -88,6 +88,20 @@ auto LogFileExplorer::setup_connections() -> void
 }
 
 /**
+ * @brief Handles change events to update the UI.
+ * @param event The change event.
+ */
+auto LogFileExplorer::changeEvent(QEvent* event) -> void
+{
+    if (event != nullptr && event->type() == QEvent::LanguageChange)
+    {
+        ui->retranslateUi(this);
+    }
+
+    QWidget::changeEvent(event);
+}
+
+/**
  * @brief Adds a single log file to the tree view.
  * @param file The LogFileInfo to add.
  */

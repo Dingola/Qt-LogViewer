@@ -16,8 +16,11 @@ LogViewerController::LogViewerController(const QString& log_format, QObject* par
 }
 
 /**
- * @brief Fügt ein einzelnes LogFileInfo dem LogFileTreeModel hinzu.
- * @param file Das LogFileInfo-Objekt, das hinzugefügt werden soll.
+ * @brief Adds a single log file to the model.
+ * @param file The LogFileInfo object to add.
+ *
+ * This method adds a single log file to the LogFileTreeModel. If the model is not initialized,
+ * it does nothing.
  */
 auto LogViewerController::add_log_file(const LogFileInfo& file) -> void
 {
@@ -28,8 +31,11 @@ auto LogViewerController::add_log_file(const LogFileInfo& file) -> void
 }
 
 /**
- * @brief Fügt mehrere LogFileInfo-Objekte dem LogFileTreeModel hinzu.
- * @param files Die Liste der LogFileInfo-Objekte, die hinzugefügt werden sollen.
+ * @brief Adds multiple log files to the model.
+ * @param files The list of LogFileInfo objects to add.
+ *
+ * This method iterates through the provided list of log files and adds each one to the
+ * LogFileTreeModel.
  */
 auto LogViewerController::add_log_files(const QList<LogFileInfo>& files) -> void
 {

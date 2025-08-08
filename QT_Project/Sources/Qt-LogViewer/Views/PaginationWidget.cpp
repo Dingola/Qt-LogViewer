@@ -504,6 +504,23 @@ void PaginationWidget::paintEvent(QPaintEvent* event)
 }
 
 /**
+ * @brief Handles change events to update the UI.
+ * This method is called when the widget's properties change.
+ * @param event The change event.
+ */
+auto PaginationWidget::changeEvent(QEvent* event) -> void
+{
+    if (event != nullptr && event->type() == QEvent::LanguageChange)
+    {
+        ui->retranslateUi(this);
+        ui->labelItemsPerPage->setText(tr("Per page"));
+        update_pagination();
+    }
+
+    QWidget::changeEvent(event);
+}
+
+/**
  * @brief Slot: Go to previous page.
  */
 auto PaginationWidget::onPrevClicked() -> void

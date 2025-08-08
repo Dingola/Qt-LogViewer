@@ -36,9 +36,9 @@ class SettingsDialog: public QDialog
 
         /**
          * @brief Sets the current language selection.
-         * @param language_code The language code (e.g. "en", "de").
+         * @param language_name The language name (e.g. "English").
          */
-        auto set_current_language(const QString& language_code) -> void;
+        auto set_current_language(const QString& language_name) -> void;
 
         /**
          * @brief Sets the current theme selection.
@@ -55,6 +55,12 @@ class SettingsDialog: public QDialog
          * @param themes The list of available theme names.
          */
         auto set_available_themes(const QStringList& themes) -> void;
+
+        /**
+         * @brief Sets the language code to name mapping.
+         * @param language_code_name_map The map of language codes to names.
+         */
+        auto set_available_language_names(const QStringList& language_names) -> void;
 
         /**
          * @brief Returns the selected language code.
@@ -89,12 +95,19 @@ class SettingsDialog: public QDialog
          */
         auto revert_changes() -> void;
 
+    protected:
+        /**
+         * @brief Handles change events to update the UI.
+         * @param event The change event.
+         */
+        auto changeEvent(QEvent* event) -> void override;
+
     signals:
         /**
          * @brief Emitted when the language is changed.
-         * @param language_code The new language code.
+         * @param language_code The new language name.
          */
-        auto language_changed(const QString& language_code) -> void;
+        auto language_name_changed(const QString& language_name) -> void;
 
         /**
          * @brief Emitted when the theme is changed.
@@ -114,4 +127,5 @@ class SettingsDialog: public QDialog
         QString m_applied_language;
         QString m_applied_theme;
         QStringList m_available_themes;
+        QStringList m_available_language_names;
 };

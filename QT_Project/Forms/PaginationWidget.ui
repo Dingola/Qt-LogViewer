@@ -39,7 +39,7 @@
       <string>...</string>
      </property>
      <property name="icon">
-      <iconset resource="../resources.qrc">
+      <iconset>
        <normaloff>:/Resources/left-arrow.svg</normaloff>:/Resources/left-arrow.svg</iconset>
      </property>
     </widget>
@@ -53,7 +53,7 @@
       <string>...</string>
      </property>
      <property name="icon">
-      <iconset resource="../resources.qrc">
+      <iconset>
        <normaloff>:/Resources/right-arrow.svg</normaloff>:/Resources/right-arrow.svg</iconset>
      </property>
     </widget>
@@ -80,7 +80,7 @@
       <string>...</string>
      </property>
      <property name="icon">
-      <iconset resource="../resources.qrc">
+      <iconset>
        <normaloff>:/Resources/left-arrow.svg</normaloff>:/Resources/left-arrow.svg</iconset>
      </property>
     </widget>
@@ -98,7 +98,7 @@
       <string>...</string>
      </property>
      <property name="icon">
-      <iconset resource="../resources.qrc">
+      <iconset>
        <normaloff>:/Resources/right-arrow.svg</normaloff>:/Resources/right-arrow.svg</iconset>
      </property>
     </widget>

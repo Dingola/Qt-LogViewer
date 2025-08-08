@@ -23,19 +23,37 @@ auto LogViewerSettings::set_theme(const QString& value) -> void
  * @brief Returns the current language code.
  * @return The language code (e.g. "en", "de"). Default is "en".
  */
-auto LogViewerSettings::get_language() -> QString
+auto LogViewerSettings::get_language_code() -> QString
 {
-    return get_value("General", "language", "en").toString();
+    return get_value("General", "language_code", "en").toString();
 }
 
 /**
  * @brief Sets the language code.
  * @param value The language code to set (e.g. "en", "de").
  */
-auto LogViewerSettings::set_language(const QString& value) -> void
+auto LogViewerSettings::set_language_code(const QString& language_code) -> void
 {
-    set_value("General", "language", value);
-    emit languageChanged(value);
+    set_value("General", "language_code", language_code);
+    emit languageCodeChanged(language_code);
+}
+
+/**
+ * @brief Returns the current language name (e.g. "English", "Deutsch").
+ */
+auto LogViewerSettings::get_language_name() -> QString
+{
+    return get_value("General", "language_name", "English").toString();
+}
+
+/**
+ * @brief Sets the language name.
+ * @param language_name The language name to set (e.g. "English", "Deutsch").
+ */
+auto LogViewerSettings::set_language_name(const QString& language_name) -> void
+{
+    set_value("General", "language_name", language_name);
+    emit languageNameChanged(language_name);
 }
 
 /**
