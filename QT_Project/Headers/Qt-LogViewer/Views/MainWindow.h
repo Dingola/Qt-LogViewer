@@ -151,6 +151,16 @@ class MainWindow: public BaseMainWindow
         QAction* m_action_quit = nullptr;
 
         /**
+         * @brief Action for showing the log file explorer (appears in the View menu).
+         */
+        QAction* m_action_show_log_file_explorer = nullptr;
+
+        /**
+         * @brief Action for showing log details (appears in the View menu).
+         */
+        QAction* m_action_show_log_details = nullptr;
+
+        /**
          * @brief Action for opening log files (appears in the Settings menu).
          */
         QAction* m_action_settings = nullptr;

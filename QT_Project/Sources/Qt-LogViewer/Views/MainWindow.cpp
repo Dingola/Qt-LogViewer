@@ -34,6 +34,10 @@ constexpr auto k_file_menu_text = QT_TRANSLATE_NOOP("MainWindow", "&File");
 constexpr auto k_loaded_log_files_status = QT_TRANSLATE_NOOP("MainWindow", "Loaded %1 log file(s)");
 constexpr auto k_search_placeholder_text = QT_TRANSLATE_NOOP("MainWindow", "Enter search text...");
 constexpr auto k_quit_text = QT_TRANSLATE_NOOP("MainWindow", "&Quit");
+constexpr auto k_views_menu_text = QT_TRANSLATE_NOOP("MainWindow", "&Views");
+constexpr auto k_show_log_file_explorer_text =
+    QT_TRANSLATE_NOOP("MainWindow", "Show Log File Explorer");
+constexpr auto k_show_log_details_text = QT_TRANSLATE_NOOP("MainWindow", "Show Log Details");
 }  // namespace
 
 /**
@@ -62,7 +66,6 @@ MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
     setWindowIcon(QIcon(":/Resources/Icons/App/AppIcon.svg"));
     // Init combo box for app names
     update_app_combo_box({});
-    initialize_menu();
     ui->lineEditSearch->setPlaceholderText(tr(k_search_placeholder_text));
 
     // Set up the log file explorer
@@ -133,6 +136,8 @@ MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
 
     addDockWidget(Qt::BottomDockWidgetArea, m_log_details_dock_widget);
 
+    initialize_menu();
+
     // Connect filter controls to controller
     connect(ui->comboBoxApp, &QComboBox::currentTextChanged, this, [this](const QString& app_name) {
         m_controller->set_app_name_filter(
@@ -202,6 +207,31 @@ auto MainWindow::initialize_menu() -> void
     ui->menubar->addMenu(file_menu);
 
     connect(m_action_quit, &QAction::triggered, this, &QWidget::close);
+
+    // Views menu
+    auto views_menu = new QMenu(tr(k_views_menu_text), this);
+
+    m_action_show_log_file_explorer = new QAction(tr(k_show_log_file_explorer_text), this);
+    m_action_show_log_file_explorer->setCheckable(true);
+    m_action_show_log_file_explorer->setChecked(m_log_file_explorer_dock_widget->isVisible());
+    views_menu->addAction(m_action_show_log_file_explorer);
+
+    m_action_show_log_details = new QAction(tr(k_show_log_details_text), this);
+    m_action_show_log_details->setCheckable(true);
+    m_action_show_log_details->setChecked(m_log_details_dock_widget->isVisible());
+    views_menu->addAction(m_action_show_log_details);
+
+    ui->menubar->addMenu(views_menu);
+
+    connect(m_action_show_log_file_explorer, &QAction::toggled, this,
+            [this](bool checked) { m_log_file_explorer_dock_widget->setVisible(checked); });
+    connect(m_log_file_explorer_dock_widget, &QDockWidget::visibilityChanged, this,
+            [this](bool visible) { m_action_show_log_file_explorer->setChecked(visible); });
+
+    connect(m_action_show_log_details, &QAction::toggled, this,
+            [this](bool checked) { m_log_details_dock_widget->setVisible(checked); });
+    connect(m_log_details_dock_widget, &QDockWidget::visibilityChanged, this,
+            [this](bool visible) { m_action_show_log_details->setChecked(visible); });
 
     // Settings menu
     auto settings_menu = new QMenu(tr("&Settings"), this);
