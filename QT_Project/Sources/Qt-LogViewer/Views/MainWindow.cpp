@@ -226,12 +226,21 @@ auto MainWindow::initialize_menu() -> void
     connect(m_action_show_log_file_explorer, &QAction::toggled, this,
             [this](bool checked) { m_log_file_explorer_dock_widget->setVisible(checked); });
     connect(m_log_file_explorer_dock_widget, &QDockWidget::visibilityChanged, this,
-            [this](bool visible) { m_action_show_log_file_explorer->setChecked(visible); });
+            [this](bool visible) {
+                if (!(windowState() & Qt::WindowMinimized))
+                {
+                    m_action_show_log_file_explorer->setChecked(visible);
+                }
+            });
 
     connect(m_action_show_log_details, &QAction::toggled, this,
             [this](bool checked) { m_log_details_dock_widget->setVisible(checked); });
-    connect(m_log_details_dock_widget, &QDockWidget::visibilityChanged, this,
-            [this](bool visible) { m_action_show_log_details->setChecked(visible); });
+    connect(m_log_details_dock_widget, &QDockWidget::visibilityChanged, this, [this](bool visible) {
+        if (!(windowState() & Qt::WindowMinimized))
+        {
+            m_action_show_log_details->setChecked(visible);
+        }
+    });
 
     // Settings menu
     auto settings_menu = new QMenu(tr("&Settings"), this);
