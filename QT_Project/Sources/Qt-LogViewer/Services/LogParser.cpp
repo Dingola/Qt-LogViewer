@@ -79,7 +79,7 @@ auto LogParser::parse_line(const QString& line) const -> LogEntry
         }
 
         QString level = values.value("level");
-        QString message = values.value("message");
+        QString message = values.value("message").trimmed();
         QString app_name = values.value("app_name");
 
         result = LogEntry(timestamp, level, message, app_name);
