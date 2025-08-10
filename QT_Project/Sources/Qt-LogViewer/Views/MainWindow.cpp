@@ -18,6 +18,7 @@
 #include "Qt-LogViewer/Models/LogModel.h"
 #include "Qt-LogViewer/Services/LogViewerSettings.h"
 #include "Qt-LogViewer/Services/Translator.h"
+#include "Qt-LogViewer/Services/UiUtils.h"
 #include "Qt-LogViewer/Views/HoverRowDelegate.h"
 #include "Qt-LogViewer/Views/SettingsDialog.h"
 #include "Qt-LogViewer/Views/TableView.h"
@@ -67,13 +68,25 @@ MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
     // Init combo box for app names
     update_app_combo_box({});
     ui->lineEditSearch->setPlaceholderText(tr(k_search_placeholder_text));
+    QIcon search_icon(
+        UiUtils::colored_svg_icon(":/Resources/Icons/magnifying-glass.svg", QColor("#42a5f5")));
+    ui->lineEditSearch->addAction(search_icon, QLineEdit::LeadingPosition);
+
+    if (ui->logLevelBar->layout() != nullptr)
+    {
+        ui->logLevelBar->layout()->setContentsMargins(6, 6, 6, 6);
+    }
 
     // Set up the log file explorer
     m_log_file_explorer = new LogFileExplorer(m_controller->get_log_file_tree_model(), this);
     m_log_file_explorer_dock_widget = new QDockWidget(tr("Log File Explorer"), this);
+    m_log_file_explorer_dock_widget->setTitleBarWidget(
+        create_dock_title_bar(m_log_file_explorer_dock_widget, "logFileExplorerTitleBar"));
     m_log_file_explorer_dock_widget->setObjectName("logFileExplorerDockWidget");
     m_log_file_explorer_dock_widget->setWidget(m_log_file_explorer);
     addDockWidget(Qt::LeftDockWidgetArea, m_log_file_explorer_dock_widget);
+    setCorner(Qt::TopLeftCorner, Qt::LeftDockWidgetArea);
+    setCorner(Qt::BottomLeftCorner, Qt::LeftDockWidgetArea);
 
     // Set up the model/view for the log table
     auto log_filter_proxy_model = m_controller->get_proxy_model();
@@ -124,16 +137,17 @@ MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
     // Create and set up the dock widget for log details
     m_log_details_dock_widget = new QDockWidget(tr("Log Details"), this);
     m_log_details_dock_widget->setObjectName("logDetailsDockWidget");
+    m_log_details_dock_widget->setTitleBarWidget(
+        create_dock_title_bar(m_log_details_dock_widget, "logDetailsTitleBar"));
     m_log_details_text_edit = new QPlainTextEdit(m_log_details_dock_widget);
     m_log_details_text_edit->setObjectName("logDetailsTextEdit");
     m_log_details_text_edit->setReadOnly(true);
-    auto* container = new QWidget(m_log_details_dock_widget);
-    auto* layout = new QVBoxLayout(container);
-    layout->setContentsMargins(8, 0, 8, 8);
-    layout->addWidget(m_log_details_text_edit);
-    container->setLayout(layout);
-    m_log_details_dock_widget->setWidget(container);
-
+    auto* log_details_container = new QWidget(m_log_details_dock_widget);
+    auto* log_details_layout = new QVBoxLayout(log_details_container);
+    log_details_layout->setContentsMargins(8, 0, 8, 8);
+    log_details_layout->addWidget(m_log_details_text_edit);
+    log_details_container->setLayout(log_details_layout);
+    m_log_details_dock_widget->setWidget(log_details_container);
     addDockWidget(Qt::BottomDockWidgetArea, m_log_details_dock_widget);
 
     initialize_menu();
@@ -271,6 +285,44 @@ auto MainWindow::initialize_menu() -> void
                                .arg(QCoreApplication::applicationName(), QT_VERSION_STR));
     });
     connect(about_qt_action, &QAction::triggered, this, [this] { QMessageBox::aboutQt(this); });
+}
+
+/**
+ * @brief Creates a custom title bar widget for a QDockWidget.
+ * @param dock_widget The dock widget to create the title bar for.
+ * @param object_name The object name for QSS styling.
+ * @return Pointer to the created QWidget.
+ */
+auto MainWindow::create_dock_title_bar(QDockWidget* dock_widget,
+                                       const QString& object_name) -> QWidget*
+{
+    auto* title_bar = new QWidget(dock_widget);
+    title_bar->setObjectName("dock_title_bar");
+
+    auto* layout = new QHBoxLayout(title_bar);
+    // Set layout margins to match or exceed the QSS top margin for consistent vertical alignment.
+    // The top margin must be at least as high as specified in the QSS for #dock_title_bar.
+    layout->setContentsMargins(10, 9, 10, 0);
+    layout->setSpacing(0);
+
+    // Add a label for the dock title
+    auto* label = new QLabel(dock_widget->windowTitle(), title_bar);
+    label->setObjectName("dock_title_label");
+    layout->addWidget(label);
+
+    layout->addStretch(1);
+
+    // Add a close button with standard icon
+    auto* close_button = new QPushButton(title_bar);
+    close_button->setObjectName("dock_title_bar_close_button");
+    close_button->setIcon(
+        title_bar->style()->standardIcon(QStyle::SP_TitleBarCloseButton, nullptr, title_bar));
+    close_button->setFlat(true);
+    layout->addWidget(close_button);
+
+    connect(close_button, &QPushButton::clicked, dock_widget, &QDockWidget::close);
+
+    return title_bar;
 }
 
 /**

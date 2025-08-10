@@ -53,6 +53,15 @@ class MainWindow: public BaseMainWindow
         auto initialize_menu() -> void;
 
         /**
+         * @brief Creates a custom title bar widget for a QDockWidget.
+         * @param dock_widget The dock widget to create the title bar for.
+         * @param object_name The object name for QSS styling.
+         * @return Pointer to the created QWidget.
+         */
+        [[nodiscard]] auto create_dock_title_bar(QDockWidget* dock_widget,
+                                                 const QString& object_name) -> QWidget*;
+
+        /**
          * @brief Updates the log level filter in the controller.
          */
         auto update_level_filter() -> void;

@@ -5,5 +5,7 @@
 		<file>Resources/down-arrow.svg</file>
 		<file>Resources/left-arrow.svg</file>
 		<file>Resources/right-arrow.svg</file>
+		<file>Resources/Icons/magnifying-glass.svg</file>
+		<file>Resources/Icons/magnifying-glass-2.svg</file>
 	</qresource>
 </RCC>

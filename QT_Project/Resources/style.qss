@@ -100,6 +100,13 @@ QWidget {
     font-size: 11pt;
 }
 
+/* === Log Level Bar === */
+#logLevelBar {
+    border: 1px solid @ColorBorder;
+    border-radius: 8px;
+    background-color: @ColorTableBackground;
+}
+
 /* === Filter/Search Bar === */
 #filterBar {
     background-color: @ColorFilterBarBackground;
@@ -164,6 +171,11 @@ QLineEdit:disabled {
 }
 QLineEdit[text=""] { 
 	color: @ColorTextPlaceholder;
+}
+
+QLineEdit#lineEditSearch {
+    min-height: 28px;
+    max-height: 28px;
 }
 
 QLineEdit#lineEditJumpTo {
@@ -330,7 +342,6 @@ QToolButton {
     border-radius: 10px;
     color: @ColorText; /* Use dark text for normal tool buttons */
     min-width: 32px;
-    min-height: 32px;
     max-width: 32px;
     max-height: 32px;
     padding: 0;
@@ -473,6 +484,11 @@ QTreeView {
     border: 1px solid @ColorBorder;
     border-radius: 6px;
     color: @ColorText;
+    outline: none;
+}
+QTreeView::item {
+    padding-top: 4px;
+    padding-bottom: 4px;
 }
 QTreeView::item:hover {
     background: @ColorFilterBarBackground;
@@ -507,19 +523,31 @@ QTabBar::tab:hover {
 }
 
 /* === DockerWidget === */
-QDockWidget {
-    font-size: 11pt;
-    font-weight: bold;
-}
 
-QDockWidget::title {
-    padding-left: 16px;
-    padding-right: 16px;
+#dock_title_bar {
+    margin-top: 9px;
     margin-right: 8px;
     margin-left: 8px;
     background: @ColorDockHeader;
     border: 1px solid @ColorBorder;
     border-top-left-radius: 8px;
     border-top-right-radius: 8px;
+}
+
+#dock_title_label {
+    padding: 2px 16px;
     color: @ColorDockHeaderText;
+    font-size: 11pt;
+    font-weight: bold;
+}
+
+#dock_title_bar_close_button {
+    padding: 2px;
+    margin: 4px;
+    background: @ColorButtonBackground;
+    border-radius: 6px;
+}
+
+#dock_title_bar_close_button:hover {
+    background: @ColorButtonBackgroundHover;
 }
