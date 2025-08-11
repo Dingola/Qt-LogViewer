@@ -16,171 +16,7 @@
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout">
     <item>
-     <widget class="QWidget" name="filterBar" native="true">
-      <property name="layoutDirection">
-       <enum>Qt::LeftToRight</enum>
-      </property>
-      <layout class="QGridLayout" name="gridLayout" columnstretch="0,0,0,0,0">
-       <property name="sizeConstraint">
-        <enum>QLayout::SetDefaultConstraint</enum>
-       </property>
-       <property name="leftMargin">
-        <number>24</number>
-       </property>
-       <property name="topMargin">
-        <number>16</number>
-       </property>
-       <property name="rightMargin">
-        <number>24</number>
-       </property>
-       <property name="bottomMargin">
-        <number>16</number>
-       </property>
-       <property name="verticalSpacing">
-        <number>12</number>
-       </property>
-       <item row="1" column="1" colspan="4">
-        <layout class="QHBoxLayout" name="horizontalLayoutSearch">
-         <property name="spacing">
-          <number>12</number>
-         </property>
-         <property name="sizeConstraint">
-          <enum>QLayout::SetDefaultConstraint</enum>
-         </property>
-         <item>
-          <widget class="QLabel" name="labelSearchArea">
-           <property name="text">
-            <string>Search area:</string>
-           </property>
-           <property name="buddy">
-            <cstring>comboBoxSearchArea</cstring>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QComboBox" name="comboBoxSearchArea"/>
-         </item>
-         <item>
-          <widget class="QCheckBox" name="checkBoxRegEx">
-           <property name="text">
-            <string>Regex</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QLineEdit" name="lineEditSearch"/>
-         </item>
-         <item>
-          <widget class="QPushButton" name="pushButtonSearch">
-           <property name="text">
-            <string>Search</string>
-           </property>
-          </widget>
-         </item>
-        </layout>
-       </item>
-       <item row="0" column="4">
-        <layout class="QHBoxLayout" name="horizontalLayoutLogLevels" stretch="0,0,0">
-         <property name="spacing">
-          <number>10</number>
-         </property>
-         <property name="sizeConstraint">
-          <enum>QLayout::SetDefaultConstraint</enum>
-         </property>
-         <item>
-          <widget class="QLabel" name="labelFilter">
-           <property name="text">
-            <string>Filter:</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QComboBox" name="comboBoxApp">
-           <property name="sizeAdjustPolicy">
-            <enum>QComboBox::AdjustToContents</enum>
-           </property>
-           <property name="minimumContentsLength">
-            <number>1</number>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QWidget" name="logLevelBar" native="true">
-           <layout class="QHBoxLayout" name="horizontalLayout">
-            <property name="leftMargin">
-             <number>6</number>
-            </property>
-            <property name="topMargin">
-             <number>6</number>
-            </property>
-            <property name="rightMargin">
-             <number>6</number>
-            </property>
-            <property name="bottomMargin">
-             <number>6</number>
-            </property>
-            <item>
-             <widget class="QCheckBox" name="checkBoxTrace">
-              <property name="text">
-               <string>Trace</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QCheckBox" name="checkBoxDebug">
-              <property name="text">
-               <string>Debug</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QCheckBox" name="checkBoxInfo">
-              <property name="text">
-               <string>Info</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QCheckBox" name="checkBoxWarning">
-              <property name="text">
-               <string>Warning</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QCheckBox" name="checkBoxError">
-              <property name="text">
-               <string>Error</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QCheckBox" name="checkBoxFatal">
-              <property name="text">
-               <string>Fatal</string>
-              </property>
-             </widget>
-            </item>
-           </layout>
-          </widget>
-         </item>
-        </layout>
-       </item>
-       <item row="0" column="1">
-        <spacer name="horizontalSpacer">
-         <property name="orientation">
-          <enum>Qt::Horizontal</enum>
-         </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>40</width>
-           <height>20</height>
-          </size>
-         </property>
-        </spacer>
-       </item>
-      </layout>
-     </widget>
+     <widget class="FilterBarWidget" name="filterBarWidget" native="true"/>
     </item>
     <item>
      <layout class="QVBoxLayout" name="verticalLayoutViewLog">
@@ -228,12 +64,14 @@
    <header>Qt-LogViewer/Views/PaginationWidget.h</header>
    <container>1</container>
   </customwidget>
+  <customwidget>
+   <class>FilterBarWidget</class>
+   <extends>QWidget</extends>
+   <header>Qt-LogViewer/Views/FilterBarWidget.h</header>
+   <container>1</container>
+  </customwidget>
  </customwidgets>
  <tabstops>
-  <tabstop>comboBoxSearchArea</tabstop>
-  <tabstop>checkBoxRegEx</tabstop>
-  <tabstop>lineEditSearch</tabstop>
-  <tabstop>pushButtonSearch</tabstop>
   <tabstop>tableViewLog</tabstop>
  </tabstops>
  <resources/>

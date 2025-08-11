@@ -54,26 +54,10 @@ class MainWindow: public BaseMainWindow
         auto initialize_menu() -> void;
 
         /**
-         * @brief Updates the log level filter in the controller.
-         */
-        auto update_level_filter() -> void;
-
-        /**
-         * @brief Updates the search filter in the controller.
-         */
-        auto update_search_filter() -> void;
-
-        /**
          * @brief Updates the log details view when a row is selected.
          * @param current The current selected index.
          */
         auto update_log_details(const QModelIndex& current) -> void;
-
-        /**
-         * @brief Updates the application combo box with the given application names.
-         * @param app_names The set of application names to populate the combo box.
-         */
-        auto update_app_combo_box(const QSet<QString>& app_names) -> void;
 
         /**
          * @brief Updates the pagination widget based on the current page and total pages.
@@ -124,6 +108,14 @@ class MainWindow: public BaseMainWindow
          * @brief Shows the settings dialog for changing application settings.
          */
         void show_settings_dialog();
+
+        /**
+         * @brief Handles search changes in the filter bar widget.
+         *
+         * This method retrieves the search text, field, and regex status from the filter bar
+         * widget, then updates the controller's search filter accordingly.
+         */
+        auto on_search_changed() -> void;
 
     private:
         /**

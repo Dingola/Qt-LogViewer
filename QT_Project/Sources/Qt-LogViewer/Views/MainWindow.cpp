@@ -18,7 +18,6 @@
 #include "Qt-LogViewer/Models/LogModel.h"
 #include "Qt-LogViewer/Services/LogViewerSettings.h"
 #include "Qt-LogViewer/Services/Translator.h"
-#include "Qt-LogViewer/Services/UiUtils.h"
 #include "Qt-LogViewer/Views/HoverRowDelegate.h"
 #include "Qt-LogViewer/Views/SettingsDialog.h"
 #include "Qt-LogViewer/Views/TableView.h"
@@ -26,14 +25,10 @@
 
 namespace
 {
-constexpr auto k_show_all_apps_text = QT_TRANSLATE_NOOP("MainWindow", "Show All Apps");
-constexpr auto k_show_all_apps_tooltip =
-    QT_TRANSLATE_NOOP("MainWindow", "Show logs from all applications");
 constexpr auto k_open_log_files_text = QT_TRANSLATE_NOOP("MainWindow", "Open Log Files");
 constexpr auto k_open_log_file_text = QT_TRANSLATE_NOOP("MainWindow", "Open Log File...");
 constexpr auto k_file_menu_text = QT_TRANSLATE_NOOP("MainWindow", "&File");
 constexpr auto k_loaded_log_files_status = QT_TRANSLATE_NOOP("MainWindow", "Loaded %1 log file(s)");
-constexpr auto k_search_placeholder_text = QT_TRANSLATE_NOOP("MainWindow", "Enter search text...");
 constexpr auto k_quit_text = QT_TRANSLATE_NOOP("MainWindow", "&Quit");
 constexpr auto k_views_menu_text = QT_TRANSLATE_NOOP("MainWindow", "&Views");
 constexpr auto k_show_log_file_explorer_text =
@@ -65,17 +60,6 @@ MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
     // Initialize the user interface
     ui->setupUi(this);
     setWindowIcon(QIcon(":/Resources/Icons/App/AppIcon.svg"));
-    // Init combo box for app names
-    update_app_combo_box({});
-    ui->lineEditSearch->setPlaceholderText(tr(k_search_placeholder_text));
-    QIcon search_icon(
-        UiUtils::colored_svg_icon(":/Resources/Icons/magnifying-glass.svg", QColor("#42a5f5")));
-    ui->lineEditSearch->addAction(search_icon, QLineEdit::LeadingPosition);
-
-    if (ui->logLevelBar->layout() != nullptr)
-    {
-        ui->logLevelBar->layout()->setContentsMargins(6, 6, 6, 6);
-    }
 
     // Set up the log file explorer
     m_log_file_explorer = new LogFileExplorer(m_controller->get_log_file_tree_model(), this);
@@ -128,12 +112,6 @@ MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
                 update_pagination_widget();
             });
 
-    // Populate search area combo box
-    ui->comboBoxSearchArea->addItems(QStringList()
-                                     << "All Fields" << "Message" << "Level" << "AppName");
-
-    ui->comboBoxApp->setFixedWidth(140);
-
     // Create and set up the dock widget for log details
     m_log_details_dock_widget = new DockWidget(tr("Log Details"), this);
     m_log_details_dock_widget->setObjectName("logDetailsDockWidget");
@@ -153,25 +131,25 @@ MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
     initialize_menu();
 
     // Connect filter controls to controller
-    connect(ui->comboBoxApp, &QComboBox::currentTextChanged, this, [this](const QString& app_name) {
-        m_controller->set_app_name_filter(
-            (app_name == tr(k_show_all_apps_text) ? QString() : app_name));
-        update_pagination_widget();
-    });
-
-    connect(ui->checkBoxTrace, &QCheckBox::toggled, this, &MainWindow::update_level_filter);
-    connect(ui->checkBoxDebug, &QCheckBox::toggled, this, &MainWindow::update_level_filter);
-    connect(ui->checkBoxInfo, &QCheckBox::toggled, this, &MainWindow::update_level_filter);
-    connect(ui->checkBoxWarning, &QCheckBox::toggled, this, &MainWindow::update_level_filter);
-    connect(ui->checkBoxError, &QCheckBox::toggled, this, &MainWindow::update_level_filter);
-    connect(ui->checkBoxFatal, &QCheckBox::toggled, this, &MainWindow::update_level_filter);
-
-    connect(ui->lineEditSearch, &QLineEdit::textChanged,
-            [=] { style()->polish(ui->lineEditSearch); });
-    connect(ui->lineEditSearch, &QLineEdit::textChanged, this, &MainWindow::update_search_filter);
-    connect(ui->comboBoxSearchArea, &QComboBox::currentTextChanged, this,
-            &MainWindow::update_search_filter);
-    connect(ui->checkBoxRegEx, &QCheckBox::toggled, this, &MainWindow::update_search_filter);
+    connect(ui->filterBarWidget, &FilterBarWidget::app_filter_changed, this,
+            [this](const QString& app_name) {
+                m_controller->set_app_name_filter(app_name);
+                update_pagination_widget();
+            });
+    connect(ui->filterBarWidget, &FilterBarWidget::log_level_filter_changed, this,
+            [this](const QSet<QString>& levels) {
+                qDebug() << "Level filter set to:" << levels;
+                m_controller->set_level_filter(levels);
+                update_pagination_widget();
+            });
+    connect(ui->filterBarWidget, &FilterBarWidget::search_requested, this,
+            &MainWindow::on_search_changed);
+    connect(ui->filterBarWidget, &FilterBarWidget::search_text_changed, this,
+            &MainWindow::on_search_changed);
+    connect(ui->filterBarWidget, &FilterBarWidget::search_field_changed, this,
+            &MainWindow::on_search_changed);
+    connect(ui->filterBarWidget, &FilterBarWidget::regex_toggled, this,
+            &MainWindow::on_search_changed);
 
     // Connect table selection to log details view
     connect(ui->tableViewLog->selectionModel(), &QItemSelectionModel::currentRowChanged, this,
@@ -279,56 +257,6 @@ auto MainWindow::initialize_menu() -> void
 }
 
 /**
- * @brief Updates the log level filter in the controller.
- */
-auto MainWindow::update_level_filter() -> void
-{
-    QSet<QString> levels;
-
-    if (ui->checkBoxTrace->isChecked())
-    {
-        levels.insert("TRACE");
-    }
-    if (ui->checkBoxDebug->isChecked())
-    {
-        levels.insert("DEBUG");
-    }
-    if (ui->checkBoxInfo->isChecked())
-    {
-        levels.insert("INFO");
-    }
-    if (ui->checkBoxWarning->isChecked())
-    {
-        levels.insert("WARNING");
-    }
-    if (ui->checkBoxError->isChecked())
-    {
-        levels.insert("ERROR");
-    }
-    if (ui->checkBoxFatal->isChecked())
-    {
-        levels.insert("FATAL");
-    }
-
-    qDebug() << "Level filter set to:" << levels;
-    m_controller->set_level_filter(levels);
-    update_pagination_widget();
-}
-
-/**
- * @brief Updates the search filter in the controller.
- */
-auto MainWindow::update_search_filter() -> void
-{
-    QString search_text = ui->lineEditSearch->text();
-    QString field = ui->comboBoxSearchArea->currentText();
-    bool use_regex = ui->checkBoxRegEx->isChecked();
-    qDebug() << "Search filter:" << search_text << "Field:" << field << "Regex:" << use_regex;
-    m_controller->set_search_filter(search_text, field, use_regex);
-    update_pagination_widget();
-}
-
-/**
  * @brief Updates the log details view when a row is selected.
  * @param current The current selected index.
  */
@@ -351,36 +279,6 @@ auto MainWindow::update_log_details(const QModelIndex& current) -> void
 
     m_log_details_text_edit->setPlainText(details);
     qDebug() << "Log details updated for row:" << current.row();
-}
-
-/**
- * @brief Updates the application combo box with the given application names.
- *
- * This method clears the combo box, adds a default entry and populates it
- * with the provided application names. It also disables the combo box if no application
- * names are provided.
- *
- * @param app_names A set of application names to populate the combo box.
- */
-auto MainWindow::update_app_combo_box(const QSet<QString>& app_names) -> void
-{
-    ui->comboBoxApp->blockSignals(true);
-    ui->comboBoxApp->clear();
-    ui->comboBoxApp->addItem(tr(k_show_all_apps_text));
-    ui->comboBoxApp->setItemData(0, tr(k_show_all_apps_tooltip), Qt::ToolTipRole);
-
-    for (const QString& app: app_names)
-    {
-        if (!app.isEmpty())
-        {
-            ui->comboBoxApp->addItem(app);
-        }
-    }
-
-    ui->comboBoxApp->setCurrentIndex(0);
-    ui->comboBoxApp->setEnabled(!app_names.isEmpty());
-    ui->comboBoxApp->blockSignals(false);
-    qDebug() << "App combo box updated with" << app_names.size() << "apps.";
 }
 
 /**
@@ -440,10 +338,9 @@ auto MainWindow::load_files_and_update_ui(const QStringList& files) -> void
 
         m_controller->load_logs(file_paths);
         QSet<QString> app_names = m_controller->get_app_names();
-        update_app_combo_box(app_names);
-
+        ui->filterBarWidget->set_app_names(app_names);
         qDebug() << "Loaded" << app_names.size() << "apps from" << files.size() << "files.";
-        update_app_combo_box(app_names);
+
         update_pagination_widget();
         statusBar()->showMessage(tr(k_loaded_log_files_status).arg(files.size()), 3000);
     }
@@ -536,14 +433,25 @@ auto MainWindow::changeEvent(QEvent* event) -> void
         ui->retranslateUi(this);
         ui->menubar->clear();
         initialize_menu();
-        ui->lineEditSearch->setPlaceholderText(tr(k_search_placeholder_text));
         m_log_file_explorer_dock_widget->setWindowTitle(tr("Log File Explorer"));
         m_log_details_dock_widget->setWindowTitle(tr("Log Details"));
-        update_app_combo_box(m_controller->get_app_names());
+        ui->filterBarWidget->set_app_names(m_controller->get_app_names());
         update_pagination_widget();
     }
 
     BaseMainWindow::changeEvent(event);
+}
+
+/**
+ * @brief Opens log files using a file dialog and loads them into the controller.
+ */
+void MainWindow::open_log_files()
+{
+    qDebug() << "Opening log file dialog";
+    QStringList files = QFileDialog::getOpenFileNames(this, tr(k_open_log_files_text), QString(),
+                                                      tr("Log Files (*.log *.txt);;All Files (*)"));
+    qDebug() << "Files selected:" << files;
+    load_files_and_update_ui(files);
 }
 
 /**
@@ -562,13 +470,17 @@ void MainWindow::show_settings_dialog()
 }
 
 /**
- * @brief Opens log files using a file dialog and loads them into the controller.
+ * @brief Handles search changes in the filter bar widget.
+ *
+ * This method retrieves the search text, field, and regex status from the filter bar widget,
+ * then updates the controller's search filter accordingly.
  */
-void MainWindow::open_log_files()
+auto MainWindow::on_search_changed() -> void
 {
-    qDebug() << "Opening log file dialog";
-    QStringList files = QFileDialog::getOpenFileNames(this, tr(k_open_log_files_text), QString(),
-                                                      tr("Log Files (*.log *.txt);;All Files (*)"));
-    qDebug() << "Files selected:" << files;
-    load_files_and_update_ui(files);
+    QString search_text = ui->filterBarWidget->get_search_text();
+    QString field = ui->filterBarWidget->get_search_field();
+    bool use_regex = ui->filterBarWidget->get_use_regex();
+    qDebug() << "Search filter:" << search_text << "Field:" << field << "Regex:" << use_regex;
+    m_controller->set_search_filter(search_text, field, use_regex);
+    update_pagination_widget();
 }

@@ -108,7 +108,7 @@ QWidget {
 }
 
 /* === Filter/Search Bar === */
-#filterBar {
+#filterBarWidget {
     background-color: @ColorFilterBarBackground;
     border: 1px solid @ColorBorder;
     border-radius: 8px;

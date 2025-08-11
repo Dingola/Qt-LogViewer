@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>FilterBarWidget</class>
+ <widget class="QWidget" name="FilterBarWidget">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>488</width>
+    <height>209</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>FilterBarWidget</string>
+  </property>
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <item>
+    <widget class="FilterWidget" name="filterWidget" native="true"/>
+   </item>
+   <item>
+    <widget class="SearchBarWidget" name="searchBarWidget" native="true"/>
+   </item>
+  </layout>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>FilterWidget</class>
+   <extends>QWidget</extends>
+   <header>Qt-LogViewer/Views/FilterWidget.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>SearchBarWidget</class>
+   <extends>QWidget</extends>
+   <header>Qt-LogViewer/Views/SearchBarWidget.h</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
+ <resources/>
+ <connections/>
+</ui>
