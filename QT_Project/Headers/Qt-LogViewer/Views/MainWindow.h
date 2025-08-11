@@ -9,6 +9,7 @@
 #include "Qt-LogViewer/Controllers/LogViewerController.h"
 #include "Qt-LogViewer/Services/StylesheetLoader.h"
 #include "Qt-LogViewer/Views/BaseMainWindow.h"
+#include "Qt-LogViewer/Views/DockWidget.h"
 #include "Qt-LogViewer/Views/LogFileExplorer.h"
 
 namespace Ui
@@ -51,15 +52,6 @@ class MainWindow: public BaseMainWindow
          * @brief Initializes the main menu bar and its actions.
          */
         auto initialize_menu() -> void;
-
-        /**
-         * @brief Creates a custom title bar widget for a QDockWidget.
-         * @param dock_widget The dock widget to create the title bar for.
-         * @param object_name The object name for QSS styling.
-         * @return Pointer to the created QWidget.
-         */
-        [[nodiscard]] auto create_dock_title_bar(QDockWidget* dock_widget,
-                                                 const QString& object_name) -> QWidget*;
 
         /**
          * @brief Updates the log level filter in the controller.
@@ -177,12 +169,12 @@ class MainWindow: public BaseMainWindow
         /**
          * @brief Dock widget for displaying log details.
          */
-        QDockWidget* m_log_details_dock_widget = nullptr;
+        DockWidget* m_log_details_dock_widget = nullptr;
 
         /**
          * @brief Dock widget for the log file explorer.
          */
-        QDockWidget* m_log_file_explorer_dock_widget = nullptr;
+        DockWidget* m_log_file_explorer_dock_widget = nullptr;
 
         /**
          * @brief Text edit widget for showing detailed log information.

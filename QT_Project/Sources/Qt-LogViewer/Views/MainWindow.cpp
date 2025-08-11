@@ -79,9 +79,9 @@ MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
 
     // Set up the log file explorer
     m_log_file_explorer = new LogFileExplorer(m_controller->get_log_file_tree_model(), this);
-    m_log_file_explorer_dock_widget = new QDockWidget(tr("Log File Explorer"), this);
-    m_log_file_explorer_dock_widget->setTitleBarWidget(
-        create_dock_title_bar(m_log_file_explorer_dock_widget, "logFileExplorerTitleBar"));
+    m_log_file_explorer_dock_widget = new DockWidget(tr("Log File Explorer"), this);
+    m_log_file_explorer_dock_widget->setTitleBarWidget(DockWidget::create_dock_title_bar(
+        m_log_file_explorer_dock_widget, "logFileExplorerTitleBar"));
     m_log_file_explorer_dock_widget->setObjectName("logFileExplorerDockWidget");
     m_log_file_explorer_dock_widget->setWidget(m_log_file_explorer);
     addDockWidget(Qt::LeftDockWidgetArea, m_log_file_explorer_dock_widget);
@@ -135,10 +135,10 @@ MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
     ui->comboBoxApp->setFixedWidth(140);
 
     // Create and set up the dock widget for log details
-    m_log_details_dock_widget = new QDockWidget(tr("Log Details"), this);
+    m_log_details_dock_widget = new DockWidget(tr("Log Details"), this);
     m_log_details_dock_widget->setObjectName("logDetailsDockWidget");
     m_log_details_dock_widget->setTitleBarWidget(
-        create_dock_title_bar(m_log_details_dock_widget, "logDetailsTitleBar"));
+        DockWidget::create_dock_title_bar(m_log_details_dock_widget, "logDetailsTitleBar"));
     m_log_details_text_edit = new QPlainTextEdit(m_log_details_dock_widget);
     m_log_details_text_edit->setObjectName("logDetailsTextEdit");
     m_log_details_text_edit->setReadOnly(true);
@@ -227,34 +227,25 @@ auto MainWindow::initialize_menu() -> void
 
     m_action_show_log_file_explorer = new QAction(tr(k_show_log_file_explorer_text), this);
     m_action_show_log_file_explorer->setCheckable(true);
-    m_action_show_log_file_explorer->setChecked(m_log_file_explorer_dock_widget->isVisible());
+    m_action_show_log_file_explorer->setChecked(true);
     views_menu->addAction(m_action_show_log_file_explorer);
 
     m_action_show_log_details = new QAction(tr(k_show_log_details_text), this);
     m_action_show_log_details->setCheckable(true);
-    m_action_show_log_details->setChecked(m_log_details_dock_widget->isVisible());
+    m_action_show_log_details->setChecked(true);
     views_menu->addAction(m_action_show_log_details);
 
     ui->menubar->addMenu(views_menu);
 
     connect(m_action_show_log_file_explorer, &QAction::toggled, this,
             [this](bool checked) { m_log_file_explorer_dock_widget->setVisible(checked); });
-    connect(m_log_file_explorer_dock_widget, &QDockWidget::visibilityChanged, this,
-            [this](bool visible) {
-                if (!(windowState() & Qt::WindowMinimized))
-                {
-                    m_action_show_log_file_explorer->setChecked(visible);
-                }
-            });
+    connect(m_log_file_explorer_dock_widget, &DockWidget::closed, this,
+            [this]() { m_action_show_log_file_explorer->setChecked(false); });
 
     connect(m_action_show_log_details, &QAction::toggled, this,
             [this](bool checked) { m_log_details_dock_widget->setVisible(checked); });
-    connect(m_log_details_dock_widget, &QDockWidget::visibilityChanged, this, [this](bool visible) {
-        if (!(windowState() & Qt::WindowMinimized))
-        {
-            m_action_show_log_details->setChecked(visible);
-        }
-    });
+    connect(m_log_details_dock_widget, &DockWidget::closed, this,
+            [this]() { m_action_show_log_details->setChecked(false); });
 
     // Settings menu
     auto settings_menu = new QMenu(tr("&Settings"), this);
@@ -285,44 +276,6 @@ auto MainWindow::initialize_menu() -> void
                                .arg(QCoreApplication::applicationName(), QT_VERSION_STR));
     });
     connect(about_qt_action, &QAction::triggered, this, [this] { QMessageBox::aboutQt(this); });
-}
-
-/**
- * @brief Creates a custom title bar widget for a QDockWidget.
- * @param dock_widget The dock widget to create the title bar for.
- * @param object_name The object name for QSS styling.
- * @return Pointer to the created QWidget.
- */
-auto MainWindow::create_dock_title_bar(QDockWidget* dock_widget,
-                                       const QString& object_name) -> QWidget*
-{
-    auto* title_bar = new QWidget(dock_widget);
-    title_bar->setObjectName("dock_title_bar");
-
-    auto* layout = new QHBoxLayout(title_bar);
-    // Set layout margins to match or exceed the QSS top margin for consistent vertical alignment.
-    // The top margin must be at least as high as specified in the QSS for #dock_title_bar.
-    layout->setContentsMargins(10, 9, 10, 0);
-    layout->setSpacing(0);
-
-    // Add a label for the dock title
-    auto* label = new QLabel(dock_widget->windowTitle(), title_bar);
-    label->setObjectName("dock_title_label");
-    layout->addWidget(label);
-
-    layout->addStretch(1);
-
-    // Add a close button with standard icon
-    auto* close_button = new QPushButton(title_bar);
-    close_button->setObjectName("dock_title_bar_close_button");
-    close_button->setIcon(
-        title_bar->style()->standardIcon(QStyle::SP_TitleBarCloseButton, nullptr, title_bar));
-    close_button->setFlat(true);
-    layout->addWidget(close_button);
-
-    connect(close_button, &QPushButton::clicked, dock_widget, &QDockWidget::close);
-
-    return title_bar;
 }
 
 /**
