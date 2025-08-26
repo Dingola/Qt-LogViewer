@@ -18,9 +18,8 @@
 #include "Qt-LogViewer/Models/LogModel.h"
 #include "Qt-LogViewer/Services/LogViewerSettings.h"
 #include "Qt-LogViewer/Services/Translator.h"
-#include "Qt-LogViewer/Views/HoverRowDelegate.h"
+#include "Qt-LogViewer/Views/LogTableView.h"
 #include "Qt-LogViewer/Views/SettingsDialog.h"
-#include "Qt-LogViewer/Views/TableView.h"
 #include "ui_MainWindow.h"
 
 namespace
@@ -75,28 +74,8 @@ MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
     // Set up the model/view for the log table
     auto log_filter_proxy_model = m_controller->get_proxy_model();
     ui->tableViewLog->setModel(log_filter_proxy_model);
-    ui->tableViewLog->setSelectionBehavior(QAbstractItemView::SelectRows);
-    ui->tableViewLog->setSelectionMode(QAbstractItemView::SingleSelection);
-    auto* header = ui->tableViewLog->horizontalHeader();
-    int column_count = ui->tableViewLog->model()->columnCount();
-    for (int i = 0; i < column_count; ++i)
-    {
-        header->setSectionResizeMode(
-            i, ((i == (column_count - 1)) ? QHeaderView::Stretch : QHeaderView::Interactive));
-    }
 
-    auto hover_delegate = new HoverRowDelegate(ui->tableViewLog);
-    ui->tableViewLog->setItemDelegate(hover_delegate);
-    ui->tableViewLog->setMouseTracking(true);
-    connect(ui->tableViewLog, &TableView::hover_index_changed, hover_delegate,
-            [hover_delegate](const QModelIndex& index) {
-                hover_delegate->set_hovered_row(index.isValid() ? index.row() : -1);
-                if (auto* view = qobject_cast<QAbstractItemView*>(hover_delegate->parent()))
-                {
-                    view->viewport()->update();
-                }
-            });
-
+    // Set up pagination
     ui->paginationWidget->set_max_page_buttons(7);
     int items_per_page = 25;
     log_filter_proxy_model->set_page_size(items_per_page);
@@ -382,12 +361,8 @@ void MainWindow::dropEvent(QDropEvent* event)
 }
 
 /**
- * @brief Resizes the table columns based on the window size.
- *
- * This method adjusts the column widths of the log table view when the window is resized.
- * It calculates the widths based on a percentage of the total width of the viewport.
- *
- * @param event The resize event containing the new size of the window.
+ * @brief Handles resize events to adjust the layout.
+ * @param event The resize event.
  */
 void MainWindow::resizeEvent(QResizeEvent* event)
 {
@@ -395,30 +370,7 @@ void MainWindow::resizeEvent(QResizeEvent* event)
 
     if (ui != nullptr)
     {
-        bool valid_model =
-            ui->tableViewLog->model() && ui->tableViewLog->model()->columnCount() >= 4;
-
-        if (valid_model)
-        {
-            int total_width = ui->tableViewLog->viewport()->width();
-            int col_0_width = static_cast<int>(total_width * 0.15);
-            int col_1_width = static_cast<int>(total_width * 0.10);
-            int col_2_width = static_cast<int>(total_width * 0.50);
-            int col_3_width = static_cast<int>(total_width * 0.15);
-
-            ui->tableViewLog->setColumnWidth(LogModel::Timestamp, col_0_width);
-            ui->tableViewLog->setColumnWidth(LogModel::Level, col_1_width);
-            ui->tableViewLog->setColumnWidth(LogModel::Message, col_2_width);
-            ui->tableViewLog->setColumnWidth(LogModel::AppName, col_3_width);
-#ifdef QT_DEBUG_VERBOSE
-            qDebug() << "Resizing columns to widths:" << col_0_width << col_1_width << col_2_width
-                     << col_3_width;
-#endif
-        }
-        else
-        {
-            qWarning() << "Table model invalid or has too few columns!";
-        }
+        ui->tableViewLog->auto_resize_columns();
     }
 }
 

@@ -24,7 +24,7 @@
        <number>0</number>
       </property>
       <item>
-       <widget class="TableView" name="tableViewLog"/>
+       <widget class="LogTableView" name="tableViewLog"/>
       </item>
       <item>
        <widget class="PaginationWidget" name="paginationWidget" native="true">
@@ -54,11 +54,6 @@
  </widget>
  <customwidgets>
   <customwidget>
-   <class>TableView</class>
-   <extends>QTableView</extends>
-   <header>Qt-LogViewer/Views/TableView.h</header>
-  </customwidget>
-  <customwidget>
    <class>PaginationWidget</class>
    <extends>QWidget</extends>
    <header>Qt-LogViewer/Views/PaginationWidget.h</header>
@@ -69,6 +64,11 @@
    <extends>QWidget</extends>
    <header>Qt-LogViewer/Views/FilterBarWidget.h</header>
    <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>LogTableView</class>
+   <extends>QTableView</extends>
+   <header>Qt-LogViewer/Views/LogTableView.h</header>
   </customwidget>
  </customwidgets>
  <tabstops>
