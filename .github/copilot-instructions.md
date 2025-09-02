@@ -38,9 +38,22 @@ The project is structured as a main application (`QT_Project`) and an optional t
 - Only **one return per method**, at the end of the method.  
   - Exception: `void` methods must not use `return`.
 - **Avoid** using `break` and `continue`.
+- Use `[[nodiscard]]` on functions where ignoring the return value would be a logical error or make the function call meaningless.  
+- **Follow the defined folder structure:**  
+  - `/Views` for UI-related classes  
+  - `/Services` for service layer code (logging, file I/O, etc.)  
+  - `/Models` for data models  
+  - `/Controllers` for application logic  
+- **Getter and setter naming convention:**  
+  - Getter methods must always start with `get` (e.g., `get_value()`).  
+  - Setter methods must always start with `set` (e.g., `set_value(int new_value)`).  
+
+## Documentation Rules
+
 - Always generate **Doxygen documentation** for both headers (`.h`) and implementation files (`.cpp`).  
-  - All documentation must be written **in English**.
-- Follow the defined folder structure (`Views`, `Services`, `Models`, `Controllers`).
+- All documentation must be written **in English**.  
+- **Any code change or addition (e.g., new class, method, parameter, or option) must always be accompanied by updated Doxygen documentation.**  
+- When making changes, always show **exactly where documentation has been added, updated, or removed**, so that code and docs remain fully synchronized.  
 
 ## Build and Test Guidelines
 

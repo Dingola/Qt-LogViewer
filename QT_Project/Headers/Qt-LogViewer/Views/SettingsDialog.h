@@ -1,8 +1,9 @@
 #pragma once
 
-#include <QDialog>
 #include <QString>
 #include <QStringList>
+
+#include "Qt-LogViewer/Views/Dialog.h"
 
 namespace Ui
 {
@@ -18,7 +19,7 @@ class LogViewerSettings;
  * Provides UI for selecting language and theme. Emits signals when settings are changed.
  * The dialog supports Apply, OK, and Cancel logic.
  */
-class SettingsDialog: public QDialog
+class SettingsDialog: public Dialog
 {
         Q_OBJECT
 
@@ -121,11 +122,11 @@ class SettingsDialog: public QDialog
         auto onCancel() -> void;
 
     private:
-        Ui::SettingsDialog* ui = nullptr;
+		Ui::SettingsDialog* ui = nullptr; 		 ///< Pointer to the UI definition generated from the .ui file.
 
-        LogViewerSettings* m_settings = nullptr;
-        QString m_applied_language;
-        QString m_applied_theme;
-        QStringList m_available_themes;
-        QStringList m_available_language_names;
+		LogViewerSettings* m_settings = nullptr; ///< Settings object for managing application settings.
+		QString m_applied_language;              ///< The language that was applied when the dialog was opened.
+		QString m_applied_theme;	             ///< The theme that was applied when the dialog was opened.
+		QStringList m_available_themes;	         ///< List of available theme names.
+		QStringList m_available_language_names;  ///< List of available language names.
 };

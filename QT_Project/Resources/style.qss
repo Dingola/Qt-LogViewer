@@ -551,3 +551,43 @@ QTabBar::tab:hover {
 #dock_title_bar_close_button:hover {
     background: @ColorButtonBackgroundHover;
 }
+
+/* === Dialogs === */
+
+#Dialog {
+    background: @ColorBackground;
+    border: 1px solid @ColorBorder;
+    qproperty-border_radius: 16;
+    border-radius: 16px;
+}
+
+#DialogHeaderWidget {
+    background: @ColorDockHeader;
+    border-top-left-radius: 16px;
+    border-top-right-radius: 16px;
+    border-bottom-left-radius: 0px;
+    border-bottom-right-radius: 0px;
+    border-bottom: 1px solid @ColorBorder;
+    padding: 8px 16px;
+}
+
+#DialogHeaderWidget QLabel {
+    color: @ColorDockHeaderText;
+    font-size: 15pt;
+    font-weight: bold;
+    letter-spacing: 0.5px;
+}
+
+#DialogHeaderCloseButton {
+    background: @ColorButtonBackground;
+    border-radius: 6px;
+    padding: 2px;
+    min-width: 24px;
+    min-height: 24px;
+    max-width: 24px;
+    max-height: 24px;
+}
+
+#DialogHeaderCloseButton:hover {
+    background: @ColorButtonBackgroundHover;
+}
