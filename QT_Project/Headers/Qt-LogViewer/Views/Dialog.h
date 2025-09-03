@@ -27,16 +27,16 @@ class Dialog: public QDialog
          */
         explicit Dialog(const QString& title, QWidget* parent = nullptr);
 
-		/**
-		 * @brief Returns the current border radius.
-		 * @return The border radius in pixels.
-		 */
+        /**
+         * @brief Returns the current border radius.
+         * @return The border radius in pixels.
+         */
         [[nodiscard]] auto get_border_radius() const -> int;
 
-		/**
-		 * @brief Sets the border radius for rounded corners.
-		 * @param radius The border radius in pixels.
-		 */
+        /**
+         * @brief Sets the border radius for rounded corners.
+         * @param radius The border radius in pixels.
+         */
         auto set_border_radius(int radius) -> void;
 
     protected:
@@ -58,7 +58,7 @@ class Dialog: public QDialog
          */
         void mouseReleaseEvent(QMouseEvent* event) override;
 
-		/**
+        /**
          * @brief Handles resize events to apply rounded corners.
          * @param event The resize event.
          */
@@ -71,7 +71,7 @@ class Dialog: public QDialog
         auto header_widget() -> DialogHeaderWidget*;
 
     private:
-		int m_border_radius = 16;			  ///< Border radius for rounded corners.
+        int m_border_radius = 16;             ///< Border radius for rounded corners.
         DialogHeaderWidget* m_header_widget;  ///< Custom header widget.
         QPoint m_drag_position;               ///< Position for drag-move.
         bool m_dragging = false;              ///< Dragging state.

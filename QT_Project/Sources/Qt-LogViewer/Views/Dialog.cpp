@@ -43,7 +43,8 @@ auto Dialog::get_border_radius() const -> int
  */
 auto Dialog::set_border_radius(int radius) -> void
 {
-    m_border_radius = radius; update();
+    m_border_radius = radius;
+    update();
 }
 
 /**

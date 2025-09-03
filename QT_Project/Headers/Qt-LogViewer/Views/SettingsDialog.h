@@ -122,11 +122,13 @@ class SettingsDialog: public Dialog
         auto onCancel() -> void;
 
     private:
-		Ui::SettingsDialog* ui = nullptr; 		 ///< Pointer to the UI definition generated from the .ui file.
+        Ui::SettingsDialog* ui =
+            nullptr;  ///< Pointer to the UI definition generated from the .ui file.
 
-		LogViewerSettings* m_settings = nullptr; ///< Settings object for managing application settings.
-		QString m_applied_language;              ///< The language that was applied when the dialog was opened.
-		QString m_applied_theme;	             ///< The theme that was applied when the dialog was opened.
-		QStringList m_available_themes;	         ///< List of available theme names.
-		QStringList m_available_language_names;  ///< List of available language names.
+        LogViewerSettings* m_settings =
+            nullptr;                 ///< Settings object for managing application settings.
+        QString m_applied_language;  ///< The language that was applied when the dialog was opened.
+        QString m_applied_theme;     ///< The theme that was applied when the dialog was opened.
+        QStringList m_available_themes;          ///< List of available theme names.
+        QStringList m_available_language_names;  ///< List of available language names.
 };

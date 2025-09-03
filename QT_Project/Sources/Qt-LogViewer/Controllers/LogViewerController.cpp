@@ -1,5 +1,7 @@
 #include "Qt-LogViewer/Controllers/LogViewerController.h"
 
+#include <algorithm>
+
 /**
  * @brief Constructs a LogViewerController.
  * @param log_format The log format string for parsing.
@@ -16,54 +18,44 @@ LogViewerController::LogViewerController(const QString& log_format, QObject* par
 }
 
 /**
- * @brief Adds a single log file to the model.
- * @param file The LogFileInfo object to add.
+ * @brief Loads log files from the specified file paths.
+ * @param file_paths A vector of file paths to load logs from.
  *
- * This method adds a single log file to the LogFileTreeModel. If the model is not initialized,
- * it does nothing.
- */
-auto LogViewerController::add_log_file(const LogFileInfo& file) -> void
-{
-    if (m_file_tree_model != nullptr)
-    {
-        m_file_tree_model->add_log_file(file);
-    }
-}
-
-/**
- * @brief Adds multiple log files to the model.
- * @param files The list of LogFileInfo objects to add.
- *
- * This method iterates through the provided list of log files and adds each one to the
- * LogFileTreeModel.
- */
-auto LogViewerController::add_log_files(const QList<LogFileInfo>& files) -> void
-{
-    if (m_file_tree_model != nullptr)
-    {
-        for (const auto& file: files)
-        {
-            m_file_tree_model->add_log_file(file);
-        }
-    }
-}
-
-/**
- * @brief Loads log files and updates the model.
- * @param file_paths The list of log file paths.
+ * This method uses the LogLoader service to parse log files and populate the LogModel.
+ * It also updates the LogFileTreeModel with information about the loaded log files.
  */
 auto LogViewerController::load_logs(const QVector<QString>& file_paths) -> void
 {
+    QVector<LogEntry> all_entries;
     QVector<LogEntry> entries;
-    QMap<QString, QVector<LogEntry>> app_logs = m_loader.load_logs_by_app(file_paths);
+    QList<LogFileInfo> log_file_infos;
+    QString app_name;
+    LogFileInfo loaded_log_file;
 
-    // Flatten all entries into a single list for the model
-    for (const auto& entry_list: app_logs)
+    for (const QString& file_path: file_paths)
     {
-        entries += entry_list;
+        if (!is_file_loaded(file_path))
+        {
+            entries = m_loader.load_log_file(file_path);
+
+            if (!entries.isEmpty())
+            {
+                app_name = entries.first().get_app_name();
+            }
+            else
+            {
+                app_name = LogLoader::identify_app(file_path);
+            }
+
+            loaded_log_file = LogFileInfo(file_path, app_name);
+            log_file_infos.append(loaded_log_file);
+            m_loaded_log_files.append(loaded_log_file);
+            all_entries += entries;
+        }
     }
 
-    m_log_model->add_entries(entries);
+    add_log_files(log_file_infos);
+    m_log_model->add_entries(all_entries);
 }
 
 /**
@@ -136,4 +128,51 @@ auto LogViewerController::get_app_names() const -> QSet<QString>
 auto LogViewerController::get_log_file_tree_model() -> LogFileTreeModel*
 {
     return m_file_tree_model;
+}
+
+/**
+ * @brief Adds a single log file to the model.
+ * @param file The LogFileInfo object to add.
+ *
+ * This method adds a single log file to the LogFileTreeModel. If the model is not initialized,
+ * it does nothing.
+ */
+auto LogViewerController::add_log_file(const LogFileInfo& file) -> void
+{
+    if (m_file_tree_model != nullptr)
+    {
+        m_file_tree_model->add_log_file(file);
+    }
+}
+
+/**
+ * @brief Adds multiple log files to the model.
+ * @param files The list of LogFileInfo objects to add.
+ *
+ * This method iterates through the provided list of log files and adds each one to the
+ * LogFileTreeModel.
+ */
+auto LogViewerController::add_log_files(const QList<LogFileInfo>& files) -> void
+{
+    if (m_file_tree_model != nullptr)
+    {
+        for (const auto& file: files)
+        {
+            m_file_tree_model->add_log_file(file);
+        }
+    }
+}
+
+/**
+ * @brief Checks if a log file is already loaded based on its file path.
+ * @param file_path The file path to check.
+ * @return True if the file is already loaded, false otherwise.
+ */
+auto LogViewerController::is_file_loaded(const QString& file_path) const -> bool
+{
+    auto it = std::find_if(
+        m_loaded_log_files.begin(), m_loaded_log_files.end(),
+        [&file_path](const LogFileInfo& info) { return info.get_file_path() == file_path; });
+
+    return (it != m_loaded_log_files.end());
 }

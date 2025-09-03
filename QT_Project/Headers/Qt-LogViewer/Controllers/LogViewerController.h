@@ -34,20 +34,11 @@ class LogViewerController: public QObject
         ~LogViewerController() override = default;
 
         /**
-         * @brief Adds a single log file to the model.
-         * @param file The LogFileInfo object to add.
-         */
-        auto add_log_file(const LogFileInfo& file) -> void;
-
-        /**
-         * @brief Adds multiple log files to the model.
-         * @param files The list of LogFileInfo objects to add.
-         */
-        auto add_log_files(const QList<LogFileInfo>& files) -> void;
-
-        /**
-         * @brief Loads log files and updates the model.
-         * @param file_paths The list of log file paths.
+         * @brief Loads log files from the specified file paths.
+         * @param file_paths A vector of file paths to load logs from.
+         *
+         * This method uses the LogLoader service to parse log files and populate the LogModel.
+         * It also updates the LogFileTreeModel with information about the loaded log files.
          */
         auto load_logs(const QVector<QString>& file_paths) -> void;
 
@@ -96,8 +87,29 @@ class LogViewerController: public QObject
         [[nodiscard]] auto get_log_file_tree_model() -> LogFileTreeModel*;
 
     private:
+        /**
+         * @brief Adds a single log file to the model.
+         * @param file The LogFileInfo object to add.
+         */
+        auto add_log_file(const LogFileInfo& file) -> void;
+
+        /**
+         * @brief Adds multiple log files to the model.
+         * @param files The list of LogFileInfo objects to add.
+         */
+        auto add_log_files(const QList<LogFileInfo>& files) -> void;
+
+        /**
+         * @brief Checks if a log file with the given file path is already loaded.
+         * @param file_path The file path to check.
+         * @return True if the file is already loaded, false otherwise.
+         */
+        auto is_file_loaded(const QString& file_path) const -> bool;
+
+    private:
         LogModel* m_log_model;
         LogFileTreeModel* m_file_tree_model;
         LogFilterProxyModel* m_proxy_model;
         LogLoader m_loader;
+        QList<LogFileInfo> m_loaded_log_files;
 };

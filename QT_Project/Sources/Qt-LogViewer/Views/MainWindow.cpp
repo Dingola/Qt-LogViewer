@@ -303,18 +303,6 @@ auto MainWindow::load_files_and_update_ui(const QStringList& files) -> void
     if (!files.isEmpty())
     {
         QVector<QString> file_paths = files.toVector();
-
-        // TODO: Determine the correct application name for each log file (replace "Unknown" with
-        // actual app name).
-        QList<LogFileInfo> log_file_infos;
-        for (const QString& file_path: file_paths)
-        {
-            // Dummy-App-Name: "Unknown"
-            log_file_infos.append(LogFileInfo(file_path, QStringLiteral("Unknown")));
-        }
-
-        m_controller->add_log_files(log_file_infos);
-
         m_controller->load_logs(file_paths);
         QSet<QString> app_names = m_controller->get_app_names();
         ui->filterBarWidget->set_app_names(app_names);

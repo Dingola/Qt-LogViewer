@@ -27,8 +27,7 @@ DialogHeaderWidget::DialogHeaderWidget(const QString& title, QWidget* parent)
     m_close_button->setObjectName("DialogHeaderCloseButton");
     m_close_button->setFixedSize(24, 24);
     m_close_button->setFlat(true);
-    m_close_button->setIcon(
-        style()->standardIcon(QStyle::SP_TitleBarCloseButton, nullptr, this));
+    m_close_button->setIcon(style()->standardIcon(QStyle::SP_TitleBarCloseButton, nullptr, this));
 
     connect(m_close_button, &QPushButton::clicked, this, &DialogHeaderWidget::close_requested);
 }

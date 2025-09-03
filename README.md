@@ -17,6 +17,7 @@
 ## 📖 [Table of Contents]
 - [Description](#description)
 - [Code Coverage Graphs](#-code-coverage-graphs)
+- [Tokens for GitHub Actions](#-tokens-for-github-actions)
 - [Solution Folder Structure](#solution-folder-structure)
 - [Configuration](#configuration)
   - [CMake Options](#cmake-options)
