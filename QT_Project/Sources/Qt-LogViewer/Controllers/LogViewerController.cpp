@@ -176,3 +176,26 @@ auto LogViewerController::is_file_loaded(const QString& file_path) const -> bool
 
     return (it != m_loaded_log_files.end());
 }
+
+/**
+ * @brief Removes a single log file from the model.
+ * @param log_file_infos The LogFileInfo object to remove.
+ *
+ * This method removes the specified log file from the LogFileTreeModel and also
+ * from the internal list of loaded log files.
+ */
+auto LogViewerController::remove_log_file(const LogFileInfo& log_file_infos) -> void
+{
+    m_file_tree_model->remove_log_file(log_file_infos);
+    m_log_model->remove_entries_by_file_path(log_file_infos.get_file_path());
+
+    auto it = std::remove_if(m_loaded_log_files.begin(), m_loaded_log_files.end(),
+                             [&log_file_infos](const LogFileInfo& info) {
+                                 return info.get_file_path() == log_file_infos.get_file_path();
+                             });
+
+    if (it != m_loaded_log_files.end())
+    {
+        m_loaded_log_files.erase(it, m_loaded_log_files.end());
+    }
+}

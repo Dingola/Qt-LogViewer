@@ -13,6 +13,15 @@ class LogFileTreeItem
 {
     public:
         /**
+         * @brief The type of the tree item (group or file).
+         */
+        enum class Type
+        {
+            Group,  ///< Represents an application group node.
+            File    ///< Represents a log file node.
+        };
+
+        /**
          * @brief Constructs a LogFileTreeItem.
          * @param data The list of column data for this item.
          * @param parent The parent item, or nullptr.
@@ -80,3 +89,5 @@ class LogFileTreeItem
         QVector<QVariant> m_item_data;
         LogFileTreeItem* m_parent_item;
 };
+
+Q_DECLARE_METATYPE(LogFileTreeItem::Type)

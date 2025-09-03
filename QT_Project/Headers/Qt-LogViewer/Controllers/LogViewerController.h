@@ -106,6 +106,13 @@ class LogViewerController: public QObject
          */
         auto is_file_loaded(const QString& file_path) const -> bool;
 
+    public slots:
+        /**
+         * @brief Removes a single log file from the model.
+         * @param file The LogFileInfo object to remove.
+         */
+        auto remove_log_file(const LogFileInfo& file) -> void;
+
     private:
         LogModel* m_log_model;
         LogFileTreeModel* m_file_tree_model;

@@ -23,6 +23,8 @@ auto main(int argc, char* argv[]) -> int
     // static linking.
     Q_INIT_RESOURCE(resources);
 
+    qRegisterMetaType<LogFileInfo>("LogFileInfo");
+
     QCoreApplication::setAttribute(Qt::AA_UseOpenGLES);
 
     QApplication app(argc, argv);

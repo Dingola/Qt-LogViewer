@@ -1,5 +1,7 @@
 #include "Qt-LogViewer/Views/LogFileExplorer.h"
 
+#include <QCursor>
+#include <QModelIndex>
 #include <QTreeView>
 
 #include "Qt-LogViewer/Models/LogFileInfo.h"
@@ -22,7 +24,9 @@ LogFileExplorer::LogFileExplorer(LogFileTreeModel* model, QWidget* parent)
     ui->treeView->setSelectionMode(QAbstractItemView::SingleSelection);
     ui->treeView->setExpandsOnDoubleClick(true);
     ui->treeView->setRootIsDecorated(true);
+    ui->treeView->setContextMenuPolicy(Qt::CustomContextMenu);
     setup_connections();
+    init_context_menu();
 }
 
 /**
@@ -63,11 +67,11 @@ auto LogFileExplorer::model() const -> LogFileTreeModel*
 
 /**
  * @brief Sets the log files to display in the tree view.
- * @param files The list of LogFileInfo objects.
+ * @param log_file_infos The list of LogFileInfo objects.
  */
-auto LogFileExplorer::set_log_files(const QList<LogFileInfo>& files) -> void
+auto LogFileExplorer::set_log_files(const QList<LogFileInfo>& log_file_infos) -> void
 {
-    m_model->set_log_files(files);
+    m_model->set_log_files(log_file_infos);
 }
 
 /**
@@ -81,10 +85,54 @@ auto LogFileExplorer::setup_connections() -> void
                 auto* item = static_cast<LogFileTreeItem*>(current.internalPointer());
                 if (item && item->parent_item())
                 {
-                    emit logFileSelected(LogFileInfo(item->data(0).toString(),
-                                                     item->parent_item()->data(0).toString()));
+                    emit file_selected(LogFileInfo(item->data(0).toString(),
+                                                   item->parent_item()->data(0).toString()));
                 }
             });
+    connect(ui->treeView, &QTreeView::customContextMenuRequested, this,
+            &LogFileExplorer::show_context_menu);
+}
+
+/**
+ * @brief Initializes the context menu for the tree view.
+ */
+auto LogFileExplorer::init_context_menu() -> void
+{
+    m_context_menu = new QMenu(this);
+    QAction* remove_action = new QAction(tr("Remove"), m_context_menu);
+    m_context_menu->addAction(remove_action);
+    connect(remove_action, &QAction::triggered, this, [this]() {
+        QModelIndex index = ui->treeView->currentIndex();
+        if (index.isValid())
+        {
+            auto* item = static_cast<LogFileTreeItem*>(index.internalPointer());
+
+            if (item != nullptr)
+            {
+                emit remove_requested(item->data(1).value<LogFileInfo>());
+            }
+        }
+    });
+}
+
+/**
+ * @brief Handles context menu requests on the tree view.
+ * @param pos The position where the menu should appear.
+ */
+auto LogFileExplorer::show_context_menu(const QPoint& pos) -> void
+{
+    QModelIndex index = ui->treeView->indexAt(pos);
+
+    if (index.isValid())
+    {
+        auto* item = static_cast<LogFileTreeItem*>(index.internalPointer());
+
+        if (item != nullptr &&
+            item->data(0).value<LogFileTreeItem::Type>() == LogFileTreeItem::Type::File)
+        {
+            m_context_menu->exec(ui->treeView->viewport()->mapToGlobal(pos));
+        }
+    }
 }
 
 /**
@@ -96,25 +144,8 @@ auto LogFileExplorer::changeEvent(QEvent* event) -> void
     if (event != nullptr && event->type() == QEvent::LanguageChange)
     {
         ui->retranslateUi(this);
+        init_context_menu();
     }
 
     QWidget::changeEvent(event);
-}
-
-/**
- * @brief Adds a single log file to the tree view.
- * @param file The LogFileInfo to add.
- */
-auto LogFileExplorer::add_log_file(const LogFileInfo& file) -> void
-{
-    m_model->add_log_file(file);
-}
-
-/**
- * @brief Removes a single log file from the tree view.
- * @param file The LogFileInfo to remove.
- */
-auto LogFileExplorer::remove_log_file(const LogFileInfo& file) -> void
-{
-    m_model->remove_log_file(file);
 }

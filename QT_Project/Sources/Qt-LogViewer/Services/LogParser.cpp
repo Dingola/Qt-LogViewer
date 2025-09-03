@@ -9,6 +9,8 @@
 #include <QFile>
 #include <QTextStream>
 
+#include "Qt-LogViewer/Models/LogFileInfo.h"
+
 /**
  * @brief Constructs a LogParser object from a format string.
  * @param format_string The format string (e.g. "{timestamp} {level} {message} {app_name}").
@@ -40,7 +42,7 @@ auto LogParser::parse_file(const QString& file_path) const -> QVector<LogEntry>
         while (!in.atEnd())
         {
             QString line = in.readLine();
-            LogEntry entry = parse_line(line);
+            LogEntry entry = parse_line(line, file_path);
 
             if (!entry.get_level().isEmpty())
             {
@@ -57,7 +59,7 @@ auto LogParser::parse_file(const QString& file_path) const -> QVector<LogEntry>
  * @param line The log line to parse.
  * @return The parsed LogEntry, or a default LogEntry if parsing fails.
  */
-auto LogParser::parse_line(const QString& line) const -> LogEntry
+auto LogParser::parse_line(const QString& line, const QString& file_path) const -> LogEntry
 {
     LogEntry result;
     QRegularExpressionMatch match = m_pattern.match(line);
@@ -82,7 +84,8 @@ auto LogParser::parse_line(const QString& line) const -> LogEntry
         QString message = values.value("message").trimmed();
         QString app_name = values.value("app_name");
 
-        result = LogEntry(timestamp, level, message, app_name);
+        LogFileInfo file_info(file_path, app_name);
+        result = LogEntry(timestamp, level, message, file_info);
     }
 
     return result;

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QMetaType>
 #include <QString>
 
 /**
@@ -10,6 +11,8 @@
  */
 class LogFileInfo
 {
+        Q_GADGET
+
     public:
         /**
          * @brief Constructs a LogFileInfo object.
@@ -47,3 +50,5 @@ class LogFileInfo
         QString m_file_path;
         QString m_app_name;
 };
+
+Q_DECLARE_METATYPE(LogFileInfo)

@@ -3,6 +3,8 @@
 #include <QDateTime>
 #include <QString>
 
+#include "Qt-LogViewer/Models/LogFileInfo.h"
+
 /**
  * @file LogEntry.h
  * @brief This file contains the definition of the LogEntry class.
@@ -26,7 +28,7 @@ class LogEntry
          * @param app_name The name of the application that generated the log.
          */
         LogEntry(const QDateTime& timestamp = QDateTime(), const QString& level = QString(),
-                 const QString& message = QString(), const QString& app_name = QString());
+                 const QString& message = QString(), const LogFileInfo& file_info = LogFileInfo());
 
         /**
          * @brief Destroys the LogEntry object.
@@ -58,6 +60,12 @@ class LogEntry
         [[nodiscard]] auto get_app_name() const -> QString;
 
         /**
+         * @brief Returns the LogFileInfo associated with this log entry.
+         * @return The LogFileInfo object.
+         */
+        [[nodiscard]] auto get_file_info() const -> LogFileInfo;
+
+        /**
          * @brief Sets the timestamp.
          * @param timestamp The new timestamp.
          */
@@ -81,9 +89,15 @@ class LogEntry
          */
         auto set_app_name(const QString& app_name) -> void;
 
+        /**
+         * @brief Sets the LogFileInfo.
+         * @param file_info The new LogFileInfo object.
+         */
+        auto set_file_info(const LogFileInfo& file_info) -> void;
+
     private:
         QDateTime m_timestamp;
         QString m_level;
         QString m_message;
-        QString m_app_name;
+        LogFileInfo m_file_info;
 };

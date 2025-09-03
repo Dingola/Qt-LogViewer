@@ -39,21 +39,21 @@ class LogFileTreeModel: public QAbstractItemModel
 
         /**
          * @brief Sets the log files to be displayed and grouped.
-         * @param files The list of LogFileInfo objects.
+         * @param log_file_infos The list of LogFileInfo objects.
          */
-        auto set_log_files(const QList<LogFileInfo>& files) -> void;
+        auto set_log_files(const QList<LogFileInfo>& log_file_infos) -> void;
 
         /**
          * @brief Adds a single log file to the model. Creates a new group if necessary.
-         * @param file The LogFileInfo to add.
+         * @param log_file_info The LogFileInfo to add.
          */
-        auto add_log_file(const LogFileInfo& file) -> void;
+        auto add_log_file(const LogFileInfo& log_file_info) -> void;
 
         /**
          * @brief Removes a single log file from the model. Removes the group if it becomes empty.
-         * @param file The LogFileInfo to remove.
+         * @param log_file_info The LogFileInfo to remove.
          */
-        auto remove_log_file(const LogFileInfo& file) -> void;
+        auto remove_log_file(const LogFileInfo& log_file_info) -> void;
 
         /**
          * @brief Returns the number of columns.
@@ -126,11 +126,11 @@ class LogFileTreeModel: public QAbstractItemModel
         /**
          * @brief Finds the row of a file in a group by file name.
          * @param group_item The group item.
-         * @param file_name The file name to search for.
+         * @param file_path The file path to search for.
          * @return The row index, or -1 if not found.
          */
         [[nodiscard]] auto find_file_row(LogFileTreeItem* group_item,
-                                         const QString& file_name) const -> int;
+                                         const QString& file_path) const -> int;
 
     private:
         LogFileTreeItem* m_root_item;

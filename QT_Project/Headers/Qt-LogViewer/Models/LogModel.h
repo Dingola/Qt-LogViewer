@@ -54,6 +54,12 @@ class LogModel: public QAbstractTableModel
         auto add_entries(const QVector<LogEntry>& entries) -> void;
         auto set_entries(const QVector<LogEntry>& entries) -> void;
 
+        /**
+         * @brief Removes all log entries associated with the given file path.
+         * @param file_path The file path whose log entries should be removed.
+         */
+        auto remove_entries_by_file_path(const QString& file_path) -> void;
+
     private:
         static auto map_log_level(const QString& level_str) -> SimpleCppLogger::LogLevel;
 

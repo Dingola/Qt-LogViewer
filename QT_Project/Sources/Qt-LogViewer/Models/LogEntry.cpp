@@ -13,8 +13,8 @@
  * @param app_name The application name.
  */
 LogEntry::LogEntry(const QDateTime& timestamp, const QString& level, const QString& message,
-                   const QString& app_name)
-    : m_timestamp(timestamp), m_level(level), m_message(message), m_app_name(app_name)
+                   const LogFileInfo& file_info)
+    : m_timestamp(timestamp), m_level(level), m_message(message), m_file_info(file_info)
 {}
 
 /**
@@ -50,7 +50,16 @@ auto LogEntry::get_message() const -> QString
  */
 auto LogEntry::get_app_name() const -> QString
 {
-    return m_app_name;
+    return m_file_info.get_app_name();
+}
+
+/**
+ * @brief Returns the LogFileInfo associated with this log entry.
+ * @return The LogFileInfo object.
+ */
+auto LogEntry::get_file_info() const -> LogFileInfo
+{
+    return m_file_info;
 }
 
 /**
@@ -86,5 +95,14 @@ auto LogEntry::set_message(const QString& message) -> void
  */
 auto LogEntry::set_app_name(const QString& app_name) -> void
 {
-    m_app_name = app_name;
+    m_file_info.set_app_name(app_name);
+}
+
+/**
+ * @brief Sets the LogFileInfo.
+ * @param file_info The new LogFileInfo object.
+ */
+auto LogEntry::set_file_info(const LogFileInfo& file_info) -> void
+{
+    m_file_info = file_info;
 }

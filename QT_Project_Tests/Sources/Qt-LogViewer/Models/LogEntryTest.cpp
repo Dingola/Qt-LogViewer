@@ -38,13 +38,15 @@ TEST_F(LogEntryTest, ParameterizedConstructor)
     QString level = "INFO";
     QString message = "Test log message";
     QString app_name = "TestApp";
+    LogFileInfo file_info("dummy.log", app_name);
 
-    LogEntry entry(timestamp, level, message, app_name);
+    LogEntry entry(timestamp, level, message, file_info);
 
     EXPECT_EQ(entry.get_timestamp(), timestamp);
     EXPECT_EQ(entry.get_level(), level);
     EXPECT_EQ(entry.get_message(), message);
     EXPECT_EQ(entry.get_app_name(), app_name);
+    EXPECT_EQ(entry.get_file_info().get_file_path(), "dummy.log");
 }
 
 /**
@@ -100,8 +102,9 @@ TEST_F(LogEntryTest, CopyConstructorAndAssignment)
     QString level = "DEBUG";
     QString message = "Copy test";
     QString app_name = "CopyApp";
+    LogFileInfo file_info("dummy.log", app_name);
 
-    LogEntry entry1(timestamp, level, message, app_name);
+    LogEntry entry1(timestamp, level, message, file_info);
     LogEntry entry2(entry1);  // Copy constructor
     LogEntry entry3;
     entry3 = entry1;  // Assignment
@@ -110,9 +113,11 @@ TEST_F(LogEntryTest, CopyConstructorAndAssignment)
     EXPECT_EQ(entry2.get_level(), level);
     EXPECT_EQ(entry2.get_message(), message);
     EXPECT_EQ(entry2.get_app_name(), app_name);
+    EXPECT_EQ(entry2.get_file_info().get_file_path(), "dummy.log");
 
     EXPECT_EQ(entry3.get_timestamp(), timestamp);
     EXPECT_EQ(entry3.get_level(), level);
     EXPECT_EQ(entry3.get_message(), message);
     EXPECT_EQ(entry3.get_app_name(), app_name);
+    EXPECT_EQ(entry3.get_file_info().get_file_path(), "dummy.log");
 }

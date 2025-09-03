@@ -296,6 +296,21 @@ auto LogModel::set_entries(const QVector<LogEntry>& entries) -> void
 }
 
 /**
+ * @brief Removes all log entries associated with the given file path.
+ * @param file_path The file path whose log entries should be removed.
+ */
+auto LogModel::remove_entries_by_file_path(const QString& file_path) -> void
+{
+    beginResetModel();
+    m_entries.erase(std::remove_if(m_entries.begin(), m_entries.end(),
+                                   [&file_path](const LogEntry& entry) {
+                                       return entry.get_file_info().get_file_path() == file_path;
+                                   }),
+                    m_entries.end());
+    endResetModel();
+}
+
+/**
  * @brief Maps a log level string to the corresponding SimpleCppLogger::LogLevel.
  *        Handles various spellings, cases, and substrings (e.g. "critical", "trace_info").
  * @param level_str The log level as string.

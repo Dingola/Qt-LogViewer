@@ -15,13 +15,13 @@ void LogFilterProxyModelTest::SetUp()
 
     // Add some test data
     m_model->add_entry(LogEntry(QDateTime::fromString("2024-01-01 10:00:00", "yyyy-MM-dd HH:mm:ss"),
-                                "INFO", "Startup", "AppA"));
+                                "INFO", "Startup", LogFileInfo("fileA.log", "AppA")));
     m_model->add_entry(LogEntry(QDateTime::fromString("2024-01-01 10:01:00", "yyyy-MM-dd HH:mm:ss"),
-                                "ERROR", "Crash", "AppA"));
+                                "ERROR", "Crash", LogFileInfo("fileA.log", "AppA")));
     m_model->add_entry(LogEntry(QDateTime::fromString("2024-01-01 10:02:00", "yyyy-MM-dd HH:mm:ss"),
-                                "DEBUG", "Debugging", "AppB"));
+                                "DEBUG", "Debugging", LogFileInfo("fileB.log", "AppB")));
     m_model->add_entry(LogEntry(QDateTime::fromString("2024-01-01 10:03:00", "yyyy-MM-dd HH:mm:ss"),
-                                "INFO", "User login", "AppB"));
+                                "INFO", "User login", LogFileInfo("fileB.log", "AppB")));
 }
 
 /**

@@ -70,6 +70,11 @@ MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
     addDockWidget(Qt::LeftDockWidgetArea, m_log_file_explorer_dock_widget);
     setCorner(Qt::TopLeftCorner, Qt::LeftDockWidgetArea);
     setCorner(Qt::BottomLeftCorner, Qt::LeftDockWidgetArea);
+    connect(m_log_file_explorer, &LogFileExplorer::remove_requested, m_controller,
+            [this](const LogFileInfo& log_file_info) {
+                m_controller->remove_log_file(log_file_info);
+                update_pagination_widget();
+            });
 
     // Set up the model/view for the log table
     auto log_filter_proxy_model = m_controller->get_proxy_model();

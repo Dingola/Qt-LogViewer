@@ -1,5 +1,7 @@
 #pragma once
 
+#include <QMenu>
+#include <QPoint>
 #include <QTreeView>
 #include <QWidget>
 
@@ -54,17 +56,28 @@ class LogFileExplorer: public QWidget
 
         /**
          * @brief Sets the log files to display in the tree view.
-         * @param files The list of LogFileInfo objects.
+         * @param log_file_infos The list of LogFileInfo objects.
          */
-        auto set_log_files(const QList<LogFileInfo>& files) -> void;
+        auto set_log_files(const QList<LogFileInfo>& log_file_infos) -> void;
 
     private:
         /**
          * @brief Sets up connections for signals and slots.
          *
-         * Connects the tree view's selection changed signal to the logFileSelected signal.
+         * Connects the tree view's selection changed signal to the file_selected signal.
          */
         auto setup_connections() -> void;
+
+        /**
+         * @brief Initializes the context menu for the tree view.
+         */
+        auto init_context_menu() -> void;
+
+        /**
+         * @brief Handles context menu requests on the tree view.
+         * @param pos The position where the menu should appear.
+         */
+        auto show_context_menu(const QPoint& pos) -> void;
 
     protected:
         /**
@@ -73,27 +86,21 @@ class LogFileExplorer: public QWidget
          */
         auto changeEvent(QEvent* event) -> void override;
 
-    public slots:
-        /**
-         * @brief Adds a single log file to the tree view.
-         * @param file The LogFileInfo to add.
-         */
-        auto add_log_file(const LogFileInfo& file) -> void;
-
-        /**
-         * @brief Removes a single log file from the tree view.
-         * @param file The LogFileInfo to remove.
-         */
-        auto remove_log_file(const LogFileInfo& file) -> void;
-
     signals:
         /**
          * @brief Emitted when a log file is selected in the tree view.
          * @param file The selected LogFileInfo.
          */
-        void logFileSelected(const LogFileInfo& file);
+        void file_selected(const LogFileInfo& log_file_info);
+
+        /**
+         * @brief Emitted when the user requests to remove a log file via the context menu.
+         * @param file The LogFileInfo to remove.
+         */
+        void remove_requested(const LogFileInfo& log_file_info);
 
     private:
         Ui::LogFileExplorer* ui;
         LogFileTreeModel* m_model = nullptr;
+        QMenu* m_context_menu = nullptr;
 };

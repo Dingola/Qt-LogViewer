@@ -53,7 +53,8 @@ class LogParser
          * @param line The log line to parse.
          * @return The parsed LogEntry, or a default LogEntry if parsing fails.
          */
-        [[nodiscard]] auto parse_line(const QString& line) const -> LogEntry;
+        [[nodiscard]] auto parse_line(const QString& line,
+                                      const QString& file_path) const -> LogEntry;
 
         /**
          * @brief Returns the regular expression pattern used for parsing.

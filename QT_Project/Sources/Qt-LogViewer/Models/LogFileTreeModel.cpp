@@ -24,30 +24,30 @@ LogFileTreeModel::~LogFileTreeModel()
 
 /**
  * @brief Sets the log files to be displayed and grouped. Rebuilds the entire tree structure.
- * @param files The list of LogFileInfo objects.
+ * @param log_file_infos The list of LogFileInfo objects.
  */
-auto LogFileTreeModel::set_log_files(const QList<LogFileInfo>& files) -> void
+auto LogFileTreeModel::set_log_files(const QList<LogFileInfo>& log_file_infos) -> void
 {
     beginResetModel();
     delete m_root_item;
     m_group_items.clear();
     QVector<QVariant> root_data;
-    root_data << tr("Application / File");
+    root_data << QVariant::fromValue(LogFileTreeItem::Type::Group) << tr("Application / File");
     m_root_item = new LogFileTreeItem(root_data);
 
-    const auto grouped = group_by_app_name(files);
+    const auto grouped = group_by_app_name(log_file_infos);
 
     for (auto it = grouped.constBegin(); it != grouped.constEnd(); ++it)
     {
         QVector<QVariant> group_data;
-        group_data << it.key();
+        group_data << QVariant::fromValue(LogFileTreeItem::Type::Group) << it.key();
         auto* group_item = new LogFileTreeItem(group_data, m_root_item);
 
-        for (int i = 0; i < it.value().size(); ++i)
+        for (const auto& file_info: it.value())
         {
-            const auto& file_info = it.value().at(i);
             QVector<QVariant> file_data;
-            file_data << file_info.get_file_name();
+            file_data << QVariant::fromValue(LogFileTreeItem::Type::File)
+                      << QVariant::fromValue(file_info);
             auto* file_item = new LogFileTreeItem(file_data, group_item);
             group_item->append_child(file_item);
         }
@@ -61,11 +61,11 @@ auto LogFileTreeModel::set_log_files(const QList<LogFileInfo>& files) -> void
 
 /**
  * @brief Adds a single log file to the model. Creates a new group if necessary.
- * @param file The LogFileInfo to add.
+ * @param log_file_info The LogFileInfo to add.
  */
-auto LogFileTreeModel::add_log_file(const LogFileInfo& file) -> void
+auto LogFileTreeModel::add_log_file(const LogFileInfo& log_file_info) -> void
 {
-    QString app_name = file.get_app_name();
+    QString app_name = log_file_info.get_app_name();
 
     if (app_name.isEmpty())
     {
@@ -80,7 +80,7 @@ auto LogFileTreeModel::add_log_file(const LogFileInfo& file) -> void
         group_row = m_root_item->child_count();
         beginInsertRows(QModelIndex(), group_row, group_row);
         QVector<QVariant> group_data;
-        group_data << app_name;
+        group_data << QVariant::fromValue(LogFileTreeItem::Type::Group) << app_name;
         group_item = new LogFileTreeItem(group_data, m_root_item);
         m_root_item->append_child(group_item);
         m_group_items[app_name] = group_item;
@@ -100,7 +100,8 @@ auto LogFileTreeModel::add_log_file(const LogFileInfo& file) -> void
 
     beginInsertRows(index(group_index, 0, QModelIndex()), file_row, file_row);
     QVector<QVariant> file_data;
-    file_data << file.get_file_name();
+    file_data << QVariant::fromValue(LogFileTreeItem::Type::File)
+              << QVariant::fromValue(log_file_info);
     auto* file_item = new LogFileTreeItem(file_data, group_item);
     group_item->append_child(file_item);
     endInsertRows();
@@ -108,11 +109,11 @@ auto LogFileTreeModel::add_log_file(const LogFileInfo& file) -> void
 
 /**
  * @brief Removes a single log file from the model. Removes the group if it becomes empty.
- * @param file The LogFileInfo to remove.
+ * @param log_file_info The LogFileInfo to remove.
  */
-auto LogFileTreeModel::remove_log_file(const LogFileInfo& file) -> void
+auto LogFileTreeModel::remove_log_file(const LogFileInfo& log_file_info) -> void
 {
-    QString app_name = file.get_app_name();
+    QString app_name = log_file_info.get_app_name();
 
     if (app_name.isEmpty())
     {
@@ -133,7 +134,7 @@ auto LogFileTreeModel::remove_log_file(const LogFileInfo& file) -> void
             }
         }
 
-        int file_row = find_file_row(group_item, file.get_file_name());
+        int file_row = find_file_row(group_item, log_file_info.get_file_path());
 
         if (file_row >= 0)
         {
@@ -202,10 +203,35 @@ auto LogFileTreeModel::data(const QModelIndex& index, int role) const -> QVarian
     if (index.isValid())
     {
         auto* item = static_cast<LogFileTreeItem*>(index.internalPointer());
+        auto type = item->data(0).value<LogFileTreeItem::Type>();
 
         if (role == Qt::DisplayRole || role == Qt::EditRole)
         {
-            value = item->data(index.column());
+            if (type == LogFileTreeItem::Type::Group)
+            {
+                if (index.column() == 0)
+                {
+                    value = item->data(1);
+                }
+            }
+            else if (type == LogFileTreeItem::Type::File)
+            {
+                LogFileInfo log_file_info = item->data(1).value<LogFileInfo>();
+                switch (index.column())
+                {
+                case 0:
+                    value = log_file_info.get_file_name();
+                    break;
+                case 1:
+                    value = log_file_info.get_file_path();
+                    break;
+                case 2:
+                    value = log_file_info.get_app_name();
+                    break;
+                default:
+                    break;
+                }
+            }
         }
     }
 
@@ -332,21 +358,27 @@ auto LogFileTreeModel::group_by_app_name(const QList<LogFileInfo>& files)
 /**
  * @brief Finds the row of a file in a group by file name.
  * @param group_item The group item.
- * @param file_name The file name to search for.
+ * @param file_path The file path to search for.
  * @return The row index, or -1 if not found.
  */
 auto LogFileTreeModel::find_file_row(LogFileTreeItem* group_item,
-                                     const QString& file_name) const -> int
+                                     const QString& file_path) const -> int
 {
     int found_row = -1;
+    LogFileInfo info;
 
     for (int i = 0; i < group_item->child_count(); ++i)
     {
-        bool match = group_item->child(i)->data(0).toString() == file_name;
-
-        if (found_row == -1 && match)
+        auto* child = group_item->child(i);
+        auto type = child->data(0).value<LogFileTreeItem::Type>();
+        if (type == LogFileTreeItem::Type::File)
         {
-            found_row = i;
+            info = child->data(1).value<LogFileInfo>();
+
+            if (found_row == -1 && info.get_file_path() == file_path)
+            {
+                found_row = i;
+            }
         }
     }
 

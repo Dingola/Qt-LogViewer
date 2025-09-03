@@ -52,7 +52,7 @@ TEST_F(LogParserTest, PatternIsGeneratedCorrectly)
 TEST_F(LogParserTest, ParseValidLogLine)
 {
     QString line = "2024-01-01 12:34:56 Debug This is a debug message MyApp [file.cpp:42 (func())]";
-    LogEntry entry = m_parser->parse_line(line);
+    LogEntry entry = m_parser->parse_line(line, "dummy.log");
 
     EXPECT_EQ(entry.get_timestamp(),
               QDateTime::fromString("2024-01-01 12:34:56", "yyyy-MM-dd HH:mm:ss"));
@@ -67,7 +67,7 @@ TEST_F(LogParserTest, ParseValidLogLine)
 TEST_F(LogParserTest, ParseInvalidLogLineReturnsDefault)
 {
     QString line = "invalid log line";
-    LogEntry entry = m_parser->parse_line(line);
+    LogEntry entry = m_parser->parse_line(line, "dummy.log");
 
     EXPECT_FALSE(entry.get_timestamp().isValid());
     EXPECT_TRUE(entry.get_level().isEmpty());
@@ -123,7 +123,7 @@ TEST_F(LogParserTest, ParseLineWithDifferentFieldOrder)
     LogParser parser(format);
 
     QString line = "2024-01-01 12:34:56 MyApp Debug This is a debug message";
-    LogEntry entry = parser.parse_line(line);
+    LogEntry entry = parser.parse_line(line, "dummy.log");
 
     EXPECT_EQ(entry.get_timestamp(),
               QDateTime::fromString("2024-01-01 12:34:56", "yyyy-MM-dd HH:mm:ss"));
@@ -142,7 +142,7 @@ TEST_F(LogParserTest, ParseLineWithMissingFields)
     LogParser parser(format);
 
     QString line = "2024-01-01 12:34:56 Debug This is a debug message";
-    LogEntry entry = parser.parse_line(line);
+    LogEntry entry = parser.parse_line(line, "dummy.log");
 
     EXPECT_EQ(entry.get_timestamp(),
               QDateTime::fromString("2024-01-01 12:34:56", "yyyy-MM-dd HH:mm:ss"));
