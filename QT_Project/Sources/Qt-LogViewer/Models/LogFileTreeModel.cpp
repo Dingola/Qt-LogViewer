@@ -1,7 +1,10 @@
 #include "Qt-LogViewer/Models/LogFileTreeModel.h"
 
+#include <QIcon>
+
 #include "Qt-LogViewer/Models/LogFileInfo.h"
 #include "Qt-LogViewer/Models/LogFileTreeItem.h"
+#include "Qt-LogViewer/Services/UiUtils.h"
 
 /**
  * @brief Constructs a LogFileTreeModel object.
@@ -192,6 +195,7 @@ auto LogFileTreeModel::rowCount(const QModelIndex& parent) const -> int
 
 /**
  * @brief Returns the data for the given index and role.
+ *        For file items and Qt::DecorationRole, returns a file icon.
  * @param index The model index.
  * @param role The data role.
  * @return The data value for the given index and role.
@@ -231,6 +235,14 @@ auto LogFileTreeModel::data(const QModelIndex& index, int role) const -> QVarian
                 default:
                     break;
                 }
+            }
+        }
+        else if (role == Qt::DecorationRole)
+        {
+            if (type == LogFileTreeItem::Type::File && index.column() == 0)
+            {
+                value = QIcon(
+                    UiUtils::colored_svg_icon(":/Resources/Icons/file.svg", QColor("#42a5f5")));
             }
         }
     }
