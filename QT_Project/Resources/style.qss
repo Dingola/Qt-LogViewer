@@ -142,6 +142,27 @@ QWidget {
     border-bottom-right-radius: 8px;
 }
 
+/* === Log File Explorer === */
+LogFileExplorer {
+    background-color: @ColorTableBackground;
+}
+
+/* === Log Level Pie Chart Widget === */
+LogLevelPieChartWidget {
+    background-color: @ColorTableBackground;
+    qproperty-trace_color: @ColorTrace;
+    qproperty-debug_color: @ColorDebug;
+    qproperty-info_color: @ColorInfo;
+    qproperty-warning_color: @ColorWarning;
+    qproperty-error_color: @ColorError;
+    qproperty-fatal_color: @ColorFatal;
+}
+
+/* === Pie Chart === */
+PieChart {
+    background: @ColorTableBackground;
+}
+
 /* === Labels === */
 QLabel {
     background: transparent;
@@ -524,10 +545,18 @@ QTabBar::tab:hover {
 
 /* === DockerWidget === */
 
+DockWidget > QWidget {
+    margin-right: 8px;
+    margin-left: 8px;
+    margin-bottom: 8px;
+    background: @ColorTableBackground;
+}
+
 #dock_title_bar {
     margin-top: 9px;
     margin-right: 8px;
     margin-left: 8px;
+    margin-bottom: 0px;
     background: @ColorDockHeader;
     border: 1px solid @ColorBorder;
     border-top-left-radius: 8px;

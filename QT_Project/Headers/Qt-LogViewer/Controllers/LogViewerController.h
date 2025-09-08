@@ -86,6 +86,13 @@ class LogViewerController: public QObject
          */
         [[nodiscard]] auto get_log_file_tree_model() -> LogFileTreeModel*;
 
+        /**
+         * @brief Returns all log entries for a given file.
+         * @param file_info The LogFileInfo for the file.
+         * @return QVector<LogEntry> containing all entries for the file.
+         */
+        [[nodiscard]] auto get_entries_for_file(const LogFileInfo& file_info) -> QVector<LogEntry>;
+
     private:
         /**
          * @brief Adds a single log file to the model.

@@ -20,11 +20,12 @@ LogFileExplorer::LogFileExplorer(LogFileTreeModel* model, QWidget* parent)
 {
     ui->setupUi(this);
     ui->treeView->setModel(m_model);
-    ui->treeView->setHeaderHidden(false);
+    ui->treeView->setHeaderHidden(true);
     ui->treeView->setSelectionMode(QAbstractItemView::SingleSelection);
     ui->treeView->setExpandsOnDoubleClick(true);
     ui->treeView->setRootIsDecorated(true);
     ui->treeView->setContextMenuPolicy(Qt::CustomContextMenu);
+    setAttribute(Qt::WA_StyledBackground, true);
     setup_connections();
     init_context_menu();
 }
@@ -85,8 +86,7 @@ auto LogFileExplorer::setup_connections() -> void
                 auto* item = static_cast<LogFileTreeItem*>(current.internalPointer());
                 if (item && item->parent_item())
                 {
-                    emit file_selected(LogFileInfo(item->data(0).toString(),
-                                                   item->parent_item()->data(0).toString()));
+                    emit file_selected(item->data(1).value<LogFileInfo>());
                 }
             });
     connect(ui->treeView, &QTreeView::customContextMenuRequested, this,

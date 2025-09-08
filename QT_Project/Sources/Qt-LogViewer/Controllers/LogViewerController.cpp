@@ -131,6 +131,26 @@ auto LogViewerController::get_log_file_tree_model() -> LogFileTreeModel*
 }
 
 /**
+ * @brief Returns all log entries for a given file.
+ * @param file_info The LogFileInfo for the file.
+ * @return QVector<LogEntry> containing all entries for the file.
+ */
+auto LogViewerController::get_entries_for_file(const LogFileInfo& file_info) -> QVector<LogEntry>
+{
+    QVector<LogEntry> result;
+
+    for (const auto& entry: m_log_model->get_entries())
+    {
+        if (entry.get_file_info().get_file_path() == file_info.get_file_path())
+        {
+            result.append(entry);
+        }
+    }
+
+    return result;
+}
+
+/**
  * @brief Adds a single log file to the model.
  * @param file The LogFileInfo object to add.
  *

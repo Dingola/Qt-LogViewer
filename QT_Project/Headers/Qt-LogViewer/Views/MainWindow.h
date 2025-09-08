@@ -7,10 +7,12 @@
 #include <QPlainTextEdit>
 
 #include "Qt-LogViewer/Controllers/LogViewerController.h"
+#include "Qt-LogViewer/Models/LogFileInfo.h"
 #include "Qt-LogViewer/Services/StylesheetLoader.h"
 #include "Qt-LogViewer/Views/BaseMainWindow.h"
 #include "Qt-LogViewer/Views/DockWidget.h"
 #include "Qt-LogViewer/Views/LogFileExplorer.h"
+#include "Qt-LogViewer/Views/LogLevelPieChartWidget.h"
 
 namespace Ui
 {
@@ -117,6 +119,12 @@ class MainWindow: public BaseMainWindow
          */
         auto on_search_changed() -> void;
 
+        /**
+         * @brief Updates the log level pie chart for the selected file.
+         * @param log_file_info The selected LogFileInfo.
+         */
+        auto update_log_level_pie_chart(const LogFileInfo& log_file_info) -> void;
+
     private:
         /**
          * @brief Pointer to the UI definition generated from the .ui file.
@@ -169,6 +177,11 @@ class MainWindow: public BaseMainWindow
         DockWidget* m_log_file_explorer_dock_widget = nullptr;
 
         /**
+         * @brief Dock widget for the log level pie chart.
+         */
+        DockWidget* m_log_level_pie_chart_dock_widget = nullptr;
+
+        /**
          * @brief Text edit widget for showing detailed log information.
          */
         QPlainTextEdit* m_log_details_text_edit = nullptr;
@@ -177,4 +190,9 @@ class MainWindow: public BaseMainWindow
          * @brief Pointer to the log file explorer widget.
          */
         LogFileExplorer* m_log_file_explorer = nullptr;
+
+        /**
+         * @brief Widget for displaying log level pie chart.
+         */
+        LogLevelPieChartWidget* m_log_level_pie_chart_widget;
 };

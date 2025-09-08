@@ -47,6 +47,7 @@ MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
     : BaseMainWindow(settings, parent),
       m_log_viewer_settings(settings),
       m_controller(new LogViewerController("{timestamp} {level} {message} {app_name}", this)),
+      m_log_level_pie_chart_widget(new LogLevelPieChartWidget(this)),
       ui(new Ui::MainWindow)
 {
     qDebug() << "MainWindow constructor started";
@@ -75,6 +76,18 @@ MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
                 m_controller->remove_log_file(log_file_info);
                 update_pagination_widget();
             });
+    connect(m_log_file_explorer, &LogFileExplorer::file_selected, this,
+            &MainWindow::update_log_level_pie_chart);
+
+    // Set up the log level pie chart
+    m_log_level_pie_chart_dock_widget = new DockWidget(tr("Log Level Pie Chart"), this);
+    m_log_level_pie_chart_dock_widget->setTitleBarWidget(DockWidget::create_dock_title_bar(
+        m_log_level_pie_chart_dock_widget, "logLevelPieChartTitleBar"));
+    m_log_level_pie_chart_dock_widget->setObjectName("logLevelPieChartDockWidget");
+    m_log_level_pie_chart_dock_widget->setWidget(m_log_level_pie_chart_widget);
+    addDockWidget(Qt::LeftDockWidgetArea, m_log_level_pie_chart_dock_widget);
+    setCorner(Qt::TopLeftCorner, Qt::LeftDockWidgetArea);
+    setCorner(Qt::BottomLeftCorner, Qt::LeftDockWidgetArea);
 
     // Set up the model/view for the log table
     auto log_filter_proxy_model = m_controller->get_proxy_model();
@@ -428,4 +441,22 @@ auto MainWindow::on_search_changed() -> void
     qDebug() << "Search filter:" << search_text << "Field:" << field << "Regex:" << use_regex;
     m_controller->set_search_filter(search_text, field, use_regex);
     update_pagination_widget();
+}
+
+/**
+ * @brief Updates the log level pie chart for the selected file.
+ * @param log_file_info The selected LogFileInfo.
+ */
+auto MainWindow::update_log_level_pie_chart(const LogFileInfo& log_file_info) -> void
+{
+    QVector<LogEntry> entries = m_controller->get_entries_for_file(log_file_info);
+
+    QMap<QString, int> level_counts;
+
+    for (const auto& entry: entries)
+    {
+        level_counts[entry.get_level()]++;
+    }
+
+    m_log_level_pie_chart_widget->set_log_level_counts(level_counts);
 }
