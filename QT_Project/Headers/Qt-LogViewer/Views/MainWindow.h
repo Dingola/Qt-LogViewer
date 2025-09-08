@@ -162,6 +162,11 @@ class MainWindow: public BaseMainWindow
         QAction* m_action_show_log_details = nullptr;
 
         /**
+         * @brief Action for showing the log level pie chart (appears in the View menu).
+         */
+        QAction* m_action_show_log_level_pie_chart = nullptr;
+
+        /**
          * @brief Action for opening log files (appears in the Settings menu).
          */
         QAction* m_action_settings = nullptr;

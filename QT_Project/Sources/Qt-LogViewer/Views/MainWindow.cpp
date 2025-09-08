@@ -210,6 +210,11 @@ auto MainWindow::initialize_menu() -> void
     m_action_show_log_details->setChecked(true);
     views_menu->addAction(m_action_show_log_details);
 
+    m_action_show_log_level_pie_chart = new QAction(tr("Show Log Level Pie Chart"), this);
+    m_action_show_log_level_pie_chart->setCheckable(true);
+    m_action_show_log_level_pie_chart->setChecked(true);
+    views_menu->addAction(m_action_show_log_level_pie_chart);
+
     ui->menubar->addMenu(views_menu);
 
     connect(m_action_show_log_file_explorer, &QAction::toggled, this,
@@ -221,6 +226,11 @@ auto MainWindow::initialize_menu() -> void
             [this](bool checked) { m_log_details_dock_widget->setVisible(checked); });
     connect(m_log_details_dock_widget, &DockWidget::closed, this,
             [this]() { m_action_show_log_details->setChecked(false); });
+
+    connect(m_action_show_log_level_pie_chart, &QAction::toggled, this,
+            [this](bool checked) { m_log_level_pie_chart_dock_widget->setVisible(checked); });
+    connect(m_log_level_pie_chart_dock_widget, &DockWidget::closed, this,
+            [this]() { m_action_show_log_level_pie_chart->setChecked(false); });
 
     // Settings menu
     auto settings_menu = new QMenu(tr("&Settings"), this);
