@@ -51,6 +51,36 @@ class MainWindow: public BaseMainWindow
 
     private:
         /**
+         * @brief Sets up the log file explorer dock widget and its connections.
+         */
+        auto setup_log_file_explorer() -> void;
+
+        /**
+         * @brief Sets up the log level pie chart dock widget.
+         */
+        auto setup_log_level_pie_chart() -> void;
+
+        /**
+         * @brief Sets up the log table view and pagination widget.
+         */
+        auto setup_log_table_and_pagination() -> void;
+
+        /**
+         * @brief Sets up the log details dock widget.
+         */
+        auto setup_log_details_dock() -> void;
+
+        /**
+         * @brief Connects filter bar widget signals to controller slots.
+         */
+        auto setup_filter_bar_connections() -> void;
+
+        /**
+         * @brief Connects table selection to log details view.
+         */
+        auto setup_table_selection_connection() -> void;
+
+        /**
          * @brief Initializes the main menu bar and its actions.
          */
         auto initialize_menu() -> void;

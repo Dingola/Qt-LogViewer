@@ -57,11 +57,38 @@ MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
             << "| Organization:" << m_log_viewer_settings->organizationName()
             << "| Application:" << m_log_viewer_settings->applicationName();
 
-    // Initialize the user interface
     ui->setupUi(this);
     setWindowIcon(QIcon(":/Resources/Icons/App/AppIcon.svg"));
 
-    // Set up the log file explorer
+    setup_log_file_explorer();
+    setup_log_level_pie_chart();
+    setup_log_table_and_pagination();
+    setup_log_details_dock();
+    setup_filter_bar_connections();
+    setup_table_selection_connection();
+
+    initialize_menu();
+
+    QTimer::singleShot(0, this, [this] { this->resizeEvent(nullptr); });
+    qDebug() << "MainWindow constructor finished";
+}
+
+/**
+ * @brief Destroys the MainWindow object.
+ *
+ * Cleans up any resources used by the main window.
+ */
+MainWindow::~MainWindow()
+{
+    qDebug() << "MainWindow destructor called";
+    delete ui;
+}
+
+/**
+ * @brief Sets up the log file explorer dock widget and its connections.
+ */
+auto MainWindow::setup_log_file_explorer() -> void
+{
     m_log_file_explorer = new LogFileExplorer(m_controller->get_log_file_tree_model(), this);
     m_log_file_explorer_dock_widget = new DockWidget(tr("Log File Explorer"), this);
     m_log_file_explorer_dock_widget->setTitleBarWidget(DockWidget::create_dock_title_bar(
@@ -71,6 +98,7 @@ MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
     addDockWidget(Qt::LeftDockWidgetArea, m_log_file_explorer_dock_widget);
     setCorner(Qt::TopLeftCorner, Qt::LeftDockWidgetArea);
     setCorner(Qt::BottomLeftCorner, Qt::LeftDockWidgetArea);
+
     connect(m_log_file_explorer, &LogFileExplorer::remove_requested, m_controller,
             [this](const LogFileInfo& log_file_info) {
                 m_controller->remove_log_file(log_file_info);
@@ -78,8 +106,13 @@ MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
             });
     connect(m_log_file_explorer, &LogFileExplorer::file_selected, this,
             &MainWindow::update_log_level_pie_chart);
+}
 
-    // Set up the log level pie chart
+/**
+ * @brief Sets up the log level pie chart dock widget.
+ */
+auto MainWindow::setup_log_level_pie_chart() -> void
+{
     m_log_level_pie_chart_dock_widget = new DockWidget(tr("Log Level Pie Chart"), this);
     m_log_level_pie_chart_dock_widget->setTitleBarWidget(DockWidget::create_dock_title_bar(
         m_log_level_pie_chart_dock_widget, "logLevelPieChartTitleBar"));
@@ -88,12 +121,16 @@ MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
     addDockWidget(Qt::LeftDockWidgetArea, m_log_level_pie_chart_dock_widget);
     setCorner(Qt::TopLeftCorner, Qt::LeftDockWidgetArea);
     setCorner(Qt::BottomLeftCorner, Qt::LeftDockWidgetArea);
+}
 
-    // Set up the model/view for the log table
+/**
+ * @brief Sets up the log table view and pagination widget.
+ */
+auto MainWindow::setup_log_table_and_pagination() -> void
+{
     auto log_filter_proxy_model = m_controller->get_proxy_model();
     ui->tableViewLog->setModel(log_filter_proxy_model);
 
-    // Set up pagination
     ui->paginationWidget->set_max_page_buttons(7);
     int items_per_page = 25;
     log_filter_proxy_model->set_page_size(items_per_page);
@@ -108,8 +145,13 @@ MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
                 proxy->set_current_page(1);
                 update_pagination_widget();
             });
+}
 
-    // Create and set up the dock widget for log details
+/**
+ * @brief Sets up the log details dock widget.
+ */
+auto MainWindow::setup_log_details_dock() -> void
+{
     m_log_details_dock_widget = new DockWidget(tr("Log Details"), this);
     m_log_details_dock_widget->setObjectName("logDetailsDockWidget");
     m_log_details_dock_widget->setTitleBarWidget(
@@ -124,10 +166,13 @@ MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
     log_details_container->setLayout(log_details_layout);
     m_log_details_dock_widget->setWidget(log_details_container);
     addDockWidget(Qt::BottomDockWidgetArea, m_log_details_dock_widget);
+}
 
-    initialize_menu();
-
-    // Connect filter controls to controller
+/**
+ * @brief Connects filter bar widget signals to controller slots.
+ */
+auto MainWindow::setup_filter_bar_connections() -> void
+{
     connect(ui->filterBarWidget, &FilterBarWidget::app_filter_changed, this,
             [this](const QString& app_name) {
                 m_controller->set_app_name_filter(app_name);
@@ -147,24 +192,15 @@ MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
             &MainWindow::on_search_changed);
     connect(ui->filterBarWidget, &FilterBarWidget::regex_toggled, this,
             &MainWindow::on_search_changed);
-
-    // Connect table selection to log details view
-    connect(ui->tableViewLog->selectionModel(), &QItemSelectionModel::currentRowChanged, this,
-            &MainWindow::update_log_details);
-
-    QTimer::singleShot(0, this, [this] { this->resizeEvent(nullptr); });
-    qDebug() << "MainWindow constructor finished";
 }
 
 /**
- * @brief Destroys the MainWindow object.
- *
- * Cleans up any resources used by the main window.
+ * @brief Connects table selection to log details view.
  */
-MainWindow::~MainWindow()
+auto MainWindow::setup_table_selection_connection() -> void
 {
-    qDebug() << "MainWindow destructor called";
-    delete ui;
+    connect(ui->tableViewLog->selectionModel(), &QItemSelectionModel::currentRowChanged, this,
+            &MainWindow::update_log_details);
 }
 
 /**
