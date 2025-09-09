@@ -13,7 +13,7 @@
 class TableView: public QTableView
 {
         Q_OBJECT
-        Q_PROPERTY(QColor hover_row_color READ hover_row_color WRITE set_hover_row_color)
+        Q_PROPERTY(QColor hover_row_color READ get_hover_row_color WRITE set_hover_row_color)
 
     public:
         /**
@@ -26,7 +26,7 @@ class TableView: public QTableView
          * @brief Returns the current hover row color.
          * @return The color used for hover row highlighting.
          */
-        auto hover_row_color() const -> QColor;
+        auto get_hover_row_color() const -> QColor;
 
         /**
          * @brief Sets the hover row color.

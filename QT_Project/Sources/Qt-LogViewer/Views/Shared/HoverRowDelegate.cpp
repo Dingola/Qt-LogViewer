@@ -53,7 +53,7 @@ void HoverRowDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
         if (auto* view = qobject_cast<TableView*>(const_cast<QWidget*>(opt.widget)))
         {
             painter->save();
-            painter->fillRect(opt.rect, view->hover_row_color());
+            painter->fillRect(opt.rect, view->get_hover_row_color());
             painter->restore();
         }
     }

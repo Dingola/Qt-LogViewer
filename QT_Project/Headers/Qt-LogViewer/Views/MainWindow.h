@@ -9,10 +9,10 @@
 #include "Qt-LogViewer/Controllers/LogViewerController.h"
 #include "Qt-LogViewer/Models/LogFileInfo.h"
 #include "Qt-LogViewer/Services/StylesheetLoader.h"
-#include "Qt-LogViewer/Views/Shared/BaseMainWindow.h"
-#include "Qt-LogViewer/Views/Shared/DockWidget.h"
 #include "Qt-LogViewer/Views/App/LogFileExplorer.h"
 #include "Qt-LogViewer/Views/App/LogLevelPieChartWidget.h"
+#include "Qt-LogViewer/Views/Shared/BaseMainWindow.h"
+#include "Qt-LogViewer/Views/Shared/DockWidget.h"
 
 namespace Ui
 {

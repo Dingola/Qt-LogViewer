@@ -6,13 +6,16 @@
  * @brief Constructs a TableView object.
  * @param parent The parent widget, or nullptr.
  */
-TableView::TableView(QWidget* parent): QTableView(parent) {}
+TableView::TableView(QWidget* parent): QTableView(parent)
+{
+    setAlternatingRowColors(true);
+}
 
 /**
  * @brief Returns the current hover row color.
  * @return The color used for hover row highlighting.
  */
-auto TableView::hover_row_color() const -> QColor
+auto TableView::get_hover_row_color() const -> QColor
 {
     return m_hover_row_color;
 }

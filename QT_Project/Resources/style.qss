@@ -40,6 +40,7 @@
     @ColorTableBackground: #272d32;
     @ColorTableSelectionBackground: #1d3d5a;
     @ColorTableHoverRow: #25384a;
+    @ColorTableAlternateRow: #24282e;
     @ColorHeaderPressed: #384248;
     @ColorPaginationBackground: #24282e;
     @ColorDockHeader: #24282e;
@@ -86,6 +87,7 @@
     @ColorTableBackground: #ffffff;
     @ColorTableSelectionBackground: #b3d4fc;
     @ColorTableHoverRow: #e3f2fd;
+    @ColorTableAlternateRow: #f5f6fa;
     @ColorHeaderPressed: #e0e0e0;
     @ColorPaginationBackground: #24282e;
     @ColorDockHeader: #e9ecef;
@@ -396,7 +398,6 @@ QTableView {
     padding-left: 8px;
     padding-right: 8px;
     background-color: @ColorTableBackground;
-    alternate-background-color: @ColorFilterBarBackground;
     gridline-color: @ColorBorder;
     color: @ColorText;
     border: 1px solid @ColorBorder;
@@ -405,6 +406,7 @@ QTableView {
     selection-color: @ColorText;
 	outline:none;
 	qproperty-hover_row_color: @ColorTableHoverRow;
+    alternate-background-color: @ColorTableAlternateRow;
 }
 QTableView::item {
 	border: 0px;

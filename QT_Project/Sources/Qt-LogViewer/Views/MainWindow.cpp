@@ -18,8 +18,8 @@
 #include "Qt-LogViewer/Models/LogModel.h"
 #include "Qt-LogViewer/Services/LogViewerSettings.h"
 #include "Qt-LogViewer/Services/Translator.h"
-#include "Qt-LogViewer/Views/App/LogTableView.h"
 #include "Qt-LogViewer/Views/App/Dialogs/SettingsDialog.h"
+#include "Qt-LogViewer/Views/App/LogTableView.h"
 #include "ui_MainWindow.h"
 
 namespace
