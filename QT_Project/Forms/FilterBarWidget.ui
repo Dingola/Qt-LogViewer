@@ -26,13 +26,13 @@
   <customwidget>
    <class>FilterWidget</class>
    <extends>QWidget</extends>
-   <header>Qt-LogViewer/Views/FilterWidget.h</header>
+   <header>Qt-LogViewer/Views/App/FilterWidget.h</header>
    <container>1</container>
   </customwidget>
   <customwidget>
    <class>SearchBarWidget</class>
    <extends>QWidget</extends>
-   <header>Qt-LogViewer/Views/SearchBarWidget.h</header>
+   <header>Qt-LogViewer/Views/App/SearchBarWidget.h</header>
    <container>1</container>
   </customwidget>
  </customwidgets>

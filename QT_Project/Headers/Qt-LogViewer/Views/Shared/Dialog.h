@@ -4,7 +4,7 @@
 #include <QMouseEvent>
 #include <QVBoxLayout>
 
-#include "Qt-LogViewer/Views/DialogHeaderWidget.h"
+#include "Qt-LogViewer/Views/Shared/DialogHeaderWidget.h"
 
 /**
  * @class Dialog

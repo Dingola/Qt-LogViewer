@@ -1,4 +1,4 @@
-#include "Qt-LogViewer/Views/LogFileExplorer.h"
+#include "Qt-LogViewer/Views/App/LogFileExplorer.h"
 
 #include <QCursor>
 #include <QModelIndex>

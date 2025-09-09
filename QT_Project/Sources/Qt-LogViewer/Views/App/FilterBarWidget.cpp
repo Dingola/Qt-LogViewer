@@ -1,7 +1,7 @@
-#include "Qt-LogViewer/Views/FilterBarWidget.h"
+#include "Qt-LogViewer/Views/App/FilterBarWidget.h"
 
-#include "Qt-LogViewer/Views/FilterWidget.h"
-#include "Qt-LogViewer/Views/SearchBarWidget.h"
+#include "Qt-LogViewer/Views/App/FilterWidget.h"
+#include "Qt-LogViewer/Views/App/SearchBarWidget.h"
 #include "ui_FilterBarWidget.h"
 
 /**

@@ -1,4 +1,4 @@
-#include "Qt-LogViewer/Views/BaseMainWindow.h"
+#include "Qt-LogViewer/Views/Shared/BaseMainWindow.h"
 
 #include "Qt-LogViewer/Services/AppPreferencesInterface.h"
 #include "Qt-LogViewer/Services/Settings.h"

@@ -3,7 +3,7 @@
  * @brief Implementation of PieChart widget using QPainter.
  */
 
-#include "Qt-LogViewer/Views/PieChart.h"
+#include "Qt-LogViewer/Views/Shared/PieChart.h"
 
 #include <QPaintEvent>
 #include <QPainter>

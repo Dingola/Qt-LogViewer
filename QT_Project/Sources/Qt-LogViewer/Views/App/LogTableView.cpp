@@ -1,4 +1,4 @@
-#include "Qt-LogViewer/Views/LogTableView.h"
+#include "Qt-LogViewer/Views/App/LogTableView.h"
 
 #include <QAbstractItemView>
 #include <QHeaderView>

@@ -3,7 +3,7 @@
 #include <QString>
 #include <QStringList>
 
-#include "Qt-LogViewer/Views/Dialog.h"
+#include "Qt-LogViewer/Views/Shared/Dialog.h"
 
 namespace Ui
 {

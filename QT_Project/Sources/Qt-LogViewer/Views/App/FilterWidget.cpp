@@ -1,4 +1,4 @@
-#include "Qt-LogViewer/Views/FilterWidget.h"
+#include "Qt-LogViewer/Views/App/FilterWidget.h"
 
 #include <QSet>
 #include <QString>

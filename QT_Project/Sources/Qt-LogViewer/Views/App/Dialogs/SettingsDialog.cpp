@@ -1,4 +1,4 @@
-#include "Qt-LogViewer/Views/SettingsDialog.h"
+#include "Qt-LogViewer/Views/App/Dialogs/SettingsDialog.h"
 
 #include <QDebug>
 

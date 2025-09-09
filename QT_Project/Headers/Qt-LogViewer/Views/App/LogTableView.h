@@ -1,8 +1,8 @@
 #pragma once
 
 #include "Qt-LogViewer/Models/LogModel.h"
-#include "Qt-LogViewer/Views/HoverRowDelegate.h"
-#include "Qt-LogViewer/Views/TableView.h"
+#include "Qt-LogViewer/Views/Shared/HoverRowDelegate.h"
+#include "Qt-LogViewer/Views/Shared/TableView.h"
 
 /**
  * @class LogTableView

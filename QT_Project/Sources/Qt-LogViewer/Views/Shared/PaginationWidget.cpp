@@ -1,4 +1,4 @@
-#include "Qt-LogViewer/Views/PaginationWidget.h"
+#include "Qt-LogViewer/Views/Shared/PaginationWidget.h"
 
 #include <QDebug>
 #include <QHBoxLayout>

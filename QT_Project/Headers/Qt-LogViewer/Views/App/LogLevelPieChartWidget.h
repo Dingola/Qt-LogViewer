@@ -9,7 +9,7 @@
 #include <QMap>
 #include <QWidget>
 
-#include "Qt-LogViewer/Views/PieChart.h"
+#include "Qt-LogViewer/Views/Shared/PieChart.h"
 
 /**
  * @class LogLevelPieChartWidget

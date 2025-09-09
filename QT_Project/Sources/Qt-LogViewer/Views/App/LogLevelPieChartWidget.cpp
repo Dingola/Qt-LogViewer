@@ -3,7 +3,7 @@
  * @brief Implementation of LogLevelPieChartWidget using PieChart.
  */
 
-#include "Qt-LogViewer/Views/LogLevelPieChartWidget.h"
+#include "Qt-LogViewer/Views/App/LogLevelPieChartWidget.h"
 
 #include <QHBoxLayout>
 

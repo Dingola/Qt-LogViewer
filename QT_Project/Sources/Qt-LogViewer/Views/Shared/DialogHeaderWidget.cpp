@@ -1,4 +1,4 @@
-#include "Qt-LogViewer/Views/DialogHeaderWidget.h"
+#include "Qt-LogViewer/Views/Shared/DialogHeaderWidget.h"
 
 #include <QStyle>
 

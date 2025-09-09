@@ -7,7 +7,7 @@
  * a custom header with close button, and drag-move functionality for all derived dialogs.
  * See Dialog.h for interface details.
  */
-#include "Qt-LogViewer/Views/Dialog.h"
+#include "Qt-LogViewer/Views/Shared/Dialog.h"
 
 #include <QPainterPath>
 #include <QRegion>

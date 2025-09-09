@@ -1,4 +1,4 @@
-#include "Qt-LogViewer/Views/DockWidget.h"
+#include "Qt-LogViewer/Views/Shared/DockWidget.h"
 
 #include <QCloseEvent>
 #include <QHBoxLayout>

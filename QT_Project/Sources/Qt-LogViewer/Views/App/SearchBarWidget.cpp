@@ -1,4 +1,4 @@
-#include "Qt-LogViewer/Views/SearchBarWidget.h"
+#include "Qt-LogViewer/Views/App/SearchBarWidget.h"
 
 #include <QString>
 

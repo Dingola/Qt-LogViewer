@@ -56,19 +56,19 @@
   <customwidget>
    <class>PaginationWidget</class>
    <extends>QWidget</extends>
-   <header>Qt-LogViewer/Views/PaginationWidget.h</header>
+   <header>Qt-LogViewer/Views/Shared/PaginationWidget.h</header>
    <container>1</container>
   </customwidget>
   <customwidget>
    <class>FilterBarWidget</class>
    <extends>QWidget</extends>
-   <header>Qt-LogViewer/Views/FilterBarWidget.h</header>
+   <header>Qt-LogViewer/Views/App/FilterBarWidget.h</header>
    <container>1</container>
   </customwidget>
   <customwidget>
    <class>LogTableView</class>
    <extends>QTableView</extends>
-   <header>Qt-LogViewer/Views/LogTableView.h</header>
+   <header>Qt-LogViewer/Views/App/LogTableView.h</header>
   </customwidget>
  </customwidgets>
  <tabstops>

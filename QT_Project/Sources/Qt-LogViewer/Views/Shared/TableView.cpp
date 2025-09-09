@@ -1,4 +1,4 @@
-#include "Qt-LogViewer/Views/TableView.h"
+#include "Qt-LogViewer/Views/Shared/TableView.h"
 
 #include <QMouseEvent>
 
