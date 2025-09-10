@@ -1,16 +1,16 @@
-#include "Qt-LogViewer/Models/LogFilterProxyModelTest.h"
+#include "Qt-LogViewer/Models/LogSortFilterProxyModelTest.h"
 
 #include <QDateTime>
 #include <QSet>
 #include <QString>
 
-/**
+/**k
  * @brief Sets up the test fixture for each test.
  */
-void LogFilterProxyModelTest::SetUp()
+void LogSortFilterProxyModelTest::SetUp()
 {
     m_model = new LogModel();
-    m_proxy = new LogFilterProxyModel();
+    m_proxy = new LogSortFilterProxyModel();
     m_proxy->setSourceModel(m_model);
 
     // Add some test data
@@ -27,7 +27,7 @@ void LogFilterProxyModelTest::SetUp()
 /**
  * @brief Tears down the test fixture after each test.
  */
-void LogFilterProxyModelTest::TearDown()
+void LogSortFilterProxyModelTest::TearDown()
 {
     delete m_proxy;
     delete m_model;
@@ -38,7 +38,7 @@ void LogFilterProxyModelTest::TearDown()
 /**
  * @brief Tests that the proxy initially shows all entries.
  */
-TEST_F(LogFilterProxyModelTest, ProxyInitiallyShowsAllEntries)
+TEST_F(LogSortFilterProxyModelTest, ProxyInitiallyShowsAllEntries)
 {
     EXPECT_EQ(m_proxy->rowCount(), 4);
 }
@@ -46,7 +46,7 @@ TEST_F(LogFilterProxyModelTest, ProxyInitiallyShowsAllEntries)
 /**
  * @brief Tests filtering by application name.
  */
-TEST_F(LogFilterProxyModelTest, FilterByAppName)
+TEST_F(LogSortFilterProxyModelTest, FilterByAppName)
 {
     m_proxy->set_app_name_filter("AppA");
     EXPECT_EQ(m_proxy->rowCount(), 2);
@@ -64,7 +64,7 @@ TEST_F(LogFilterProxyModelTest, FilterByAppName)
 /**
  * @brief Tests filtering by log level.
  */
-TEST_F(LogFilterProxyModelTest, FilterByLogLevel)
+TEST_F(LogSortFilterProxyModelTest, FilterByLogLevel)
 {
     QSet<QString> levels;
     levels.insert("INFO");
@@ -83,7 +83,7 @@ TEST_F(LogFilterProxyModelTest, FilterByLogLevel)
 /**
  * @brief Tests filtering by search string (plain text).
  */
-TEST_F(LogFilterProxyModelTest, FilterBySearchText)
+TEST_F(LogSortFilterProxyModelTest, FilterBySearchText)
 {
     m_proxy->set_search_filter("Debug", "Message", false);
     EXPECT_EQ(m_proxy->rowCount(), 1);
@@ -107,7 +107,7 @@ TEST_F(LogFilterProxyModelTest, FilterBySearchText)
 /**
  * @brief Tests filtering by search string (regex).
  */
-TEST_F(LogFilterProxyModelTest, FilterBySearchRegex)
+TEST_F(LogSortFilterProxyModelTest, FilterBySearchRegex)
 {
     m_proxy->set_search_filter("^User.*", "Message", true);
     EXPECT_EQ(m_proxy->rowCount(), 1);
@@ -128,7 +128,7 @@ TEST_F(LogFilterProxyModelTest, FilterBySearchRegex)
 /**
  * @brief Tests combined filtering by app name and log level.
  */
-TEST_F(LogFilterProxyModelTest, CombinedAppNameAndLevelFilter)
+TEST_F(LogSortFilterProxyModelTest, CombinedAppNameAndLevelFilter)
 {
     m_proxy->set_app_name_filter("AppA");
     QSet<QString> levels;

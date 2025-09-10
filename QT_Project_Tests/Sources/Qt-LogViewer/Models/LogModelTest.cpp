@@ -34,7 +34,8 @@ TEST_F(LogModelTest, ModelIsInitiallyEmpty)
  */
 TEST_F(LogModelTest, AddEntryIncreasesRowCount)
 {
-    LogEntry entry(QDateTime::currentDateTime(), "INFO", "Test message", LogFileInfo("dummy.log", "TestApp"));
+    LogEntry entry(QDateTime::currentDateTime(), "INFO", "Test message",
+                   LogFileInfo("dummy.log", "TestApp"));
     m_model.add_entry(entry);
 
     EXPECT_EQ(m_model.rowCount(), 1);
@@ -46,8 +47,10 @@ TEST_F(LogModelTest, AddEntryIncreasesRowCount)
  */
 TEST_F(LogModelTest, ClearRemovesAllEntries)
 {
-    m_model.add_entry(LogEntry(QDateTime::currentDateTime(), "INFO", "A", LogFileInfo("file1.log", "App")));
-    m_model.add_entry(LogEntry(QDateTime::currentDateTime(), "ERROR", "B", LogFileInfo("file2.log", "App")));
+    m_model.add_entry(
+        LogEntry(QDateTime::currentDateTime(), "INFO", "A", LogFileInfo("file1.log", "App")));
+    m_model.add_entry(
+        LogEntry(QDateTime::currentDateTime(), "ERROR", "B", LogFileInfo("file2.log", "App")));
     EXPECT_EQ(m_model.rowCount(), 2);
 
     m_model.clear();
@@ -61,8 +64,10 @@ TEST_F(LogModelTest, ClearRemovesAllEntries)
 TEST_F(LogModelTest, SetEntriesReplacesAllEntries)
 {
     QVector<LogEntry> entries;
-    entries.append(LogEntry(QDateTime::currentDateTime(), "INFO", "A", LogFileInfo("file1.log", "App1")));
-    entries.append(LogEntry(QDateTime::currentDateTime(), "ERROR", "B", LogFileInfo("file2.log", "App2")));
+    entries.append(
+        LogEntry(QDateTime::currentDateTime(), "INFO", "A", LogFileInfo("file1.log", "App1")));
+    entries.append(
+        LogEntry(QDateTime::currentDateTime(), "ERROR", "B", LogFileInfo("file2.log", "App2")));
 
     m_model.set_entries(entries);
 
@@ -77,7 +82,8 @@ TEST_F(LogModelTest, SetEntriesReplacesAllEntries)
 TEST_F(LogModelTest, GetEntryOutOfRangeReturnsDefault)
 {
     EXPECT_TRUE(m_model.get_entry(0).get_level().isEmpty());
-    m_model.add_entry(LogEntry(QDateTime::currentDateTime(), "INFO", "A", LogFileInfo("dummy.log", "App")));
+    m_model.add_entry(
+        LogEntry(QDateTime::currentDateTime(), "INFO", "A", LogFileInfo("dummy.log", "App")));
     EXPECT_TRUE(m_model.get_entry(-1).get_level().isEmpty());
     EXPECT_TRUE(m_model.get_entry(100).get_level().isEmpty());
 }
@@ -139,7 +145,8 @@ TEST_F(LogModelTest, HeaderDataReturnsCorrectNames)
  */
 TEST_F(LogModelTest, FlagsReturnsSelectableAndEnabled)
 {
-    m_model.add_entry(LogEntry(QDateTime::currentDateTime(), "INFO", "A", LogFileInfo("dummy.log", "App")));
+    m_model.add_entry(
+        LogEntry(QDateTime::currentDateTime(), "INFO", "A", LogFileInfo("dummy.log", "App")));
     QModelIndex idx = m_model.index(0, 0);
     EXPECT_TRUE(m_model.flags(idx).testFlag(Qt::ItemIsSelectable));
     EXPECT_TRUE(m_model.flags(idx).testFlag(Qt::ItemIsEnabled));

@@ -56,7 +56,7 @@ void LogViewerControllerTest::TearDown()
  */
 TEST_F(LogViewerControllerTest, LoadsAllLogEntries)
 {
-    auto* proxy = m_controller->get_proxy_model();
+    auto* proxy = m_controller->get_sort_filter_proxy();
     EXPECT_EQ(proxy->rowCount(), 4);
 }
 
@@ -65,7 +65,7 @@ TEST_F(LogViewerControllerTest, LoadsAllLogEntries)
  */
 TEST_F(LogViewerControllerTest, FilterByAppName)
 {
-    auto* proxy = m_controller->get_proxy_model();
+    auto* proxy = m_controller->get_sort_filter_proxy();
     m_controller->set_app_name_filter("AppA");
     EXPECT_EQ(proxy->rowCount(), 2);
 
@@ -84,7 +84,7 @@ TEST_F(LogViewerControllerTest, FilterByAppName)
  */
 TEST_F(LogViewerControllerTest, FilterByLogLevel)
 {
-    auto* proxy = m_controller->get_proxy_model();
+    auto* proxy = m_controller->get_sort_filter_proxy();
     QSet<QString> levels;
     levels.insert("INFO");
     m_controller->set_level_filter(levels);
@@ -104,7 +104,7 @@ TEST_F(LogViewerControllerTest, FilterByLogLevel)
  */
 TEST_F(LogViewerControllerTest, FilterBySearchText)
 {
-    auto* proxy = m_controller->get_proxy_model();
+    auto* proxy = m_controller->get_sort_filter_proxy();
     m_controller->set_search_filter("Debug", "Message", false);
     EXPECT_EQ(proxy->rowCount(), 1);
 
@@ -129,7 +129,7 @@ TEST_F(LogViewerControllerTest, FilterBySearchText)
  */
 TEST_F(LogViewerControllerTest, FilterBySearchRegex)
 {
-    auto* proxy = m_controller->get_proxy_model();
+    auto* proxy = m_controller->get_sort_filter_proxy();
     m_controller->set_search_filter("^User.*", "Message", true);
     EXPECT_EQ(proxy->rowCount(), 1);
 
@@ -152,5 +152,5 @@ TEST_F(LogViewerControllerTest, FilterBySearchRegex)
 TEST_F(LogViewerControllerTest, ModelAccessorsReturnValidPointers)
 {
     EXPECT_NE(m_controller->get_log_model(), nullptr);
-    EXPECT_NE(m_controller->get_proxy_model(), nullptr);
+    EXPECT_NE(m_controller->get_sort_filter_proxy(), nullptr);
 }
