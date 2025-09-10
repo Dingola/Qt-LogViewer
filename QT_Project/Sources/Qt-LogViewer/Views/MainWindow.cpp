@@ -14,8 +14,8 @@
 #include <QTimer>
 #include <QUrl>
 
-#include "Qt-LogViewer/Models/LogFilterProxyModel.h"
 #include "Qt-LogViewer/Models/LogModel.h"
+#include "Qt-LogViewer/Models/LogSortFilterProxyModel.h"
 #include "Qt-LogViewer/Services/LogViewerSettings.h"
 #include "Qt-LogViewer/Services/Translator.h"
 #include "Qt-LogViewer/Views/App/Dialogs/SettingsDialog.h"
@@ -128,19 +128,19 @@ auto MainWindow::setup_log_level_pie_chart() -> void
  */
 auto MainWindow::setup_log_table_and_pagination() -> void
 {
-    auto log_filter_proxy_model = m_controller->get_proxy_model();
-    ui->tableViewLog->setModel(log_filter_proxy_model);
+    auto paging_proxy = m_controller->get_paging_proxy();
+    ui->tableViewLog->setModel(paging_proxy);
 
     ui->paginationWidget->set_max_page_buttons(7);
     int items_per_page = 25;
-    log_filter_proxy_model->set_page_size(items_per_page);
-    log_filter_proxy_model->set_current_page(1);
+    paging_proxy->set_page_size(items_per_page);
+    paging_proxy->set_current_page(1);
 
     connect(ui->paginationWidget, &PaginationWidget::page_changed, this,
-            [this](int page) { m_controller->get_proxy_model()->set_current_page(page); });
+            [this](int page) { m_controller->get_paging_proxy()->set_current_page(page); });
     connect(ui->paginationWidget, &PaginationWidget::items_per_page_changed, this,
             [this](int items_per_page) {
-                auto* proxy = m_controller->get_proxy_model();
+                auto* proxy = m_controller->get_paging_proxy();
                 proxy->set_page_size(items_per_page);
                 proxy->set_current_page(1);
                 update_pagination_widget();
@@ -309,15 +309,22 @@ auto MainWindow::update_log_details(const QModelIndex& current) -> void
 
     if (current.isValid())
     {
-        auto* proxy = m_controller->get_proxy_model();
+        auto* paging_proxy = m_controller->get_paging_proxy();
+        auto* sort_filter_proxy = m_controller->get_sort_filter_proxy();
         auto* model = m_controller->get_log_model();
-        QModelIndex source_index = proxy->mapToSource(current);
-        LogEntry entry = model->get_entry(source_index.row());
-        details = QString("Timestamp: %1\nLevel: %2\nApp: %3\nMessage: %4")
-                      .arg(entry.get_timestamp().toString("yyyy-MM-dd HH:mm:ss"))
-                      .arg(entry.get_level())
-                      .arg(entry.get_app_name())
-                      .arg(entry.get_message());
+
+        QModelIndex sort_index = paging_proxy->mapToSource(current);
+        QModelIndex source_index = sort_filter_proxy->mapToSource(sort_index);
+
+        if (source_index.isValid())
+        {
+            LogEntry entry = model->get_entry(source_index.row());
+            details = QString("Timestamp: %1\nLevel: %2\nApp: %3\nMessage: %4")
+                          .arg(entry.get_timestamp().toString("yyyy-MM-dd HH:mm:ss"))
+                          .arg(entry.get_level())
+                          .arg(entry.get_app_name())
+                          .arg(entry.get_message());
+        }
     }
 
     m_log_details_text_edit->setPlainText(details);
@@ -332,7 +339,7 @@ auto MainWindow::update_log_details(const QModelIndex& current) -> void
  */
 auto MainWindow::update_pagination_widget() -> void
 {
-    auto* proxy = m_controller->get_proxy_model();
+    auto* proxy = m_controller->get_paging_proxy();
     int total_pages = proxy->get_total_pages();
     int current_page = proxy->get_current_page();
 

@@ -8,8 +8,9 @@
 
 #include "Qt-LogViewer/Models/LogFileInfo.h"
 #include "Qt-LogViewer/Models/LogFileTreeModel.h"
-#include "Qt-LogViewer/Models/LogFilterProxyModel.h"
 #include "Qt-LogViewer/Models/LogModel.h"
+#include "Qt-LogViewer/Models/LogSortFilterProxyModel.h"
+#include "Qt-LogViewer/Models/PagingProxyModel.h"
 #include "Qt-LogViewer/Services/LogLoader.h"
 
 /**
@@ -65,13 +66,21 @@ class LogViewerController: public QObject
 
         /**
          * @brief Returns the LogModel.
+         * @return Pointer to the LogModel.
          */
         [[nodiscard]] auto get_log_model() -> LogModel*;
 
         /**
-         * @brief Returns the LogFilterProxyModel.
+         * @brief Returns the LogSortFilterProxyModel.
+         * @return Pointer to the LogSortFilterProxyModel.
          */
-        [[nodiscard]] auto get_proxy_model() -> LogFilterProxyModel*;
+        [[nodiscard]] auto get_sort_filter_proxy() -> LogSortFilterProxyModel*;
+
+        /**
+         * @brief Returns the PagingProxyModel.
+         * @return Pointer to the PagingProxyModel.
+         */
+        [[nodiscard]] auto get_paging_proxy() -> PagingProxyModel*;
 
         /**
          * @brief Returns the set of unique application names from the loaded logs.
@@ -123,7 +132,8 @@ class LogViewerController: public QObject
     private:
         LogModel* m_log_model;
         LogFileTreeModel* m_file_tree_model;
-        LogFilterProxyModel* m_proxy_model;
+        LogSortFilterProxyModel* m_sort_filter_proxy;
+        PagingProxyModel* m_paging_proxy;
         LogLoader m_loader;
         QList<LogFileInfo> m_loaded_log_files;
 };

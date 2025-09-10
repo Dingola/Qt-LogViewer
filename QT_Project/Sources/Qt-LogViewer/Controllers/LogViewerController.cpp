@@ -12,9 +12,11 @@ LogViewerController::LogViewerController(const QString& log_format, QObject* par
       m_loader(log_format),
       m_log_model(new LogModel(this)),
       m_file_tree_model(new LogFileTreeModel(this)),
-      m_proxy_model(new LogFilterProxyModel(this))
+      m_sort_filter_proxy(new LogSortFilterProxyModel(this)),
+      m_paging_proxy(new PagingProxyModel(this))
 {
-    m_proxy_model->setSourceModel(m_log_model);
+    m_sort_filter_proxy->setSourceModel(m_log_model);
+    m_paging_proxy->setSourceModel(m_sort_filter_proxy);
 }
 
 /**
@@ -64,7 +66,7 @@ auto LogViewerController::load_logs(const QVector<QString>& file_paths) -> void
  */
 auto LogViewerController::set_app_name_filter(const QString& app_name) -> void
 {
-    m_proxy_model->set_app_name_filter(app_name);
+    m_sort_filter_proxy->set_app_name_filter(app_name);
 }
 
 /**
@@ -73,7 +75,7 @@ auto LogViewerController::set_app_name_filter(const QString& app_name) -> void
  */
 auto LogViewerController::set_level_filter(const QSet<QString>& levels) -> void
 {
-    m_proxy_model->set_level_filter(levels);
+    m_sort_filter_proxy->set_level_filter(levels);
 }
 
 /**
@@ -85,11 +87,12 @@ auto LogViewerController::set_level_filter(const QSet<QString>& levels) -> void
 auto LogViewerController::set_search_filter(const QString& search_text, const QString& field,
                                             bool use_regex) -> void
 {
-    m_proxy_model->set_search_filter(search_text, field, use_regex);
+    m_sort_filter_proxy->set_search_filter(search_text, field, use_regex);
 }
 
 /**
  * @brief Returns the LogModel.
+ * @return Pointer to the LogModel.
  */
 auto LogViewerController::get_log_model() -> LogModel*
 {
@@ -97,11 +100,21 @@ auto LogViewerController::get_log_model() -> LogModel*
 }
 
 /**
- * @brief Returns the LogFilterProxyModel.
+ * @brief Returns the LogSortFilterProxyModel.
+ * @return Pointer to the LogSortFilterProxyModel.
  */
-auto LogViewerController::get_proxy_model() -> LogFilterProxyModel*
+auto LogViewerController::get_sort_filter_proxy() -> LogSortFilterProxyModel*
 {
-    return m_proxy_model;
+    return m_sort_filter_proxy;
+}
+
+/**
+ * @brief Returns the PagingProxyModel.
+ * @return Pointer to the PagingProxyModel.
+ */
+auto LogViewerController::get_paging_proxy() -> PagingProxyModel*
+{
+    return m_paging_proxy;
 }
 
 /**

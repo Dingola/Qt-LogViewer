@@ -26,6 +26,8 @@ LogTableView::LogTableView(QWidget* parent): TableView(parent)
                     view->viewport()->update();
                 }
             });
+
+    setSortingEnabled(true);
 }
 
 /**
