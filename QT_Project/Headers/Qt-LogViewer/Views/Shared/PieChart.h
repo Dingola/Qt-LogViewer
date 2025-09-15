@@ -145,6 +145,15 @@ class PieChart: public QWidget
         [[nodiscard]] auto find_segment_value(const QString& segment) const -> int;
 
     private:
+        static constexpr int k_default_inner_radius_percent = 60;
+        static constexpr int k_default_segment_gap_angle = 4;
+        static constexpr int k_min_slice_steps = 4;
+        static constexpr int k_max_slice_steps = 720;
+        static constexpr double k_gap_width = 6.0;
+        static constexpr double k_inner_radius_threshold = 0.5;
+        static constexpr const char* k_default_bg_color = "#e0e0e0";
+
+    private:
         QMap<QString, int> m_values;
         QMap<QString, QColor> m_segment_colors;
         int m_inner_radius_percent;

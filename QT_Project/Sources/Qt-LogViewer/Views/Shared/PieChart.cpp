@@ -15,7 +15,9 @@
  * @param parent The parent widget.
  */
 PieChart::PieChart(QWidget* parent)
-    : QWidget(parent), m_inner_radius_percent(60), m_segment_gap_angle(4)
+    : QWidget(parent),
+      m_inner_radius_percent(k_default_inner_radius_percent),
+      m_segment_gap_angle(k_default_segment_gap_angle)
 {
     setAttribute(Qt::WA_StyledBackground, true);
 }
@@ -55,7 +57,7 @@ auto PieChart::get_segment_color(const QString& segment) const -> QColor
         return m_segment_colors.value(key);
     }
 
-    return QColor("#e0e0e0");
+    return QColor(k_default_bg_color);
 }
 
 /**
@@ -139,10 +141,10 @@ auto PieChart::draw_empty_ring(QPainter& painter, const QPointF& center, double 
                                double inner_radius) -> void
 {
     QColor bg_color = palette().window().color();
-    painter.setBrush(QColor("#e0e0e0"));
+    painter.setBrush(QColor(k_default_bg_color));
     painter.drawEllipse(center, outer_radius, outer_radius);
 
-    if (inner_radius > 0.5)
+    if (inner_radius > k_inner_radius_threshold)
     {
         painter.setBrush(bg_color);
         painter.drawEllipse(center, inner_radius, inner_radius);
@@ -208,9 +210,9 @@ auto PieChart::draw_slice(QPainter& painter, const QPointF& center, double outer
                           double inner_radius, double start_angle_deg, double sweep_angle_deg,
                           const QString& segment) -> void
 {
-    const int min_steps = 4;
+    const int min_steps = k_min_slice_steps;
     int steps = qMax<int>(min_steps, static_cast<int>(std::ceil(std::abs(sweep_angle_deg))));
-    steps = qMin(steps, 720);
+    steps = qMin(steps, k_max_slice_steps);
 
     QPolygonF poly;
     poly.reserve((steps + 1) * 2);
@@ -253,7 +255,7 @@ auto PieChart::draw_slice(QPainter& painter, const QPointF& center, double outer
 auto PieChart::draw_gaps(QPainter& painter, const QPointF& center, double outer_radius,
                          double inner_radius, const QVector<double>& boundary_angles_deg) -> void
 {
-    const double gap_width = 6.0;
+    const double gap_width = k_gap_width;
     double half_gap = gap_width * 0.5;
     QColor bg_color = palette().window().color();
     painter.setBrush(bg_color);
@@ -293,7 +295,7 @@ auto PieChart::draw_gaps(QPainter& painter, const QPointF& center, double outer_
 auto PieChart::draw_inner_hole(QPainter& painter, const QPointF& center,
                                double inner_radius) -> void
 {
-    if (inner_radius > 0.5)
+    if (inner_radius > k_inner_radius_threshold)
     {
         QColor bg_color = palette().window().color();
         painter.setBrush(bg_color);
