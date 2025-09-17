@@ -136,7 +136,7 @@ auto PaginationWidget::get_items_per_page() const -> int
 auto PaginationWidget::create_page_buttons() -> void
 {
     clear_page_buttons_layout();
-    QHBoxLayout* layout = qobject_cast<QHBoxLayout*>(ui->pageButtonsWidget->layout());
+    auto layout = qobject_cast<QHBoxLayout*>(ui->pageButtonsWidget->layout());
 
     if (layout != nullptr)
     {
@@ -177,7 +177,7 @@ auto PaginationWidget::create_page_buttons() -> void
 auto PaginationWidget::create_page_button(int page, bool enabled,
                                           bool checked) const -> QToolButton*
 {
-    QToolButton* btn = new QToolButton(ui->pageButtonsWidget);
+    auto btn = new QToolButton(ui->pageButtonsWidget);
     btn->setText(QString::number(page));
     btn->setEnabled(enabled);
     btn->setCheckable(true);
@@ -246,7 +246,7 @@ auto PaginationWidget::update_controls_state() -> void
  */
 auto PaginationWidget::create_ellipsis_button() -> QToolButton*
 {
-    QToolButton* button = new QToolButton(ui->pageButtonsWidget);
+    auto button = new QToolButton(ui->pageButtonsWidget);
     button->setText("...");
     button->setEnabled(false);
     button->setAutoRaise(true);
@@ -259,7 +259,7 @@ auto PaginationWidget::create_ellipsis_button() -> QToolButton*
  */
 auto PaginationWidget::clear_page_buttons_layout() -> void
 {
-    QHBoxLayout* layout = qobject_cast<QHBoxLayout*>(ui->pageButtonsWidget->layout());
+    auto layout = qobject_cast<QHBoxLayout*>(ui->pageButtonsWidget->layout());
 
     while (QLayoutItem* child = (layout != nullptr ? layout->takeAt(0) : nullptr))
     {
@@ -407,7 +407,7 @@ auto PaginationWidget::calculate_middle_range(int total_pages, int max_btns,
     int num_middle = max_btns - num_required - num_ellipsis;
 
     int start = 2;
-    int end = total_pages - 1;
+    int end;
 
     if (total_pages <= max_btns)
     {
@@ -549,7 +549,7 @@ auto PaginationWidget::onNextClicked() -> void
  */
 auto PaginationWidget::onPageButtonClicked() -> void
 {
-    QToolButton* button = qobject_cast<QToolButton*>(sender());
+    auto button = qobject_cast<QToolButton*>(sender());
 
     int page = 0;
 

@@ -12,9 +12,11 @@
  * @param message The log message.
  * @param app_name The application name.
  */
-LogEntry::LogEntry(const QDateTime& timestamp, const QString& level, const QString& message,
-                   const LogFileInfo& file_info)
-    : m_timestamp(timestamp), m_level(level), m_message(message), m_file_info(file_info)
+LogEntry::LogEntry(QDateTime timestamp, QString level, QString message, LogFileInfo file_info)
+    : m_timestamp{std::move(timestamp)},
+      m_level{std::move(level)},
+      m_message{std::move(message)},
+      m_file_info{std::move(file_info)}
 {}
 
 /**

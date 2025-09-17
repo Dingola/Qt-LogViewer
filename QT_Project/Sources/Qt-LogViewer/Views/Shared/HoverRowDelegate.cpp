@@ -8,8 +8,7 @@
  * @brief Constructs a HoverRowDelegate object.
  * @param parent The parent QObject, or nullptr.
  */
-HoverRowDelegate::HoverRowDelegate(QObject* parent): QStyledItemDelegate(parent), m_hovered_row(-1)
-{}
+HoverRowDelegate::HoverRowDelegate(QObject* parent): QStyledItemDelegate(parent) {}
 
 /**
  * @brief Sets the currently hovered row.

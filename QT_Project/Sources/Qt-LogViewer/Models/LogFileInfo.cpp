@@ -7,8 +7,8 @@
  * @param file_path The full path to the log file.
  * @param app_name The name of the application (optional).
  */
-LogFileInfo::LogFileInfo(const QString& file_path, const QString& app_name)
-    : m_file_path(file_path), m_app_name(app_name)
+LogFileInfo::LogFileInfo(QString file_path, QString app_name)
+    : m_file_path{std::move(file_path)}, m_app_name{std::move(app_name)}
 {}
 
 /**

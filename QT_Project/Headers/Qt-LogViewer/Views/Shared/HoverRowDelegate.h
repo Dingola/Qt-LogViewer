@@ -29,7 +29,7 @@ class HoverRowDelegate: public QStyledItemDelegate
          * @brief Returns the currently hovered row.
          * @return The hovered row index, or -1 if none.
          */
-        auto hovered_row() const -> int;
+        [[nodiscard]] auto hovered_row() const -> int;
 
         /**
          * @brief Paints the item, applying the hover color to the full row if applicable.
@@ -41,5 +41,5 @@ class HoverRowDelegate: public QStyledItemDelegate
                    const QModelIndex& index) const override;
 
     private:
-        int m_hovered_row;
+        int m_hovered_row = -1;
 };

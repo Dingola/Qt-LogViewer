@@ -99,7 +99,7 @@ auto LogFileExplorer::setup_connections() -> void
 auto LogFileExplorer::init_context_menu() -> void
 {
     m_context_menu = new QMenu(this);
-    QAction* remove_action = new QAction(tr("Remove"), m_context_menu);
+    auto remove_action = new QAction(tr("Remove"), m_context_menu);
     m_context_menu->addAction(remove_action);
     connect(remove_action, &QAction::triggered, this, [this]() {
         QModelIndex index = ui->treeView->currentIndex();

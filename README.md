@@ -404,6 +404,7 @@ To format the C++ code, run the following command after enabling the USE_CLANG_F
 
 ```
 cmake -DUSE_CLANG_FORMAT=ON -DCLANG_TOOLS_PATH="C:/path/to/clang+llvm-18.1.8-x86_64-pc-windows-msvc/bin" ..
+cmake --build .
 cmake --build . --target _run_clang_format_project
 cmake --build . --target _run_clang_format_tests
 ```
@@ -412,6 +413,7 @@ To run static analysis with clang-tidy, ensure the USE_CLANG_TIDY option is enab
 
 ```
 cmake -DUSE_CLANG_TIDY=ON -DCLANG_TOOLS_PATH="C:/path/to/clang+llvm-18.1.8-x86_64-pc-windows-msvc/bin" ..
+cmake --build .
 cmake --build . --target _run_clang_tidy_project
 cmake --build . --target _run_clang_tidy_tests
 ```

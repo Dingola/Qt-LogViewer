@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.19.0 FATAL_ERROR)
+cmake_minimum_required(VERSION 4.1.1 FATAL_ERROR)
 
 ############################################
 ### Project Configuration                ###
@@ -16,6 +16,9 @@ include(${CMAKE_SOURCE_DIR}/CMake/SanitizerConfig.cmake)
 ############################################
 ### Global Properties                    ###
 ############################################
+
+# Disable CMake searching for modules
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 
 # Global properties for project organization
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
@@ -149,16 +152,16 @@ endif()
 if(USE_CLANG_TIDY)
     find_program(CLANG_TIDY "clang-tidy" HINTS ${CLANG_TOOLS_PATH})
     if(CLANG_TIDY)
-        # Define a custom target for running clang-tidy
-        add_custom_target(_run_clang_tidy_project
-            COMMAND ${CLANG_TIDY}
+		# Define a custom target for running clang-tidy
+		add_custom_target(_run_clang_tidy_project
+			COMMAND ${CLANG_TIDY}
 			--config-file=${CMAKE_SOURCE_DIR}/Configs/.clang-tidy
-            -p=${CMAKE_BINARY_DIR}
-            ${Headers}
-            ${Sources}
-            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-            COMMENT "Running clang-tidy for static analysis"
-        )
+			-p=${CMAKE_BINARY_DIR}
+			${Headers}
+			${Sources}
+			WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+			COMMENT "Running clang-tidy for static analysis"
+		)
     else()
         message(WARNING "clang-tidy not found. Please ensure clang-tidy is installed and the path is set correctly.")
     endif()
@@ -223,10 +226,12 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/Doxygen.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/SimpleQtLogger.cmake)
 
 if (WIN32)
-    if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-        set_target_properties(${PROJECT_NAME} PROPERTIES 
-            LINK_FLAGS "/SUBSYSTEM:CONSOLE"
-        )
+    if (MSVC OR (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC"))
+        if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+            set_target_properties(${PROJECT_NAME} PROPERTIES 
+                LINK_FLAGS "/SUBSYSTEM:CONSOLE"
+            )
+        endif()
     endif()
     set_target_properties(${PROJECT_NAME} PROPERTIES 
         WIN32_EXECUTABLE ON

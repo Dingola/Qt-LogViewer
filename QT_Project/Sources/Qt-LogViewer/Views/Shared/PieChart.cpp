@@ -57,7 +57,7 @@ auto PieChart::get_segment_color(const QString& segment) const -> QColor
         return m_segment_colors.value(key);
     }
 
-    return QColor(k_default_bg_color);
+    return {k_default_bg_color};
 }
 
 /**

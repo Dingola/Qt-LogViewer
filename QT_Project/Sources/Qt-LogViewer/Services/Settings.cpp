@@ -95,8 +95,8 @@ bool Settings::contains(const QString& group, const QString& key)
  * @param file_name The name of the settings file.
  * @return The full path to the settings file.
  */
-QString Settings::settings_file_path(QStandardPaths::StandardLocation location,
-                                     const QString& file_name)
+auto Settings::settings_file_path(QStandardPaths::StandardLocation location,
+                                  const QString& file_name) -> QString
 {
     const QString dir = QStandardPaths::writableLocation(location);
     QDir().mkpath(dir);
@@ -110,7 +110,7 @@ QString Settings::settings_file_path(QStandardPaths::StandardLocation location,
  *
  * @return The full path to the default settings file.
  */
-QString Settings::default_settings_file_path()
+auto Settings::default_settings_file_path() -> QString
 {
     return settings_file_path(QStandardPaths::AppConfigLocation, QStringLiteral("settings.ini"));
 }

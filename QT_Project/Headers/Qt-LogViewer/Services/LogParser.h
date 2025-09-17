@@ -73,6 +73,6 @@ class LogParser
         LogFieldOrder m_field_order;
 
     private:
-        static QPair<QRegularExpression, LogFieldOrder> format_string_to_regex(
-            const QString& format);
+        static auto format_string_to_regex(const QString& format)
+            -> QPair<QRegularExpression, LogFieldOrder>;
 };

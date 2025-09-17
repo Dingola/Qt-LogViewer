@@ -220,7 +220,7 @@ auto LogFileTreeModel::data(const QModelIndex& index, int role) const -> QVarian
             }
             else if (type == LogFileTreeItem::Type::File)
             {
-                LogFileInfo log_file_info = item->data(1).value<LogFileInfo>();
+                auto log_file_info = item->data(1).value<LogFileInfo>();
                 switch (index.column())
                 {
                 case 0:
@@ -347,9 +347,9 @@ auto LogFileTreeModel::group_by_app_name(const QList<LogFileInfo>& files)
 {
     QMap<QString, QList<LogFileInfo>> groups;
 
-    for (int i = 0; i < files.size(); ++i)
+    for (const auto& file: files)
     {
-        QString app_name = files.at(i).get_app_name();
+        QString app_name = file.get_app_name();
 
         if (app_name.isEmpty())
         {
@@ -361,7 +361,7 @@ auto LogFileTreeModel::group_by_app_name(const QList<LogFileInfo>& files)
             groups[app_name] = QList<LogFileInfo>();
         }
 
-        groups[app_name].append(files.at(i));
+        groups[app_name].append(file);
     }
 
     return groups;

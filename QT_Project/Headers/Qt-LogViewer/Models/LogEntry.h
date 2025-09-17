@@ -27,8 +27,8 @@ class LogEntry
          * @param message The log message.
          * @param app_name The name of the application that generated the log.
          */
-        LogEntry(const QDateTime& timestamp = QDateTime(), const QString& level = QString(),
-                 const QString& message = QString(), const LogFileInfo& file_info = LogFileInfo());
+        LogEntry(QDateTime timestamp = QDateTime(), QString level = QString(),
+                 QString message = QString(), LogFileInfo file_info = LogFileInfo());
 
         /**
          * @brief Destroys the LogEntry object.

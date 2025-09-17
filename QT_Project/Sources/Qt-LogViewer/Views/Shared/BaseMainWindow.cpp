@@ -199,7 +199,7 @@ void BaseMainWindow::onLanguageCodeChanged(const QString& language_code)
     {
         if (m_preferences != nullptr && m_preferences->get_language_name() != language_name)
         {
-            QObject* obj = dynamic_cast<QObject*>(m_preferences);
+            auto obj = dynamic_cast<QObject*>(m_preferences);
             obj->blockSignals(true);
             m_preferences->set_language_name(language_name);
             obj->blockSignals(false);
@@ -240,7 +240,7 @@ void BaseMainWindow::onLanguageNameChanged(const QString& language_name)
     {
         if (m_preferences != nullptr && m_preferences->get_language_code() != found_code)
         {
-            QObject* obj = dynamic_cast<QObject*>(m_preferences);
+            auto obj = dynamic_cast<QObject*>(m_preferences);
             obj->blockSignals(true);
             m_preferences->set_language_code(found_code);
             obj->blockSignals(false);

@@ -67,7 +67,7 @@ auto LogModel::data(const QModelIndex& index, int role) const -> QVariant
 {
     if (!index.isValid() || index.row() < 0 || index.row() >= m_entries.size())
     {
-        return QVariant();
+        return {};
     }
 
     const LogEntry& entry = m_entries.at(index.row());
@@ -113,9 +113,9 @@ auto LogModel::data(const QModelIndex& index, int role) const -> QVariant
         case AppName:
             return entry.get_app_name();
         case Spacer:
-            return QVariant();
+            return {};
         default:
-            return QVariant();
+            return {};
         }
     }
 
@@ -130,7 +130,7 @@ auto LogModel::data(const QModelIndex& index, int role) const -> QVariant
     case AppNameRole:
         return entry.get_app_name();
     default:
-        return QVariant();
+        return {};
     }
 }
 
@@ -148,7 +148,7 @@ auto LogModel::headerData(int section, Qt::Orientation orientation, int role) co
 {
     if (role != Qt::DisplayRole || orientation != Qt::Horizontal)
     {
-        return QVariant();
+        return {};
     }
 
     switch (section)
@@ -162,9 +162,9 @@ auto LogModel::headerData(int section, Qt::Orientation orientation, int role) co
     case AppName:
         return QStringLiteral("App Name");
     case Spacer:
-        return QVariant();
+        return {};
     default:
-        return QVariant();
+        return {};
     }
 }
 
@@ -245,7 +245,7 @@ auto LogModel::get_entry(int row) const -> LogEntry
 {
     if (row < 0 || row >= m_entries.size())
     {
-        return LogEntry();
+        return {};
     }
 
     return m_entries.at(row);

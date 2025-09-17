@@ -238,7 +238,7 @@ auto PagingProxyModel::index(int row, int column, const QModelIndex& parent) con
  */
 auto PagingProxyModel::parent(const QModelIndex& /*index*/) const -> QModelIndex
 {
-    return QModelIndex();
+    return {};
 }
 
 /**
@@ -322,7 +322,7 @@ void PagingProxyModel::sort(int column, Qt::SortOrder order)
 {
     if (sourceModel() != nullptr)
     {
-        QSortFilterProxyModel* sort_proxy = qobject_cast<QSortFilterProxyModel*>(sourceModel());
+        auto sort_proxy = qobject_cast<QSortFilterProxyModel*>(sourceModel());
 
         if (sort_proxy != nullptr)
         {

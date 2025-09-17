@@ -19,8 +19,7 @@ class LogFileInfo
          * @param file_path The full path to the log file.
          * @param app_name The name of the application (optional).
          */
-        explicit LogFileInfo(const QString& file_path = QString(),
-                             const QString& app_name = QString());
+        explicit LogFileInfo(QString file_path = QString(), QString app_name = QString());
 
         /**
          * @brief Returns the file path.

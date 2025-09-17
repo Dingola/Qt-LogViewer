@@ -56,8 +56,8 @@ class LogSortFilterProxyModel: public QSortFilterProxyModel
          * @param source_parent The parent index in the source model.
          * @return True if the row matches all filters, false otherwise.
          */
-        auto filterAcceptsRow(int source_row,
-                              const QModelIndex& source_parent) const -> bool override;
+        [[nodiscard]] auto filterAcceptsRow(int source_row, const QModelIndex& source_parent) const
+            -> bool override;
 
         /**
          * @brief Custom sorting logic for columns.
@@ -65,7 +65,8 @@ class LogSortFilterProxyModel: public QSortFilterProxyModel
          * @param right The right index to compare.
          * @return True if the left value is less than the right value.
          */
-        auto lessThan(const QModelIndex& left, const QModelIndex& right) const -> bool override;
+        [[nodiscard]] auto lessThan(const QModelIndex& left,
+                                    const QModelIndex& right) const -> bool override;
 
     private:
         /**

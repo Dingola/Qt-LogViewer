@@ -117,7 +117,8 @@ auto LogParser::get_field_order() const -> LogFieldOrder
  * This helper function replaces placeholders in the format string with appropriate
  * regular expression groups and records the order of the fields for later extraction.
  */
-QPair<QRegularExpression, LogFieldOrder> LogParser::format_string_to_regex(const QString& format)
+auto LogParser::format_string_to_regex(const QString& format)
+    -> QPair<QRegularExpression, LogFieldOrder>
 {
     QVector<QString> fields;
     QString regex_pattern;

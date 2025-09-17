@@ -120,7 +120,7 @@ class LogViewerController: public QObject
          * @param file_path The file path to check.
          * @return True if the file is already loaded, false otherwise.
          */
-        auto is_file_loaded(const QString& file_path) const -> bool;
+        [[nodiscard]] auto is_file_loaded(const QString& file_path) const -> bool;
 
     public slots:
         /**

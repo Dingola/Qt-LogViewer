@@ -26,7 +26,7 @@ class TableView: public QTableView
          * @brief Returns the current hover row color.
          * @return The color used for hover row highlighting.
          */
-        auto get_hover_row_color() const -> QColor;
+        [[nodiscard]] auto get_hover_row_color() const -> QColor;
 
         /**
          * @brief Sets the hover row color.

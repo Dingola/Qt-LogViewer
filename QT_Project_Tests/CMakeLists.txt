@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.19.0 FATAL_ERROR)
+cmake_minimum_required(VERSION 4.1.1 FATAL_ERROR)
 
 ############################################
 ### Setup project                        ###
@@ -14,6 +14,9 @@ include(${CMAKE_SOURCE_DIR}/CMake/BuildThirdPartyProject.cmake)
 ############################################
 ### Global Properties                    ###
 ############################################
+
+# Disable CMake searching for modules
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 
 # Global properties for project organization
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
@@ -157,10 +160,12 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/Doxygen.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/GoogleTest.cmake)
 
 if (WIN32)
-    set_target_properties(${PROJECT_NAME} PROPERTIES 
-        LINK_FLAGS "/SUBSYSTEM:CONSOLE"
-        WIN32_EXECUTABLE ON
-    )
+    if (MSVC OR (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC"))
+		set_target_properties(${PROJECT_NAME} PROPERTIES 
+			LINK_FLAGS "/SUBSYSTEM:CONSOLE"
+			WIN32_EXECUTABLE ON
+		)
+    endif()
 elseif (APPLE)
     set_target_properties(${PROJECT_NAME} PROPERTIES 
         MACOSX_BUNDLE ON
