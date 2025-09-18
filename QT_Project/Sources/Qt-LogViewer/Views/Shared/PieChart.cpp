@@ -20,6 +20,7 @@ PieChart::PieChart(QWidget* parent)
       m_segment_gap_angle(k_default_segment_gap_angle)
 {
     setAttribute(Qt::WA_StyledBackground, true);
+    setObjectName("PieChart");
 }
 
 /**

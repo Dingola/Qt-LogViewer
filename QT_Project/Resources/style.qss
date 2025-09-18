@@ -163,6 +163,7 @@ LogLevelPieChartWidget {
 /* === Pie Chart === */
 PieChart {
     background: @ColorTableBackground;
+    max-height: 200px;
 }
 
 /* === Labels === */
@@ -621,4 +622,36 @@ DockWidget > QWidget {
 
 #DialogHeaderCloseButton:hover {
     background: @ColorButtonBackgroundHover;
+}
+
+/* === Log Level Pie Chart Rows Widget === */
+#logLevelRowsWidget {
+    background: @ColorTableBackground;
+    border-radius: 8px;
+    padding: 8px;
+}
+
+/* === Log Level Pie Chart Row Widget === */
+#logLevelRowWidget {
+    background: @ColorTableBackground;
+}
+
+/* === Log Level Row Labels === */
+#logLevelNameLabel {
+    font-weight: 500;
+    font-size: 14px;
+    color: @ColorText;
+    background: @ColorTableBackground;
+}
+
+#logLevelPercentLabel {
+    font-size: 14px;
+    color: #666666;
+    background: @ColorTableBackground;
+}
+
+/* === Log Level Color Square === */
+#logLevelColorSquare {
+    border-radius: 3px;
+    /* background-color is set dynamically in C++ */
 }

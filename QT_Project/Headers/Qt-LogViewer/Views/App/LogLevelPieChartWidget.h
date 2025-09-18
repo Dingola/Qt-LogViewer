@@ -9,6 +9,7 @@
 #include <QMap>
 #include <QWidget>
 
+#include "Qt-LogViewer/Views/Shared/FlowLayout.h"
 #include "Qt-LogViewer/Views/Shared/PieChart.h"
 
 /**
@@ -82,6 +83,22 @@ class LogLevelPieChartWidget: public QWidget
         auto set_segment_gap_angle(int degrees) -> void;
 
     private:
+        /**
+         * @brief Updates the log level rows below the pie chart.
+         *
+         * Creates or updates a row for each log level present in m_level_counts.
+         * Each row contains a colored square, the log level name, and the percentage value.
+         */
+        auto update_log_level_rows() -> void;
+
+        /**
+         * @brief Updates the color square for a given log level row.
+         * @param level The log level name (e.g., "trace").
+         * @param color The color to apply.
+         */
+        auto update_level_color_square(const QString& level, const QColor& color) -> void;
+
+    private:
         PieChart* m_pie_chart;
         QMap<QString, int> m_level_counts;
         QColor m_trace_color;
@@ -90,4 +107,7 @@ class LogLevelPieChartWidget: public QWidget
         QColor m_warning_color;
         QColor m_error_color;
         QColor m_fatal_color;
+        QWidget* m_levels_widget;                     ///< Container for log level rows
+        FlowLayout* m_levels_layout;                  ///< Layout for stacking log level rows
+        QMap<QString, QWidget*> m_level_row_widgets;  ///< Map log level to row widget
 };
