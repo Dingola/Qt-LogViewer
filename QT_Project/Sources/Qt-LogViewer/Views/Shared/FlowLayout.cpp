@@ -230,11 +230,14 @@ auto FlowLayout::get_expand_to_show_all_rows() const -> bool
  */
 auto FlowLayout::do_layout(const QRect& rect, bool test_only) const -> int
 {
-    int x = rect.x();
-    int y = rect.y();
+    int left = 0, top = 0, right = 0, bottom = 0;
+    getContentsMargins(&left, &top, &right, &bottom);
+
+    int x = rect.x() + left;
+    int y = rect.y() + top;
     int line_height = 0;
     int start_x = x;
-    int max_width = rect.width();
+    int max_width = rect.width() - left - right;
 
     QList<QLayoutItem*> line_items;
     int line_width = 0;
