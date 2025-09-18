@@ -150,7 +150,7 @@ void FlowLayout::setGeometry(const QRect& rect)
 
 /**
  * @brief Returns the horizontal spacing between items.
- * @return The horizontal spacing.
+ * @return The horizontal spacing (never negative).
  */
 auto FlowLayout::horizontal_spacing() const -> int
 {
@@ -159,6 +159,11 @@ auto FlowLayout::horizontal_spacing() const -> int
     if (result < 0)
     {
         result = smart_spacing(QStyle::PM_LayoutHorizontalSpacing);
+
+        if (result < 0)
+        {
+            result = 0;
+        }
     }
 
     return result;
@@ -166,7 +171,7 @@ auto FlowLayout::horizontal_spacing() const -> int
 
 /**
  * @brief Returns the vertical spacing between rows.
- * @return The vertical spacing.
+ * @return The vertical spacing (never negative).
  */
 auto FlowLayout::vertical_spacing() const -> int
 {
@@ -175,6 +180,11 @@ auto FlowLayout::vertical_spacing() const -> int
     if (result < 0)
     {
         result = smart_spacing(QStyle::PM_LayoutVerticalSpacing);
+
+        if (result < 0)
+        {
+            result = 0;
+        }
     }
 
     return result;
