@@ -1,4 +1,4 @@
-#include "Qt-LogViewer/Views/BaseMainWindowTest.h"
+#include "Qt-LogViewer/Views/Shared/BaseMainWindowTest.h"
 
 #include <QByteArray>
 #include <QFile>

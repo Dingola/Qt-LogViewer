@@ -1,4 +1,4 @@
-#include "Qt-LogViewer/Views/PaginationWidgetTest.h"
+#include "Qt-LogViewer/Views/Shared/PaginationWidgetTest.h"
 
 #include <QComboBox>
 #include <QLineEdit>
