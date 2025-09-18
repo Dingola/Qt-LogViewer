@@ -61,6 +61,12 @@ jobs:
       - name: Set QT6_DIR
         run: echo "QT6_DIR=${{ github.workspace }}/../Qt/${{ env.QT_VERSION }}/gcc_64" >> $GITHUB_ENV
 
+      # Install CMake
+      - name: Install CMake
+        uses: jwlawson/actions-setup-cmake@v1
+        with:
+          cmake-version: '4.1.1'
+
       # Configure CMake
       - name: Configure CMake
         run: |

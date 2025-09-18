@@ -54,6 +54,12 @@ jobs:
       - name: Set QT6_DIR
         run: echo "QT6_DIR=C:\\Qt\\${{ env.QT_VERSION }}\\msvc2022_64" >> $env:GITHUB_ENV
 
+      # Install CMake
+      - name: Install CMake
+        uses: jwlawson/actions-setup-cmake@v1
+        with:
+          cmake-version: '4.1.1'
+
       # Configure CMake
       - name: Configure CMake
         run: |
