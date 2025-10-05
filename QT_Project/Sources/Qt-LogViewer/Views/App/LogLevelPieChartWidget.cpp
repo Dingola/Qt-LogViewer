@@ -273,10 +273,10 @@ auto LogLevelPieChartWidget::update_log_level_rows() -> void
 
         for (const auto& level: levels)
         {
-            if (m_level_counts.contains(level))
+            if (m_level_counts.contains(level) && m_level_counts.value(level, 0) > 0)
             {
                 int count = m_level_counts.value(level, 0);
-                int percent = static_cast<int>(std::round(100.0 * count / total));
+                double percent = 100.0 * static_cast<double>(count) / static_cast<double>(total);
 
                 auto* row_widget = new QWidget(m_levels_widget);
                 row_widget->setObjectName("logLevelRowWidget");
@@ -293,7 +293,8 @@ auto LogLevelPieChartWidget::update_log_level_rows() -> void
                 auto* name_label = new QLabel(level.toUpper(), row_widget);
                 name_label->setObjectName("logLevelNameLabel");
 
-                auto* percent_label = new QLabel(QString("%1%").arg(percent), row_widget);
+                auto* percent_label =
+                    new QLabel(QString::number(percent, 'f', 1) + "%", row_widget);
                 percent_label->setObjectName("logLevelPercentLabel");
 
                 color_label->setFixedHeight(name_label->sizeHint().height());
