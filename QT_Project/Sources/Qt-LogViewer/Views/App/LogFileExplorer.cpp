@@ -82,13 +82,27 @@ auto LogFileExplorer::setup_connections() -> void
 {
     connect(ui->treeView->selectionModel(), &QItemSelectionModel::currentChanged, this,
             [this](const QModelIndex& current, const QModelIndex&) {
-                if (!current.isValid()) return;
-                auto* item = static_cast<LogFileTreeItem*>(current.internalPointer());
-                if (item && item->parent_item())
+                if (current.isValid())
                 {
-                    emit file_selected(item->data(1).value<LogFileInfo>());
+                    auto* item = static_cast<LogFileTreeItem*>(current.internalPointer());
+                    if (item != nullptr &&
+                        item->data(0).value<LogFileTreeItem::Type>() == LogFileTreeItem::Type::File)
+                    {
+                        emit file_selected(item->data(1).value<LogFileInfo>());
+                    }
                 }
             });
+    connect(ui->treeView, &QTreeView::doubleClicked, this, [this](const QModelIndex& index) {
+        if (index.isValid())
+        {
+            auto* item = static_cast<LogFileTreeItem*>(index.internalPointer());
+            if (item != nullptr &&
+                item->data(0).value<LogFileTreeItem::Type>() == LogFileTreeItem::Type::File)
+            {
+                emit open_file_requested(item->data(1).value<LogFileInfo>());
+            }
+        }
+    });
     connect(ui->treeView, &QTreeView::customContextMenuRequested, this,
             &LogFileExplorer::show_context_menu);
 }
@@ -99,17 +113,37 @@ auto LogFileExplorer::setup_connections() -> void
 auto LogFileExplorer::init_context_menu() -> void
 {
     m_context_menu = new QMenu(this);
-    auto remove_action = new QAction(tr("Remove"), m_context_menu);
-    m_context_menu->addAction(remove_action);
-    connect(remove_action, &QAction::triggered, this, [this]() {
+
+    auto open_action = new QAction(tr("Open"), m_context_menu);
+    m_context_menu->addAction(open_action);
+    connect(open_action, &QAction::triggered, this, [this]() {
         QModelIndex index = ui->treeView->currentIndex();
+
         if (index.isValid())
         {
             auto* item = static_cast<LogFileTreeItem*>(index.internalPointer());
 
-            if (item != nullptr)
+            if (item != nullptr &&
+                item->data(0).value<LogFileTreeItem::Type>() == LogFileTreeItem::Type::File)
             {
-                emit remove_requested(item->data(1).value<LogFileInfo>());
+                emit open_file_requested(item->data(1).value<LogFileInfo>());
+            }
+        }
+    });
+
+    auto remove_action = new QAction(tr("Remove"), m_context_menu);
+    m_context_menu->addAction(remove_action);
+    connect(remove_action, &QAction::triggered, this, [this]() {
+        QModelIndex index = ui->treeView->currentIndex();
+
+        if (index.isValid())
+        {
+            auto* item = static_cast<LogFileTreeItem*>(index.internalPointer());
+
+            if (item != nullptr &&
+                item->data(0).value<LogFileTreeItem::Type>() == LogFileTreeItem::Type::File)
+            {
+                emit remove_file_requested(item->data(1).value<LogFileInfo>());
             }
         }
     });

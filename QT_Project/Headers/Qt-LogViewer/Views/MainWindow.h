@@ -5,8 +5,10 @@
 #include <QMainWindow>
 #include <QModelIndex>
 #include <QPlainTextEdit>
+#include <QVector>
 
 #include "Qt-LogViewer/Controllers/LogViewerController.h"
+#include "Qt-LogViewer/Models/LogEntry.h"
 #include "Qt-LogViewer/Models/LogFileInfo.h"
 #include "Qt-LogViewer/Services/StylesheetLoader.h"
 #include "Qt-LogViewer/Views/App/LogFileExplorer.h"
@@ -61,9 +63,9 @@ class MainWindow: public BaseMainWindow
         auto setup_log_level_pie_chart() -> void;
 
         /**
-         * @brief Sets up the log table view and pagination widget.
+         * @brief Sets up pagination widget.
          */
-        auto setup_log_table_and_pagination() -> void;
+        auto setup_pagination_widget() -> void;
 
         /**
          * @brief Sets up the log details dock widget.
@@ -71,14 +73,14 @@ class MainWindow: public BaseMainWindow
         auto setup_log_details_dock() -> void;
 
         /**
-         * @brief Connects filter bar widget signals to controller slots.
+         * @brief Sets up the filter bar widget.
          */
-        auto setup_filter_bar_connections() -> void;
+        auto setup_filter_bar() -> void;
 
         /**
-         * @brief Connects table selection to log details view.
+         * @brief Sets up the tab widget.
          */
-        auto setup_table_selection_connection() -> void;
+        auto setup_tab_widget() -> void;
 
         /**
          * @brief Initializes the main menu bar and its actions.
@@ -98,12 +100,6 @@ class MainWindow: public BaseMainWindow
          * ensures they are within valid ranges, and updates the pagination widget accordingly.
          */
         auto update_pagination_widget() -> void;
-
-        /**
-         * @brief Loads log files and updates the UI.
-         * @param files The list of log file paths to load.
-         */
-        auto load_files_and_update_ui(const QStringList& files) -> void;
 
         /**
          * @brief Handles drag enter events to allow dropping log files.
@@ -132,14 +128,14 @@ class MainWindow: public BaseMainWindow
 
     private slots:
         /**
-         * @brief Opens log files using a file dialog.
+         * @brief Opens log files using a file dialog and adds them into the LogFileExplorer.
          */
-        void open_log_files();
+        void handle_open_log_file_dialog_requested();
 
         /**
          * @brief Shows the settings dialog for changing application settings.
          */
-        void show_settings_dialog();
+        void handle_show_settings_dialog_requested();
 
         /**
          * @brief Handles search changes in the filter bar widget.
@@ -147,13 +143,31 @@ class MainWindow: public BaseMainWindow
          * This method retrieves the search text, field, and regex status from the filter bar
          * widget, then updates the controller's search filter accordingly.
          */
-        auto on_search_changed() -> void;
+        auto handle_search_changed() -> void;
 
         /**
          * @brief Updates the log level pie chart for the selected file.
          * @param log_file_info The selected LogFileInfo.
          */
-        auto update_log_level_pie_chart(const LogFileInfo& log_file_info) -> void;
+        auto update_log_level_pie_chart(const QVector<LogEntry>& log_entries) -> void;
+
+        /**
+         * @brief Handles open log file requests and creates a new tab with a LogTableView.
+         * @param log_file_info The LogFileInfo to load and display.
+         */
+        auto handle_log_file_open_requested(const LogFileInfo& log_file_info) -> void;
+
+        /**
+         * @brief Slot to handle changes in the current view ID.
+         * @param view_id The new current view ID.
+         */
+        auto handle_current_view_id_changed(const QUuid& view_id) -> void;
+
+        /**
+         * @brief Handles removal of a view by closing the corresponding tab.
+         * @param view_id The QUuid of the removed view.
+         */
+        auto handle_view_removed(const QUuid& view_id) -> void;
 
     private:
         /**

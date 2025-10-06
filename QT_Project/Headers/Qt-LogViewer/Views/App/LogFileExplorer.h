@@ -94,10 +94,16 @@ class LogFileExplorer: public QWidget
         void file_selected(const LogFileInfo& log_file_info);
 
         /**
+         * @brief Emitted when the user requests to open a log file via the context menu.
+         * @param file The LogFileInfo to open.
+         */
+        void open_file_requested(const LogFileInfo& log_file_info);
+
+        /**
          * @brief Emitted when the user requests to remove a log file via the context menu.
          * @param file The LogFileInfo to remove.
          */
-        void remove_requested(const LogFileInfo& log_file_info);
+        void remove_file_requested(const LogFileInfo& log_file_info);
 
     private:
         Ui::LogFileExplorer* ui;

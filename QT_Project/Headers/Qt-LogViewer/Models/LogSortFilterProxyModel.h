@@ -38,7 +38,7 @@ class LogSortFilterProxyModel: public QSortFilterProxyModel
          * @brief Sets the set of log levels to filter by.
          * @param levels The set of log levels (e.g., {"Info", "Error"}).
          */
-        auto set_level_filter(const QSet<QString>& levels) -> void;
+        auto set_log_level_filters(const QSet<QString>& levels) -> void;
 
         /**
          * @brief Sets the search string and field.
@@ -48,6 +48,36 @@ class LogSortFilterProxyModel: public QSortFilterProxyModel
          */
         auto set_search_filter(const QString& search_text, const QString& field,
                                bool use_regex) -> void;
+
+        /**
+         * @brief Returns the current application name filter.
+         * @return The application name filter string.
+         */
+        [[nodiscard]] auto get_app_name_filter() const noexcept -> QString;
+
+        /**
+         * @brief Returns the current set of log levels being filtered.
+         * @return The set of log levels.
+         */
+        [[nodiscard]] auto get_log_level_filters() const noexcept -> QSet<QString>;
+
+        /**
+         * @brief Returns the current search text.
+         * @return The search text string.
+         */
+        [[nodiscard]] auto get_search_text() const noexcept -> QString;
+
+        /**
+         * @brief Returns the current search field.
+         * @return The search field string.
+         */
+        [[nodiscard]] auto get_search_field() const noexcept -> QString;
+
+        /**
+         * @brief Returns whether the search text is treated as a regex.
+         * @return True if using regex, false if plain text.
+         */
+        [[nodiscard]] auto is_search_regex() const noexcept -> bool;
 
     protected:
         /**
@@ -78,7 +108,7 @@ class LogSortFilterProxyModel: public QSortFilterProxyModel
 
     private:
         QString m_app_name_filter;
-        QSet<QString> m_level_filter;
+        QSet<QString> m_log_level_filters;
         QString m_search_text;
         QString m_search_field;
         bool m_use_regex = false;

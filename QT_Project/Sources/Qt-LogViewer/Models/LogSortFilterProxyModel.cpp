@@ -34,11 +34,11 @@ auto LogSortFilterProxyModel::set_app_name_filter(const QString& app_name) -> vo
  * @brief Sets the set of log levels to filter by.
  * @param levels The set of log levels (e.g., {"Info", "Error"}).
  */
-auto LogSortFilterProxyModel::set_level_filter(const QSet<QString>& levels) -> void
+auto LogSortFilterProxyModel::set_log_level_filters(const QSet<QString>& levels) -> void
 {
-    if (m_level_filter != levels)
+    if (m_log_level_filters != levels)
     {
-        m_level_filter = levels;
+        m_log_level_filters = levels;
         invalidateFilter();
     }
 }
@@ -73,6 +73,51 @@ auto LogSortFilterProxyModel::set_search_filter(const QString& search_text, cons
 
         invalidateFilter();
     }
+}
+
+/**
+ * @brief Returns the current application name filter.
+ * @return The application name filter string.
+ */
+auto LogSortFilterProxyModel::get_app_name_filter() const noexcept -> QString
+{
+    return m_app_name_filter;
+}
+
+/**
+ * @brief Returns the current set of log levels being filtered.
+ * @return The set of log levels.
+ */
+auto LogSortFilterProxyModel::get_log_level_filters() const noexcept -> QSet<QString>
+{
+    return m_log_level_filters;
+}
+
+/**
+ * @brief Returns the current search text.
+ * @return The search text string.
+ */
+auto LogSortFilterProxyModel::get_search_text() const noexcept -> QString
+{
+    return m_search_text;
+}
+
+/**
+ * @brief Returns the current search field.
+ * @return The search field string.
+ */
+auto LogSortFilterProxyModel::get_search_field() const noexcept -> QString
+{
+    return m_search_field;
+}
+
+/**
+ * @brief Returns whether the search text is treated as a regex.
+ * @return True if using regex, false if plain text.
+ */
+auto LogSortFilterProxyModel::is_search_regex() const noexcept -> bool
+{
+    return m_use_regex;
 }
 
 /**
@@ -124,10 +169,10 @@ auto LogSortFilterProxyModel::row_passes_filter(int row, const QModelIndex& pare
     }
 
     // Level filter
-    if (accepted && !m_level_filter.isEmpty())
+    if (accepted && !m_log_level_filters.isEmpty())
     {
         QString level = sourceModel()->data(index_level, Qt::DisplayRole).toString();
-        if (!m_level_filter.contains(level))
+        if (!m_log_level_filters.contains(level))
         {
             accepted = false;
         }

@@ -60,12 +60,18 @@ MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
     ui->setupUi(this);
     setWindowIcon(QIcon(":/Resources/Icons/App/AppIcon.svg"));
 
+    m_controller->set_current_view(m_controller->load_log_files({}));
+    connect(m_controller, &LogViewerController::current_view_id_changed, this,
+            &MainWindow::handle_current_view_id_changed);
+    connect(m_controller, &LogViewerController::view_removed, this,
+            &MainWindow::handle_view_removed);
+
     setup_log_file_explorer();
     setup_log_level_pie_chart();
-    setup_log_table_and_pagination();
+    setup_pagination_widget();
     setup_log_details_dock();
-    setup_filter_bar_connections();
-    setup_table_selection_connection();
+    setup_filter_bar();
+    setup_tab_widget();
 
     initialize_menu();
 
@@ -99,13 +105,13 @@ auto MainWindow::setup_log_file_explorer() -> void
     setCorner(Qt::TopLeftCorner, Qt::LeftDockWidgetArea);
     setCorner(Qt::BottomLeftCorner, Qt::LeftDockWidgetArea);
 
-    connect(m_log_file_explorer, &LogFileExplorer::remove_requested, m_controller,
+    connect(m_log_file_explorer, &LogFileExplorer::open_file_requested, this,
+            &MainWindow::handle_log_file_open_requested);
+    connect(m_log_file_explorer, &LogFileExplorer::remove_file_requested, m_controller,
             [this](const LogFileInfo& log_file_info) {
                 m_controller->remove_log_file(log_file_info);
                 update_pagination_widget();
             });
-    connect(m_log_file_explorer, &LogFileExplorer::file_selected, this,
-            &MainWindow::update_log_level_pie_chart);
 }
 
 /**
@@ -126,24 +132,22 @@ auto MainWindow::setup_log_level_pie_chart() -> void
 /**
  * @brief Sets up the log table view and pagination widget.
  */
-auto MainWindow::setup_log_table_and_pagination() -> void
+auto MainWindow::setup_pagination_widget() -> void
 {
-    auto paging_proxy = m_controller->get_paging_proxy();
-    ui->tableViewLog->setModel(paging_proxy);
-
     ui->paginationWidget->set_max_page_buttons(7);
-    int items_per_page = 25;
-    paging_proxy->set_page_size(items_per_page);
-    paging_proxy->set_current_page(1);
 
     connect(ui->paginationWidget, &PaginationWidget::page_changed, this,
             [this](int page) { m_controller->get_paging_proxy()->set_current_page(page); });
     connect(ui->paginationWidget, &PaginationWidget::items_per_page_changed, this,
             [this](int items_per_page) {
                 auto* proxy = m_controller->get_paging_proxy();
-                proxy->set_page_size(items_per_page);
-                proxy->set_current_page(1);
-                update_pagination_widget();
+
+                if (proxy != nullptr)
+                {
+                    proxy->set_page_size(items_per_page);
+                    proxy->set_current_page(1);
+                    update_pagination_widget();
+                }
             });
 }
 
@@ -169,9 +173,9 @@ auto MainWindow::setup_log_details_dock() -> void
 }
 
 /**
- * @brief Connects filter bar widget signals to controller slots.
+ * @brief Sets up the filter bar widget.
  */
-auto MainWindow::setup_filter_bar_connections() -> void
+auto MainWindow::setup_filter_bar() -> void
 {
     connect(ui->filterBarWidget, &FilterBarWidget::app_filter_changed, this,
             [this](const QString& app_name) {
@@ -179,28 +183,56 @@ auto MainWindow::setup_filter_bar_connections() -> void
                 update_pagination_widget();
             });
     connect(ui->filterBarWidget, &FilterBarWidget::log_level_filter_changed, this,
-            [this](const QSet<QString>& levels) {
-                qDebug() << "Level filter set to:" << levels;
-                m_controller->set_level_filter(levels);
+            [this](const QSet<QString>& log_levels) {
+                qDebug() << "Level filter set to:" << log_levels;
+                m_controller->set_log_level_filters(log_levels);
                 update_pagination_widget();
             });
     connect(ui->filterBarWidget, &FilterBarWidget::search_requested, this,
-            &MainWindow::on_search_changed);
+            &MainWindow::handle_search_changed);
     connect(ui->filterBarWidget, &FilterBarWidget::search_text_changed, this,
-            &MainWindow::on_search_changed);
+            &MainWindow::handle_search_changed);
     connect(ui->filterBarWidget, &FilterBarWidget::search_field_changed, this,
-            &MainWindow::on_search_changed);
+            &MainWindow::handle_search_changed);
     connect(ui->filterBarWidget, &FilterBarWidget::regex_toggled, this,
-            &MainWindow::on_search_changed);
+            &MainWindow::handle_search_changed);
 }
 
 /**
- * @brief Connects table selection to log details view.
+ * @brief Sets up the tab widget.
  */
-auto MainWindow::setup_table_selection_connection() -> void
+auto MainWindow::setup_tab_widget() -> void
 {
-    connect(ui->tableViewLog->selectionModel(), &QItemSelectionModel::currentRowChanged, this,
-            &MainWindow::update_log_details);
+    ui->tabWidgetLog->setTabsClosable(true);
+
+    connect(ui->tabWidgetLog, &QTabWidget::currentChanged, this, [this](int index) {
+        auto* log_table_view = qobject_cast<LogTableView*>(ui->tabWidgetLog->widget(index));
+        if (log_table_view != nullptr)
+        {
+            QUuid view_id = log_table_view->property("view_id").value<QUuid>();
+            m_controller->set_current_view(view_id);
+            update_pagination_widget();
+        }
+    });
+    connect(ui->tabWidgetLog, &QTabWidget::tabCloseRequested, this, [this](int index) {
+        auto* log_table_view = qobject_cast<LogTableView*>(ui->tabWidgetLog->widget(index));
+        if (log_table_view != nullptr)
+        {
+            QUuid view_id = log_table_view->property("view_id").value<QUuid>();
+            m_controller->remove_view(view_id);
+        }
+        ui->tabWidgetLog->removeTab(index);
+        delete log_table_view;
+
+        // Update pagination when last tab is closed (not handled by handle_current_view_id_changed)
+        if (ui->tabWidgetLog->count() == 0)
+        {
+            ui->filterBarWidget->set_app_names({});
+            ui->filterBarWidget->set_log_levels({});
+            update_log_level_pie_chart({});
+            update_pagination_widget();
+        }
+    });
 }
 
 /**
@@ -217,7 +249,8 @@ auto MainWindow::initialize_menu() -> void
     file_menu->addAction(m_action_open_log_file);
     ui->menubar->addMenu(file_menu);
 
-    connect(m_action_open_log_file, &QAction::triggered, this, &MainWindow::open_log_files);
+    connect(m_action_open_log_file, &QAction::triggered, this,
+            &MainWindow::handle_open_log_file_dialog_requested);
 
     // Separator before the quit action
     file_menu->addSeparator();
@@ -276,7 +309,8 @@ auto MainWindow::initialize_menu() -> void
     settings_menu->addAction(m_action_settings);
     ui->menubar->addMenu(settings_menu);
 
-    connect(m_action_settings, &QAction::triggered, this, &MainWindow::show_settings_dialog);
+    connect(m_action_settings, &QAction::triggered, this,
+            &MainWindow::handle_show_settings_dialog_requested);
 
     // Help menu
     auto help_menu = new QMenu(tr("&Help"), this);
@@ -340,52 +374,16 @@ auto MainWindow::update_log_details(const QModelIndex& current) -> void
 auto MainWindow::update_pagination_widget() -> void
 {
     auto* proxy = m_controller->get_paging_proxy();
-    int total_pages = proxy->get_total_pages();
-    int current_page = proxy->get_current_page();
+    int total_pages = 0;
+    int current_page = 0;
 
-    if (total_pages < 1)
+    if (proxy != nullptr)
     {
-        total_pages = 1;
-    }
-    if (current_page < 1)
-    {
-        current_page = 1;
-    }
-    if (current_page > total_pages)
-    {
-        current_page = total_pages;
+        total_pages = proxy->get_total_pages();
+        current_page = proxy->get_current_page();
     }
 
     ui->paginationWidget->set_pagination(current_page, total_pages);
-}
-
-/**
- * @brief Loads log files and updates the UI.
- * @param files The list of log file paths to load.
- *
- * This method loads the specified log files into the controller, extracts unique application names
- * from the loaded logs, updates the application combo box, and shows a status message indicating
- * how many files were loaded.
- */
-auto MainWindow::load_files_and_update_ui(const QStringList& files) -> void
-{
-    qDebug() << "Requested to load files:" << files;
-
-    if (!files.isEmpty())
-    {
-        QVector<QString> file_paths = files.toVector();
-        m_controller->load_logs(file_paths);
-        QSet<QString> app_names = m_controller->get_app_names();
-        ui->filterBarWidget->set_app_names(app_names);
-        qDebug() << "Loaded" << app_names.size() << "apps from" << files.size() << "files.";
-
-        update_pagination_widget();
-        statusBar()->showMessage(tr(k_loaded_log_files_status).arg(files.size()), 3000);
-    }
-    else
-    {
-        qWarning() << "No files provided to load_files_and_update_ui.";
-    }
 }
 
 /**
@@ -416,7 +414,7 @@ void MainWindow::dropEvent(QDropEvent* event)
     }
 
     qDebug() << "Files dropped:" << files;
-    load_files_and_update_ui(files);
+    m_controller->add_log_files_to_tree(files);
 }
 
 /**
@@ -429,7 +427,12 @@ void MainWindow::resizeEvent(QResizeEvent* event)
 
     if (ui != nullptr)
     {
-        ui->tableViewLog->auto_resize_columns();
+        auto* log_table_view = qobject_cast<LogTableView*>(ui->tabWidgetLog->currentWidget());
+
+        if (log_table_view != nullptr)
+        {
+            log_table_view->auto_resize_columns();
+        }
     }
 }
 
@@ -454,21 +457,21 @@ auto MainWindow::changeEvent(QEvent* event) -> void
 }
 
 /**
- * @brief Opens log files using a file dialog and loads them into the controller.
+ * @brief Opens log files using a file dialog and adds them into the LogFileExplorer.
  */
-void MainWindow::open_log_files()
+void MainWindow::handle_open_log_file_dialog_requested()
 {
     qDebug() << "Opening log file dialog";
     QStringList files = QFileDialog::getOpenFileNames(this, tr(k_open_log_files_text), QString(),
                                                       tr("Log Files (*.log *.txt);;All Files (*)"));
     qDebug() << "Files selected:" << files;
-    load_files_and_update_ui(files);
+    m_controller->add_log_files_to_tree(files);
 }
 
 /**
  * @brief Opens the settings dialog for changing application settings.
  */
-void MainWindow::show_settings_dialog()
+void MainWindow::handle_show_settings_dialog_requested()
 {
     SettingsDialog dialog(m_log_viewer_settings, this);
     dialog.setWindowTitle("SettingsDialog");
@@ -486,7 +489,7 @@ void MainWindow::show_settings_dialog()
  * This method retrieves the search text, field, and regex status from the filter bar widget,
  * then updates the controller's search filter accordingly.
  */
-auto MainWindow::on_search_changed() -> void
+auto MainWindow::handle_search_changed() -> void
 {
     QString search_text = ui->filterBarWidget->get_search_text();
     QString field = ui->filterBarWidget->get_search_field();
@@ -500,16 +503,91 @@ auto MainWindow::on_search_changed() -> void
  * @brief Updates the log level pie chart for the selected file.
  * @param log_file_info The selected LogFileInfo.
  */
-auto MainWindow::update_log_level_pie_chart(const LogFileInfo& log_file_info) -> void
+auto MainWindow::update_log_level_pie_chart(const QVector<LogEntry>& log_entries) -> void
 {
-    QVector<LogEntry> entries = m_controller->get_entries_for_file(log_file_info);
-
     QMap<QString, int> level_counts;
 
-    for (const auto& entry: entries)
+    for (const auto& entry: log_entries)
     {
         level_counts[entry.get_level()]++;
     }
 
     m_log_level_pie_chart_widget->set_log_level_counts(level_counts);
+}
+
+/**
+ * @brief Handles open log file requests and creates a new tab with a LogTableView.
+ * @param log_file_info The LogFileInfo to load and display.
+ */
+auto MainWindow::handle_log_file_open_requested(const LogFileInfo& log_file_info) -> void
+{
+    auto view_id = m_controller->load_log_file(log_file_info.get_file_path());
+    m_controller->set_current_view(view_id);
+
+    auto* log_table_view = new LogTableView(ui->tabWidgetLog);
+    log_table_view->setProperty("view_id", QVariant::fromValue(view_id));
+    auto* paging_proxy = m_controller->get_paging_proxy(view_id);
+    log_table_view->setModel(paging_proxy);
+    connect(log_table_view->selectionModel(), &QItemSelectionModel::currentRowChanged, this,
+            &MainWindow::update_log_details);
+
+    QString tab_title = log_file_info.get_file_name();
+    int tab_index = ui->tabWidgetLog->addTab(log_table_view, tab_title);
+    ui->tabWidgetLog->setCurrentIndex(tab_index);
+    log_table_view->auto_resize_columns();
+}
+
+/**
+ * @brief Slot to handle changes in the current view ID.
+ * @param view_id The new current view ID.
+ */
+auto MainWindow::handle_current_view_id_changed(const QUuid& view_id) -> void
+{
+    QVector<LogEntry> log_entries = m_controller->get_log_entries(view_id);
+    update_log_level_pie_chart(log_entries);
+
+    auto* log_table_view = qobject_cast<LogTableView*>(ui->tabWidgetLog->currentWidget());
+
+    if (log_table_view != nullptr)
+    {
+        log_table_view->auto_resize_columns();
+    }
+
+    QSet<QString> app_names = m_controller->get_app_names(view_id);
+    ui->filterBarWidget->set_app_names(app_names);
+    QString app_name_filter = m_controller->get_app_name_filter(view_id);
+    ui->filterBarWidget->set_current_app_name_filter(app_name_filter);
+    QSet<QString> log_level_filters = m_controller->get_log_level_filters(view_id);
+    ui->filterBarWidget->set_log_levels(log_level_filters);
+    update_pagination_widget();
+}
+
+/**
+ * @brief Handles removal of a view by closing the corresponding tab.
+ * @param view_id The QUuid of the removed view.
+ */
+auto MainWindow::handle_view_removed(const QUuid& view_id) -> void
+{
+    bool tab_removed = false;
+    int tab_count = ui->tabWidgetLog->count();
+
+    for (int i = 0; i < tab_count && !tab_removed; ++i)
+    {
+        auto* log_table_view = qobject_cast<LogTableView*>(ui->tabWidgetLog->widget(i));
+
+        if (log_table_view)
+        {
+            QUuid tab_view_id = log_table_view->property("view_id").value<QUuid>();
+
+            if (tab_view_id == view_id)
+            {
+                ui->tabWidgetLog->removeTab(i);
+                tab_removed = true;
+            }
+        }
+    }
+
+    ui->filterBarWidget->set_app_names({});
+    ui->filterBarWidget->set_log_levels({});
+    update_pagination_widget();
 }

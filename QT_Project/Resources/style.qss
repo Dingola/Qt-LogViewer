@@ -41,6 +41,7 @@
     @ColorTableSelectionBackground: #1d3d5a;
     @ColorTableHoverRow: #25384a;
     @ColorTableAlternateRow: #24282e;
+    @ColorTabWidgetBackground: #24282e;
     @ColorHeaderPressed: #384248;
     @ColorPaginationBackground: #24282e;
     @ColorDockHeader: #24282e;
@@ -88,6 +89,7 @@
     @ColorTableSelectionBackground: #b3d4fc;
     @ColorTableHoverRow: #e3f2fd;
     @ColorTableAlternateRow: #f5f6fa;
+    @ColorTabWidgetBackground: #e9ecef;
     @ColorHeaderPressed: #e0e0e0;
     @ColorPaginationBackground: #24282e;
     @ColorDockHeader: #e9ecef;
@@ -529,6 +531,7 @@ QTabWidget::pane {
     border-radius: 6px;
 }
 QTabWidget > QWidget {
+    background: @ColorTabWidgetBackground;
     padding: 6px;
 }
 QTabBar::tab {
