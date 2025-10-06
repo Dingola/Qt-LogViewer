@@ -56,6 +56,23 @@ FilterWidget::~FilterWidget()
 }
 
 /**
+ * @brief Sets the currently selected application name in the combo box.
+ *
+ * If the provided application name does not exist in the combo box, no selection is made.
+ *
+ * @param app_name The application name to select.
+ */
+auto FilterWidget::set_current_app_name_filter(const QString& app_name) -> void
+{
+    int index = ui->comboBoxApp->findText(app_name);
+
+    if (index != -1)
+    {
+        ui->comboBoxApp->setCurrentIndex(index);
+    }
+}
+
+/**
  * @brief Populates the application filter combo box.
  *
  * Clears the combo box, adds a default entry, and populates it with the provided application names.

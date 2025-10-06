@@ -50,6 +50,15 @@ class FilterBarWidget: public QWidget
         auto set_app_names(const QSet<QString>& app_names) -> void;
 
         /**
+         * @brief Sets the currently selected application name in the combo box.
+         *
+         * If the provided application name does not exist in the combo box, no selection is made.
+         *
+         * @param app_name The application name to select.
+         */
+        auto set_current_app_name_filter(const QString& app_name) -> void;
+
+        /**
          * @brief Sets the checked state of log level checkboxes in the filter widget.
          *
          * @param levels The set of log levels to check.
