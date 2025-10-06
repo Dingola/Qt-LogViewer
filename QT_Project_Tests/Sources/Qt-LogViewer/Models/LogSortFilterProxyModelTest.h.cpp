@@ -68,15 +68,15 @@ TEST_F(LogSortFilterProxyModelTest, FilterByLogLevel)
 {
     QSet<QString> levels;
     levels.insert("INFO");
-    m_proxy->set_level_filter(levels);
+    m_proxy->set_log_level_filters(levels);
     EXPECT_EQ(m_proxy->rowCount(), 2);
 
     levels.insert("ERROR");
-    m_proxy->set_level_filter(levels);
+    m_proxy->set_log_level_filters(levels);
     EXPECT_EQ(m_proxy->rowCount(), 3);
 
     levels.clear();
-    m_proxy->set_level_filter(levels);
+    m_proxy->set_log_level_filters(levels);
     EXPECT_EQ(m_proxy->rowCount(), 4);
 }
 
@@ -133,7 +133,7 @@ TEST_F(LogSortFilterProxyModelTest, CombinedAppNameAndLevelFilter)
     m_proxy->set_app_name_filter("AppA");
     QSet<QString> levels;
     levels.insert("ERROR");
-    m_proxy->set_level_filter(levels);
+    m_proxy->set_log_level_filters(levels);
     EXPECT_EQ(m_proxy->rowCount(), 1);
 
     m_proxy->set_search_filter("Crash", "Message", false);
@@ -142,7 +142,7 @@ TEST_F(LogSortFilterProxyModelTest, CombinedAppNameAndLevelFilter)
     m_proxy->set_search_filter("Startup", "Message", false);
     EXPECT_EQ(m_proxy->rowCount(), 0);
 
-    m_proxy->set_level_filter(QSet<QString>());
+    m_proxy->set_log_level_filters(QSet<QString>());
     m_proxy->set_search_filter("", "Message", false);
     m_proxy->set_app_name_filter("");
     EXPECT_EQ(m_proxy->rowCount(), 4);
