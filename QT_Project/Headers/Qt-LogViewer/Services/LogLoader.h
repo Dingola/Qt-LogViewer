@@ -49,6 +49,13 @@ class LogLoader
             -> QMap<QString, QVector<LogEntry>>;
 
         /**
+         * @brief Reads only the first log entry from the given file.
+         * @param file_path The path to the log file.
+         * @return The first LogEntry if available, otherwise a default LogEntry.
+         */
+        [[nodiscard]] auto read_first_log_entry(const QString& file_path) const -> LogEntry;
+
+        /**
          * @brief Identifies the application name for a given log file path.
          * @param file_path The path to the log file.
          * @return The application name, or an empty string if not identifiable.

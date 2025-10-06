@@ -57,6 +57,39 @@ auto LogLoader::load_logs_by_app(const QVector<QString>& file_paths) const
 }
 
 /**
+ * @brief Reads only the first log entry from the given file.
+ * @param file_path The path to the log file.
+ * @return The first LogEntry if available, otherwise a default LogEntry.
+ */
+auto LogLoader::read_first_log_entry(const QString& file_path) const -> LogEntry
+{
+    LogEntry first_entry;
+    QFile file(file_path);
+
+    if (file.open(QIODevice::ReadOnly | QIODevice::Text))
+    {
+        QTextStream in(&file);
+
+        while (!in.atEnd() && first_entry.get_app_name().isEmpty())
+        {
+            QString line = in.readLine().trimmed();
+
+            if (!line.isEmpty())
+            {
+                LogEntry entry = m_parser.parse_line(line, file_path);
+
+                if (!entry.get_app_name().isEmpty())
+                {
+                    first_entry = entry;
+                }
+            }
+        }
+    }
+
+    return first_entry;
+}
+
+/**
  * @brief Identifies the application name for a given log file path.
  *        This implementation uses the base file name (without extension) as the app name.
  * @param file_path The path to the log file.
