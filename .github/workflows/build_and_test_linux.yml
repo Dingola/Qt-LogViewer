@@ -93,7 +93,7 @@ jobs:
       - name: Generate coverage report
         run: |
           cd build
-          gcovr --root ${{ github.workspace }} -r ${{ github.workspace }} --exclude 'QT_Project_Tests/' --xml-pretty -o coverage.xml
+          gcovr --root ${{ github.workspace }} -r ${{ github.workspace }} --exclude '.*/QT_Project_Tests/.*' --xml-pretty -o coverage.xml
 
       # Upload coverage to Codecov
       - name: Upload coverage to Codecov
