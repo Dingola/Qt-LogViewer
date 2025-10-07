@@ -114,6 +114,36 @@ TEST_F(LogParserTest, ParseFileReturnsEmptyIfFileNotFound)
 }
 
 /**
+ * @test Verifies that parse_file returns an empty vector for an empty file.
+ */
+TEST_F(LogParserTest, ParseFileReturnsEmptyForEmptyFile)
+{
+    QTemporaryFile temp_file;
+    ASSERT_TRUE(temp_file.open());
+    temp_file.close();
+
+    QVector<LogEntry> entries = m_parser->parse_file(temp_file.fileName());
+    EXPECT_TRUE(entries.isEmpty());
+}
+
+/**
+ * @test Verifies that parse_file returns an empty vector for a file with only invalid lines.
+ */
+TEST_F(LogParserTest, ParseFileReturnsEmptyForOnlyInvalidLines)
+{
+    QTemporaryFile temp_file;
+    ASSERT_TRUE(temp_file.open());
+    QTextStream out(&temp_file);
+    out << "invalid line 1\n";
+    out << "invalid line 2\n";
+    out.flush();
+    temp_file.close();
+
+    QVector<LogEntry> entries = m_parser->parse_file(temp_file.fileName());
+    EXPECT_TRUE(entries.isEmpty());
+}
+
+/**
  * @test Verifies parsing with a different field order in the format string.
  */
 TEST_F(LogParserTest, ParseLineWithDifferentFieldOrder)
@@ -149,4 +179,60 @@ TEST_F(LogParserTest, ParseLineWithMissingFields)
     EXPECT_EQ(entry.get_level(), "Debug");
     EXPECT_EQ(entry.get_message(), "This is a debug message");
     EXPECT_TRUE(entry.get_app_name().isEmpty());
+}
+
+/**
+ * @test Verifies that parse_line works when the format string does not include a timestamp.
+ */
+TEST_F(LogParserTest, ParseLineWithoutTimestampField)
+{
+    // Format: level message app_name
+    QString format = "{level} {message} {app_name}";
+    LogParser parser(format);
+
+    QString line = "Info HelloWorld MyApp";
+    LogEntry entry = parser.parse_line(line, "dummy.log");
+
+    EXPECT_TRUE(entry.get_timestamp().isNull() || !entry.get_timestamp().isValid());
+    EXPECT_EQ(entry.get_level(), "Info");
+    EXPECT_EQ(entry.get_message(), "HelloWorld");
+    EXPECT_EQ(entry.get_app_name(), "MyApp");
+}
+
+/**
+ * @test Verifies that get_field_order returns the correct field order from the format string.
+ */
+TEST_F(LogParserTest, GetFieldOrderReturnsCorrectOrder)
+{
+    // The default format string used in SetUp:
+    // "{timestamp} {level} {message} {app_name} [{file}:{line} ({function})]"
+    LogFieldOrder order = m_parser->get_field_order();
+
+    QVector<QString> expected_fields = {"timestamp", "level", "message", "app_name",
+                                        "file",      "line",  "function"};
+
+    EXPECT_EQ(order.fields, expected_fields);
+}
+
+/**
+ * @test Verifies that LogParser handles a format string with no placeholders.
+ */
+TEST_F(LogParserTest, LogParserWithNoPlaceholders)
+{
+    QString format = "static text only";
+    LogParser parser(format);
+
+    QRegularExpression regex = parser.get_pattern();
+    LogFieldOrder order = parser.get_field_order();
+
+    // The regex should match only the exact static text
+    QRegularExpressionMatch match = regex.match("static text only");
+    EXPECT_TRUE(match.hasMatch());
+
+    // There should be no fields in the order
+    EXPECT_TRUE(order.fields.isEmpty());
+
+    // Should not match anything else
+    QRegularExpressionMatch mismatch = regex.match("other text");
+    EXPECT_FALSE(mismatch.hasMatch());
 }
