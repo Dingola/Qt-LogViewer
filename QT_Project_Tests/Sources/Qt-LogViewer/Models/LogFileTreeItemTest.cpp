@@ -46,6 +46,18 @@ TEST_F(LogFileTreeItemTest, ChildManagement)
 }
 
 /**
+ * @brief Tests child() with negative index.
+ */
+TEST_F(LogFileTreeItemTest, ChildNegativeIndex)
+{
+    LogFileTreeItem parent(QVector<QVariant>{"Parent"});
+    auto* child = new LogFileTreeItem(QVector<QVariant>{"Child"}, &parent);
+    parent.append_child(child);
+
+    EXPECT_EQ(parent.child(-1), nullptr);
+}
+
+/**
  * @brief Tests parent_item and row logic.
  */
 TEST_F(LogFileTreeItemTest, ParentAndRowLogic)
@@ -122,6 +134,18 @@ TEST_F(LogFileTreeItemTest, MultiColumnDataAccess)
 }
 
 /**
+ * @brief Tests data() with negative index.
+ */
+TEST_F(LogFileTreeItemTest, DataNegativeIndex)
+{
+    QVector<QVariant> data;
+    data << "A" << 123;
+    LogFileTreeItem item(data);
+
+    EXPECT_EQ(item.data(-1), QVariant());
+}
+
+/**
  * @brief Tests row indices after removing a child.
  */
 TEST_F(LogFileTreeItemTest, RowAfterRemoveChild)
@@ -143,4 +167,22 @@ TEST_F(LogFileTreeItemTest, RowAfterRemoveChild)
     EXPECT_EQ(child2->row(), 0);
 
     delete removed;
+}
+
+/**
+ * @brief Tests row() when parent has no children.
+ */
+TEST_F(LogFileTreeItemTest, RowWithParentNoChildren)
+{
+    QVector<QVariant> parent_data;
+    parent_data << "Parent";
+    LogFileTreeItem parent_item(parent_data);
+
+    QVector<QVariant> child_data;
+    child_data << "Child";
+    auto* child_item = new LogFileTreeItem(child_data, &parent_item);
+
+    EXPECT_EQ(child_item->row(), 0);
+
+    delete child_item;
 }

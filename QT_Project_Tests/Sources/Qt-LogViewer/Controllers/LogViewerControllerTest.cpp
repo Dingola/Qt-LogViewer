@@ -2,6 +2,7 @@
 
 #include <QFile>
 #include <QSet>
+#include <QSignalSpy>
 #include <QTextStream>
 
 /**
@@ -233,6 +234,67 @@ TEST_F(LogViewerControllerTest, ViewManagement)
 }
 
 /**
+ * @brief Tests load_log_file when the log file is empty and app name is identified via
+ * LogLoader::identify_app.
+ */
+TEST_F(LogViewerControllerTest, LoadLogFileEmptyFile)
+{
+    QTemporaryFile* temp_file = create_temp_file({});
+    ASSERT_NE(temp_file, nullptr);
+
+    QUuid view_id = m_controller->load_log_file(temp_file->fileName());
+    EXPECT_FALSE(view_id.isNull());
+
+    auto* model = m_controller->get_log_model(view_id);
+    ASSERT_NE(model, nullptr);
+    EXPECT_EQ(model->rowCount(), 0);
+
+    QSet<QString> app_names = m_controller->get_app_names(view_id);
+    EXPECT_GE(app_names.size(), 0);
+}
+
+/**
+ * @brief Tests load_log_files when one file is empty and app name is identified via
+ * LogLoader::identify_app.
+ */
+TEST_F(LogViewerControllerTest, LoadLogFilesWithEmptyFile)
+{
+    QTemporaryFile* temp_file1 = create_temp_file({});
+    QTemporaryFile* temp_file2 = create_temp_file({"2024-01-01 15:00:00 INFO Entry AppG"});
+    ASSERT_NE(temp_file1, nullptr);
+    ASSERT_NE(temp_file2, nullptr);
+
+    QVector<QString> files = {temp_file1->fileName(), temp_file2->fileName()};
+    QUuid view_id = m_controller->load_log_files(files);
+    EXPECT_FALSE(view_id.isNull());
+
+    auto* model = m_controller->get_log_model(view_id);
+    ASSERT_NE(model, nullptr);
+
+    QSet<QString> app_names = m_controller->get_app_names(view_id);
+    EXPECT_TRUE(app_names.contains("AppG"));
+}
+
+/**
+ * @brief Tests remove_view with an invalid view_id.
+ */
+TEST_F(LogViewerControllerTest, RemoveViewInvalidId)
+{
+    QUuid invalid_id = QUuid::createUuid();
+    EXPECT_FALSE(m_controller->remove_view(invalid_id));
+}
+
+/**
+ * @brief Tests set_current_view with an invalid view_id.
+ */
+TEST_F(LogViewerControllerTest, SetCurrentViewInvalidId)
+{
+    QUuid invalid_id = QUuid::createUuid();
+    EXPECT_FALSE(m_controller->set_current_view(invalid_id));
+    EXPECT_NE(m_controller->get_current_view(), invalid_id);
+}
+
+/**
  * @brief Tests is_file_loaded for global and per-view checks.
  */
 TEST_F(LogViewerControllerTest, IsFileLoadedChecks)
@@ -247,6 +309,57 @@ TEST_F(LogViewerControllerTest, IsFileLoadedChecks)
 
     EXPECT_TRUE(m_controller->is_file_loaded(m_view_id, file1));
     EXPECT_TRUE(m_controller->is_file_loaded(m_view_id, file2));
+}
+
+/**
+ * @brief Tests is_file_loaded returns true if the file is loaded in any view.
+ */
+TEST_F(LogViewerControllerTest, IsFileLoadedTrue)
+{
+    ASSERT_GE(m_temp_file_names.size(), 1);
+    QString file1 = m_temp_file_names[0];
+    EXPECT_TRUE(m_controller->is_file_loaded(file1));
+}
+
+/**
+ * @brief Tests is_file_loaded returns false if the file is not loaded in any view.
+ */
+TEST_F(LogViewerControllerTest, IsFileLoadedFalse)
+{
+    QString not_loaded_file = "not_loaded_file.log";
+    EXPECT_FALSE(m_controller->is_file_loaded(not_loaded_file));
+}
+
+/**
+ * @brief Tests is_file_loaded(view_id, file_path) returns true if the file is loaded in the given
+ * view.
+ */
+TEST_F(LogViewerControllerTest, IsFileLoadedViewTrue)
+{
+    ASSERT_GE(m_temp_file_names.size(), 1);
+    QString file1 = m_temp_file_names[0];
+    EXPECT_TRUE(m_controller->is_file_loaded(m_view_id, file1));
+}
+
+/**
+ * @brief Tests is_file_loaded(view_id, file_path) returns false if the file is not loaded in the
+ * given view.
+ */
+TEST_F(LogViewerControllerTest, IsFileLoadedViewFalse)
+{
+    QString not_loaded_file = "not_loaded_file.log";
+    EXPECT_FALSE(m_controller->is_file_loaded(m_view_id, not_loaded_file));
+}
+
+/**
+ * @brief Tests is_file_loaded(view_id, file_path) returns false if the view_id does not exist.
+ */
+TEST_F(LogViewerControllerTest, IsFileLoadedViewInvalidViewId)
+{
+    QUuid invalid_id = QUuid::createUuid();
+    ASSERT_GE(m_temp_file_names.size(), 1);
+    QString file1 = m_temp_file_names[0];
+    EXPECT_FALSE(m_controller->is_file_loaded(invalid_id, file1));
 }
 
 /**
@@ -280,6 +393,88 @@ TEST_F(LogViewerControllerTest, RemoveLogFile)
 }
 
 /**
+ * @brief Tests remove_log_file removes the file from all views and removes empty views.
+ */
+TEST_F(LogViewerControllerTest, RemoveLogFileRemovesEmptyView)
+{
+    QTemporaryFile* temp_file = create_temp_file({"2024-01-01 16:00:00 INFO OnlyEntry AppH"});
+    ASSERT_NE(temp_file, nullptr);
+
+    QUuid view_id = m_controller->load_log_file(temp_file->fileName());
+    ASSERT_FALSE(view_id.isNull());
+
+    LogFileInfo info(temp_file->fileName());
+
+    ASSERT_NE(m_controller->get_log_model(view_id), nullptr);
+
+    QSignalSpy spy(m_controller, &LogViewerController::view_removed);
+    m_controller->remove_log_file(info);
+
+    EXPECT_EQ(m_controller->get_log_model(view_id), nullptr);
+    EXPECT_EQ(m_controller->get_sort_filter_proxy(view_id), nullptr);
+    EXPECT_EQ(m_controller->get_paging_proxy(view_id), nullptr);
+
+    EXPECT_EQ(spy.count(), 1);
+    if (spy.count() > 0)
+    {
+        QList<QVariant> arguments = spy.takeFirst();
+        EXPECT_EQ(arguments.at(0).toUuid(), view_id);
+    }
+}
+
+/**
+ * @brief Tests remove_log_file does nothing if file is not loaded in any view.
+ */
+TEST_F(LogViewerControllerTest, RemoveLogFileNotLoaded)
+{
+    LogFileInfo info("not_loaded_file.log");
+    m_controller->remove_log_file(info);
+
+    EXPECT_NE(m_controller->get_log_model(m_view_id), nullptr);
+}
+
+/**
+ * @brief Tests remove_log_file removes file from LogFileTreeModel if present.
+ */
+TEST_F(LogViewerControllerTest, RemoveLogFileRemovesFromTreeModel)
+{
+    QTemporaryFile* temp_file = create_temp_file({"2024-01-01 17:00:00 INFO TreeEntry AppI"});
+    ASSERT_NE(temp_file, nullptr);
+
+    m_controller->add_log_file_to_tree(temp_file->fileName());
+    LogFileInfo info(temp_file->fileName(), "AppI");
+
+    auto* tree_model = m_controller->get_log_file_tree_model();
+    ASSERT_NE(tree_model, nullptr);
+
+    bool found = false;
+    for (int i = 0; i < tree_model->rowCount() && !found; ++i)
+    {
+        QModelIndex index = tree_model->index(i, 0);
+        QVariant data = tree_model->data(index, Qt::DisplayRole);
+        if (data.toString().contains("AppI"))
+        {
+            found = true;
+        }
+    }
+    EXPECT_TRUE(found);
+
+    m_controller->remove_log_file(info);
+
+    found = false;
+    for (int i = 0; i < tree_model->rowCount() && !found; ++i)
+    {
+        QModelIndex index = tree_model->index(i, 0);
+        QVariant data = tree_model->data(index, Qt::DisplayRole);
+        if (data.toString().contains("AppI"))
+        {
+            found = true;
+        }
+    }
+    EXPECT_FALSE(found);
+}
+
+/**
  * @brief Tests that get_app_names returns correct set of application names.
  */
 TEST_F(LogViewerControllerTest, GetAppNames)
@@ -294,6 +489,33 @@ TEST_F(LogViewerControllerTest, GetAppNames)
 }
 
 /**
+ * @brief Tests get_app_names for an invalid view_id.
+ */
+TEST_F(LogViewerControllerTest, GetAppNamesInvalidViewId)
+{
+    QUuid invalid_id = QUuid::createUuid();
+    QSet<QString> app_names = m_controller->get_app_names(invalid_id);
+    EXPECT_TRUE(app_names.isEmpty());
+}
+
+/**
+ * @brief Tests get_app_names for a valid view_id with no entries.
+ */
+TEST_F(LogViewerControllerTest, GetAppNamesValidViewIdNoEntries)
+{
+    QTemporaryFile* temp_file = create_temp_file({});
+    ASSERT_NE(temp_file, nullptr);
+
+    QUuid view_id = m_controller->load_log_file(temp_file->fileName());
+    auto* model = m_controller->get_log_model(view_id);
+    ASSERT_NE(model, nullptr);
+    EXPECT_EQ(model->rowCount(), 0);
+
+    QSet<QString> app_names = m_controller->get_app_names(view_id);
+    EXPECT_TRUE(app_names.isEmpty());
+}
+
+/**
  * @brief Tests getter methods for filters and search.
  */
 TEST_F(LogViewerControllerTest, FilterGetters)
@@ -304,8 +526,10 @@ TEST_F(LogViewerControllerTest, FilterGetters)
 
     QSet<QString> levels;
     levels.insert("INFO");
+    levels.insert("ERROR");
     m_controller->set_log_level_filters(levels);
     EXPECT_EQ(m_controller->get_log_level_filters(m_view_id), levels);
+    EXPECT_EQ(m_controller->get_log_level_filters(), levels);
 
     m_controller->set_search_filter("Crash", "Message", false);
     EXPECT_EQ(m_controller->get_search_text(), "Crash");
@@ -317,12 +541,129 @@ TEST_F(LogViewerControllerTest, FilterGetters)
 }
 
 /**
+ * @brief Tests set_app_name_filter for a view_id that does not exist.
+ */
+TEST_F(LogViewerControllerTest, SetAppNameFilterInvalidViewId)
+{
+    QUuid invalid_id = QUuid::createUuid();
+    m_controller->set_app_name_filter(invalid_id, "NonExistentApp");
+
+    auto* proxy = m_controller->get_sort_filter_proxy();
+    ASSERT_NE(proxy, nullptr);
+    EXPECT_EQ(proxy->get_app_name_filter(), "");
+}
+
+/**
+ * @brief Tests set_log_level_filters for a view_id that does not exist.
+ */
+TEST_F(LogViewerControllerTest, SetLogLevelFiltersInvalidViewId)
+{
+    QUuid invalid_id = QUuid::createUuid();
+    QSet<QString> levels;
+    levels.insert("INFO");
+    m_controller->set_log_level_filters(invalid_id, levels);
+
+    auto* proxy = m_controller->get_sort_filter_proxy();
+    ASSERT_NE(proxy, nullptr);
+    EXPECT_EQ(proxy->get_log_level_filters().size(), 0);
+}
+
+/**
+ * @brief Tests set_search_filter for a view_id that does not exist.
+ */
+TEST_F(LogViewerControllerTest, SetSearchFilterInvalidViewId)
+{
+    QUuid invalid_id = QUuid::createUuid();
+    m_controller->set_search_filter(invalid_id, "NonExistentText", "Message", true);
+
+    auto* proxy = m_controller->get_sort_filter_proxy();
+    ASSERT_NE(proxy, nullptr);
+    EXPECT_EQ(proxy->get_app_name_filter(), "");
+    EXPECT_EQ(proxy->get_log_level_filters().size(), 0);
+}
+
+/**
+ * @brief Tests is_search_regex for a view_id that does not exist.
+ */
+TEST_F(LogViewerControllerTest, IsSearchRegexInvalidViewId)
+{
+    QUuid invalid_id = QUuid::createUuid();
+    bool result = m_controller->is_search_regex(invalid_id);
+    EXPECT_FALSE(result);
+}
+
+/**
  * @brief Tests get_log_file_tree_model returns a valid pointer.
  */
 TEST_F(LogViewerControllerTest, LogFileTreeModelAccess)
 {
     auto* tree_model = m_controller->get_log_file_tree_model();
     EXPECT_NE(tree_model, nullptr);
+}
+
+/**
+ * @brief Tests add_log_file_to_tree adds a single file to the LogFileTreeModel.
+ */
+TEST_F(LogViewerControllerTest, AddLogFileToTree)
+{
+    QTemporaryFile* temp_file = create_temp_file({"2024-01-01 13:00:00 INFO Added AppD"});
+    ASSERT_NE(temp_file, nullptr);
+
+    m_controller->add_log_file_to_tree(temp_file->fileName());
+    auto* tree_model = m_controller->get_log_file_tree_model();
+    ASSERT_NE(tree_model, nullptr);
+
+    bool found = false;
+
+    for (int i = 0; i < tree_model->rowCount() && !found; ++i)
+    {
+        QModelIndex index = tree_model->index(i, 0);
+        QVariant data = tree_model->data(index, Qt::DisplayRole);
+
+        if (data.toString().contains("AppD"))
+        {
+            found = true;
+        }
+    }
+
+    EXPECT_TRUE(found);
+}
+
+/**
+ * @brief Tests add_log_files_to_tree adds multiple files to the LogFileTreeModel.
+ */
+TEST_F(LogViewerControllerTest, AddLogFilesToTree)
+{
+    QTemporaryFile* temp_file1 = create_temp_file({"2024-01-01 14:00:00 INFO Added AppE"});
+    QTemporaryFile* temp_file2 = create_temp_file({"2024-01-01 14:01:00 INFO Added AppF"});
+    ASSERT_NE(temp_file1, nullptr);
+    ASSERT_NE(temp_file2, nullptr);
+
+    QVector<QString> files = {temp_file1->fileName(), temp_file2->fileName()};
+    m_controller->add_log_files_to_tree(files);
+    auto* tree_model = m_controller->get_log_file_tree_model();
+    ASSERT_NE(tree_model, nullptr);
+
+    bool found_e = false, found_f = false;
+
+    for (int i = 0; i < tree_model->rowCount(); ++i)
+    {
+        QModelIndex index = tree_model->index(i, 0);
+        QVariant data = tree_model->data(index, Qt::DisplayRole);
+
+        if (data.toString().contains("AppE"))
+        {
+            found_e = true;
+        }
+
+        if (data.toString().contains("AppF"))
+        {
+            found_f = true;
+        }
+    }
+
+    EXPECT_TRUE(found_e);
+    EXPECT_TRUE(found_f);
 }
 
 /**
@@ -346,6 +687,7 @@ TEST_F(LogViewerControllerTest, LogEntriesAccess)
             found = true;
         }
     }
+
     ASSERT_FALSE(info.get_file_path().isEmpty());
 
     auto file_entries = m_controller->get_entries_for_file(info);
@@ -365,6 +707,53 @@ TEST_F(LogViewerControllerTest, LogEntriesAccess)
         EXPECT_EQ(file_entries[i].get_file_info().get_app_name(),
                   file_entries_view[i].get_file_info().get_app_name());
     }
+}
+
+/**
+ * @brief Tests get_entries_for_file for an invalid view_id.
+ */
+TEST_F(LogViewerControllerTest, GetEntriesForFileInvalidViewId)
+{
+    QUuid invalid_id = QUuid::createUuid();
+    ASSERT_GE(m_temp_file_names.size(), 1);
+    LogFileInfo info(m_temp_file_names[0]);
+    auto entries = m_controller->get_entries_for_file(invalid_id, info);
+    EXPECT_TRUE(entries.isEmpty());
+}
+
+/**
+ * @brief Tests get_entries_for_file for a valid view_id with no entries.
+ */
+TEST_F(LogViewerControllerTest, GetEntriesForFileValidViewIdNoEntries)
+{
+    QTemporaryFile* temp_file = create_temp_file({});
+    ASSERT_NE(temp_file, nullptr);
+
+    QUuid view_id = m_controller->load_log_file(temp_file->fileName());
+    LogFileInfo info(temp_file->fileName());
+    auto entries = m_controller->get_entries_for_file(view_id, info);
+    EXPECT_TRUE(entries.isEmpty());
+}
+
+/**
+ * @brief Tests get_entries_for_file for a valid view_id with entries, but none match file_info.
+ */
+TEST_F(LogViewerControllerTest, GetEntriesForFileValidViewIdNoMatch)
+{
+    ASSERT_GE(m_temp_file_names.size(), 1);
+    LogFileInfo info("nonexistent_file.log");
+    auto entries = m_controller->get_entries_for_file(m_view_id, info);
+    EXPECT_TRUE(entries.isEmpty());
+}
+
+/**
+ * @brief Tests get_log_entries for a view_id that does not exist.
+ */
+TEST_F(LogViewerControllerTest, GetLogEntriesInvalidViewId)
+{
+    QUuid invalid_id = QUuid::createUuid();
+    auto entries = m_controller->get_log_entries(invalid_id);
+    EXPECT_TRUE(entries.isEmpty());
 }
 
 /**

@@ -2,6 +2,9 @@
 
 #include <QApplication>
 
+#include "Qt-LogViewer/Models/LogFileInfo.h"
+#include "Qt-LogViewer/Models/LogFileTreeItem.h"
+
 /**
  * @brief Initializes and runs all Google Test unit tests.
  *
@@ -14,6 +17,9 @@
 auto main(int argc, char* argv[]) -> int
 {
     testing::InitGoogleTest(&argc, argv);
+
+    qRegisterMetaType<LogFileInfo>("LogFileInfo");
+    qRegisterMetaType<LogFileTreeItem::Type>("LogFileTreeItem::Type");
 
     QApplication app(argc, argv);
     app.setApplicationName(QStringLiteral("Qt-LogViewer_Tests"));

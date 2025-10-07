@@ -320,6 +320,7 @@ auto LogViewerController::get_app_names(const QUuid& view_id) const -> QSet<QStr
     if (m_view_models.contains(view_id))
     {
         const auto* model = m_view_models[view_id];
+
         for (const LogEntry& entry: model->get_entries())
         {
             app_names.insert(entry.get_app_name());
@@ -356,7 +357,7 @@ auto LogViewerController::get_app_name_filter(const QUuid& view_id) const -> QSt
  */
 auto LogViewerController::get_log_level_filters() const -> QSet<QString>
 {
-    return QSet<QString>();
+	return get_log_level_filters(m_current_view_id);
 }
 
 /**

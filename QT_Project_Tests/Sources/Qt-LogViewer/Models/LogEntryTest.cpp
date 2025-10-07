@@ -94,6 +94,19 @@ TEST_F(LogEntryTest, SetAndGetAppName)
 }
 
 /**
+ * @brief Tests the setter and getter for file_info.
+ */
+TEST_F(LogEntryTest, SetAndGetFileInfo)
+{
+    LogEntry entry;
+    LogFileInfo file_info("test.log", "TestApp");
+    entry.set_file_info(file_info);
+
+    EXPECT_EQ(entry.get_file_info().get_file_path(), "test.log");
+    EXPECT_EQ(entry.get_file_info().get_app_name(), "TestApp");
+}
+
+/**
  * @brief Tests that LogEntry can be copied correctly.
  */
 TEST_F(LogEntryTest, CopyConstructorAndAssignment)

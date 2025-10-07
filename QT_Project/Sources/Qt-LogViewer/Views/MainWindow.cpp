@@ -575,7 +575,7 @@ auto MainWindow::handle_view_removed(const QUuid& view_id) -> void
     {
         auto* log_table_view = qobject_cast<LogTableView*>(ui->tabWidgetLog->widget(i));
 
-        if (log_table_view)
+        if (log_table_view != nullptr)
         {
             QUuid tab_view_id = log_table_view->property("view_id").value<QUuid>();
 
