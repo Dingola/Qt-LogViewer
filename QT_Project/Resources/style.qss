@@ -8,7 +8,7 @@
     @ColorButtonText: #ffffff;
     @ColorBorder: #30353a;
     @ColorBorderDisabled: #444444;
-    @ColorFilterBarBackground: #24282e;
+    @ColorLogFilterBarBackground: #24282e;
     @ColorLineEditBackground: #1e2126;
     @ColorLineEditBackgroundHover: #283035;
     @ColorLineEditBackgroundDisabled: #1a1f24;
@@ -56,7 +56,7 @@
     @ColorButtonText: #ffffff;
     @ColorBorder: #d1d5db;
     @ColorBorderDisabled: #e0e0e0;
-    @ColorFilterBarBackground: #e9ecef;
+    @ColorLogFilterBarBackground: #e9ecef;
     @ColorLineEditBackground: #ffffff;
     @ColorLineEditBackgroundHover: #f0f4f8;
     @ColorLineEditBackgroundDisabled: #f5f5f5;
@@ -112,8 +112,8 @@ QWidget {
 }
 
 /* === Filter/Search Bar === */
-#filterBarWidget {
-    background-color: @ColorFilterBarBackground;
+#logFilterBarWidget {
+    background-color: @ColorLogFilterBarBackground;
     border: 1px solid @ColorBorder;
     border-radius: 8px;
     padding: 8px;
@@ -454,7 +454,7 @@ QPlainTextEdit:disabled {
 
 /* === MenuBar === */
 QMenuBar {
-    background-color: @ColorFilterBarBackground;
+    background-color: @ColorLogFilterBarBackground;
     color: @ColorText;
 }
 QMenuBar::item {
@@ -467,7 +467,7 @@ QMenuBar::item:selected {
 
 /* === Menu === */
 QMenu {
-    background-color: @ColorFilterBarBackground;
+    background-color: @ColorLogFilterBarBackground;
     border: 1px solid @ColorBorder;
 }
 QMenu::item {
@@ -482,7 +482,7 @@ QMenu::item:selected {
 
 /* === ScrollBar === */
 QScrollBar:vertical, QScrollBar:horizontal {
-    background-color: @ColorFilterBarBackground;
+    background-color: @ColorLogFilterBarBackground;
     border: none;
     width: 10px;
     height: 10px;
@@ -517,7 +517,7 @@ QTreeView::item {
     padding-bottom: 4px;
 }
 QTreeView::item:hover {
-    background: @ColorFilterBarBackground;
+    background: @ColorLogFilterBarBackground;
 }
 QTreeView::item:selected {
     background: @ColorButtonBackground;
@@ -535,7 +535,7 @@ QTabWidget > QWidget {
     padding: 6px;
 }
 QTabBar::tab {
-    background: @ColorFilterBarBackground;
+    background: @ColorLogFilterBarBackground;
     border: 1px solid @ColorBorder;
     padding: 6px 12px;
     border-top-left-radius: 6px;

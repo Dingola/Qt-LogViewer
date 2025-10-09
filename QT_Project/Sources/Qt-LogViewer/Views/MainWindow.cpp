@@ -177,24 +177,24 @@ auto MainWindow::setup_log_details_dock() -> void
  */
 auto MainWindow::setup_filter_bar() -> void
 {
-    connect(ui->filterBarWidget, &FilterBarWidget::app_filter_changed, this,
+    connect(ui->logFilterBarWidget, &LogFilterBarWidget::app_filter_changed, this,
             [this](const QString& app_name) {
                 m_controller->set_app_name_filter(app_name);
                 update_pagination_widget();
             });
-    connect(ui->filterBarWidget, &FilterBarWidget::log_level_filter_changed, this,
+    connect(ui->logFilterBarWidget, &LogFilterBarWidget::log_level_filter_changed, this,
             [this](const QSet<QString>& log_levels) {
                 qDebug() << "Level filter set to:" << log_levels;
                 m_controller->set_log_level_filters(log_levels);
                 update_pagination_widget();
             });
-    connect(ui->filterBarWidget, &FilterBarWidget::search_requested, this,
+    connect(ui->logFilterBarWidget, &LogFilterBarWidget::search_requested, this,
             &MainWindow::handle_search_changed);
-    connect(ui->filterBarWidget, &FilterBarWidget::search_text_changed, this,
+    connect(ui->logFilterBarWidget, &LogFilterBarWidget::search_text_changed, this,
             &MainWindow::handle_search_changed);
-    connect(ui->filterBarWidget, &FilterBarWidget::search_field_changed, this,
+    connect(ui->logFilterBarWidget, &LogFilterBarWidget::search_field_changed, this,
             &MainWindow::handle_search_changed);
-    connect(ui->filterBarWidget, &FilterBarWidget::regex_toggled, this,
+    connect(ui->logFilterBarWidget, &LogFilterBarWidget::regex_toggled, this,
             &MainWindow::handle_search_changed);
 }
 
@@ -227,8 +227,8 @@ auto MainWindow::setup_tab_widget() -> void
         // Update pagination when last tab is closed (not handled by handle_current_view_id_changed)
         if (ui->tabWidgetLog->count() == 0)
         {
-            ui->filterBarWidget->set_app_names({});
-            ui->filterBarWidget->set_log_levels({});
+            ui->logFilterBarWidget->set_app_names({});
+            ui->logFilterBarWidget->set_log_levels({});
             update_log_level_pie_chart({});
             update_pagination_widget();
         }
@@ -449,7 +449,7 @@ auto MainWindow::changeEvent(QEvent* event) -> void
         initialize_menu();
         m_log_file_explorer_dock_widget->setWindowTitle(tr("Log File Explorer"));
         m_log_details_dock_widget->setWindowTitle(tr("Log Details"));
-        ui->filterBarWidget->set_app_names(m_controller->get_app_names());
+        ui->logFilterBarWidget->set_app_names(m_controller->get_app_names());
         update_pagination_widget();
     }
 
@@ -491,9 +491,9 @@ void MainWindow::handle_show_settings_dialog_requested()
  */
 auto MainWindow::handle_search_changed() -> void
 {
-    QString search_text = ui->filterBarWidget->get_search_text();
-    QString field = ui->filterBarWidget->get_search_field();
-    bool use_regex = ui->filterBarWidget->get_use_regex();
+    QString search_text = ui->logFilterBarWidget->get_search_text();
+    QString field = ui->logFilterBarWidget->get_search_field();
+    bool use_regex = ui->logFilterBarWidget->get_use_regex();
     qDebug() << "Search filter:" << search_text << "Field:" << field << "Regex:" << use_regex;
     m_controller->set_search_filter(search_text, field, use_regex);
     update_pagination_widget();
@@ -554,11 +554,11 @@ auto MainWindow::handle_current_view_id_changed(const QUuid& view_id) -> void
     }
 
     QSet<QString> app_names = m_controller->get_app_names(view_id);
-    ui->filterBarWidget->set_app_names(app_names);
+    ui->logFilterBarWidget->set_app_names(app_names);
     QString app_name_filter = m_controller->get_app_name_filter(view_id);
-    ui->filterBarWidget->set_current_app_name_filter(app_name_filter);
+    ui->logFilterBarWidget->set_current_app_name_filter(app_name_filter);
     QSet<QString> log_level_filters = m_controller->get_log_level_filters(view_id);
-    ui->filterBarWidget->set_log_levels(log_level_filters);
+    ui->logFilterBarWidget->set_log_levels(log_level_filters);
     update_pagination_widget();
 }
 
@@ -587,7 +587,7 @@ auto MainWindow::handle_view_removed(const QUuid& view_id) -> void
         }
     }
 
-    ui->filterBarWidget->set_app_names({});
-    ui->filterBarWidget->set_log_levels({});
+    ui->logFilterBarWidget->set_app_names({});
+    ui->logFilterBarWidget->set_log_levels({});
     update_pagination_widget();
 }

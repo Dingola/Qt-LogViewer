@@ -6,35 +6,35 @@
 
 namespace Ui
 {
-class FilterWidget;
+class LogFilterWidget;
 }
 
 /**
- * @class FilterWidget
+ * @class LogFilterWidget
  * @brief Widget for filtering log entries by application and log level.
  *
  * Provides controls for selecting the application and log levels to filter the log view.
  */
-class FilterWidget: public QWidget
+class LogFilterWidget: public QWidget
 {
         Q_OBJECT
 
     public:
         /**
-         * @brief Constructs a FilterWidget object.
+         * @brief Constructs a LogFilterWidget object.
          *
          * Initializes the filter widget and its UI.
          *
          * @param parent The parent widget, or nullptr if this is a top-level widget.
          */
-        explicit FilterWidget(QWidget* parent = nullptr);
+        explicit LogFilterWidget(QWidget* parent = nullptr);
 
         /**
-         * @brief Destroys the FilterWidget object.
+         * @brief Destroys the LogFilterWidget object.
          *
          * Cleans up any resources used by the filter widget.
          */
-        ~FilterWidget() override;
+        ~LogFilterWidget() override;
 
         /**
          * @brief Sets the currently selected application name in the combo box.
@@ -109,5 +109,5 @@ class FilterWidget: public QWidget
         auto changeEvent(QEvent* event) -> void override;
 
     private:
-        Ui::FilterWidget* ui;
+        Ui::LogFilterWidget* ui;
 };

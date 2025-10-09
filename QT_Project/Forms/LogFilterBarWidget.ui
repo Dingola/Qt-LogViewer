@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>FilterBarWidget</class>
- <widget class="QWidget" name="FilterBarWidget">
+ <class>LogFilterBarWidget</class>
+ <widget class="QWidget" name="LogFilterBarWidget">
   <property name="geometry">
    <rect>
     <x>0</x>
@@ -15,7 +15,7 @@
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
-    <widget class="FilterWidget" name="filterWidget" native="true"/>
+    <widget class="LogFilterWidget" name="logFilterWidget" native="true"/>
    </item>
    <item>
     <widget class="SearchBarWidget" name="searchBarWidget" native="true"/>
@@ -24,9 +24,9 @@
  </widget>
  <customwidgets>
   <customwidget>
-   <class>FilterWidget</class>
+   <class>LogFilterWidget</class>
    <extends>QWidget</extends>
-   <header>Qt-LogViewer/Views/App/FilterWidget.h</header>
+   <header>Qt-LogViewer/Views/App/LogFilterWidget.h</header>
    <container>1</container>
   </customwidget>
   <customwidget>

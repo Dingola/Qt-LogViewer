@@ -7,38 +7,38 @@
 
 namespace Ui
 {
-class FilterBarWidget;
+class LogFilterBarWidget;
 }
 
-class FilterWidget;
+class LogFilterWidget;
 class SearchBarWidget;
 
 /**
- * @class FilterBarWidget
+ * @class LogFilterBarWidget
  * @brief Composite widget for log filtering and searching.
  *
- * Combines FilterWidget and SearchBarWidget to provide a unified filter/search bar.
+ * Combines LogFilterWidget and SearchBarWidget to provide a unified filter/search bar.
  */
-class FilterBarWidget: public QWidget
+class LogFilterBarWidget: public QWidget
 {
         Q_OBJECT
 
     public:
         /**
-         * @brief Constructs a FilterBarWidget object.
+         * @brief Constructs a LogFilterBarWidget object.
          *
          * Initializes the filter bar widget and its UI.
          *
          * @param parent The parent widget, or nullptr if this is a top-level widget.
          */
-        explicit FilterBarWidget(QWidget* parent = nullptr);
+        explicit LogFilterBarWidget(QWidget* parent = nullptr);
 
         /**
-         * @brief Destroys the FilterBarWidget object.
+         * @brief Destroys the LogFilterBarWidget object.
          *
          * Cleans up any resources used by the filter bar widget.
          */
-        ~FilterBarWidget() override;
+        ~LogFilterBarWidget() override;
 
         /**
          * @brief Sets the application names in the combo box.
@@ -115,11 +115,11 @@ class FilterBarWidget: public QWidget
         [[nodiscard]] auto get_use_regex() const -> bool;
 
         /**
-         * @brief Returns a pointer to the contained FilterWidget.
+         * @brief Returns a pointer to the contained LogFilterWidget.
          *
-         * @return Pointer to FilterWidget.
+         * @return Pointer to LogFilterWidget.
          */
-        [[nodiscard]] auto get_filter_widget() const -> FilterWidget*;
+        [[nodiscard]] auto get_filter_widget() const -> LogFilterWidget*;
 
         /**
          * @brief Returns a pointer to the contained SearchBarWidget.
@@ -175,5 +175,5 @@ class FilterBarWidget: public QWidget
         auto changeEvent(QEvent* event) -> void override;
 
     private:
-        Ui::FilterBarWidget* ui;
+        Ui::LogFilterBarWidget* ui;
 };

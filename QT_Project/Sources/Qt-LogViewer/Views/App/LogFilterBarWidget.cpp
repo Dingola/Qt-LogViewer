@@ -1,44 +1,45 @@
-#include "Qt-LogViewer/Views/App/FilterBarWidget.h"
+#include "Qt-LogViewer/Views/App/LogFilterBarWidget.h"
 
-#include "Qt-LogViewer/Views/App/FilterWidget.h"
+#include "Qt-LogViewer/Views/App/LogFilterWidget.h"
 #include "Qt-LogViewer/Views/App/SearchBarWidget.h"
-#include "ui_FilterBarWidget.h"
+#include "ui_LogFilterBarWidget.h"
 
 /**
- * @brief Constructs a FilterBarWidget object.
+ * @brief Constructs a LogFilterBarWidget object.
  *
  * Initializes the filter bar widget and its UI.
  *
  * @param parent The parent widget, or nullptr if this is a top-level widget.
  */
-FilterBarWidget::FilterBarWidget(QWidget* parent): QWidget(parent), ui(new Ui::FilterBarWidget)
+LogFilterBarWidget::LogFilterBarWidget(QWidget* parent)
+    : QWidget(parent), ui(new Ui::LogFilterBarWidget)
 {
     ui->setupUi(this);
     setAttribute(Qt::WA_StyledBackground, true);
 
-    // Forward signals from FilterWidget
-    connect(ui->filterWidget, &FilterWidget::app_filter_changed, this,
-            &FilterBarWidget::app_filter_changed);
-    connect(ui->filterWidget, &FilterWidget::log_level_filter_changed, this,
-            &FilterBarWidget::log_level_filter_changed);
+    // Forward signals from LogFilterWidget
+    connect(ui->logFilterWidget, &LogFilterWidget::app_filter_changed, this,
+            &LogFilterBarWidget::app_filter_changed);
+    connect(ui->logFilterWidget, &LogFilterWidget::log_level_filter_changed, this,
+            &LogFilterBarWidget::log_level_filter_changed);
 
     // Forward signals from SearchBarWidget
     connect(ui->searchBarWidget, &SearchBarWidget::search_requested, this,
-            &FilterBarWidget::search_requested);
+            &LogFilterBarWidget::search_requested);
     connect(ui->searchBarWidget, &SearchBarWidget::search_text_changed, this,
-            &FilterBarWidget::search_text_changed);
+            &LogFilterBarWidget::search_text_changed);
     connect(ui->searchBarWidget, &SearchBarWidget::search_field_changed, this,
-            &FilterBarWidget::search_field_changed);
+            &LogFilterBarWidget::search_field_changed);
     connect(ui->searchBarWidget, &SearchBarWidget::regex_toggled, this,
-            &FilterBarWidget::regex_toggled);
+            &LogFilterBarWidget::regex_toggled);
 }
 
 /**
- * @brief Destroys the FilterBarWidget object.
+ * @brief Destroys the LogFilterBarWidget object.
  *
  * Cleans up any resources used by the filter bar widget.
  */
-FilterBarWidget::~FilterBarWidget()
+LogFilterBarWidget::~LogFilterBarWidget()
 {
     delete ui;
 }
@@ -50,9 +51,9 @@ FilterBarWidget::~FilterBarWidget()
  *
  * @param app_names The set of application names to populate the combo box.
  */
-auto FilterBarWidget::set_app_names(const QSet<QString>& app_names) -> void
+auto LogFilterBarWidget::set_app_names(const QSet<QString>& app_names) -> void
 {
-    ui->filterWidget->set_app_names(app_names);
+    ui->logFilterWidget->set_app_names(app_names);
 }
 
 /**
@@ -62,9 +63,9 @@ auto FilterBarWidget::set_app_names(const QSet<QString>& app_names) -> void
  *
  * @param app_name The application name to select.
  */
-auto FilterBarWidget::set_current_app_name_filter(const QString& app_name) -> void
+auto LogFilterBarWidget::set_current_app_name_filter(const QString& app_name) -> void
 {
-    ui->filterWidget->set_current_app_name_filter(app_name);
+    ui->logFilterWidget->set_current_app_name_filter(app_name);
 }
 
 /**
@@ -72,9 +73,9 @@ auto FilterBarWidget::set_current_app_name_filter(const QString& app_name) -> vo
  *
  * @param levels The set of log levels to check.
  */
-auto FilterBarWidget::set_log_levels(const QSet<QString>& levels) -> void
+auto LogFilterBarWidget::set_log_levels(const QSet<QString>& levels) -> void
 {
-    ui->filterWidget->set_log_levels(levels);
+    ui->logFilterWidget->set_log_levels(levels);
 }
 
 /**
@@ -82,7 +83,7 @@ auto FilterBarWidget::set_log_levels(const QSet<QString>& levels) -> void
  *
  * @param fields The list of search fields.
  */
-auto FilterBarWidget::set_search_fields(const QStringList& fields) -> void
+auto LogFilterBarWidget::set_search_fields(const QStringList& fields) -> void
 {
     ui->searchBarWidget->set_search_fields(fields);
 }
@@ -92,7 +93,7 @@ auto FilterBarWidget::set_search_fields(const QStringList& fields) -> void
  *
  * @param text The placeholder text.
  */
-auto FilterBarWidget::set_search_placeholder(const QString& text) -> void
+auto LogFilterBarWidget::set_search_placeholder(const QString& text) -> void
 {
     ui->searchBarWidget->set_search_placeholder(text);
 }
@@ -102,9 +103,9 @@ auto FilterBarWidget::set_search_placeholder(const QString& text) -> void
  *
  * @return The selected application name.
  */
-auto FilterBarWidget::get_current_app_name() const -> QString
+auto LogFilterBarWidget::get_current_app_name() const -> QString
 {
-    return ui->filterWidget->get_current_app_name();
+    return ui->logFilterWidget->get_current_app_name();
 }
 
 /**
@@ -112,9 +113,9 @@ auto FilterBarWidget::get_current_app_name() const -> QString
  *
  * @return The set of selected log levels.
  */
-auto FilterBarWidget::get_current_log_levels() const -> QSet<QString>
+auto LogFilterBarWidget::get_current_log_levels() const -> QSet<QString>
 {
-    return ui->filterWidget->get_current_log_levels();
+    return ui->logFilterWidget->get_current_log_levels();
 }
 
 /**
@@ -122,7 +123,7 @@ auto FilterBarWidget::get_current_log_levels() const -> QSet<QString>
  *
  * @return The search text.
  */
-auto FilterBarWidget::get_search_text() const -> QString
+auto LogFilterBarWidget::get_search_text() const -> QString
 {
     return ui->searchBarWidget->get_search_text();
 }
@@ -132,7 +133,7 @@ auto FilterBarWidget::get_search_text() const -> QString
  *
  * @return The search field.
  */
-auto FilterBarWidget::get_search_field() const -> QString
+auto LogFilterBarWidget::get_search_field() const -> QString
 {
     return ui->searchBarWidget->get_search_field();
 }
@@ -142,19 +143,19 @@ auto FilterBarWidget::get_search_field() const -> QString
  *
  * @return True if regex is enabled, false otherwise.
  */
-auto FilterBarWidget::get_use_regex() const -> bool
+auto LogFilterBarWidget::get_use_regex() const -> bool
 {
     return ui->searchBarWidget->get_use_regex();
 }
 
 /**
- * @brief Returns a pointer to the contained FilterWidget.
+ * @brief Returns a pointer to the contained LogFilterWidget.
  *
- * @return Pointer to FilterWidget.
+ * @return Pointer to LogFilterWidget.
  */
-auto FilterBarWidget::get_filter_widget() const -> FilterWidget*
+auto LogFilterBarWidget::get_filter_widget() const -> LogFilterWidget*
 {
-    return ui->filterWidget;
+    return ui->logFilterWidget;
 }
 
 /**
@@ -162,7 +163,7 @@ auto FilterBarWidget::get_filter_widget() const -> FilterWidget*
  *
  * @return Pointer to SearchBarWidget.
  */
-auto FilterBarWidget::get_search_bar_widget() const -> SearchBarWidget*
+auto LogFilterBarWidget::get_search_bar_widget() const -> SearchBarWidget*
 {
     return ui->searchBarWidget;
 }
@@ -171,7 +172,7 @@ auto FilterBarWidget::get_search_bar_widget() const -> SearchBarWidget*
  * @brief Handles change events to update the UI.
  * @param event The change event.
  */
-auto FilterBarWidget::changeEvent(QEvent* event) -> void
+auto LogFilterBarWidget::changeEvent(QEvent* event) -> void
 {
     if (event != nullptr && event->type() == QEvent::LanguageChange)
     {

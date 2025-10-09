@@ -1,25 +1,25 @@
-#include "Qt-LogViewer/Views/App/FilterWidget.h"
+#include "Qt-LogViewer/Views/App/LogFilterWidget.h"
 
 #include <QSet>
 #include <QString>
 
-#include "ui_FilterWidget.h"
+#include "ui_LogFilterWidget.h"
 
 namespace
 {
-constexpr auto k_show_all_apps_text = QT_TRANSLATE_NOOP("FilterWidget", "Show All Apps");
+constexpr auto k_show_all_apps_text = QT_TRANSLATE_NOOP("LogFilterWidget", "Show All Apps");
 constexpr auto k_show_all_apps_tooltip =
-    QT_TRANSLATE_NOOP("FilterWidget", "Show logs from all applications");
+    QT_TRANSLATE_NOOP("LogFilterWidget", "Show logs from all applications");
 }  // namespace
 
 /**
- * @brief Constructs a FilterWidget object.
+ * @brief Constructs a LogFilterWidget object.
  *
  * Initializes the filter widget and its UI.
  *
  * @param parent The parent widget, or nullptr if this is a top-level widget.
  */
-FilterWidget::FilterWidget(QWidget* parent): QWidget(parent), ui(new Ui::FilterWidget)
+LogFilterWidget::LogFilterWidget(QWidget* parent): QWidget(parent), ui(new Ui::LogFilterWidget)
 {
     ui->setupUi(this);
     ui->comboBoxApp->setFixedWidth(140);
@@ -46,11 +46,11 @@ FilterWidget::FilterWidget(QWidget* parent): QWidget(parent), ui(new Ui::FilterW
 }
 
 /**
- * @brief Destroys the FilterWidget object.
+ * @brief Destroys the LogFilterWidget object.
  *
  * Cleans up any resources used by the filter widget.
  */
-FilterWidget::~FilterWidget()
+LogFilterWidget::~LogFilterWidget()
 {
     delete ui;
 }
@@ -62,7 +62,7 @@ FilterWidget::~FilterWidget()
  *
  * @param app_name The application name to select.
  */
-auto FilterWidget::set_current_app_name_filter(const QString& app_name) -> void
+auto LogFilterWidget::set_current_app_name_filter(const QString& app_name) -> void
 {
     int index = ui->comboBoxApp->findText(app_name);
 
@@ -82,8 +82,8 @@ auto FilterWidget::set_current_app_name_filter(const QString& app_name) -> void
  * @param default_text The default entry text.
  * @param default_tooltip The tooltip for the default entry.
  */
-auto FilterWidget::set_app_names(const QSet<QString>& app_names, const QString& default_text,
-                                 const QString& default_tooltip) -> void
+auto LogFilterWidget::set_app_names(const QSet<QString>& app_names, const QString& default_text,
+                                    const QString& default_tooltip) -> void
 {
     ui->comboBoxApp->blockSignals(true);
     ui->comboBoxApp->clear();
@@ -111,7 +111,7 @@ auto FilterWidget::set_app_names(const QSet<QString>& app_names, const QString& 
  *
  * @param app_names The set of application names to populate the combo box.
  */
-auto FilterWidget::set_app_names(const QSet<QString>& app_names) -> void
+auto LogFilterWidget::set_app_names(const QSet<QString>& app_names) -> void
 {
     set_app_names(app_names, tr(k_show_all_apps_text), tr(k_show_all_apps_tooltip));
 }
@@ -121,7 +121,7 @@ auto FilterWidget::set_app_names(const QSet<QString>& app_names) -> void
  *
  * @param levels The set of log levels to check.
  */
-auto FilterWidget::set_log_levels(const QSet<QString>& levels) -> void
+auto LogFilterWidget::set_log_levels(const QSet<QString>& levels) -> void
 {
     ui->checkBoxTrace->setChecked(levels.contains("TRACE"));
     ui->checkBoxDebug->setChecked(levels.contains("DEBUG"));
@@ -136,7 +136,7 @@ auto FilterWidget::set_log_levels(const QSet<QString>& levels) -> void
  *
  * @return The selected application name.
  */
-auto FilterWidget::get_current_app_name() const -> QString
+auto LogFilterWidget::get_current_app_name() const -> QString
 {
     return ui->comboBoxApp->currentText();
 }
@@ -146,7 +146,7 @@ auto FilterWidget::get_current_app_name() const -> QString
  *
  * @return The set of selected log levels.
  */
-auto FilterWidget::get_current_log_levels() const -> QSet<QString>
+auto LogFilterWidget::get_current_log_levels() const -> QSet<QString>
 {
     QSet<QString> levels;
 
@@ -182,7 +182,7 @@ auto FilterWidget::get_current_log_levels() const -> QSet<QString>
  * @brief Handles change events to update the UI.
  * @param event The change event.
  */
-auto FilterWidget::changeEvent(QEvent* event) -> void
+auto LogFilterWidget::changeEvent(QEvent* event) -> void
 {
     if (event != nullptr && event->type() == QEvent::LanguageChange)
     {

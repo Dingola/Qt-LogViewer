@@ -16,7 +16,7 @@
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout">
     <item>
-     <widget class="FilterBarWidget" name="filterBarWidget" native="true"/>
+     <widget class="LogFilterBarWidget" name="logFilterBarWidget" native="true"/>
     </item>
     <item>
      <layout class="QVBoxLayout" name="verticalLayoutViewLog">
@@ -64,9 +64,9 @@
    <container>1</container>
   </customwidget>
   <customwidget>
-   <class>FilterBarWidget</class>
+   <class>LogFilterBarWidget</class>
    <extends>QWidget</extends>
-   <header>Qt-LogViewer/Views/App/FilterBarWidget.h</header>
+   <header>Qt-LogViewer/Views/App/LogFilterBarWidget.h</header>
    <container>1</container>
   </customwidget>
  </customwidgets>

@@ -357,7 +357,7 @@ auto LogViewerController::get_app_name_filter(const QUuid& view_id) const -> QSt
  */
 auto LogViewerController::get_log_level_filters() const -> QSet<QString>
 {
-	return get_log_level_filters(m_current_view_id);
+    return get_log_level_filters(m_current_view_id);
 }
 
 /**
