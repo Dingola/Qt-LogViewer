@@ -525,8 +525,8 @@ TEST_F(LogViewerControllerTest, FilterGetters)
     EXPECT_EQ(m_controller->get_app_name_filter(m_view_id), "AppA");
 
     QSet<QString> levels;
-    levels.insert("INFO");
-    levels.insert("ERROR");
+    levels.insert("info");
+    levels.insert("error");
     m_controller->set_log_level_filters(levels);
     EXPECT_EQ(m_controller->get_log_level_filters(m_view_id), levels);
     EXPECT_EQ(m_controller->get_log_level_filters(), levels);
