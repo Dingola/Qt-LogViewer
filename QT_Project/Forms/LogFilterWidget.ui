@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>544</width>
-    <height>50</height>
+    <width>179</width>
+    <height>41</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -48,64 +48,7 @@
     </widget>
    </item>
    <item>
-    <widget class="QWidget" name="logLevelBar" native="true">
-     <layout class="QHBoxLayout" name="horizontalLayout">
-      <property name="leftMargin">
-       <number>6</number>
-      </property>
-      <property name="topMargin">
-       <number>6</number>
-      </property>
-      <property name="rightMargin">
-       <number>6</number>
-      </property>
-      <property name="bottomMargin">
-       <number>6</number>
-      </property>
-      <item>
-       <widget class="QCheckBox" name="checkBoxTrace">
-        <property name="text">
-         <string>Trace</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QCheckBox" name="checkBoxDebug">
-        <property name="text">
-         <string>Debug</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QCheckBox" name="checkBoxInfo">
-        <property name="text">
-         <string>Info</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QCheckBox" name="checkBoxWarning">
-        <property name="text">
-         <string>Warning</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QCheckBox" name="checkBoxError">
-        <property name="text">
-         <string>Error</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QCheckBox" name="checkBoxFatal">
-        <property name="text">
-         <string>Fatal</string>
-        </property>
-       </widget>
-      </item>
-     </layout>
-    </widget>
+    <widget class="QWidget" name="logLevelBar" native="true"/>
    </item>
   </layout>
  </widget>

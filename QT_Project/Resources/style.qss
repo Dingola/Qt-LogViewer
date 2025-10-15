@@ -104,80 +104,11 @@ QWidget {
     font-size: 11pt;
 }
 
-/* === Log Level Bar === */
-#logLevelBar {
-    border: 1px solid @ColorBorder;
-    border-radius: 8px;
-    background-color: @ColorTableBackground;
-}
-
-/* === Filter/Search Bar === */
-#logFilterBarWidget {
-    background-color: @ColorLogFilterBarBackground;
-    border: 1px solid @ColorBorder;
-    border-radius: 8px;
-    padding: 8px;
-}
-
-/* === TableViewLog === */
-#tableViewLog {
-    border-top-left-radius: 8px;
-    border-top-right-radius: 8px;
-    border-bottom-left-radius: 0px;
-    border-bottom-right-radius: 0px;
-}
-
-/* === Pagination Widget === */
-#paginationWidget {
-    background-color: @ColorPaginationBackground;
-    border-bottom-left-radius: 8px;
-    border-bottom-right-radius: 8px;
-}
-
-#pageButtonsWidget {
-    background: @ColorPaginationBackground;
-}
-
-/* === Log Details TextEdit === */
-#logDetailsTextEdit {
-    border-top-left-radius: 0px;
-    border-top-right-radius: 0px;
-    border-bottom-left-radius: 8px;
-    border-bottom-right-radius: 8px;
-}
-
-/* === Log File Explorer === */
-LogFileExplorer {
-    background-color: @ColorTableBackground;
-}
-
-/* === Log Level Pie Chart Widget === */
-LogLevelPieChartWidget {
-    background-color: @ColorTableBackground;
-    qproperty-trace_color: @ColorTrace;
-    qproperty-debug_color: @ColorDebug;
-    qproperty-info_color: @ColorInfo;
-    qproperty-warning_color: @ColorWarning;
-    qproperty-error_color: @ColorError;
-    qproperty-fatal_color: @ColorFatal;
-}
-
-/* === Pie Chart === */
-PieChart {
-    background: @ColorTableBackground;
-    max-height: 200px;
-}
-
 /* === Labels === */
 QLabel {
     background: transparent;
     color: @ColorText;
     font-weight: bold;
-}
-
-QLabel#labelSettings {
-    font-weight: 900;
-    font-size: 16pt;
 }
 
 /* === LineEdit === */
@@ -197,19 +128,6 @@ QLineEdit:disabled {
 }
 QLineEdit[text=""] { 
 	color: @ColorTextPlaceholder;
-}
-
-QLineEdit#lineEditSearch {
-    min-height: 28px;
-    max-height: 28px;
-}
-
-QLineEdit#lineEditJumpTo {
-    border-radius: 10px;
-    min-height: 26px;
-    max-height: 26px;
-    min-width: 40px;
-    max-width: 40px;
 }
 
 /* === ComboBox === */
@@ -279,69 +197,6 @@ QCheckBox::indicator:disabled {
     border: 1px solid @ColorBorderDisabled;
 }
 
-/* === Log Level CheckBoxes === */
-#checkBoxTrace {
-	color: @ColorTrace;
-    border: 1px solid transparent;
-    border-radius: 6px;
-    padding: 4px 12px;
-}
-#checkBoxDebug {
-	color: @ColorDebug;
-    border: 1px solid transparent;
-    border-radius: 6px;
-    padding: 4px 12px;
-}
-#checkBoxInfo {
-	color: @ColorInfo;
-    border: 1px solid transparent;
-    border-radius: 6px;
-    padding: 4px 12px;
-}
-#checkBoxWarning {
-	color: @ColorWarning;
-    border: 1px solid transparent;
-    border-radius: 6px;
-    padding: 4px 12px;
-}
-#checkBoxError {
-	color: @ColorError;
-    border: 1px solid transparent;
-    border-radius: 6px;
-    padding: 4px 12px;
-}
-#checkBoxFatal {
-	color: @ColorFatal;
-    border: 1px solid transparent;
-    border-radius: 6px;
-    padding: 4px 12px;
-}
-
-#checkBoxTrace:hover {
-    border-color: @ColorTraceHover;
-}
-#checkBoxDebug:hover {
-    border-color: @ColorDebugHover;
-}
-#checkBoxInfo:hover {
-    border-color: @ColorInfoHover;
-}
-#checkBoxWarning:hover {
-    border-color: @ColorWarningHover;
-}
-#checkBoxError:hover {
-    border-color: @ColorErrorHover;
-}
-#checkBoxFatal:hover {
-    border-color: @ColorFatalHover;
-}
-
-/* === PaginationWidget CheckBoxes === */
-#comboBoxItemsPerPage {
-    min-height: 26px;
-    max-height: 26px;
-}
-
 /* === PushButton === */
 QPushButton {
     background-color: @ColorButtonBackground;
@@ -381,19 +236,6 @@ QToolButton:disabled {
     background-color: @ColorLineEditBackgroundDisabled;
     color: @ColorTextDisabled;
     border: 2px solid @ColorBorderDisabled;
-}
-
-/* Active (current) page button */
-QToolButton[isCurrentPage="true"] {
-    background-color: @ColorButtonBackground;
-    border: 2px solid @ColorToolButtonBorderHover;
-    color: @ColorButtonText; /* White text on blue */
-    font-weight: bold;
-}
-QToolButton[isCurrentPage="true"]:hover {
-    background-color: @ColorButtonBackgroundHover;
-    border: 2px solid @ColorToolButtonBorderHover;
-    color: @ColorButtonText;
 }
 
 /* === TableView === */
@@ -550,7 +392,6 @@ QTabBar::tab:hover {
 }
 
 /* === DockerWidget === */
-
 DockWidget > QWidget {
     margin-right: 8px;
     margin-left: 8px;
@@ -588,7 +429,6 @@ DockWidget > QWidget {
 }
 
 /* === Dialogs === */
-
 #Dialog {
     background: @ColorBackground;
     border: 1px solid @ColorBorder;
@@ -627,6 +467,23 @@ DockWidget > QWidget {
     background: @ColorButtonBackgroundHover;
 }
 
+/* === Pie Chart === */
+PieChart {
+    background: @ColorTableBackground;
+    max-height: 200px;
+}
+
+/* === Log Level Pie Chart Widget === */
+LogLevelPieChartWidget {
+    background-color: @ColorTableBackground;
+    qproperty-trace_color: @ColorTrace;
+    qproperty-debug_color: @ColorDebug;
+    qproperty-info_color: @ColorInfo;
+    qproperty-warning_color: @ColorWarning;
+    qproperty-error_color: @ColorError;
+    qproperty-fatal_color: @ColorFatal;
+}
+
 /* === Log Level Pie Chart Rows Widget === */
 #logLevelRowsWidget {
     background: @ColorTableBackground;
@@ -657,4 +514,150 @@ DockWidget > QWidget {
 #logLevelColorSquare {
     border-radius: 3px;
     /* background-color is set dynamically in C++ */
+}
+
+/* === LogFilterBarWidget === */
+LogFilterBarWidget {
+    background-color: @ColorLogFilterBarBackground;
+    border: 1px solid @ColorBorder;
+    border-radius: 8px;
+}
+
+/* === LogFilterWidget === */
+LogFilterWidget QWidget#logLevelBar {
+    background-color: @ColorTableBackground;
+    border: 1px solid @ColorBorder;
+    border-radius: 8px;
+}
+
+/* === LogLevelFilterItemWidget === */
+LogLevelFilterItemWidget QCheckBox {
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 4px 4px;
+    font-weight: bold;
+    font-size: 11pt;
+}
+
+LogLevelFilterItemWidget QCheckBox:hover {
+    background-color: @ColorLogFilterBarBackground;
+}
+
+LogLevelFilterItemWidget QLabel {
+    background-color: @ColorLogFilterBarBackground;
+    border: 1px solid @ColorBorder;
+    border-radius: 6px;
+    padding-left: 6px;
+    padding-right: 6px;
+    font-weight: 600;
+    font-size: 8pt;
+    max-height: 24px;
+}
+
+#checkBoxTrace {
+	color: @ColorTrace;
+}
+#checkBoxDebug {
+	color: @ColorDebug;
+}
+#checkBoxInfo {
+	color: @ColorInfo;
+}
+#checkBoxWarning {
+	color: @ColorWarning;
+}
+#checkBoxError {
+	color: @ColorError;
+}
+#checkBoxFatal {
+	color: @ColorFatal;
+}
+#checkBoxTrace:hover {
+    border-color: @ColorTraceHover;
+}
+#checkBoxDebug:hover {
+    border-color: @ColorDebugHover;
+}
+#checkBoxInfo:hover {
+    border-color: @ColorInfoHover;
+}
+#checkBoxWarning:hover {
+    border-color: @ColorWarningHover;
+}
+#checkBoxError:hover {
+    border-color: @ColorErrorHover;
+}
+#checkBoxFatal:hover {
+    border-color: @ColorFatalHover;
+}
+
+/* === TableViewLog === */
+#tableViewLog {
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    border-bottom-left-radius: 0px;
+    border-bottom-right-radius: 0px;
+}
+
+/* === Pagination Widget === */
+#paginationWidget {
+    background-color: @ColorPaginationBackground;
+    border-bottom-left-radius: 8px;
+    border-bottom-right-radius: 8px;
+}
+
+#pageButtonsWidget {
+    background: @ColorPaginationBackground;
+}
+
+/* === Log Details TextEdit === */
+#logDetailsTextEdit {
+    border-top-left-radius: 0px;
+    border-top-right-radius: 0px;
+    border-bottom-left-radius: 8px;
+    border-bottom-right-radius: 8px;
+}
+
+/* === Log File Explorer === */
+LogFileExplorer {
+    background-color: @ColorTableBackground;
+}
+
+/* TODO */
+QLabel#labelSettings {
+    font-weight: 900;
+    font-size: 16pt;
+}
+
+QLineEdit#lineEditSearch {
+    min-height: 28px;
+    max-height: 28px;
+}
+
+QLineEdit#lineEditJumpTo {
+    border-radius: 10px;
+    min-height: 26px;
+    max-height: 26px;
+    min-width: 40px;
+    max-width: 40px;
+}
+
+/* === PaginationWidget CheckBoxes === */
+#comboBoxItemsPerPage {
+    min-height: 26px;
+    max-height: 26px;
+}
+
+/* Active (current) page button */
+QToolButton[isCurrentPage="true"] {
+    background-color: @ColorButtonBackground;
+    border: 2px solid @ColorToolButtonBorderHover;
+    color: @ColorButtonText; /* White text on blue */
+    font-weight: bold;
+}
+QToolButton[isCurrentPage="true"]:hover {
+    background-color: @ColorButtonBackgroundHover;
+    border: 2px solid @ColorToolButtonBorderHover;
+    color: @ColorButtonText;
 }

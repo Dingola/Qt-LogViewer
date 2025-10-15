@@ -1,8 +1,12 @@
 #include "Qt-LogViewer/Views/App/LogFilterWidget.h"
 
+#include <QHBoxLayout>
+#include <QMap>
 #include <QSet>
 #include <QString>
+#include <QVector>
 
+#include "Qt-LogViewer/Views/App/LogLevelFilterItemWidget.h"
 #include "ui_LogFilterWidget.h"
 
 namespace
@@ -25,24 +29,21 @@ LogFilterWidget::LogFilterWidget(QWidget* parent): QWidget(parent), ui(new Ui::L
     ui->comboBoxApp->setFixedWidth(140);
     set_app_names({}, tr(k_show_all_apps_text), tr(k_show_all_apps_tooltip));
 
-    if (ui->logLevelBar->layout() != nullptr)
+    QLayout* layout = ui->logLevelBar->layout();
+
+    if (layout == nullptr)
     {
-        ui->logLevelBar->layout()->setContentsMargins(6, 6, 6, 6);
+        layout = new QHBoxLayout(ui->logLevelBar);
+        ui->logLevelBar->setLayout(layout);
     }
+
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(0);
 
     // Connect app filter changes
     connect(ui->comboBoxApp, &QComboBox::currentTextChanged, this, [this](const QString& app_name) {
         emit app_filter_changed((app_name == tr(k_show_all_apps_text) ? QString() : app_name));
     });
-
-    // Connect log level changes
-    auto emit_log_levels = [this] { emit log_level_filter_changed(get_current_log_levels()); };
-    connect(ui->checkBoxTrace, &QCheckBox::toggled, this, emit_log_levels);
-    connect(ui->checkBoxDebug, &QCheckBox::toggled, this, emit_log_levels);
-    connect(ui->checkBoxInfo, &QCheckBox::toggled, this, emit_log_levels);
-    connect(ui->checkBoxWarning, &QCheckBox::toggled, this, emit_log_levels);
-    connect(ui->checkBoxError, &QCheckBox::toggled, this, emit_log_levels);
-    connect(ui->checkBoxFatal, &QCheckBox::toggled, this, emit_log_levels);
 }
 
 /**
@@ -117,18 +118,95 @@ auto LogFilterWidget::set_app_names(const QSet<QString>& app_names) -> void
 }
 
 /**
- * @brief Sets the checked state of log level checkboxes.
+ * @brief Sets the available log levels and creates filter items dynamically.
+ *        Log level names are normalized for matching.
+ *
+ * Removes any existing log level filter items and creates new ones for each log level.
+ * Each item's checkbox receives a unique objectName for QSS styling.
+ *
+ * @param log_levels List of log level names (e.g., "TRACE", "DEBUG").
+ */
+auto LogFilterWidget::set_available_log_levels(const QVector<QString>& log_levels) -> void
+{
+    // Remove old items
+    QLayout* layout = ui->logLevelBar->layout();
+
+    if (layout != nullptr)
+    {
+        QLayoutItem* item;
+        while ((item = layout->takeAt(0)) != nullptr)
+        {
+            QWidget* widget = item->widget();
+
+            if (widget != nullptr)
+            {
+                widget->deleteLater();
+            }
+
+            delete item;
+        }
+    }
+
+    m_log_level_items.clear();
+
+    // Add new items
+    for (const QString& level: log_levels)
+    {
+        auto* item_widget = new LogLevelFilterItemWidget(ui->logLevelBar);
+        item_widget->set_log_level_name(level);
+        item_widget->set_count_text("0");
+        item_widget->set_checked(false);
+
+        connect(item_widget, &LogLevelFilterItemWidget::toggled, this,
+                [this] { emit log_level_filter_changed(get_current_log_levels()); });
+
+        layout->addWidget(item_widget);
+        const QString normalized_level = level.trimmed().toLower();
+        m_log_level_items[normalized_level] = item_widget;
+    }
+}
+
+/**
+ * @brief Sets the checked state of log level filter items.
+ *        Log level names are normalized for matching.
  *
  * @param levels The set of log levels to check.
  */
 auto LogFilterWidget::set_log_levels(const QSet<QString>& levels) -> void
 {
-    ui->checkBoxTrace->setChecked(levels.contains("TRACE"));
-    ui->checkBoxDebug->setChecked(levels.contains("DEBUG"));
-    ui->checkBoxInfo->setChecked(levels.contains("INFO"));
-    ui->checkBoxWarning->setChecked(levels.contains("WARNING"));
-    ui->checkBoxError->setChecked(levels.contains("ERROR"));
-    ui->checkBoxFatal->setChecked(levels.contains("FATAL"));
+    QSet<QString> normalized_levels;
+
+    for (const auto& level: levels)
+    {
+        normalized_levels.insert(level.trimmed().toLower());
+    }
+
+    for (auto it = m_log_level_items.begin(); it != m_log_level_items.end(); ++it)
+    {
+        it.value()->set_checked(normalized_levels.contains(it.key()));
+    }
+}
+
+/**
+ * @brief Sets the count for each log level and updates the UI.
+ *        Log level names are normalized for matching.
+ *
+ * @param level_counts Map of log level name to count.
+ */
+auto LogFilterWidget::set_log_level_counts(const QMap<QString, int>& level_counts) -> void
+{
+    QMap<QString, int> normalized_counts;
+
+    for (auto it = level_counts.begin(); it != level_counts.end(); ++it)
+    {
+        normalized_counts[it.key().trimmed().toLower()] = it.value();
+    }
+
+    for (auto it = m_log_level_items.begin(); it != m_log_level_items.end(); ++it)
+    {
+        int count = normalized_counts.value(it.key(), 0);
+        it.value()->set_count(count);
+    }
 }
 
 /**
@@ -150,29 +228,12 @@ auto LogFilterWidget::get_current_log_levels() const -> QSet<QString>
 {
     QSet<QString> levels;
 
-    if (ui->checkBoxTrace->isChecked())
+    for (auto it = m_log_level_items.begin(); it != m_log_level_items.end(); ++it)
     {
-        levels.insert("TRACE");
-    }
-    if (ui->checkBoxDebug->isChecked())
-    {
-        levels.insert("DEBUG");
-    }
-    if (ui->checkBoxInfo->isChecked())
-    {
-        levels.insert("INFO");
-    }
-    if (ui->checkBoxWarning->isChecked())
-    {
-        levels.insert("WARNING");
-    }
-    if (ui->checkBoxError->isChecked())
-    {
-        levels.insert("ERROR");
-    }
-    if (ui->checkBoxFatal->isChecked())
-    {
-        levels.insert("FATAL");
+        if (it.value()->get_checked())
+        {
+            levels.insert(it.key());
+        }
     }
 
     return levels;

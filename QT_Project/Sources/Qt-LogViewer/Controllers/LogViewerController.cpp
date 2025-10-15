@@ -352,12 +352,59 @@ auto LogViewerController::get_app_name_filter(const QUuid& view_id) const -> QSt
 }
 
 /**
+ * @brief Returns the available log levels for the specified view.
+ *        Currently returns the same static set for all views.
+ * @param view_id The QUuid of the view.
+ * @return QVector of log level names (e.g., "Trace", "Debug", ...).
+ */
+auto LogViewerController::get_available_log_levels(const QUuid& view_id) const -> QVector<QString>
+{
+    QVector<QString> log_levels;
+
+    log_levels << "Trace"
+               << "Debug"
+               << "Info"
+               << "Warning"
+               << "Error"
+               << "Fatal";
+
+    return log_levels;
+}
+
+/**
  * @brief Returns the current set of log levels being filtered.
  * @return The set of log levels.
  */
 auto LogViewerController::get_log_level_filters() const -> QSet<QString>
 {
     return get_log_level_filters(m_current_view_id);
+}
+
+/**
+ * @brief Returns a map of log level names to their counts in the specified view.
+ * @param view_id The QUuid of the view.
+ * @return QMap of log level names to counts.
+ */
+auto LogViewerController::get_log_level_counts(const QUuid& view_id) const -> QMap<QString, int>
+{
+    QVector<LogEntry> log_entries = get_log_entries(view_id);
+    QMap<QString, int> level_counts;
+
+    for (const auto& entry: log_entries)
+    {
+        level_counts[entry.get_level()]++;
+    }
+
+    return level_counts;
+}
+
+/**
+ * @brief Returns a map of log level names to their counts in the current view.
+ * @return QMap of log level names to counts.
+ */
+auto LogViewerController::get_log_level_counts() const -> QMap<QString, int>
+{
+    return get_log_level_counts(m_current_view_id);
 }
 
 /**
@@ -448,7 +495,7 @@ auto LogViewerController::get_log_file_tree_model() -> LogFileTreeModel*
  * @brief Returns all log entries in the current view.
  * @return QVector<LogEntry> containing all entries.
  */
-auto LogViewerController::get_log_entries() -> QVector<LogEntry>
+auto LogViewerController::get_log_entries() const -> QVector<LogEntry>
 {
     return get_log_entries(m_current_view_id);
 }
@@ -458,7 +505,7 @@ auto LogViewerController::get_log_entries() -> QVector<LogEntry>
  * @param view_id The QUuid of the view.
  * @return QVector<LogEntry> containing all entries.
  */
-auto LogViewerController::get_log_entries(const QUuid& view_id) -> QVector<LogEntry>
+auto LogViewerController::get_log_entries(const QUuid& view_id) const -> QVector<LogEntry>
 {
     QVector<LogEntry> result;
 

@@ -36,9 +36,16 @@ auto LogSortFilterProxyModel::set_app_name_filter(const QString& app_name) -> vo
  */
 auto LogSortFilterProxyModel::set_log_level_filters(const QSet<QString>& levels) -> void
 {
-    if (m_log_level_filters != levels)
+    QSet<QString> normalized_filters;
+
+    for (const auto& filter_level: levels)
     {
-        m_log_level_filters = levels;
+        normalized_filters.insert(filter_level.trimmed().toLower());
+    }
+
+    if (m_log_level_filters != normalized_filters)
+    {
+        m_log_level_filters = normalized_filters;
         invalidateFilter();
     }
 }
@@ -172,7 +179,8 @@ auto LogSortFilterProxyModel::row_passes_filter(int row, const QModelIndex& pare
     if (accepted && !m_log_level_filters.isEmpty())
     {
         QString level = sourceModel()->data(index_level, Qt::DisplayRole).toString();
-        if (!m_log_level_filters.contains(level))
+        QString normalized_level = level.trimmed().toLower();
+        if (!m_log_level_filters.contains(normalized_level))
         {
             accepted = false;
         }

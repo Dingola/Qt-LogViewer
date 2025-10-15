@@ -177,6 +177,8 @@ auto MainWindow::setup_log_details_dock() -> void
  */
 auto MainWindow::setup_filter_bar() -> void
 {
+    QVector<QString> available_log_levels = m_controller->get_available_log_levels({});
+    ui->logFilterBarWidget->set_available_log_levels(available_log_levels);
     connect(ui->logFilterBarWidget, &LogFilterBarWidget::app_filter_changed, this,
             [this](const QString& app_name) {
                 m_controller->set_app_name_filter(app_name);
@@ -229,7 +231,8 @@ auto MainWindow::setup_tab_widget() -> void
         {
             ui->logFilterBarWidget->set_app_names({});
             ui->logFilterBarWidget->set_log_levels({});
-            update_log_level_pie_chart({});
+            m_log_level_pie_chart_widget->set_log_level_counts({});
+            ui->logFilterBarWidget->set_log_level_counts({});
             update_pagination_widget();
         }
     });
@@ -500,22 +503,6 @@ auto MainWindow::handle_search_changed() -> void
 }
 
 /**
- * @brief Updates the log level pie chart for the selected file.
- * @param log_file_info The selected LogFileInfo.
- */
-auto MainWindow::update_log_level_pie_chart(const QVector<LogEntry>& log_entries) -> void
-{
-    QMap<QString, int> level_counts;
-
-    for (const auto& entry: log_entries)
-    {
-        level_counts[entry.get_level()]++;
-    }
-
-    m_log_level_pie_chart_widget->set_log_level_counts(level_counts);
-}
-
-/**
  * @brief Handles open log file requests and creates a new tab with a LogTableView.
  * @param log_file_info The LogFileInfo to load and display.
  */
@@ -543,8 +530,18 @@ auto MainWindow::handle_log_file_open_requested(const LogFileInfo& log_file_info
  */
 auto MainWindow::handle_current_view_id_changed(const QUuid& view_id) -> void
 {
-    QVector<LogEntry> log_entries = m_controller->get_log_entries(view_id);
-    update_log_level_pie_chart(log_entries);
+    QSet<QString> app_names = m_controller->get_app_names(view_id);
+    ui->logFilterBarWidget->set_app_names(app_names);
+    QString app_name_filter = m_controller->get_app_name_filter(view_id);
+    ui->logFilterBarWidget->set_current_app_name_filter(app_name_filter);
+    QVector<QString> available_log_levels = m_controller->get_available_log_levels(view_id);
+    ui->logFilterBarWidget->set_available_log_levels(available_log_levels);
+    QSet<QString> log_level_filters = m_controller->get_log_level_filters(view_id);
+    ui->logFilterBarWidget->set_log_levels(log_level_filters);
+
+    QMap<QString, int> level_counts = m_controller->get_log_level_counts(view_id);
+    m_log_level_pie_chart_widget->set_log_level_counts(level_counts);
+    ui->logFilterBarWidget->set_log_level_counts(level_counts);
 
     auto* log_table_view = qobject_cast<LogTableView*>(ui->tabWidgetLog->currentWidget());
 
@@ -553,12 +550,6 @@ auto MainWindow::handle_current_view_id_changed(const QUuid& view_id) -> void
         log_table_view->auto_resize_columns();
     }
 
-    QSet<QString> app_names = m_controller->get_app_names(view_id);
-    ui->logFilterBarWidget->set_app_names(app_names);
-    QString app_name_filter = m_controller->get_app_name_filter(view_id);
-    ui->logFilterBarWidget->set_current_app_name_filter(app_name_filter);
-    QSet<QString> log_level_filters = m_controller->get_log_level_filters(view_id);
-    ui->logFilterBarWidget->set_log_levels(log_level_filters);
     update_pagination_widget();
 }
 

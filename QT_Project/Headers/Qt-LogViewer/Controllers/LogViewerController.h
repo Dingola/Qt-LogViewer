@@ -198,10 +198,31 @@ class LogViewerController: public QObject
         [[nodiscard]] auto get_app_name_filter(const QUuid& view_id) const -> QString;
 
         /**
+         * @brief Returns the available log levels for the specified view.
+         *        Currently returns the same static set for all views.
+         * @param view_id The QUuid of the view.
+         * @return QVector of log level names (e.g., "Trace", "Debug", ...).
+         */
+        [[nodiscard]] auto get_available_log_levels(const QUuid& view_id) const -> QVector<QString>;
+
+        /**
          * @brief Returns the current set of log levels being filtered.
          * @return The set of log levels.
          */
         [[nodiscard]] auto get_log_level_filters() const -> QSet<QString>;
+
+        /**
+         * @brief Returns a map of log level names to their counts in the specified view.
+         * @param view_id The QUuid of the view.
+         * @return QMap of log level names to counts.
+         */
+        [[nodiscard]] auto get_log_level_counts(const QUuid& view_id) const -> QMap<QString, int>;
+
+        /**
+         * @brief Returns a map of log level names to their counts in the current view.
+         * @return QMap of log level names to counts.
+         */
+        [[nodiscard]] auto get_log_level_counts() const -> QMap<QString, int>;
 
         /**
          * @brief Returns the set of log levels being filtered for the specified view.
@@ -261,14 +282,14 @@ class LogViewerController: public QObject
          * @brief Returns all log entries in the current view.
          * @return QVector<LogEntry> containing all entries.
          */
-        [[nodiscard]] auto get_log_entries() -> QVector<LogEntry>;
+        [[nodiscard]] auto get_log_entries() const -> QVector<LogEntry>;
 
         /**
          * @brief Returns all log entries in the specified view.
          * @param view_id The QUuid of the view.
          * @return QVector<LogEntry> containing all entries.
          */
-        [[nodiscard]] auto get_log_entries(const QUuid& view_id) -> QVector<LogEntry>;
+        [[nodiscard]] auto get_log_entries(const QUuid& view_id) const -> QVector<LogEntry>;
 
         /**
          * @brief Returns all log entries for a given file in the current view.

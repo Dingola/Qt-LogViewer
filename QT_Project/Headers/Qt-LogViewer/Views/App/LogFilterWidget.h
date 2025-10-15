@@ -1,8 +1,12 @@
 #pragma once
 
+#include <QMap>
 #include <QSet>
 #include <QString>
+#include <QVector>
 #include <QWidget>
+
+#include "Qt-LogViewer/Views/App/LogLevelFilterItemWidget.h"
 
 namespace Ui
 {
@@ -68,11 +72,28 @@ class LogFilterWidget: public QWidget
         auto set_app_names(const QSet<QString>& app_names) -> void;
 
         /**
+         * @brief Sets the available log levels and creates filter items dynamically.
+         *
+         * Removes any existing log level filter items and creates new ones for each log level.
+         * Each item's checkbox receives a unique objectName for QSS styling.
+         *
+         * @param log_levels List of log level names (e.g., "TRACE", "DEBUG").
+         */
+        auto set_available_log_levels(const QVector<QString>& log_levels) -> void;
+
+        /**
          * @brief Sets the checked state of log level checkboxes.
          *
          * @param levels The set of log levels to check.
          */
         auto set_log_levels(const QSet<QString>& levels) -> void;
+
+        /**
+         * @brief Sets the count for each log level and updates the UI.
+         *
+         * @param level_counts Map of log level name to count.
+         */
+        auto set_log_level_counts(const QMap<QString, int>& level_counts) -> void;
 
         /**
          * @brief Returns the currently selected application name.
@@ -110,4 +131,10 @@ class LogFilterWidget: public QWidget
 
     private:
         Ui::LogFilterWidget* ui;
+
+        /**
+         * @brief Holds the dynamically created log level filter items.
+         * Key: log level name (e.g., "TRACE"), Value: pointer to item widget.
+         */
+        QMap<QString, LogLevelFilterItemWidget*> m_log_level_items;
 };

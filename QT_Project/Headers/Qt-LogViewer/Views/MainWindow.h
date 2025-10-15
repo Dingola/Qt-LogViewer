@@ -146,12 +146,6 @@ class MainWindow: public BaseMainWindow
         auto handle_search_changed() -> void;
 
         /**
-         * @brief Updates the log level pie chart for the selected file.
-         * @param log_file_info The selected LogFileInfo.
-         */
-        auto update_log_level_pie_chart(const QVector<LogEntry>& log_entries) -> void;
-
-        /**
          * @brief Handles open log file requests and creates a new tab with a LogTableView.
          * @param log_file_info The LogFileInfo to load and display.
          */

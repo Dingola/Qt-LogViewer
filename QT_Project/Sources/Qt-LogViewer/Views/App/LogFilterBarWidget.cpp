@@ -69,6 +69,15 @@ auto LogFilterBarWidget::set_current_app_name_filter(const QString& app_name) ->
 }
 
 /**
+ * @brief Sets the available log levels in the filter widget.
+ * @param log_levels List of log level names (e.g., "TRACE", "DEBUG").
+ */
+auto LogFilterBarWidget::set_available_log_levels(const QVector<QString>& log_levels) -> void
+{
+    ui->logFilterWidget->set_available_log_levels(log_levels);
+}
+
+/**
  * @brief Sets the checked state of log level checkboxes in the filter widget.
  *
  * @param levels The set of log levels to check.
@@ -76,6 +85,15 @@ auto LogFilterBarWidget::set_current_app_name_filter(const QString& app_name) ->
 auto LogFilterBarWidget::set_log_levels(const QSet<QString>& levels) -> void
 {
     ui->logFilterWidget->set_log_levels(levels);
+}
+
+/**
+ * @brief Sets the count for each log level in the filter widget.
+ * @param level_counts Map of log level name to count.
+ */
+auto LogFilterBarWidget::set_log_level_counts(const QMap<QString, int>& level_counts) -> void
+{
+    ui->logFilterWidget->set_log_level_counts(level_counts);
 }
 
 /**
