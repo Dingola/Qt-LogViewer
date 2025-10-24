@@ -25,8 +25,10 @@ class StylesheetLoader: public QObject
         explicit StylesheetLoader(QObject* parent = nullptr);
 
         /**
-         * @brief Loads a stylesheet file, parses variables, and applies it to the application.
+         * @brief Loads a stylesheet file, parses variables (default and theme), resolves them
+         * recursively, and applies it to the application. Logs success or failure.
          * @param file_path The path to the QSS file.
+         * @param theme_name The theme name to use, or empty for default.
          * @return true if loading and applying succeeded, false otherwise.
          */
         auto load_stylesheet(const QString& file_path,
@@ -101,14 +103,31 @@ class StylesheetLoader: public QObject
          * @param stylesheet The raw QSS stylesheet.
          * @return A QStringList of theme names.
          */
-        static auto parse_available_themes(const QString& stylesheet) -> QStringList;
+        [[nodiscard]] static auto parse_available_themes(const QString& stylesheet) -> QStringList;
 
         /**
          * @brief Removes all @Variables blocks from the given stylesheet string.
          * @param stylesheet The stylesheet string to process.
          * @return The stylesheet with all @Variables blocks removed.
          */
-        static auto remove_variables_blocks(const QString& stylesheet) -> QString;
+        [[nodiscard]] static auto remove_variables_blocks(const QString& stylesheet) -> QString;
+
+        /**
+         * @brief Recursively resolves a variable to its final value, following references to other
+         * variables.
+         *
+         * Prevents infinite recursion by tracking already visited variable names.
+         *
+         * @param name The variable name to resolve (without '@').
+         * @param variables The map of all available variables.
+         * @param seen A set of variable names already visited in this resolution chain (to prevent
+         * cycles).
+         * @return The fully resolved value of the variable, or an empty string if not found or
+         * cyclic.
+         */
+        [[nodiscard]] static auto resolve_variable(const QString& name,
+                                                   const QMap<QString, QString>& variables,
+                                                   QSet<QString>& seen) -> QString;
 
     private:
         QMap<QString, QString> m_variables;
