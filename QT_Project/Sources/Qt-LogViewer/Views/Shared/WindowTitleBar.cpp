@@ -1,0 +1,339 @@
+#include "Qt-LogViewer/Views/Shared/WindowTitleBar.h"
+
+#include <QHBoxLayout>
+#include <QLabel>
+#include <QMenuBar>
+#include <QMouseEvent>
+#include <QPushButton>
+#include <QVBoxLayout>
+
+/**
+ * @brief Constructs a WindowTitleBar object.
+ * @param parent The parent widget, or nullptr if this is a top-level widget.
+ */
+WindowTitleBar::WindowTitleBar(QWidget* parent): QWidget(parent)
+{
+    setObjectName("dock_title_bar");
+    setMinimumHeight(36);
+
+    m_icon_label = new QLabel(this);
+    m_icon_label->setObjectName("dock_title_icon");
+    m_icon_label->setFixedSize(20, 20);
+    m_icon_label->setScaledContents(true);
+
+    m_title_label = new QLabel(tr("AppWindow"), this);
+    m_title_label->setObjectName("dock_title_label");
+    m_title_label->setAlignment(Qt::AlignVCenter | Qt::AlignLeft);
+
+    m_minimize_button = new QPushButton("-", this);
+    m_maximize_button = new QPushButton("[]", this);
+    m_close_button = new QPushButton("X", this);
+
+    for (auto btn: {m_minimize_button, m_maximize_button, m_close_button})
+    {
+        btn->setFixedSize(28, 28);
+        btn->setFlat(true);
+    }
+    m_close_button->setObjectName("dock_title_bar_close_button");
+
+    m_root_layout = new QVBoxLayout(this);
+    m_root_layout->setContentsMargins(8, 0, 8, 0);
+    m_root_layout->setSpacing(0);
+
+    m_top_row = new QHBoxLayout();
+    m_top_row->setContentsMargins(0, 0, 0, 0);
+    m_top_row->setSpacing(4);
+
+    m_bottom_row = new QHBoxLayout();
+    m_bottom_row->setContentsMargins(0, 0, 0, 0);
+    m_bottom_row->setSpacing(4);
+
+    m_top_row->addWidget(m_icon_label);
+    m_top_row->addWidget(m_title_label);
+    m_top_row->addWidget(m_minimize_button);
+    m_top_row->addWidget(m_maximize_button);
+    m_top_row->addWidget(m_close_button);
+
+    m_root_layout->addLayout(m_top_row);
+    m_root_layout->addLayout(m_bottom_row);
+
+    setLayout(m_root_layout);
+
+    connect(m_minimize_button, &QPushButton::clicked, this, &WindowTitleBar::minimize_requested);
+    connect(m_maximize_button, &QPushButton::clicked, [this] {
+        QWidget* top = window();
+        const bool maximized = (top != nullptr) ? top->isMaximized() : false;
+        if (maximized)
+        {
+            emit restore_requested();
+        }
+        else
+        {
+            emit maximize_requested();
+        }
+    });
+    connect(m_close_button, &QPushButton::clicked, this, &WindowTitleBar::close_requested);
+}
+
+/**
+ * @brief Sets the small icon displayed at the far left of the title bar.
+ * @param icon The icon to display.
+ */
+auto WindowTitleBar::set_icon(const QIcon& icon) -> void
+{
+    if (m_icon_label != nullptr)
+    {
+        const int icon_size = 20;
+        QPixmap pm = icon.pixmap(icon_size, icon_size);
+        m_icon_label->setPixmap(pm);
+        m_icon_label->setVisible(!pm.isNull());
+    }
+}
+
+/**
+ * @brief Sets the window title text.
+ * @param title The title to display.
+ */
+auto WindowTitleBar::set_title(const QString& title) -> void
+{
+    if (m_title_label != nullptr)
+    {
+        m_title_label->setText(title);
+    }
+}
+
+/**
+ * @brief Set a menubar to be embedded in the title bar and re-parent it to this widget.
+ * @param menubar Pointer to a QMenuBar to embed (may be nullptr to remove).
+ */
+auto WindowTitleBar::set_menubar(QMenuBar* menubar) -> void
+{
+    if (m_menu_bar != menubar)
+    {
+        if (m_menu_bar != nullptr)
+        {
+            m_menu_bar->setParent(nullptr);
+            m_menu_bar->deleteLater();
+        }
+
+        m_menu_bar = menubar;
+
+        if (m_menu_bar != nullptr)
+        {
+            m_menu_bar->setParent(this);
+        }
+
+        rebuild_layout();
+    }
+}
+
+/**
+ * @brief Choose the row where the menubar should be placed.
+ * @param row Top to place between title and buttons; Bottom to place under icon+title.
+ */
+auto WindowTitleBar::set_menubar_row(RowPosition row) -> void
+{
+    if (m_menubar_row != row)
+    {
+        m_menubar_row = row;
+        rebuild_layout();
+    }
+}
+
+/**
+ * @brief Set a custom widget to appear in the title bar and re-parent it to this widget.
+ * @param widget Pointer to a QWidget to embed (may be nullptr to remove).
+ */
+auto WindowTitleBar::set_custom_widget(QWidget* widget) -> void
+{
+    if (m_custom_widget != widget)
+    {
+        if (m_custom_widget != nullptr)
+        {
+            m_custom_widget->setParent(nullptr);
+            m_custom_widget->deleteLater();
+        }
+
+        m_custom_widget = widget;
+
+        if (m_custom_widget != nullptr)
+        {
+            m_custom_widget->setParent(this);
+        }
+
+        rebuild_layout();
+    }
+}
+
+/**
+ * @brief Choose the row where the custom widget should be placed.
+ * @param row Top to place between title/menu and buttons; Bottom to place under icon+title.
+ */
+auto WindowTitleBar::set_custom_widget_row(RowPosition row) -> void
+{
+    if (m_custom_row != row)
+    {
+        m_custom_row = row;
+        rebuild_layout();
+    }
+}
+
+/**
+ * @brief Returns the embedded menubar if set.
+ * @return QMenuBar* Pointer to the menubar or nullptr.
+ */
+[[nodiscard]] auto WindowTitleBar::get_menubar() const -> QMenuBar*
+{
+    QMenuBar* result = m_menu_bar;
+    return result;
+}
+
+/**
+ * @brief Returns the custom widget if set.
+ * @return QWidget* Pointer to the custom widget or nullptr.
+ */
+[[nodiscard]] auto WindowTitleBar::get_custom_widget() const -> QWidget*
+{
+    QWidget* result = m_custom_widget;
+    return result;
+}
+
+/**
+ * @brief Returns the minimize button.
+ * @return Pointer to the minimize QPushButton.
+ */
+auto WindowTitleBar::get_minimize_button() const -> QPushButton*
+{
+    QPushButton* result = m_minimize_button;
+    return result;
+}
+
+/**
+ * @brief Returns the maximize button.
+ * @return Pointer to the maximize/restore QPushButton.
+ */
+auto WindowTitleBar::get_maximize_button() const -> QPushButton*
+{
+    QPushButton* result = m_maximize_button;
+    return result;
+}
+
+/**
+ * @brief Returns the close button.
+ * @return Pointer to the close QPushButton.
+ */
+auto WindowTitleBar::get_close_button() const -> QPushButton*
+{
+    QPushButton* result = m_close_button;
+    return result;
+}
+
+/**
+ * @brief Handles mouse double-click events for maximize/restore.
+ * @param event The mouse event.
+ */
+void WindowTitleBar::mouseDoubleClickEvent(QMouseEvent* event)
+{
+    if (event->button() == Qt::LeftButton)
+    {
+        m_maximize_button->click();
+    }
+}
+
+/**
+ * @brief Handles mouse press events for drag start.
+ * @param event The mouse event.
+ */
+void WindowTitleBar::mousePressEvent(QMouseEvent* event)
+{
+    if (event->button() == Qt::LeftButton)
+    {
+        emit drag_started(event->globalPos());
+    }
+
+    QWidget::mousePressEvent(event);
+}
+
+/**
+ * @brief Rebuild the layout to reflect current menubar/custom widget placement.
+ *
+ * Rules:
+ *  - Top row order is [Icon][Title][MenuBar?][Custom?][...][Min][Max][Close].
+ *  - Bottom row order is [MenuBar?][Custom?].
+ *  - When only one of them is set to Bottom, it appears alone on the second row.
+ */
+auto WindowTitleBar::rebuild_layout() -> void
+{
+    if (m_top_row != nullptr)
+    {
+        for (int i = m_top_row->count() - 1; i >= 0; --i)
+        {
+            QWidget* w = m_top_row->itemAt(i)->widget();
+
+            if (w != nullptr)
+            {
+                if (w == m_menu_bar || w == m_custom_widget)
+                {
+                    m_top_row->removeWidget(w);
+                }
+            }
+        }
+    }
+
+    if (m_bottom_row != nullptr)
+    {
+        for (int i = m_bottom_row->count() - 1; i >= 0; --i)
+        {
+            QWidget* w = m_bottom_row->itemAt(i)->widget();
+
+            if (w != nullptr)
+            {
+                if (w == m_menu_bar || w == m_custom_widget)
+                {
+                    m_bottom_row->removeWidget(w);
+                }
+            }
+        }
+    }
+
+    if (m_bottom_row != nullptr)
+    {
+        if (m_menubar_row == RowPosition::Bottom && m_menu_bar != nullptr)
+        {
+            m_bottom_row->addWidget(m_menu_bar);
+        }
+
+        if (m_custom_row == RowPosition::Bottom && m_custom_widget != nullptr)
+        {
+            m_bottom_row->addWidget(m_custom_widget);
+        }
+    }
+
+    if (m_top_row != nullptr)
+    {
+        int insert_index = m_top_row->count();
+
+        for (int i = 0; i < m_top_row->count(); ++i)
+        {
+            QWidget* w = m_top_row->itemAt(i)->widget();
+
+            if (w == m_minimize_button)
+            {
+                insert_index = i;
+                i = m_top_row->count();
+            }
+        }
+
+        if (m_menubar_row == RowPosition::Top && m_menu_bar != nullptr)
+        {
+            m_top_row->insertWidget(insert_index, m_menu_bar);
+            insert_index = insert_index + 1;
+        }
+
+        if (m_custom_row == RowPosition::Top && m_custom_widget != nullptr)
+        {
+            m_top_row->insertWidget(insert_index, m_custom_widget);
+            insert_index = insert_index + 1;
+        }
+    }
+}
