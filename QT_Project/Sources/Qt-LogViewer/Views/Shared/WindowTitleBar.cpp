@@ -1,11 +1,16 @@
 #include "Qt-LogViewer/Views/Shared/WindowTitleBar.h"
 
+#include <QEvent>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QMenuBar>
 #include <QMouseEvent>
 #include <QPushButton>
+#include <QShowEvent>
+#include <QSize>
 #include <QVBoxLayout>
+
+#include "Qt-LogViewer/Services/UiUtils.h"
 
 /**
  * @brief Constructs a WindowTitleBar object.
@@ -13,28 +18,31 @@
  */
 WindowTitleBar::WindowTitleBar(QWidget* parent): QWidget(parent)
 {
-    setObjectName("dock_title_bar");
+    setObjectName("windowtitlebar");
     setMinimumHeight(36);
 
     m_icon_label = new QLabel(this);
-    m_icon_label->setObjectName("dock_title_icon");
+    m_icon_label->setObjectName("windowtitlebar_icon");
     m_icon_label->setFixedSize(20, 20);
     m_icon_label->setScaledContents(true);
 
     m_title_label = new QLabel(tr("AppWindow"), this);
-    m_title_label->setObjectName("dock_title_label");
+    m_title_label->setObjectName("windowtitlebar_title");
     m_title_label->setAlignment(Qt::AlignVCenter | Qt::AlignLeft);
 
-    m_minimize_button = new QPushButton("-", this);
-    m_maximize_button = new QPushButton("[]", this);
-    m_close_button = new QPushButton("X", this);
+    m_minimize_button = new QPushButton(this);
+    m_minimize_button->setObjectName("windowtitlebar_minimize_button");
+    m_maximize_button = new QPushButton(this);
+    m_maximize_button->setObjectName("windowtitlebar_maximize_button");
+    m_close_button = new QPushButton(this);
+    m_close_button->setObjectName("windowtitlebar_close_button");
 
     for (auto btn: {m_minimize_button, m_maximize_button, m_close_button})
     {
         btn->setFixedSize(28, 28);
         btn->setFlat(true);
     }
-    m_close_button->setObjectName("dock_title_bar_close_button");
+    apply_button_icon_size();
 
     m_root_layout = new QVBoxLayout(this);
     m_root_layout->setContentsMargins(8, 0, 8, 0);
@@ -58,6 +66,9 @@ WindowTitleBar::WindowTitleBar(QWidget* parent): QWidget(parent)
     m_root_layout->addLayout(m_bottom_row);
 
     setLayout(m_root_layout);
+
+    // Initial icon render based on default color/size and current window state.
+    update_button_icons();
 
     connect(m_minimize_button, &QPushButton::clicked, this, &WindowTitleBar::minimize_requested);
     connect(m_maximize_button, &QPushButton::clicked, [this] {
@@ -229,6 +240,59 @@ auto WindowTitleBar::get_close_button() const -> QPushButton*
 }
 
 /**
+ * @brief Returns the current color used to render window button SVG icons.
+ * @return The current window button color.
+ */
+[[nodiscard]] auto WindowTitleBar::get_window_button_color() const -> QColor
+{
+    QColor result = m_window_button_color;
+    return result;
+}
+
+/**
+ * @brief Sets the color used to render window button SVG icons.
+ * @param color The new color to apply to the icons.
+ */
+auto WindowTitleBar::set_window_button_color(const QColor& color) -> void
+{
+    if (m_window_button_color != color)
+    {
+        m_window_button_color = color;
+        update_button_icons();
+    }
+}
+
+/**
+ * @brief Returns the current icon size in pixels for window buttons.
+ * @return The icon size in pixels.
+ */
+[[nodiscard]] auto WindowTitleBar::get_window_button_icon_px() const -> int
+{
+    int result = m_window_button_icon_px;
+    return result;
+}
+
+/**
+ * @brief Sets the icon size in pixels for window buttons (square).
+ * @param px The new icon size in pixels. Values < 1 are clamped to 1.
+ */
+auto WindowTitleBar::set_window_button_icon_px(int px) -> void
+{
+    int clamped = px;
+    if (clamped < 1)
+    {
+        clamped = 1;
+    }
+
+    if (m_window_button_icon_px != clamped)
+    {
+        m_window_button_icon_px = clamped;
+        apply_button_icon_size();
+        update_button_icons();
+    }
+}
+
+/**
  * @brief Handles mouse double-click events for maximize/restore.
  * @param event The mouse event.
  */
@@ -252,6 +316,48 @@ void WindowTitleBar::mousePressEvent(QMouseEvent* event)
     }
 
     QWidget::mousePressEvent(event);
+}
+
+/**
+ * @brief Install an event filter on the top-level window when shown.
+ * @param event The show event.
+ */
+void WindowTitleBar::showEvent(QShowEvent* event)
+{
+    QWidget::showEvent(event);
+
+    QWidget* top = window();
+    if (top != nullptr)
+    {
+        top->installEventFilter(this);
+        update_maximize_restore_icon();
+    }
+}
+
+/**
+ * @brief Intercepts top-level window state changes to update the max/restore icon.
+ * @param watched The object being watched.
+ * @param event The event being filtered.
+ * @return true if handled; false otherwise.
+ */
+bool WindowTitleBar::eventFilter(QObject* watched, QEvent* event)
+{
+    bool handled = false;
+
+    QWidget* top = window();
+    if (top != nullptr)
+    {
+        if (watched == top)
+        {
+            if (event->type() == QEvent::WindowStateChange)
+            {
+                update_maximize_restore_icon();
+                handled = false;
+            }
+        }
+    }
+
+    return handled;
 }
 
 /**
@@ -335,5 +441,71 @@ auto WindowTitleBar::rebuild_layout() -> void
             m_top_row->insertWidget(insert_index, m_custom_widget);
             insert_index = insert_index + 1;
         }
+    }
+}
+
+/**
+ * @brief Apply the current icon size to all window buttons.
+ */
+auto WindowTitleBar::apply_button_icon_size() -> void
+{
+    const QSize sz(m_window_button_icon_px, m_window_button_icon_px);
+
+    if (m_minimize_button != nullptr)
+    {
+        m_minimize_button->setIconSize(sz);
+    }
+
+    if (m_maximize_button != nullptr)
+    {
+        m_maximize_button->setIconSize(sz);
+    }
+
+    if (m_close_button != nullptr)
+    {
+        m_close_button->setIconSize(sz);
+    }
+}
+
+/**
+ * @brief Re-color and set all window button icons according to the current property.
+ */
+auto WindowTitleBar::update_button_icons() -> void
+{
+    const QSize sz(m_window_button_icon_px, m_window_button_icon_px);
+
+    if (m_minimize_button != nullptr)
+    {
+        QIcon icon = QIcon(UiUtils::colored_svg_icon(":/Resources/Icons/titlebar-minimize.svg",
+                                                     m_window_button_color, sz));
+        m_minimize_button->setIcon(icon);
+    }
+
+    if (m_close_button != nullptr)
+    {
+        QIcon icon = QIcon(UiUtils::colored_svg_icon(":/Resources/Icons/titlebar-close.svg",
+                                                     m_window_button_color, sz));
+        m_close_button->setIcon(icon);
+    }
+
+    update_maximize_restore_icon();
+}
+
+/**
+ * @brief Update the maximize/restore button icon based on the actual window state.
+ */
+auto WindowTitleBar::update_maximize_restore_icon() -> void
+{
+    if (m_maximize_button != nullptr)
+    {
+        QWidget* top = window();
+        const bool maximized = (top != nullptr) ? top->isMaximized() : false;
+
+        const QString path = maximized ? QString(":/Resources/Icons/titlebar-restore.svg")
+                                       : QString(":/Resources/Icons/titlebar-maximize.svg");
+
+        const QSize sz(m_window_button_icon_px, m_window_button_icon_px);
+        QIcon icon = QIcon(UiUtils::colored_svg_icon(path, m_window_button_color, sz));
+        m_maximize_button->setIcon(icon);
     }
 }

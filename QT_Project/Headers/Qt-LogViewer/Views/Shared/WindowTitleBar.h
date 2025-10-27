@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QColor>
 #include <QIcon>
 #include <QMenu>
 #include <QWidget>
@@ -17,6 +18,22 @@ class QVBoxLayout;
 class WindowTitleBar: public QWidget
 {
         Q_OBJECT
+        /**
+         * @brief Color used to render SVG icons for the window control buttons.
+         *
+         * This property can be set via QSS using:
+         *   QWidget#windowtitlebar { qproperty-window_button_color: #42a5f5; }
+         */
+        Q_PROPERTY(
+            QColor window_button_color READ get_window_button_color WRITE set_window_button_color)
+        /**
+         * @brief Size (in pixels) used for the window control button icons (square).
+         *
+         * Default is 18. Can be set via QSS:
+         *   QWidget#windowtitlebar { qproperty-window_button_icon_px: 20; }
+         */
+        Q_PROPERTY(int window_button_icon_px READ get_window_button_icon_px WRITE
+                       set_window_button_icon_px)
 
     public:
         /**
@@ -111,6 +128,38 @@ class WindowTitleBar: public QWidget
          */
         [[nodiscard]] auto get_close_button() const -> QPushButton*;
 
+        /**
+         * @brief Returns the current color used to render window button SVG icons.
+         * @return The current window button color.
+         */
+        [[nodiscard]] auto get_window_button_color() const -> QColor;
+
+        /**
+         * @brief Sets the color used to render window button SVG icons.
+         *
+         * Setting this property will re-render and update all window button icons.
+         * Can be set via QSS as: qproperty-window_button_color: #RRGGBB;
+         *
+         * @param color The new color to apply to the icons.
+         */
+        auto set_window_button_color(const QColor& color) -> void;
+
+        /**
+         * @brief Returns the current icon size in pixels for window buttons.
+         * @return The icon size in pixels.
+         */
+        [[nodiscard]] auto get_window_button_icon_px() const -> int;
+
+        /**
+         * @brief Sets the icon size in pixels for window buttons (square).
+         *
+         * Setting this property updates button icon sizes and re-renders SVG icons.
+         * Can be set via QSS as: qproperty-window_button_icon_px: 18;
+         *
+         * @param px The new icon size in pixels. Values < 1 are clamped to 1.
+         */
+        auto set_window_button_icon_px(int px) -> void;
+
     protected:
         /**
          * @brief Handles mouse double-click events for maximize/restore.
@@ -124,6 +173,20 @@ class WindowTitleBar: public QWidget
          */
         void mousePressEvent(QMouseEvent* event) override;
 
+        /**
+         * @brief Install an event filter on the top-level window when shown.
+         * @param event The show event.
+         */
+        void showEvent(QShowEvent* event) override;
+
+        /**
+         * @brief Intercepts top-level window state changes to update the max/restore icon.
+         * @param watched The object being watched (expected: top-level window).
+         * @param event The event being filtered.
+         * @return true if handled; false otherwise.
+         */
+        bool eventFilter(QObject* watched, QEvent* event) override;
+
     private:
         /**
          * @brief Rebuild the layout to reflect current menubar/custom widget placement.
@@ -134,6 +197,23 @@ class WindowTitleBar: public QWidget
          *  - When only one of them is set to Bottom, it appears alone on the second row.
          */
         auto rebuild_layout() -> void;
+
+        /**
+         * @brief Apply the current icon size to all window buttons.
+         */
+        auto apply_button_icon_size() -> void;
+
+        /**
+         * @brief Re-color and set all window button icons according to the current property.
+         */
+        auto update_button_icons() -> void;
+
+        /**
+         * @brief Update the maximize/restore button icon based on the actual window state.
+         *
+         * When the window is maximized, the restore icon is shown; otherwise the maximize icon.
+         */
+        auto update_maximize_restore_icon() -> void;
 
     signals:
         /**
@@ -178,4 +258,7 @@ class WindowTitleBar: public QWidget
 
         RowPosition m_menubar_row = RowPosition::Top;
         RowPosition m_custom_row = RowPosition::Top;
+
+        QColor m_window_button_color = QColor("#000000");
+        int m_window_button_icon_px = 18;  ///< Default icon size in pixels
 };

@@ -9,5 +9,10 @@
 		<file>Resources/Icons/magnifying-glass-2.svg</file>
 		<file>Resources/Icons/file.svg</file>
 		<file>Resources/Icons/settings.svg</file>
+		<file>Resources/Icons/titlebar-close.svg</file>
+		<file>Resources/Icons/titlebar-maximize.svg</file>
+		<file>Resources/Icons/titlebar-minimize.svg</file>
+		<file>Resources/Icons/titlebar-restore.svg</file>
+		<file>Resources/Icons/close.svg</file>
 	</qresource>
 </RCC>

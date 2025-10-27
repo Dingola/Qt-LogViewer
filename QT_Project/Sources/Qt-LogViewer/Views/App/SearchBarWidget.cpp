@@ -7,8 +7,7 @@
 
 namespace
 {
-constexpr auto k_search_placeholder_text =
-    QT_TRANSLATE_NOOP("SearchBarWidget", "Enter search text...");
+constexpr auto k_search_placeholder_text = QT_TRANSLATE_NOOP("SearchBarWidget", "Search...");
 }  // namespace
 
 /**

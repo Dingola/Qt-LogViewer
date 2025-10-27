@@ -17,7 +17,8 @@
 PieChart::PieChart(QWidget* parent)
     : QWidget(parent),
       m_inner_radius_percent(k_default_inner_radius_percent),
-      m_segment_gap_angle(k_default_segment_gap_angle)
+      m_segment_gap_angle(k_default_segment_gap_angle),
+      m_empty_ring_color(QColor(k_default_bg_color))
 {
     setAttribute(Qt::WA_StyledBackground, true);
     setObjectName("PieChart");
@@ -52,13 +53,18 @@ auto PieChart::set_segment_color(const QString& segment, const QColor& color) ->
 auto PieChart::get_segment_color(const QString& segment) const -> QColor
 {
     QString key = segment.trimmed().toLower();
+    QColor result;
 
     if (m_segment_colors.contains(key))
     {
-        return m_segment_colors.value(key);
+        result = m_segment_colors.value(key);
+    }
+    else
+    {
+        result = QColor(k_default_bg_color);
     }
 
-    return {k_default_bg_color};
+    return result;
 }
 
 /**
@@ -97,6 +103,29 @@ auto PieChart::set_segment_gap_angle(int degrees) -> void
 {
     m_segment_gap_angle = qMax(0, degrees);
     update();
+}
+
+/**
+ * @brief Gets the current empty (background) ring color.
+ * @return The background ring color.
+ */
+auto PieChart::get_empty_ring_color() const -> QColor
+{
+    QColor result = m_empty_ring_color;
+    return result;
+}
+
+/**
+ * @brief Sets the empty (background) ring color and repaints.
+ * @param color New background ring color.
+ */
+auto PieChart::set_empty_ring_color(const QColor& color) -> void
+{
+    if (m_empty_ring_color != color)
+    {
+        m_empty_ring_color = color;
+        update();
+    }
 }
 
 /**
@@ -142,7 +171,7 @@ auto PieChart::draw_empty_ring(QPainter& painter, const QPointF& center, double 
                                double inner_radius) -> void
 {
     QColor bg_color = palette().window().color();
-    painter.setBrush(QColor(k_default_bg_color));
+    painter.setBrush(m_empty_ring_color);
     painter.drawEllipse(center, outer_radius, outer_radius);
 
     if (inner_radius > k_inner_radius_threshold)

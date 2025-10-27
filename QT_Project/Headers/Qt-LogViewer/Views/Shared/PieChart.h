@@ -25,6 +25,13 @@ class PieChart: public QWidget
         Q_PROPERTY(
             int inner_radius_percent READ get_inner_radius_percent WRITE set_inner_radius_percent)
         Q_PROPERTY(int segment_gap_angle READ get_segment_gap_angle WRITE set_segment_gap_angle)
+        /**
+         * @brief Background ring color used when no values exist (empty donut).
+         *
+         * Can be styled via QSS, for example:
+         *   PieChart { qproperty-empty_ring_color: #e0e0e0; }
+         */
+        Q_PROPERTY(QColor empty_ring_color READ get_empty_ring_color WRITE set_empty_ring_color)
 
     public:
         /**
@@ -74,6 +81,16 @@ class PieChart: public QWidget
          *        0 = no gap, 2-8 = small gap.
          */
         auto set_segment_gap_angle(int degrees) -> void;
+
+        /**
+         * @brief Gets the current empty (background) ring color.
+         */
+        [[nodiscard]] auto get_empty_ring_color() const -> QColor;
+
+        /**
+         * @brief Sets the empty (background) ring color and repaints.
+         */
+        auto set_empty_ring_color(const QColor& color) -> void;
 
     protected:
         /**
@@ -158,4 +175,5 @@ class PieChart: public QWidget
         QMap<QString, QColor> m_segment_colors;
         int m_inner_radius_percent;
         int m_segment_gap_angle;
+        QColor m_empty_ring_color;  ///< Background ring color when no values exist
 };

@@ -6,44 +6,31 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>461</width>
-    <height>42</height>
+    <width>236</width>
+    <height>68</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>SearchBarWidget</string>
   </property>
-  <layout class="QHBoxLayout" name="horizontalLayout">
-   <property name="spacing">
-    <number>12</number>
-   </property>
-   <item>
-    <widget class="QLabel" name="labelSearchArea">
-     <property name="text">
-      <string>Search area:</string>
-     </property>
-     <property name="buddy">
-      <cstring>comboBoxSearchArea</cstring>
-     </property>
-    </widget>
-   </item>
-   <item>
+  <layout class="QGridLayout" name="gridLayout">
+   <item row="0" column="0">
     <widget class="QComboBox" name="comboBoxSearchArea"/>
    </item>
-   <item>
-    <widget class="QCheckBox" name="checkBoxRegEx">
-     <property name="text">
-      <string>Regex</string>
-     </property>
-    </widget>
-   </item>
-   <item>
+   <item row="0" column="1">
     <widget class="QLineEdit" name="lineEditSearch"/>
    </item>
-   <item>
+   <item row="0" column="2">
     <widget class="QPushButton" name="pushButtonSearch">
      <property name="text">
       <string>Search</string>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="1">
+    <widget class="QCheckBox" name="checkBoxRegEx">
+     <property name="text">
+      <string>Regex</string>
      </property>
     </widget>
    </item>
