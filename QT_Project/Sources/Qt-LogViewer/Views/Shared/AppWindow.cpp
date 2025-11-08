@@ -1069,6 +1069,25 @@ auto AppWindow::nativeEvent(const QByteArray& eventType, void* message, qintptr*
 
 #endif  // Q_OS_WIN
 
+#ifndef Q_OS_WIN
+/**
+ * @brief Native event handler (non-Windows platforms).
+ *
+ * On Linux/macOS this class does not perform custom frame handling;
+ * the method simply forwards to QWidget to preserve default behavior.
+ *
+ * @param eventType Platform event type identifier.
+ * @param message Pointer to the native message structure (platform-specific).
+ * @param result Optional output for a platform-specific result value.
+ * @return bool Result of QWidget::nativeEvent().
+ */
+auto AppWindow::nativeEvent(const QByteArray& eventType, void* message, qintptr* result) -> bool
+{
+    bool call_result = QWidget::nativeEvent(eventType, message, result);
+    return call_result;
+}
+#endif  // Q_OS_WIN
+
 /**
  * @brief Adopt the central widget's QMenuBar into the title bar according to current flags.
  */
