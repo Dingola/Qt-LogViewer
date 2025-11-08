@@ -135,7 +135,7 @@
     @ColorTableAlternateRow: @Neutral-15;
 
     /* Header (QHeaderView::section) */
-    @ColorHeaderBackground: @Neutral-13;
+    @ColorHeaderBackground: @Neutral-5;
     @ColorHeaderBackgroundHover: @Neutral-12;
     @ColorHeaderPressed: @Neutral-12;
 
@@ -170,9 +170,14 @@
     @ColorPaginationCurrentBorder: @Brand-Accent-500;
     @ColorPaginationCurrentText: @Neutral-6;
 
-    /* Dock / MenuBar */
+    /* Dock */
     @ColorDockHeader: @Neutral-3;
-    @ColorDockHeaderText: @Neutral-6;
+    @ColorDockHeaderText: @Neutral-10;
+    @ColorDockWidgetToolButtonBg: transparent;
+    @ColorDockWidgetToolButtonBgHover: @Neutral-5;
+    @ColorDockWidgetToolButtonBgPressed: @Neutral-4;
+
+    /* MenuBar */
     @ColorMenuBarBackground: @Neutral-4;
     @ColorMenuBarItemSelectedBackground: @Brand-Accent-700;
 
@@ -291,14 +296,19 @@
     @ColorPaginationCurrentBorder: @Brand-Accent-500;
     @ColorPaginationCurrentText: @Neutral-6;
 
-    /* Dock / MenuBar */
+    /* Dock */
     @ColorDockHeader: @Neutral-19;
     @ColorDockHeaderText: @Neutral-7;
-    @ColorMenuBarBackground: @Neutral-19;
+    @ColorDockWidgetToolButtonBg: transparent;
+    @ColorDockWidgetToolButtonBgHover: transparent;
+    @ColorDockWidgetToolButtonBgPressed: @Neutral-21;
+
+    /* MenuBar */
+    @ColorMenuBarBackground: @Neutral-16;
     @ColorMenuBarItemSelectedBackground: @Brand-Accent-100;
 
     /* Menu */
-    @ColorMenuBackground: @Neutral-6;
+    @ColorMenuBackground: @Neutral-17;
     @ColorMenuItemSelectedBackground: @Brand-Accent-100;
 
     /* ScrollBars */
@@ -325,7 +335,8 @@ QWidget {
 QLabel {
     background: transparent;
     color: @ColorText;
-    font-weight: bold;
+    font-size: 10pt;
+    font-weight: 400;
 }
 
 /* === LineEdit === */
@@ -462,13 +473,10 @@ QToolButton:disabled {
 
 /* === TableView === */
 QTableView {
-    padding-left: 8px;
-    padding-right: 8px;
     background-color: @ColorTableBackground;
     gridline-color: @ColorBorder;
     color: @ColorText;
     border: 1px solid @ColorBorder;
-    border-radius: 8px;
     selection-background-color: @ColorTableSelectionBackground;
     selection-color: @ColorText;
     outline: none;
@@ -488,7 +496,7 @@ QTableView::item:!selected:focus {
 QHeaderView::section {
     background-color: @ColorHeaderBackground;
     color: @ColorText;
-    padding: 6px;
+    padding: 2px;
     border: 1px solid @ColorBorder;
     border-radius: 0px;
 }
@@ -594,11 +602,10 @@ QTreeView::item:selected {
 QTabWidget::pane {
     border: 1px solid @ColorBorder;
     background: @ColorTabPaneBackground;
-    border-radius: 6px;
 }
 QTabWidget > QWidget {
     background: @ColorTabWidgetBackground;
-    padding: 6px;
+    padding-top: 2px;
 }
 QTabBar::tab {
     background: @ColorTabBackground;
@@ -674,40 +681,42 @@ TabWidget#tabWidgetLog TabBar::tab {
 }
 
 /* === DockerWidget === */
-DockWidget > QWidget {
-    margin-right: 8px;
-    margin-left: 8px;
-    margin-bottom: 8px;
-    background: @ColorTableBackground;
-}
-
-#dock_title_bar {
-    margin-top: 9px;
-    margin-right: 8px;
-    margin-left: 8px;
-    margin-bottom: 0px;
+DockWidget QWidget#dock_title_bar {
     background: @ColorDockHeader;
-    border: 1px solid @ColorBorder;
+    border-bottom: 1px solid @ColorBorder;
     border-top-left-radius: 8px;
     border-top-right-radius: 8px;
 }
 
-#dock_title_label {
-    padding: 2px 16px;
+DockWidget QLabel#dock_title_label {
+    padding: 2px 8px;
     color: @ColorDockHeaderText;
-    font-size: 11pt;
-    font-weight: bold;
+    font-size: 9pt;
+    font-weight: 600;
 }
 
-#dock_title_bar_close_button {
-    padding: 2px;
-    margin: 4px;
-    background: @ColorButtonBackground;
-    border-radius: 6px;
+DockWidget QToolButton#dock_title_bar_close_button {
+    background-color: @ColorDockWidgetToolButtonBg;
+    border: none;
+    border-radius: 0px;
+    margin: 0;
+    padding: 0px;
+    padding-top: 3px;
+    padding-bottom: 3px;
+    padding-right: 4px;
+    min-height: 0px;
+    max-height: 9999px;
 }
 
-#dock_title_bar_close_button:hover {
-    background: @ColorButtonBackgroundHover;
+DockWidget QToolButton#dock_title_bar_close_button:hover {
+    background-color: @ColorDockWidgetToolButtonBgHover;
+    border: none;
+    border-radius: 0px;
+    border-top-right-radius: 8px;
+}
+
+DockWidget QToolButton#dock_title_bar_close_button:pressed {
+    background-color: @ColorDockWidgetToolButtonBgPressed;
 }
 
 /* === Dialogs === */
@@ -885,11 +894,9 @@ QToolButton[isCurrentPage="true"]:hover {
 }
 
 /* === Log Details TextEdit === */
-#logDetailsTextEdit {
-    border-top-left-radius: 0px;
-    border-top-right-radius: 0px;
-    border-bottom-left-radius: 8px;
-    border-bottom-right-radius: 8px;
+QPlainTextEdit#logDetailsTextEdit {
+    border: none;
+    border-radius: 0px;
 }
 
 /* === Log File Explorer === */
@@ -911,10 +918,17 @@ QLineEdit#lineEditJumpTo {
     max-width: 40px;
 }
 
-/* === PaginationWidget ComboBox === */
+/* === PaginationWidget === */
 #comboBoxItemsPerPage {
     min-height: 26px;
     max-height: 26px;
+}
+
+QLabel#labelItemsPerPage {
+    background: transparent;
+    color: @ColorText;
+    font-size: 12pt;
+    font-weight: 600;
 }
 
 /* === Log Search Bar Widget === */
@@ -938,6 +952,13 @@ QPushButton#pushButtonSearch {
 QWidget#windowtitlebar {
     qproperty-window_button_color: @ColorWindowButtonColor;
     qproperty-window_button_icon_px: @ColorWindowButtonIconPx;
+}
+
+QWidget#windowtitlebar QLabel#windowtitlebar_title {
+    background: transparent;
+    color: @ColorText;
+    font-size: 10pt;
+    font-weight: 600;
 }
 
 QWidget#windowtitlebar QPushButton {

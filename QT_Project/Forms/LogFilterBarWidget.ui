@@ -14,6 +14,9 @@
    <string>FilterBarWidget</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout" stretch="0,0">
+   <property name="spacing">
+    <number>0</number>
+   </property>
    <item>
     <widget class="LogFilterWidget" name="logFilterWidget" native="true"/>
    </item>

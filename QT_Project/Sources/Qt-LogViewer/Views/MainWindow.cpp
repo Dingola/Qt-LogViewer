@@ -58,6 +58,7 @@ MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
             << "| Application:" << m_log_viewer_settings->applicationName();
 
     ui->setupUi(this);
+    setContentsMargins(9, 9, 9, 9);
     setWindowIcon(QIcon(":/Resources/Icons/App/AppIcon.svg"));
 
     m_controller->set_current_view(m_controller->load_log_files({}));
@@ -97,8 +98,9 @@ auto MainWindow::setup_log_file_explorer() -> void
 {
     m_log_file_explorer = new LogFileExplorer(m_controller->get_log_file_tree_model(), this);
     m_log_file_explorer_dock_widget = new DockWidget(tr("Log File Explorer"), this);
-    m_log_file_explorer_dock_widget->setTitleBarWidget(DockWidget::create_dock_title_bar(
-        m_log_file_explorer_dock_widget, "logFileExplorerTitleBar"));
+    m_log_file_explorer_dock_widget->setContentsMargins(0, 0, 0, 0);
+    m_log_file_explorer_dock_widget->setTitleBarWidget(
+        DockWidget::create_dock_title_bar(m_log_file_explorer_dock_widget));
     m_log_file_explorer_dock_widget->setObjectName("logFileExplorerDockWidget");
     m_log_file_explorer_dock_widget->setWidget(m_log_file_explorer);
     addDockWidget(Qt::LeftDockWidgetArea, m_log_file_explorer_dock_widget);
@@ -120,8 +122,9 @@ auto MainWindow::setup_log_file_explorer() -> void
 auto MainWindow::setup_log_level_pie_chart() -> void
 {
     m_log_level_pie_chart_dock_widget = new DockWidget(tr("Log Level Pie Chart"), this);
-    m_log_level_pie_chart_dock_widget->setTitleBarWidget(DockWidget::create_dock_title_bar(
-        m_log_level_pie_chart_dock_widget, "logLevelPieChartTitleBar"));
+    m_log_level_pie_chart_dock_widget->setContentsMargins(0, 0, 0, 0);
+    m_log_level_pie_chart_dock_widget->setTitleBarWidget(
+        DockWidget::create_dock_title_bar(m_log_level_pie_chart_dock_widget));
     m_log_level_pie_chart_dock_widget->setObjectName("logLevelPieChartDockWidget");
     m_log_level_pie_chart_dock_widget->setWidget(m_log_level_pie_chart_widget);
     addDockWidget(Qt::LeftDockWidgetArea, m_log_level_pie_chart_dock_widget);
@@ -157,18 +160,14 @@ auto MainWindow::setup_pagination_widget() -> void
 auto MainWindow::setup_log_details_dock() -> void
 {
     m_log_details_dock_widget = new DockWidget(tr("Log Details"), this);
+    m_log_details_dock_widget->setContentsMargins(0, 0, 0, 0);
     m_log_details_dock_widget->setObjectName("logDetailsDockWidget");
     m_log_details_dock_widget->setTitleBarWidget(
-        DockWidget::create_dock_title_bar(m_log_details_dock_widget, "logDetailsTitleBar"));
+        DockWidget::create_dock_title_bar(m_log_details_dock_widget));
     m_log_details_text_edit = new QPlainTextEdit(m_log_details_dock_widget);
     m_log_details_text_edit->setObjectName("logDetailsTextEdit");
     m_log_details_text_edit->setReadOnly(true);
-    auto* log_details_container = new QWidget(m_log_details_dock_widget);
-    auto* log_details_layout = new QVBoxLayout(log_details_container);
-    log_details_layout->setContentsMargins(8, 0, 8, 8);
-    log_details_layout->addWidget(m_log_details_text_edit);
-    log_details_container->setLayout(log_details_layout);
-    m_log_details_dock_widget->setWidget(log_details_container);
+    m_log_details_dock_widget->setWidget(m_log_details_text_edit);
     addDockWidget(Qt::BottomDockWidgetArea, m_log_details_dock_widget);
 }
 
@@ -178,6 +177,7 @@ auto MainWindow::setup_log_details_dock() -> void
 auto MainWindow::setup_filter_bar() -> void
 {
     QVector<QString> available_log_levels = m_controller->get_available_log_levels({});
+    ui->logFilterBarWidget->setContentsMargins(0, 0, 0, 0);
     ui->logFilterBarWidget->set_available_log_levels(available_log_levels);
     connect(ui->logFilterBarWidget, &LogFilterBarWidget::app_filter_changed, this,
             [this](const QString& app_name) {
