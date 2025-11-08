@@ -201,7 +201,7 @@ auto DockWidget::update_close_button() -> void
 auto DockWidget::make_close_icon(const QColor& color) const -> QIcon
 {
     auto result = QIcon(UiUtils::colored_svg_icon(QStringLiteral(":/Resources/Icons/close.svg"),
-                                                   color, QSize(m_close_icon_px, m_close_icon_px)));
+                                                  color, QSize(m_close_icon_px, m_close_icon_px)));
     return result;
 }
 

@@ -135,9 +135,9 @@
     @ColorTableAlternateRow: @Neutral-15;
 
     /* Header (QHeaderView::section) */
-    @ColorHeaderBackground: @Neutral-5;
+    @ColorHeaderBackground: @Neutral-4;
     @ColorHeaderBackgroundHover: @Neutral-12;
-    @ColorHeaderPressed: @Neutral-12;
+    @ColorHeaderPressed: @Neutral-5;
 
     /* Tabs */
     @ColorTabWidgetBackground: @Neutral-3;
@@ -550,6 +550,9 @@ QMenu::item {
 QMenu::item:selected {
     background-color: @ColorMenuItemSelectedBackground;
     color: @ColorText;
+}
+QMenu::item:disabled {
+    color: @ColorTextDisabled;
 }
 
 /* === ScrollBar === */
