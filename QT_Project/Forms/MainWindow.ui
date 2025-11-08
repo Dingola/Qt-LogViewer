@@ -24,7 +24,7 @@
        <number>0</number>
       </property>
       <item>
-       <widget class="QTabWidget" name="tabWidgetLog">
+       <widget class="TabWidget" name="tabWidgetLog">
         <property name="currentIndex">
          <number>-1</number>
         </property>
@@ -67,6 +67,12 @@
    <class>LogFilterBarWidget</class>
    <extends>QWidget</extends>
    <header>Qt-LogViewer/Views/App/LogFilterBarWidget.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>TabWidget</class>
+   <extends>QTabWidget</extends>
+   <header>Qt-LogViewer/Views/Shared/TabWidget.h</header>
    <container>1</container>
   </customwidget>
  </customwidgets>

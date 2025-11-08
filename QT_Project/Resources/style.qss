@@ -141,9 +141,16 @@
 
     /* Tabs */
     @ColorTabWidgetBackground: @Neutral-3;
+    @ColorTabWidgetCloseIconColor: @Neutral-6;
+    @ColorTabWidgetCloseIconColorHover: @Severity-Info;
+    @ColorTabWidgetCloseIconPx: 18;
+    @ColorTabWidgetToolButtonBg: transparent;
+    @ColorTabWidgetToolButtonBgHover: @Neutral-5;
+    @ColorTabWidgetToolButtonBgPressed: @Neutral-4;
+
     @ColorTabPaneBackground: @ColorTableBackground;
-    @ColorTabBackground: @Neutral-4;
-    @ColorTabSelectedBackground: @Neutral-5;
+    @ColorTabBackground: @Neutral-5;
+    @ColorTabSelectedBackground: @Neutral-12;
     @ColorTabHoverBackground: @Neutral-12;
     @ColorTabText: @ColorText;
     @ColorTabTextInactive: @ColorTextSecondary;
@@ -255,9 +262,16 @@
 
     /* Tabs */
     @ColorTabWidgetBackground: @Neutral-19;
+    @ColorTabWidgetCloseIconColor: @Neutral-7;
+    @ColorTabWidgetCloseIconColorHover: @Severity-Info;
+    @ColorTabWidgetCloseIconPx: 18;
+    @ColorTabWidgetToolButtonBg: transparent;
+    @ColorTabWidgetToolButtonBgHover: @Neutral-6;
+    @ColorTabWidgetToolButtonBgPressed: @Neutral-21;
+
     @ColorTabPaneBackground: @ColorTableBackground;
     @ColorTabBackground: @Neutral-19;
-    @ColorTabSelectedBackground: @Neutral-6;
+    @ColorTabSelectedBackground: @Neutral-17;
     @ColorTabHoverBackground: @Neutral-17;
     @ColorTabText: @ColorText;
     @ColorTabTextInactive: @ColorTextSecondary;
@@ -601,6 +615,62 @@ QTabBar::tab:selected {
     background: @ColorTabSelectedBackground;
     color: @ColorTabText;
     border-bottom-color: @ColorTabPaneBackground;
+    border-top: 2px solid @Brand-Accent-600;
+}
+QTabBar::scroller {
+    width: 60px;
+}
+QTabBar::tear {
+    width: 0px;
+}
+QTabBar QToolButton::right-arrow {
+    image: url(:/Resources/right-arrow.svg);
+    padding: 4px;
+}
+QTabBar QToolButton::left-arrow {
+    image: url(:/Resources/left-arrow.svg);
+    padding: 4px;
+}
+
+/* === TabWidget === */
+TabWidget {
+    qproperty-close_icon_color: @ColorTabWidgetCloseIconColor;
+    qproperty-close_icon_color_hover: @ColorTabWidgetCloseIconColorHover;
+    qproperty-close_icon_px: @ColorTabWidgetCloseIconPx;
+}
+
+TabWidget QToolButton {
+    background-color: @ColorTabWidgetToolButtonBg;
+    border: none;
+    border-radius: 0px;
+    padding: 0px;
+    min-height: 0px;
+    max-height: 9999px;
+}
+
+TabWidget QToolButton:hover {
+    background-color: @ColorTabWidgetToolButtonBgHover;
+    border: none;
+}
+
+TabWidget QToolButton:pressed {
+    background-color: @ColorTabWidgetToolButtonBgPressed;
+}
+
+TabWidget QToolButton:disabled {
+    border: none;
+}
+
+/* === TabWidgetLog Specific Styles === */
+QTabWidget#tabWidgetLog::pane  {
+    border-radius: 0px;
+}
+
+TabWidget#tabWidgetLog TabBar::tab {
+    min-height: 28px;
+    padding: 0 12px;
+    border-top-left-radius: 0px;
+    border-top-right-radius: 0px;
 }
 
 /* === DockerWidget === */
