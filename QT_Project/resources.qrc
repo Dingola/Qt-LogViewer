@@ -14,5 +14,7 @@
 		<file>Resources/Icons/titlebar-minimize.svg</file>
 		<file>Resources/Icons/titlebar-restore.svg</file>
 		<file>Resources/Icons/close.svg</file>
+		<file>Resources/Icons/branch-closed.svg</file>
+		<file>Resources/Icons/branch-open.svg</file>
 	</qresource>
 </RCC>

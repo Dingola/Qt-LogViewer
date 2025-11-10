@@ -155,8 +155,10 @@
     @ColorTabText: @ColorText;
     @ColorTabTextInactive: @ColorTextSecondary;
 
-    /* TreeView selection */
-    @ColorTreeViewSelectionBackground: @Brand-Accent-700;
+    /* TreeView */
+    @ColorTreeViewItemBackground: @Neutral-5;
+    @ColorTreeViewItemBackgroundHover: @Neutral-12;
+    @ColorTreeViewItemBackgroundSelected: @Brand-Accent-700;
 
     /* Window Title Bar */
     @ColorWindowButtonColor: @Neutral-6;
@@ -281,8 +283,10 @@
     @ColorTabText: @ColorText;
     @ColorTabTextInactive: @ColorTextSecondary;
 
-    /* TreeView selection */
-    @ColorTreeViewSelectionBackground: @Brand-Accent-100;
+    /* TreeView */
+    @ColorTreeViewItemBackground: @Neutral-4;
+    @ColorTreeViewItemBackgroundHover: @Neutral-12;
+    @ColorTreeViewItemBackgroundSelected: @Brand-Accent-100;
 
     /* Window Title Bar */
     @ColorWindowButtonColor: @Neutral-7;
@@ -583,22 +587,61 @@ QScrollBar::add-page, QScrollBar::sub-page {
 
 /* === TreeView === */
 QTreeView {
+    margin: 2px;
     background-color: @ColorTableBackground;
-    border: 1px solid @ColorBorder;
     border-radius: 6px;
     color: @ColorText;
     outline: none;
 }
 QTreeView::item {
-    padding-top: 4px;
-    padding-bottom: 4px;
+    padding-top: 5px;
+    padding-bottom: 5px;
+    padding-left: 5px;
+    margin-top: 5px;
+    margin-right: 2px;
+    background: @ColorTreeViewItemBackground;
+    border-radius: 8px;
 }
 QTreeView::item:hover {
-    background: @ColorLogFilterBarBackground;
+    background: @ColorTreeViewItemBackgroundHover;
 }
 QTreeView::item:selected {
-    background: @ColorTreeViewSelectionBackground;
+    background: @ColorTreeViewItemBackgroundSelected;
     color: @ColorText;
+}
+QTreeView::branch {
+    background: @ColorTableBackground;
+}
+QTreeView::branch:has-siblings:!adjoins-item {
+    background: @ColorTableBackground;
+}
+QTreeView::branch:has-siblings:adjoins-item {
+    background: @ColorTableBackground;
+}
+QTreeView::branch:!has-children:!has-siblings:adjoins-item {
+    background: @ColorTableBackground;
+}
+QTreeView::branch:closed:has-children:has-siblings {
+    background: @ColorTableBackground;
+}
+QTreeView::branch:has-children:!has-siblings:closed {
+    background: @ColorTableBackground;
+}
+QTreeView::branch:open:has-children:has-siblings {
+    background: @ColorTableBackground;
+}
+QTreeView::branch:open:has-children:!has-siblings {
+    background: @ColorTableBackground;
+}
+
+TreeView {
+    qproperty-tree_view_branch_icon_open:   ":/Resources/Icons/branch-open.svg";
+    qproperty-tree_view_branch_icon_closed: ":/Resources/Icons/branch-closed.svg";
+    qproperty-tree_view_branch_icon_color:  @Severity-Info;
+    qproperty-tree_view_branch_icon_px:     16;
+    qproperty-tree_view_branch_pen_width:   1;
+    qproperty-tree_view_branch_hlength_px:  10;
+    qproperty-tree_view_branch_top_vline:   false;
 }
 
 /* === Tabs === */
