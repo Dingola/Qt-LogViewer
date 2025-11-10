@@ -38,12 +38,24 @@ SearchBarWidget::SearchBarWidget(QWidget* parent): QWidget(parent), ui(new Ui::S
     connect(ui->lineEditSearch, &QLineEdit::returnPressed, this, [this] {
         emit search_requested(get_search_text(), get_search_field(), get_use_regex());
     });
-    connect(ui->lineEditSearch, &QLineEdit::textChanged, this,
-            [this] { emit search_text_changed(get_search_text()); });
+    connect(ui->lineEditSearch, &QLineEdit::textChanged, this, [this] {
+        emit search_text_changed(get_search_text());
+        if (get_use_live_search())
+        {
+            emit search_requested(get_search_text(), get_search_field(), get_use_regex());
+        }
+    });
     connect(ui->comboBoxSearchArea, &QComboBox::currentTextChanged, this,
             [this] { emit search_field_changed(get_search_field()); });
     connect(ui->checkBoxRegEx, &QCheckBox::toggled, this,
             [this] { emit regex_toggled(get_use_regex()); });
+    connect(ui->checkBoxLiveSearch, &QCheckBox::toggled, this, [this] {
+        emit live_search_toggled(get_use_live_search());
+        if (get_use_live_search())
+        {
+            emit search_requested(get_search_text(), get_search_field(), get_use_regex());
+        }
+    });
 }
 
 /**
@@ -105,6 +117,16 @@ auto SearchBarWidget::get_search_field() const -> QString
 auto SearchBarWidget::get_use_regex() const -> bool
 {
     return ui->checkBoxRegEx->isChecked();
+}
+
+/**
+ * @brief Returns whether live search is enabled.
+ *
+ * @return True if live search is enabled, false otherwise.
+ */
+auto SearchBarWidget::get_use_live_search() const -> bool
+{
+    return ui->checkBoxLiveSearch->isChecked();
 }
 
 /**

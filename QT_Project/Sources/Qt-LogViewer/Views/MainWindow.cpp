@@ -190,9 +190,9 @@ auto MainWindow::setup_filter_bar() -> void
                 m_controller->set_log_level_filters(log_levels);
                 update_pagination_widget();
             });
+
+    // React only to search_requested; avoids double-calling when live search is on.
     connect(ui->logFilterBarWidget, &LogFilterBarWidget::search_requested, this,
-            &MainWindow::handle_search_changed);
-    connect(ui->logFilterBarWidget, &LogFilterBarWidget::search_text_changed, this,
             &MainWindow::handle_search_changed);
     connect(ui->logFilterBarWidget, &LogFilterBarWidget::search_field_changed, this,
             &MainWindow::handle_search_changed);

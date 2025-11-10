@@ -127,6 +127,16 @@ class LogFilterBarWidget: public QWidget
         [[nodiscard]] auto get_use_regex() const -> bool;
 
         /**
+         * @brief Returns whether live search is enabled.
+         *
+         * When enabled, a search is requested automatically while typing without
+         * pressing Enter or the Search button.
+         *
+         * @return True if live search is enabled, false otherwise.
+         */
+        [[nodiscard]] auto get_use_live_search() const -> bool;
+
+        /**
          * @brief Returns a pointer to the contained LogFilterWidget.
          *
          * @return Pointer to LogFilterWidget.
@@ -178,6 +188,12 @@ class LogFilterBarWidget: public QWidget
          * @param enabled True if regex is enabled.
          */
         void regex_toggled(bool enabled);
+
+        /**
+         * @brief Emitted when the live search checkbox is toggled.
+         * @param enabled True if live search is enabled.
+         */
+        void live_search_toggled(bool enabled);
 
     protected:
         /**

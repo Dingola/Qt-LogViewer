@@ -32,6 +32,8 @@ LogFilterBarWidget::LogFilterBarWidget(QWidget* parent)
             &LogFilterBarWidget::search_field_changed);
     connect(ui->searchBarWidget, &SearchBarWidget::regex_toggled, this,
             &LogFilterBarWidget::regex_toggled);
+    connect(ui->searchBarWidget, &SearchBarWidget::live_search_toggled, this,
+            &LogFilterBarWidget::live_search_toggled);
 }
 
 /**
@@ -164,6 +166,16 @@ auto LogFilterBarWidget::get_search_field() const -> QString
 auto LogFilterBarWidget::get_use_regex() const -> bool
 {
     return ui->searchBarWidget->get_use_regex();
+}
+
+/**
+ * @brief Returns whether live search is enabled.
+ *
+ * @return True if live search is enabled, false otherwise.
+ */
+auto LogFilterBarWidget::get_use_live_search() const -> bool
+{
+    return ui->searchBarWidget->get_use_live_search();
 }
 
 /**
