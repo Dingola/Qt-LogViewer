@@ -278,7 +278,7 @@ auto TabBar::handle_close_button_clicked() -> void
 
     if (index_to_close >= 0)
     {
-        emit tabCloseRequested(index_to_close);
+        emit close_tab_requested(index_to_close);
     }
 }
 

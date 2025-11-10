@@ -22,7 +22,7 @@ TabWidget::TabWidget(QWidget* parent): QTabWidget(parent)
     setTabBar(bar);
 
     // Remove tabs when the close button on a tab is clicked (QTabWidget's own signal).
-    connect(this, &QTabWidget::tabCloseRequested, this, &QTabWidget::removeTab);
+    connect(this, &QTabWidget::tabCloseRequested, this, &TabWidget::handle_close_tab_requested);
 
     // Default close behavior for context menu actions emitted by TabBar.
     connect(bar, &TabBar::close_tab_requested, this, &TabWidget::handle_close_tab_requested);

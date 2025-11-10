@@ -32,8 +32,8 @@ class QEvent;
  *      - "Close Others" is disabled when there is only one tab.
  *      - "Close Tabs to Left" is disabled for the first tab.
  *      - "Close Tabs to Right" is disabled for the last tab.
- *  - External code can extend/modify the menu via the signal about_to_show_context_menu(int, QMenu*),
- *    or by subclassing and overriding build_default_context_menu(int, QMenu&).
+ *  - External code can extend/modify the menu via the signal about_to_show_context_menu(int,
+ * QMenu*), or by subclassing and overriding build_default_context_menu(int, QMenu&).
  *  - The default context menu can be enabled/disabled via the property enable_default_context_menu.
  *
  * Translation:
