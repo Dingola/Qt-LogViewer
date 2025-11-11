@@ -21,6 +21,13 @@ LogParser::LogParser(const QString& format_string)
 
     m_pattern = pair.first;
     m_field_order = pair.second;
+
+    // Default timestamp formats to try (ISO formats are tried separately first).
+    m_timestamp_formats = QVector<QString>{"yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd HH:mm:ss.zzz",
+                                           "yyyy-MM-ddTHH:mm:ss", "yyyy-MM-ddTHH:mm:ss.zzz",
+                                           "dd.MM.yyyy HH:mm:ss", "dd.MM.yyyy HH:mm:ss.zzz",
+                                           "MM/dd/yyyy HH:mm:ss", "MM/dd/yyyy HH:mm:ss.zzz",
+                                           "yyyy/MM/dd HH:mm:ss", "yyyy/MM/dd HH:mm:ss.zzz"};
 }
 
 /**
@@ -57,6 +64,7 @@ auto LogParser::parse_file(const QString& file_path) const -> QVector<LogEntry>
 /**
  * @brief Parses a single log line and returns a LogEntry object.
  * @param line The log line to parse.
+ * @param file_path The originating file path for contextual metadata.
  * @return The parsed LogEntry, or a default LogEntry if parsing fails.
  */
 auto LogParser::parse_line(const QString& line, const QString& file_path) const -> LogEntry
@@ -77,7 +85,7 @@ auto LogParser::parse_line(const QString& line, const QString& file_path) const 
 
         if (values.contains("timestamp"))
         {
-            timestamp = QDateTime::fromString(values["timestamp"], "yyyy-MM-dd HH:mm:ss");
+            timestamp = parse_timestamp(values["timestamp"]);
         }
 
         QString level = values.value("level");
@@ -110,6 +118,25 @@ auto LogParser::get_field_order() const -> LogFieldOrder
 }
 
 /**
+ * @brief Sets the list of accepted timestamp formats attempted during parsing.
+ *        ISO-8601 formats are always tried first.
+ * @param formats A list of timestamp format strings understood by QDateTime::fromString.
+ */
+auto LogParser::set_timestamp_formats(const QVector<QString>& formats) -> void
+{
+    m_timestamp_formats = formats;
+}
+
+/**
+ * @brief Returns the list of accepted timestamp formats attempted during parsing.
+ * @return The list of timestamp formats.
+ */
+auto LogParser::get_timestamp_formats() const -> QVector<QString>
+{
+    return m_timestamp_formats;
+}
+
+/**
  * @brief Converts a format string to a regular expression and field order.
  * @param format The format string (e.g. "{timestamp} {level} {message} {app_name}").
  * @return A pair containing the generated QRegularExpression and the LogFieldOrder.
@@ -139,7 +166,8 @@ auto LogParser::format_string_to_regex(const QString& format)
 
         if (field == "timestamp")
         {
-            regex_pattern += R"((\d{4}-\d{2}-\d{2}\ \d{2}:\d{2}:\d{2}))";
+            // Relaxed capture for timestamp; actual validation is done in parse_timestamp().
+            regex_pattern += R"((.*?))";
         }
         else if (field == "level")
         {
@@ -168,4 +196,41 @@ auto LogParser::format_string_to_regex(const QString& format)
                                                     LogFieldOrder{fields});
 
     return result;
+}
+
+/**
+ * @brief Attempts to parse a timestamp value using ISO-8601 and configured formats.
+ * @param value The timestamp string as captured from the log line.
+ * @return The parsed QDateTime, or an invalid QDateTime if parsing fails.
+ */
+auto LogParser::parse_timestamp(const QString& value) const -> QDateTime
+{
+    QDateTime parsed;
+
+    // Try ISO-8601 with and without milliseconds first.
+    if (!parsed.isValid())
+    {
+        parsed = QDateTime::fromString(value, Qt::ISODateWithMs);
+    }
+    if (!parsed.isValid())
+    {
+        parsed = QDateTime::fromString(value, Qt::ISODate);
+    }
+
+    // Try configured explicit formats.
+    if (!parsed.isValid())
+    {
+        for (qsizetype i = 0; i < m_timestamp_formats.size(); ++i)
+        {
+            const QString fmt = m_timestamp_formats.at(i);
+            QDateTime candidate = QDateTime::fromString(value, fmt);
+            if (candidate.isValid())
+            {
+                parsed = candidate;
+                i = m_timestamp_formats.size();
+            }
+        }
+    }
+
+    return parsed;
 }

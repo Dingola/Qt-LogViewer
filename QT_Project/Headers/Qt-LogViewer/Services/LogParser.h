@@ -1,6 +1,6 @@
 #pragma once
 
-#include <QMap>
+#include <QPair>
 #include <QRegularExpression>
 #include <QString>
 #include <QVector>
@@ -14,7 +14,7 @@
 
 /**
  * @struct LogFieldOrder
- * @brief Stores the order of fields as they appear in the format string.
+ * @brief Stores the order of fields parsed from the format string.
  */
 struct LogFieldOrder {
         QVector<QString> fields;
@@ -51,6 +51,7 @@ class LogParser
         /**
          * @brief Parses a single log line and returns a LogEntry object.
          * @param line The log line to parse.
+         * @param file_path The originating file path for contextual metadata.
          * @return The parsed LogEntry, or a default LogEntry if parsing fails.
          */
         [[nodiscard]] auto parse_line(const QString& line,
@@ -68,11 +69,37 @@ class LogParser
          */
         [[nodiscard]] auto get_field_order() const -> LogFieldOrder;
 
+        /**
+         * @brief Sets the list of accepted timestamp formats attempted during parsing.
+         *        ISO-8601 formats are always tried first.
+         * @param formats A list of timestamp format strings understood by QDateTime::fromString.
+         */
+        auto set_timestamp_formats(const QVector<QString>& formats) -> void;
+
+        /**
+         * @brief Returns the list of accepted timestamp formats attempted during parsing.
+         * @return The list of timestamp formats.
+         */
+        [[nodiscard]] auto get_timestamp_formats() const -> QVector<QString>;
+
+    private:
+        /**
+         * @brief Converts a format string to a regular expression and field order.
+         * @param format The format string (e.g. "{timestamp} {level} {message} {app_name}").
+         * @return A pair containing the generated QRegularExpression and the LogFieldOrder.
+         */
+        static auto format_string_to_regex(const QString& format)
+            -> QPair<QRegularExpression, LogFieldOrder>;
+
+        /**
+         * @brief Attempts to parse a timestamp value using ISO-8601 and configured formats.
+         * @param value The timestamp string as captured from the log line.
+         * @return The parsed QDateTime, or an invalid QDateTime if parsing fails.
+         */
+        [[nodiscard]] auto parse_timestamp(const QString& value) const -> QDateTime;
+
     private:
         QRegularExpression m_pattern;
         LogFieldOrder m_field_order;
-
-    private:
-        static auto format_string_to_regex(const QString& format)
-            -> QPair<QRegularExpression, LogFieldOrder>;
+        QVector<QString> m_timestamp_formats;
 };
