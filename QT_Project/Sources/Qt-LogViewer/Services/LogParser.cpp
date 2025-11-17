@@ -166,8 +166,13 @@ auto LogParser::format_string_to_regex(const QString& format)
 
         if (field == "timestamp")
         {
-            // Relaxed capture for timestamp; actual validation is done in parse_timestamp().
-            regex_pattern += R"((.*?))";
+            // Constrained, multi-format timestamp (matches the formats parse_timestamp supports).
+            // - ISO: yyyy-MM-dd[ T]HH:mm:ss(.sss)?(Z|±HH:MM)?
+            // - Dotted: dd.MM.yyyy HH:mm:ss(.sss)?
+            // - Slash (MDY): MM/dd/yyyy HH:mm:ss(.sss)?
+            // - Slash (YMD): yyyy/MM/dd HH:mm:ss(.sss)?
+            regex_pattern +=
+                R"((\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+\-]\d{2}:\d{2})?|\d{2}\.\d{2}\.\d{4}\s+\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?|\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?|\d{4}\/\d{2}\/\d{2}\s+\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?))";
         }
         else if (field == "level")
         {
