@@ -5,13 +5,20 @@
 
 #include "Qt-LogViewer/Services/LogLoader.h"
 
+#include <QFile>
 #include <QFileInfo>
+#include <QTextStream>
+#include <QThread>
+
+#include "Qt-LogViewer/Services/LogStreamWorker.h"
 
 /**
  * @brief Constructs a LogLoader object.
  * @param format_string The log format string for parsing.
  */
-LogLoader::LogLoader(const QString& format_string): m_parser(format_string) {}
+LogLoader::LogLoader(const QString& format_string, QObject* parent)
+    : QObject(parent), m_parser(format_string), m_worker(nullptr), m_worker_thread(nullptr)
+{}
 
 /**
  * @brief Loads and parses a single log file.
@@ -20,7 +27,9 @@ LogLoader::LogLoader(const QString& format_string): m_parser(format_string) {}
  */
 auto LogLoader::load_log_file(const QString& file_path) const -> QVector<LogEntry>
 {
-    return m_parser.parse_file(file_path);
+    QVector<LogEntry> result;
+    result = m_parser.parse_file(file_path);
+    return result;
 }
 
 /**
@@ -72,11 +81,11 @@ auto LogLoader::read_first_log_entry(const QString& file_path) const -> LogEntry
 
         while (!in.atEnd() && first_entry.get_app_name().isEmpty())
         {
-            QString line = in.readLine().trimmed();
+            const QString line = in.readLine().trimmed();
 
             if (!line.isEmpty())
             {
-                LogEntry entry = m_parser.parse_line(line, file_path);
+                const LogEntry entry = m_parser.parse_line(line, file_path);
 
                 if (!entry.get_app_name().isEmpty())
                 {
@@ -98,5 +107,72 @@ auto LogLoader::read_first_log_entry(const QString& file_path) const -> LogEntry
 auto LogLoader::identify_app(const QString& file_path) -> QString
 {
     QFileInfo info(file_path);
-    return info.baseName();
+    QString app_name = info.baseName();
+    return app_name;
+}
+
+/**
+ * @brief Starts asynchronous, streaming load of a single log file.
+ * @param file_path The path to the log file.
+ * @param batch_size The number of entries per emitted batch.
+ *
+ * Only one streaming operation runs at a time. The next queued file should start
+ * on the streaming_idle() signal.
+ */
+auto LogLoader::load_log_file_async(const QString& file_path, qsizetype batch_size) -> void
+{
+    if (m_worker_thread == nullptr)
+    {
+        m_worker_thread = new QThread(this);
+        m_worker = new LogStreamWorker(m_parser);
+        m_worker->moveToThread(m_worker_thread);
+
+        // Forward worker signals.
+        QObject::connect(m_worker, &LogStreamWorker::entry_batch_parsed, this,
+                         &LogLoader::entry_batch_parsed, Qt::QueuedConnection);
+        QObject::connect(m_worker, &LogStreamWorker::progress, this, &LogLoader::progress,
+                         Qt::QueuedConnection);
+        QObject::connect(m_worker, &LogStreamWorker::finished, this, &LogLoader::finished,
+                         Qt::QueuedConnection);
+        QObject::connect(m_worker, &LogStreamWorker::error, this, &LogLoader::error,
+                         Qt::QueuedConnection);
+
+        // Quit thread when worker finishes.
+        QObject::connect(m_worker, &LogStreamWorker::finished, m_worker_thread, &QThread::quit);
+
+        // Cleanup and emit idle after thread actually stops.
+        QObject::connect(m_worker_thread, &QThread::finished, this, [this]() {
+            if (m_worker != nullptr)
+            {
+                m_worker->deleteLater();
+                m_worker = nullptr;
+            }
+            m_worker_thread = nullptr;
+            emit streaming_idle();
+        });
+
+        // Start work in thread context.
+        QObject::connect(
+            m_worker_thread, &QThread::started, m_worker,
+            [this, file_path, batch_size]() {
+                if (m_worker != nullptr)
+                {
+                    m_worker->start(file_path, batch_size);
+                }
+            },
+            Qt::QueuedConnection);
+
+        m_worker_thread->start();
+    }
+}
+
+/**
+ * @brief Requests cancellation of the current asynchronous load (if any).
+ */
+auto LogLoader::cancel_async() -> void
+{
+    if (m_worker_thread != nullptr && m_worker != nullptr)
+    {
+        m_worker->cancel();
+    }
 }

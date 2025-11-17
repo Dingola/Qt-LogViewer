@@ -191,13 +191,21 @@ auto TabWidget::handle_close_tab_requested(int tab_index) -> void
 
     if (idx >= 0 && idx < count())
     {
+        QWidget* w = widget(idx);
+        emit about_to_close_tab(idx, w);
         removeTab(idx);
+        if (w != nullptr)
+        {
+            w->deleteLater();
+        }
     }
 }
 
 /**
  * @brief Default handler: close all tabs except the given one.
  * @param tab_index Index of the tab to keep.
+ *
+ * Emits about_to_close_tab(idx, widget) for each tab that will be removed, then removes it.
  */
 auto TabWidget::handle_close_other_tabs_requested(int tab_index) -> void
 {
@@ -209,7 +217,13 @@ auto TabWidget::handle_close_other_tabs_requested(int tab_index) -> void
         {
             if (i != keep)
             {
+                QWidget* w = widget(i);
+                emit about_to_close_tab(i, w);
                 removeTab(i);
+                if (w != nullptr)
+                {
+                    w->deleteLater();
+                }
             }
         }
     }
@@ -218,6 +232,8 @@ auto TabWidget::handle_close_other_tabs_requested(int tab_index) -> void
 /**
  * @brief Default handler: close tabs to the left of the given one.
  * @param tab_index Rightmost tab to keep.
+ *
+ * Emits about_to_close_tab(idx, widget) for each tab that will be removed, then removes it.
  */
 auto TabWidget::handle_close_tabs_to_left_requested(int tab_index) -> void
 {
@@ -227,7 +243,13 @@ auto TabWidget::handle_close_tabs_to_left_requested(int tab_index) -> void
     {
         for (int i = idx - 1; i >= 0; --i)
         {
+            QWidget* w = widget(i);
+            emit about_to_close_tab(i, w);
             removeTab(i);
+            if (w != nullptr)
+            {
+                w->deleteLater();
+            }
         }
     }
 }
@@ -235,6 +257,8 @@ auto TabWidget::handle_close_tabs_to_left_requested(int tab_index) -> void
 /**
  * @brief Default handler: close tabs to the right of the given one.
  * @param tab_index Leftmost tab to keep.
+ *
+ * Emits about_to_close_tab(idx, widget) for each tab that will be removed, then removes it.
  */
 auto TabWidget::handle_close_tabs_to_right_requested(int tab_index) -> void
 {
@@ -244,7 +268,13 @@ auto TabWidget::handle_close_tabs_to_right_requested(int tab_index) -> void
     {
         for (int i = count() - 1; i > idx; --i)
         {
+            QWidget* w = widget(i);
+            emit about_to_close_tab(i, w);
             removeTab(i);
+            if (w != nullptr)
+            {
+                w->deleteLater();
+            }
         }
     }
 }

@@ -147,6 +147,19 @@ class TabWidget: public QTabWidget
          */
         void close_tabs_to_right_requested(int tab_index);
 
+        /**
+         * @brief Emitted immediately before a tab is removed by TabWidget.
+         *
+         * Allows external code to clean up state (e.g., controller/view) while the tab widget is
+         * still accessible. After all connected slots return, TabWidget will remove the tab.
+         *
+         * Do not call removeTab() yourself in response to this signal.
+         *
+         * @param tab_index Index of the tab that will be removed.
+         * @param widget The current tab's widget (still owned by TabWidget at this point).
+         */
+        void about_to_close_tab(int tab_index, QWidget* widget);
+
     protected:
         /**
          * @brief Re-translates persistent UI texts on language changes.
@@ -163,18 +176,21 @@ class TabWidget: public QTabWidget
 
         /**
          * @brief Default handler: close all tabs except the given one.
+         *        For each removed tab, emits about_to_close_tab(index, widget) before removal.
          * @param tab_index Index of the tab to keep.
          */
         auto handle_close_other_tabs_requested(int tab_index) -> void;
 
         /**
          * @brief Default handler: close tabs to the left of the given one.
+         *        For each removed tab, emits about_to_close_tab(index, widget) before removal.
          * @param tab_index Rightmost tab to keep.
          */
         auto handle_close_tabs_to_left_requested(int tab_index) -> void;
 
         /**
          * @brief Default handler: close tabs to the right of the given one.
+         *        For each removed tab, emits about_to_close_tab(index, widget) before removal.
          * @param tab_index Leftmost tab to keep.
          */
         auto handle_close_tabs_to_right_requested(int tab_index) -> void;

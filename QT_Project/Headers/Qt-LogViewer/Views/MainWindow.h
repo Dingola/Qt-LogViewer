@@ -40,6 +40,7 @@ class MainWindow: public BaseMainWindow
          *
          * Initializes the main window and its user interface.
          *
+         * @param settings Optional app settings.
          * @param parent The parent widget, or nullptr if this is a top-level window.
          */
         explicit MainWindow(LogViewerSettings* settings = nullptr, QWidget* parent = nullptr);
@@ -147,6 +148,7 @@ class MainWindow: public BaseMainWindow
 
         /**
          * @brief Handles open log file requests and creates a new tab with a LogTableView.
+         *        Uses streaming loading to keep the UI responsive.
          * @param log_file_info The LogFileInfo to load and display.
          */
         auto handle_log_file_open_requested(const LogFileInfo& log_file_info) -> void;
@@ -163,79 +165,45 @@ class MainWindow: public BaseMainWindow
          */
         auto handle_view_removed(const QUuid& view_id) -> void;
 
+        /**
+         * @brief Handles streaming progress for a specific view.
+         * @param view_id The target view.
+         * @param bytes_read Bytes read so far.
+         * @param total_bytes Total file size in bytes.
+         */
+        auto handle_loading_progress(const QUuid& view_id, qint64 bytes_read,
+                                     qint64 total_bytes) -> void;
+
+        /**
+         * @brief Handles streaming completion for a file/view.
+         * @param view_id The view that received the data.
+         * @param file_path The file that finished streaming.
+         */
+        auto handle_loading_finished(const QUuid& view_id, const QString& file_path) -> void;
+
+        /**
+         * @brief Handles streaming errors.
+         * @param view_id The target view.
+         * @param file_path The file that errored.
+         * @param message Error message.
+         */
+        auto handle_loading_error(const QUuid& view_id, const QString& file_path,
+                                  const QString& message) -> void;
+
     private:
-        /**
-         * @brief Pointer to the UI definition generated from the .ui file.
-         */
         Ui::MainWindow* ui;
-
-        /**
-         * @brief Settings object for managing application settings.
-         */
         LogViewerSettings* m_log_viewer_settings = nullptr;
-
-        /**
-         * @brief Controller for log loading and filtering.
-         */
         LogViewerController* m_controller = nullptr;
-
-        /**
-         * @brief Action for opening log files (appears in the File menu).
-         */
         QAction* m_action_open_log_file = nullptr;
-
-        /**
-         * @brief Action for quitting the application (appears in the File menu).
-         */
         QAction* m_action_quit = nullptr;
-
-        /**
-         * @brief Action for showing the log file explorer (appears in the View menu).
-         */
         QAction* m_action_show_log_file_explorer = nullptr;
-
-        /**
-         * @brief Action for showing log details (appears in the View menu).
-         */
         QAction* m_action_show_log_details = nullptr;
-
-        /**
-         * @brief Action for showing the log level pie chart (appears in the View menu).
-         */
         QAction* m_action_show_log_level_pie_chart = nullptr;
-
-        /**
-         * @brief Action for opening log files (appears in the Settings menu).
-         */
         QAction* m_action_settings = nullptr;
-
-        /**
-         * @brief Dock widget for displaying log details.
-         */
         DockWidget* m_log_details_dock_widget = nullptr;
-
-        /**
-         * @brief Dock widget for the log file explorer.
-         */
         DockWidget* m_log_file_explorer_dock_widget = nullptr;
-
-        /**
-         * @brief Dock widget for the log level pie chart.
-         */
         DockWidget* m_log_level_pie_chart_dock_widget = nullptr;
-
-        /**
-         * @brief Text edit widget for showing detailed log information.
-         */
         QPlainTextEdit* m_log_details_text_edit = nullptr;
-
-        /**
-         * @brief Pointer to the log file explorer widget.
-         */
         LogFileExplorer* m_log_file_explorer = nullptr;
-
-        /**
-         * @brief Widget for displaying log level pie chart.
-         */
-        LogLevelPieChartWidget* m_log_level_pie_chart_widget;
+        LogLevelPieChartWidget* m_log_level_pie_chart_widget = nullptr;
 };

@@ -76,14 +76,36 @@ class LogViewerController: public QObject
         auto load_log_file(const QString& file_path) -> QUuid;
 
         /**
-         * @brief Loads log files from the specified file paths and updates the global model.
+         * @brief Loads log files from the specified file paths and creates a new view (model/proxy)
+         * for them.
          * @param file_paths A vector of file paths to load logs from.
-         *
-         * This method uses the LogLoader service to parse log files and populate the global
-         * LogModel. It also updates the LogFileTreeModel with information about the loaded log
-         * files.
+         * @return QUuid of the created view, or an empty QUuid if no files were loaded.
          */
         auto load_log_files(const QVector<QString>& file_paths) -> QUuid;
+
+        /**
+         * @brief Starts streaming load of a single log file and creates a new view (model/proxy).
+         * @param file_path The path to the log file to stream.
+         * @param batch_size Number of entries per batch appended to the model.
+         * @return QUuid of the created view.
+         */
+        auto load_log_file_async(const QString& file_path, qsizetype batch_size = 1000) -> QUuid;
+
+        /**
+         * @brief Starts streaming load of multiple log files into a single new view (model/proxy).
+         *        Files are streamed sequentially in the background.
+         * @param file_paths Paths to stream.
+         * @param batch_size Number of entries per batch appended to the model.
+         * @return QUuid of the created view.
+         */
+        auto load_log_files_async(const QVector<QString>& file_paths,
+                                  qsizetype batch_size = 1000) -> QUuid;
+
+        /**
+         * @brief Cancels any ongoing streaming for the specified view and clears its pending queue.
+         * @param view_id The view to cancel streaming for.
+         */
+        auto cancel_loading(const QUuid& view_id) -> void;
 
         /**
          * @brief Sets the application name filter for the current view.
@@ -335,6 +357,30 @@ class LogViewerController: public QObject
          */
         auto view_removed(const QUuid& view_id) -> void;
 
+        /**
+         * @brief Streaming progress signal mapped to view IDs.
+         * @param view_id The view receiving streamed data.
+         * @param bytes_read Bytes read so far.
+         * @param total_bytes Total file size.
+         */
+        auto loading_progress(const QUuid& view_id, qint64 bytes_read, qint64 total_bytes) -> void;
+
+        /**
+         * @brief Emitted when a file finishes streaming for a view.
+         * @param view_id View that received the data.
+         * @param file_path File that finished.
+         */
+        auto loading_finished(const QUuid& view_id, const QString& file_path) -> void;
+
+        /**
+         * @brief Emitted when an error occurs during streaming for a view.
+         * @param view_id View that attempted to load the file.
+         * @param file_path File that errored.
+         * @param message Error message.
+         */
+        auto loading_error(const QUuid& view_id, const QString& file_path,
+                           const QString& message) -> void;
+
     public slots:
         /**
          * @brief Removes a single log file from all views and from the LogFileTreeModel.
@@ -344,6 +390,34 @@ class LogViewerController: public QObject
         auto remove_log_file(const LogFileInfo& file) -> void;
 
     private:
+        /**
+         * @brief Enqueues an asynchronous load request for a log file.
+         * @param view_id The QUuid of the view to load into.
+         * @param file_path The path to the log file.
+         */
+        auto enqueue_async(const QUuid& view_id, const QString& file_path) -> void;
+
+        /**
+         * @brief Attempts to start the next asynchronous load if none is active.
+         * @param batch_size Number of entries per batch.
+         */
+        auto try_start_next_async(qsizetype batch_size) -> void;
+
+        /**
+         * @brief Callback when an asynchronous load batch is received.
+         * @param view_id The QUuid of the view receiving data.
+         * @param file_path The path to the log file.
+         * @param entries The batch of log entries.
+         */
+        auto clear_pending_for_view(const QUuid& view_id) -> void;
+
+        /**
+         * @brief Ensures that models and proxies exist for the specified view ID.
+         * @param view_id The QUuid of the view.
+         */
+        auto ensure_view_models(const QUuid& view_id) -> void;
+
+    private:
         LogFileTreeModel* m_file_tree_model;
         LogLoader m_loader;
         QMap<QUuid, QList<LogFileInfo>> m_loaded_log_files;
@@ -351,4 +425,10 @@ class LogViewerController: public QObject
         QMap<QUuid, LogSortFilterProxyModel*> m_sort_filter_models;
         QMap<QUuid, PagingProxyModel*> m_paging_models;
         QUuid m_current_view_id;
+
+        // Async orchestration (single active stream globally, queued requests)
+        QList<QPair<QUuid, QString>> m_async_queue;
+        QUuid m_active_view_id;
+        QString m_active_file_path;
+        qsizetype m_active_batch_size;
 };

@@ -8,8 +8,72 @@
  * @param parent The parent QObject.
  */
 LogViewerController::LogViewerController(const QString& log_format, QObject* parent)
-    : QObject(parent), m_loader(log_format), m_file_tree_model(new LogFileTreeModel(this))
-{}
+    : QObject(parent),
+      m_file_tree_model(new LogFileTreeModel(this)),
+      m_loader(log_format, this),
+      m_current_view_id(),
+      m_async_queue(),
+      m_active_view_id(),
+      m_active_file_path(),
+      m_active_batch_size(1000)
+{
+    connect(&m_loader, &LogLoader::entry_batch_parsed, this,
+            [this](const QString& file_path, const QVector<LogEntry>& batch) {
+                QUuid view_id;
+                if (file_path == m_active_file_path)
+                {
+                    view_id = m_active_view_id;
+                }
+                if (!view_id.isNull() && m_view_models.contains(view_id))
+                {
+                    m_view_models[view_id]->add_entries(batch);
+                }
+            });
+
+    connect(&m_loader, &LogLoader::progress, this,
+            [this](const QString& file_path, qint64 bytes_read, qint64 total_bytes) {
+                QUuid view_id;
+                if (file_path == m_active_file_path)
+                {
+                    view_id = m_active_view_id;
+                }
+                if (!view_id.isNull())
+                {
+                    emit loading_progress(view_id, bytes_read, total_bytes);
+                }
+            });
+
+    connect(&m_loader, &LogLoader::error, this,
+            [this](const QString& file_path, const QString& message) {
+                QUuid view_id;
+                if (file_path == m_active_file_path)
+                {
+                    view_id = m_active_view_id;
+                }
+                if (!view_id.isNull())
+                {
+                    emit loading_error(view_id, file_path, message);
+                }
+            });
+
+    connect(&m_loader, &LogLoader::finished, this, [this](const QString& file_path) {
+        QUuid view_id;
+        if (file_path == m_active_file_path)
+        {
+            view_id = m_active_view_id;
+        }
+        if (!view_id.isNull())
+        {
+            emit loading_finished(view_id, file_path);
+        }
+        m_active_view_id = QUuid();
+        m_active_file_path = QString();
+    });
+
+    // Advance queue only after thread cleanup (safe to start next).
+    connect(&m_loader, &LogLoader::streaming_idle, this,
+            [this]() { try_start_next_async(m_active_batch_size); });
+}
 
 /**
  * @brief Sets the current view to the given QUuid if it exists.
@@ -73,6 +137,9 @@ auto LogViewerController::remove_view(const QUuid& view_id) -> bool
         m_current_view_id = QUuid();  // Reset current view if it was removed
     }
 
+    // Also clear queued/active streaming work for this view
+    cancel_loading(view_id);
+
     return removed;
 }
 
@@ -83,7 +150,20 @@ auto LogViewerController::remove_view(const QUuid& view_id) -> bool
 auto LogViewerController::add_log_file_to_tree(const QString& file_path) -> void
 {
     LogEntry entry = m_loader.read_first_log_entry(file_path);
-    m_file_tree_model->add_log_file(entry.get_file_info());
+    LogFileInfo info;
+
+    if (!entry.get_app_name().isEmpty())
+    {
+        info = entry.get_file_info();
+    }
+    else
+    {
+        // Fallback: derive app name from file if the log line did not provide one
+        const QString app_name = LogLoader::identify_app(file_path);
+        info = LogFileInfo(file_path, app_name);
+    }
+
+    m_file_tree_model->add_log_file(info);
 }
 
 /**
@@ -167,6 +247,75 @@ auto LogViewerController::load_log_files(const QVector<QString>& file_paths) -> 
     m_paging_models[view_id] = paging_proxy;
 
     return view_id;
+}
+
+/**
+ * @brief Starts streaming load of a single log file and creates a new view (model/proxy).
+ * @param file_path The path to the log file to stream.
+ * @param batch_size Number of entries per batch appended to the model.
+ * @return QUuid of the created view.
+ */
+auto LogViewerController::load_log_file_async(const QString& file_path,
+                                              qsizetype batch_size) -> QUuid
+{
+    auto view_id = QUuid::createUuid();
+    ensure_view_models(view_id);
+
+    // Track file in the view (no tree insert here to avoid duplicates)
+    const QString app_name = LogLoader::identify_app(file_path);
+    LogFileInfo loaded_log_file(file_path, app_name);
+    m_loaded_log_files[view_id] = QList<LogFileInfo>{loaded_log_file};
+
+    enqueue_async(view_id, file_path);
+    m_active_batch_size = batch_size;
+    try_start_next_async(m_active_batch_size);
+
+    return view_id;
+}
+
+/**
+ * @brief Starts streaming load of multiple log files into a single new view (model/proxy).
+ *        Files are streamed sequentially in the background.
+ * @param file_paths Paths to stream.
+ * @param batch_size Number of entries per batch appended to the model.
+ * @return QUuid of the created view.
+ */
+auto LogViewerController::load_log_files_async(const QVector<QString>& file_paths,
+                                               qsizetype batch_size) -> QUuid
+{
+    auto view_id = QUuid::createUuid();
+    ensure_view_models(view_id);
+
+    QList<LogFileInfo> files_info;
+
+    for (const QString& file_path: file_paths)
+    {
+        const QString app_name = LogLoader::identify_app(file_path);
+        files_info.append(LogFileInfo(file_path, app_name));
+        enqueue_async(view_id, file_path);
+    }
+
+    m_loaded_log_files[view_id] = files_info;
+    m_active_batch_size = batch_size;
+    try_start_next_async(m_active_batch_size);
+
+    return view_id;
+}
+
+/**
+ * @brief Cancels any ongoing streaming for the specified view and clears its pending queue.
+ * @param view_id The view to cancel streaming for.
+ */
+auto LogViewerController::cancel_loading(const QUuid& view_id) -> void
+{
+    // Cancel active if it belongs to the view
+    if (m_active_view_id == view_id)
+    {
+        m_loader.cancel_async();
+    }
+
+    // Clear any queued items for the view
+    clear_pending_for_view(view_id);
 }
 
 /**
@@ -649,5 +798,92 @@ auto LogViewerController::remove_log_file(const LogFileInfo& file) -> void
     {
         remove_view(view_id);
         emit view_removed(view_id);
+    }
+}
+
+/**
+ * @brief Enqueues an asynchronous load request for a log file.
+ * @param view_id The QUuid of the view to load into.
+ * @param file_path The path to the log file.
+ */
+auto LogViewerController::enqueue_async(const QUuid& view_id, const QString& file_path) -> void
+{
+    m_async_queue.append(qMakePair(view_id, file_path));
+}
+
+/**
+ * @brief Attempts to start the next asynchronous load if none is active.
+ * @param batch_size Number of entries per batch.
+ */
+auto LogViewerController::try_start_next_async(qsizetype batch_size) -> void
+{
+    bool started = false;
+
+    if (m_active_file_path.isEmpty() && !m_async_queue.isEmpty())
+    {
+        const auto pair = m_async_queue.front();
+        m_async_queue.pop_front();
+        m_active_view_id = pair.first;
+        m_active_file_path = pair.second;
+        m_active_batch_size = batch_size;
+
+        if (m_current_view_id != m_active_view_id)
+        {
+            set_current_view(m_active_view_id);
+        }
+
+        m_loader.load_log_file_async(m_active_file_path, m_active_batch_size);
+        started = true;
+    }
+
+    if (!started)
+    {
+        // Nothing to start; remain idle.
+    }
+}
+
+/**
+ * @brief Callback when an asynchronous load batch is received.
+ * @param view_id The QUuid of the view receiving data.
+ * @param file_path The path to the log file.
+ * @param entries The batch of log entries.
+ */
+auto LogViewerController::clear_pending_for_view(const QUuid& view_id) -> void
+{
+    QList<QPair<QUuid, QString>> kept;
+
+    for (const auto& it: std::as_const(m_async_queue))
+    {
+        if (it.first != view_id)
+        {
+            kept.append(it);
+        }
+    }
+
+    m_async_queue = kept;
+
+    if (m_active_view_id == view_id)
+    {
+        // Active will be stopped by cancel, try to start next after it finishes via loader signal.
+    }
+}
+
+/**
+ * @brief Ensures that models and proxies exist for the specified view ID.
+ * @param view_id The QUuid of the view.
+ */
+auto LogViewerController::ensure_view_models(const QUuid& view_id) -> void
+{
+    if (!m_view_models.contains(view_id))
+    {
+        auto* model = new LogModel(this);
+        auto* sort_proxy = new LogSortFilterProxyModel(this);
+        sort_proxy->setSourceModel(model);
+        auto* paging_proxy = new PagingProxyModel(this);
+        paging_proxy->setSourceModel(sort_proxy);
+
+        m_view_models[view_id] = model;
+        m_sort_filter_models[view_id] = sort_proxy;
+        m_paging_models[view_id] = paging_proxy;
     }
 }

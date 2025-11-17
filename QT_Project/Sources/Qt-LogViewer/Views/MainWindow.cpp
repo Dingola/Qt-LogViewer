@@ -4,6 +4,7 @@
 #include <QDragEnterEvent>
 #include <QDropEvent>
 #include <QFileDialog>
+#include <QFileInfo>
 #include <QIcon>
 #include <QItemSelectionModel>
 #include <QMenu>
@@ -66,6 +67,12 @@ MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
             &MainWindow::handle_current_view_id_changed);
     connect(m_controller, &LogViewerController::view_removed, this,
             &MainWindow::handle_view_removed);
+    connect(m_controller, &LogViewerController::loading_progress, this,
+            &MainWindow::handle_loading_progress);
+    connect(m_controller, &LogViewerController::loading_finished, this,
+            &MainWindow::handle_loading_finished);
+    connect(m_controller, &LogViewerController::loading_error, this,
+            &MainWindow::handle_loading_error);
 
     setup_log_file_explorer();
     setup_log_level_pie_chart();
@@ -216,16 +223,15 @@ auto MainWindow::setup_tab_widget() -> void
             update_pagination_widget();
         }
     });
-    connect(ui->tabWidgetLog, &QTabWidget::tabCloseRequested, this, [this](int index) {
+    connect(ui->tabWidgetLog, &TabWidget::about_to_close_tab, this, [this](int index) {
         auto* log_table_view = qobject_cast<LogTableView*>(ui->tabWidgetLog->widget(index));
         if (log_table_view != nullptr)
         {
             QUuid view_id = log_table_view->property("view_id").value<QUuid>();
             m_controller->remove_view(view_id);
         }
-        ui->tabWidgetLog->removeTab(index);
-        delete log_table_view;
-
+    });
+    connect(ui->tabWidgetLog, &TabWidget::close_tab_requested, this, [this](int index) {
         // Update pagination when last tab is closed (not handled by handle_current_view_id_changed)
         if (ui->tabWidgetLog->count() == 0)
         {
@@ -503,28 +509,6 @@ auto MainWindow::handle_search_changed() -> void
 }
 
 /**
- * @brief Handles open log file requests and creates a new tab with a LogTableView.
- * @param log_file_info The LogFileInfo to load and display.
- */
-auto MainWindow::handle_log_file_open_requested(const LogFileInfo& log_file_info) -> void
-{
-    auto view_id = m_controller->load_log_file(log_file_info.get_file_path());
-    m_controller->set_current_view(view_id);
-
-    auto* log_table_view = new LogTableView(ui->tabWidgetLog);
-    log_table_view->setProperty("view_id", QVariant::fromValue(view_id));
-    auto* paging_proxy = m_controller->get_paging_proxy(view_id);
-    log_table_view->setModel(paging_proxy);
-    connect(log_table_view->selectionModel(), &QItemSelectionModel::currentRowChanged, this,
-            &MainWindow::update_log_details);
-
-    QString tab_title = log_file_info.get_file_name();
-    int tab_index = ui->tabWidgetLog->addTab(log_table_view, tab_title);
-    ui->tabWidgetLog->setCurrentIndex(tab_index);
-    log_table_view->auto_resize_columns();
-}
-
-/**
  * @brief Slot to handle changes in the current view ID.
  * @param view_id The new current view ID.
  */
@@ -581,4 +565,96 @@ auto MainWindow::handle_view_removed(const QUuid& view_id) -> void
     ui->logFilterBarWidget->set_app_names({});
     ui->logFilterBarWidget->set_log_levels({});
     update_pagination_widget();
+}
+
+/**
+ * @brief Handles open log file requests and creates a new tab with a LogTableView.
+ *        Uses streaming loading to keep the UI responsive.
+ * @param log_file_info The LogFileInfo to load and display.
+ */
+auto MainWindow::handle_log_file_open_requested(const LogFileInfo& log_file_info) -> void
+{
+    // Start streaming load; view and proxies are created empty and filled in batches.
+    auto view_id = m_controller->load_log_file_async(log_file_info.get_file_path(), 1000);
+    m_controller->set_current_view(view_id);
+
+    auto* log_table_view = new LogTableView(ui->tabWidgetLog);
+    log_table_view->setProperty("view_id", QVariant::fromValue(view_id));
+    auto* paging_proxy = m_controller->get_paging_proxy(view_id);
+    log_table_view->setModel(paging_proxy);
+    connect(log_table_view->selectionModel(), &QItemSelectionModel::currentRowChanged, this,
+            &MainWindow::update_log_details);
+
+    QString tab_title = log_file_info.get_file_name();
+    int tab_index = ui->tabWidgetLog->addTab(log_table_view, tab_title);
+    ui->tabWidgetLog->setCurrentIndex(tab_index);
+    log_table_view->auto_resize_columns();
+
+    update_pagination_widget();
+}
+
+/**
+ * @brief Handles loading progress updates for a log file.
+ * @param view_id The QUuid of the view being loaded.
+ * @param bytes_read The number of bytes read so far.
+ * @param total_bytes The total number of bytes to read.
+ */
+auto MainWindow::handle_loading_progress(const QUuid& view_id, qint64 bytes_read,
+                                         qint64 total_bytes) -> void
+{
+    // Update status bar and pagination for the active view
+    bool is_current = (view_id == m_controller->get_current_view());
+    int percent = 0;
+
+    if (total_bytes > 0)
+    {
+        percent = static_cast<int>(
+            (static_cast<double>(bytes_read) * 100.0) / static_cast<double>(total_bytes) + 0.5);
+    }
+
+    statusBar()->showMessage(
+        tr("Loading... %1% (%2 / %3 bytes)").arg(percent).arg(bytes_read).arg(total_bytes));
+
+    if (is_current)
+    {
+        update_pagination_widget();
+    }
+}
+
+/**
+ * @brief Handles the completion of log file loading.
+ * @param view_id The QUuid of the view that finished loading.
+ * @param file_path The path of the loaded log file.
+ */
+auto MainWindow::handle_loading_finished(const QUuid& view_id, const QString& file_path) -> void
+{
+    bool is_current = (view_id == m_controller->get_current_view());
+    QFileInfo info(file_path);
+    statusBar()->showMessage(tr("Loaded %1 (%2 bytes)").arg(info.fileName()).arg(info.size()),
+                             4000);
+
+    if (is_current)
+    {
+        // Refresh filters and charts now that data is available
+        handle_current_view_id_changed(view_id);
+        update_pagination_widget();
+    }
+
+    Q_UNUSED(file_path);
+}
+
+/**
+ * @brief Handles loading errors for a log file.
+ * @param view_id The QUuid of the view that encountered an error.
+ * @param file_path The path of the log file that failed to load.
+ * @param message The error message.
+ */
+auto MainWindow::handle_loading_error(const QUuid& view_id, const QString& file_path,
+                                      const QString& message) -> void
+{
+    bool is_current = (view_id == m_controller->get_current_view());
+    statusBar()->clearMessage();
+
+    QMessageBox::critical(this, tr("Load Error"),
+                          tr("Failed to load file:\n%1\n\n%2").arg(file_path, message));
 }
