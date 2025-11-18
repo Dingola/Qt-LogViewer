@@ -40,6 +40,7 @@ auto main(int argc, char* argv[]) -> int
     auto* main_window = new MainWindow(&settings);
     AppWindow app_window(nullptr, main_window);
     app_window.resize(1120, 800);
+    app_window.set_app_title("Qt-LogViewer");
     app_window.set_app_icon(QIcon(":/Resources/Icons/App/AppIcon.svg"));
     app_window.set_adopt_menubar(true, WindowTitleBar::RowPosition::Top);
     app_window.show();

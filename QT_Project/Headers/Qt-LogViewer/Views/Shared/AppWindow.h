@@ -88,6 +88,15 @@ class AppWindow: public QWidget
         auto set_app_icon(const QIcon& icon) -> void;
 
         /**
+         * @brief Set the window title text.
+         *
+         * Updates both the native window title and the custom title bar text.
+         *
+         * @param title New window title.
+         */
+        auto set_app_title(const QString& title) -> void;
+
+        /**
          * @brief Enable/disable Mica-like backdrop on Windows 11 at runtime.
          *
          * When enabled, attempts to use DWMWA_SYSTEM_BACKDROP_TYPE (preferred) or the legacy
