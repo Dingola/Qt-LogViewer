@@ -40,6 +40,8 @@ LogFilterWidget::LogFilterWidget(QWidget* parent): QWidget(parent), ui(new Ui::L
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
 
+    ui->horizontalLayout->setContentsMargins(0, 0, 0, 0);
+
     // Connect app filter changes
     connect(ui->comboBoxApp, &QComboBox::currentTextChanged, this, [this](const QString& app_name) {
         emit app_filter_changed((app_name == tr(k_show_all_apps_text) ? QString() : app_name));

@@ -20,7 +20,7 @@
 #include "Qt-LogViewer/Services/LogViewerSettings.h"
 #include "Qt-LogViewer/Services/Translator.h"
 #include "Qt-LogViewer/Views/App/Dialogs/SettingsDialog.h"
-#include "Qt-LogViewer/Views/App/LogTableView.h"
+#include "Qt-LogViewer/Views/App/LogViewWidget.h"
 #include "ui_MainWindow.h"
 
 namespace
@@ -185,6 +185,7 @@ auto MainWindow::setup_filter_bar() -> void
 {
     QVector<QString> available_log_levels = m_controller->get_available_log_levels({});
     ui->logFilterBarWidget->setContentsMargins(0, 0, 0, 0);
+    ui->logFilterBarWidget->set_filter_widget_visible(false);
     ui->logFilterBarWidget->set_available_log_levels(available_log_levels);
     connect(ui->logFilterBarWidget, &LogFilterBarWidget::app_filter_changed, this,
             [this](const QString& app_name) {
@@ -215,30 +216,26 @@ auto MainWindow::setup_tab_widget() -> void
     ui->tabWidgetLog->setTabsClosable(true);
 
     connect(ui->tabWidgetLog, &QTabWidget::currentChanged, this, [this](int index) {
-        auto* log_table_view = qobject_cast<LogTableView*>(ui->tabWidgetLog->widget(index));
-        if (log_table_view != nullptr)
+        auto* log_view_widget = qobject_cast<LogViewWidget*>(ui->tabWidgetLog->widget(index));
+        if (log_view_widget != nullptr)
         {
-            QUuid view_id = log_table_view->property("view_id").value<QUuid>();
+            QUuid view_id = log_view_widget->get_view_id();
             m_controller->set_current_view(view_id);
             update_pagination_widget();
         }
     });
     connect(ui->tabWidgetLog, &TabWidget::about_to_close_tab, this, [this](int index) {
-        auto* log_table_view = qobject_cast<LogTableView*>(ui->tabWidgetLog->widget(index));
-        if (log_table_view != nullptr)
+        auto* log_view_widget = qobject_cast<LogViewWidget*>(ui->tabWidgetLog->widget(index));
+        if (log_view_widget != nullptr)
         {
-            QUuid view_id = log_table_view->property("view_id").value<QUuid>();
+            QUuid view_id = log_view_widget->get_view_id();
             m_controller->remove_view(view_id);
         }
     });
     connect(ui->tabWidgetLog, &TabWidget::close_tab_requested, this, [this](int index) {
-        // Update pagination when last tab is closed (not handled by handle_current_view_id_changed)
         if (ui->tabWidgetLog->count() == 0)
         {
-            ui->logFilterBarWidget->set_app_names({});
-            ui->logFilterBarWidget->set_log_levels({});
             m_log_level_pie_chart_widget->set_log_level_counts({});
-            ui->logFilterBarWidget->set_log_level_counts({});
             update_pagination_widget();
         }
     });
@@ -436,11 +433,11 @@ void MainWindow::resizeEvent(QResizeEvent* event)
 
     if (ui != nullptr)
     {
-        auto* log_table_view = qobject_cast<LogTableView*>(ui->tabWidgetLog->currentWidget());
+        auto* log_view_widget = qobject_cast<LogViewWidget*>(ui->tabWidgetLog->currentWidget());
 
-        if (log_table_view != nullptr)
+        if (log_view_widget != nullptr)
         {
-            log_table_view->auto_resize_columns();
+            log_view_widget->auto_resize_columns();
         }
     }
 }
@@ -527,11 +524,16 @@ auto MainWindow::handle_current_view_id_changed(const QUuid& view_id) -> void
     m_log_level_pie_chart_widget->set_log_level_counts(level_counts);
     ui->logFilterBarWidget->set_log_level_counts(level_counts);
 
-    auto* log_table_view = qobject_cast<LogTableView*>(ui->tabWidgetLog->currentWidget());
+    auto* log_view_widget = qobject_cast<LogViewWidget*>(ui->tabWidgetLog->currentWidget());
 
-    if (log_table_view != nullptr)
+    if (log_view_widget != nullptr)
     {
-        log_table_view->auto_resize_columns();
+        log_view_widget->set_app_names(app_names);
+        log_view_widget->set_current_app_name_filter(app_name_filter);
+        log_view_widget->set_available_log_levels(available_log_levels);
+        log_view_widget->set_log_levels(log_level_filters);
+        log_view_widget->set_log_level_counts(level_counts);
+        log_view_widget->auto_resize_columns();
     }
 
     update_pagination_widget();
@@ -548,11 +550,11 @@ auto MainWindow::handle_view_removed(const QUuid& view_id) -> void
 
     for (int i = 0; i < tab_count && !tab_removed; ++i)
     {
-        auto* log_table_view = qobject_cast<LogTableView*>(ui->tabWidgetLog->widget(i));
+        auto* log_view_widget = qobject_cast<LogViewWidget*>(ui->tabWidgetLog->widget(i));
 
-        if (log_table_view != nullptr)
+        if (log_view_widget != nullptr)
         {
-            QUuid tab_view_id = log_table_view->property("view_id").value<QUuid>();
+            QUuid tab_view_id = log_view_widget->get_view_id();
 
             if (tab_view_id == view_id)
             {
@@ -574,21 +576,34 @@ auto MainWindow::handle_view_removed(const QUuid& view_id) -> void
  */
 auto MainWindow::handle_log_file_open_requested(const LogFileInfo& log_file_info) -> void
 {
-    // Start streaming load; view and proxies are created empty and filled in batches.
     auto view_id = m_controller->load_log_file_async(log_file_info.get_file_path(), 1000);
     m_controller->set_current_view(view_id);
 
-    auto* log_table_view = new LogTableView(ui->tabWidgetLog);
-    log_table_view->setProperty("view_id", QVariant::fromValue(view_id));
+    auto* log_view_widget = new LogViewWidget(ui->tabWidgetLog);
+    log_view_widget->set_view_id(view_id);
+
     auto* paging_proxy = m_controller->get_paging_proxy(view_id);
-    log_table_view->setModel(paging_proxy);
-    connect(log_table_view->selectionModel(), &QItemSelectionModel::currentRowChanged, this,
+    log_view_widget->set_model(paging_proxy);
+
+    QVector<QString> available_log_levels = m_controller->get_available_log_levels({});
+    log_view_widget->set_available_log_levels(available_log_levels);
+
+    connect(log_view_widget, &LogViewWidget::current_row_changed, this,
             &MainWindow::update_log_details);
+    connect(log_view_widget, &LogViewWidget::app_filter_changed, this, [this](const QString& app) {
+        m_controller->set_app_name_filter(app);
+        update_pagination_widget();
+    });
+    connect(log_view_widget, &LogViewWidget::log_level_filter_changed, this,
+            [this](const QSet<QString>& levels) {
+                m_controller->set_log_level_filters(levels);
+                update_pagination_widget();
+            });
 
     QString tab_title = log_file_info.get_file_name();
-    int tab_index = ui->tabWidgetLog->addTab(log_table_view, tab_title);
+    int tab_index = ui->tabWidgetLog->addTab(log_view_widget, tab_title);
     ui->tabWidgetLog->setCurrentIndex(tab_index);
-    log_table_view->auto_resize_columns();
+    log_view_widget->auto_resize_columns();
 
     update_pagination_widget();
 }

@@ -197,6 +197,9 @@
 
     /* Pie Chart */
     @ColorPieChartEmptyRing: @Neutral-12;
+
+    /* Log View Widget */
+    @ColorLogViewWidgetBackground: @Neutral-3;
 }
 
 @Variables[Name="Light"] {
@@ -325,6 +328,9 @@
 
     /* Pie Chart */
     @ColorPieChartEmptyRing: @Neutral-16;
+
+    /* Log View Widget */
+    @ColorLogViewWidgetBackground: @Neutral-19;
 }
 
 /* === Global === */
@@ -852,6 +858,11 @@ LogLevelPieChartWidget {
 #logLevelColorSquare {
     border-radius: 3px;
     /* background-color is set dynamically in C++ */
+}
+
+/* === Log View Widget === */
+LogViewWidget {
+    background-color: @ColorLogViewWidgetBackground;
 }
 
 /* === LogFilterBarWidget === */

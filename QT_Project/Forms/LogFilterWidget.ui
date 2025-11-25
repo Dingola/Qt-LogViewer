@@ -13,7 +13,7 @@
   <property name="windowTitle">
    <string>FilterWidget</string>
   </property>
-  <layout class="QHBoxLayout" name="horizontalLayout_2">
+  <layout class="QHBoxLayout" name="horizontalLayout">
    <property name="spacing">
     <number>10</number>
    </property>

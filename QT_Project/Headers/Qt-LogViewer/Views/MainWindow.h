@@ -147,7 +147,7 @@ class MainWindow: public BaseMainWindow
         auto handle_search_changed() -> void;
 
         /**
-         * @brief Handles open log file requests and creates a new tab with a LogTableView.
+         * @brief Handles open log file requests and creates a new tab with a LogViewWidget.
          *        Uses streaming loading to keep the UI responsive.
          * @param log_file_info The LogFileInfo to load and display.
          */

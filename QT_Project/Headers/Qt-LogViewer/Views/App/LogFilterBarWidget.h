@@ -92,6 +92,20 @@ class LogFilterBarWidget: public QWidget
         auto set_search_placeholder(const QString& text) -> void;
 
         /**
+         * @brief Shows or hides the filter widget area.
+         *
+         * @param visible True to show, false to hide.
+         */
+        auto set_filter_widget_visible(bool visible) -> void;
+
+        /**
+         * @brief Shows or hides the search bar area.
+         *
+         * @param visible True to show, false to hide.
+         */
+        auto set_search_bar_visible(bool visible) -> void;
+
+        /**
          * @brief Returns the currently selected application name.
          *
          * @return The selected application name.

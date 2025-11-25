@@ -119,6 +119,36 @@ auto LogFilterBarWidget::set_search_placeholder(const QString& text) -> void
 }
 
 /**
+ * @brief Shows or hides the filter widget area.
+ *
+ * @param visible True to show, false to hide.
+ */
+auto LogFilterBarWidget::set_filter_widget_visible(bool visible) -> void
+{
+    LogFilterWidget* filter = get_filter_widget();
+
+    if (filter != nullptr)
+    {
+        filter->setVisible(visible);
+    }
+}
+
+/**
+ * @brief Shows or hides the search bar area.
+ *
+ * @param visible True to show, false to hide.
+ */
+auto LogFilterBarWidget::set_search_bar_visible(bool visible) -> void
+{
+    SearchBarWidget* search = get_search_bar_widget();
+
+    if (search != nullptr)
+    {
+        search->setVisible(visible);
+    }
+}
+
+/**
  * @brief Returns the currently selected application name.
  *
  * @return The selected application name.

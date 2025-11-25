@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>LogViewWidget</class>
+ <widget class="QWidget" name="LogViewWidget">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>274</width>
+    <height>226</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>LogViewWidget</string>
+  </property>
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <item>
+    <widget class="LogFilterWidget" name="logFilterWidget" native="true"/>
+   </item>
+   <item>
+    <widget class="LogTableView" name="logTableView"/>
+   </item>
+  </layout>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>LogFilterWidget</class>
+   <extends>QWidget</extends>
+   <header>Qt-LogViewer/Views/App/LogFilterWidget.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>LogTableView</class>
+   <extends>QTableView</extends>
+   <header>Qt-LogViewer/Views/App/LogTableView.h</header>
+  </customwidget>
+ </customwidgets>
+ <resources/>
+ <connections/>
+</ui>
