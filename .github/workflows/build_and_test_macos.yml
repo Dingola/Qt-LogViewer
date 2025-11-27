@@ -27,8 +27,6 @@ jobs:
   build_and_test:
     name: Build and Test on macOS Latest
     runs-on: macos-latest
-    env:
-      CMAKE_PREFIX_PATH: ${{ github.workspace }}/../Qt/${{ env.QT_VERSION }}/clang_64
     steps:
       # Checkout the repository and submodules
       - name: Checkout repository (and submodules)
@@ -61,7 +59,7 @@ jobs:
       - name: Configure CMake
         run: |
           cmake -B build -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
-                -DCMAKE_PREFIX_PATH="${{ env.CMAKE_PREFIX_PATH }}" \
+                -DCMAKE_PREFIX_PATH="${{ github.workspace }}/../Qt/${{ env.QT_VERSION }}/clang_64" \
                 -DMAIN_PROJECT_NAME=${{ env.MAIN_PROJECT_NAME }} \
                 -D${{ env.MAIN_PROJECT_NAME }}_BUILD_TARGET_TYPE=${{ env.BUILD_TARGET_TYPE }} \
                 -D${{ env.MAIN_PROJECT_NAME }}_BUILD_TEST_PROJECT=${{ env.BUILD_TEST_PROJECT }} \
@@ -74,6 +72,6 @@ jobs:
       # Run Tests
       - name: Run Tests
         env:
-          DYLD_LIBRARY_PATH: ${{ env.CMAKE_PREFIX_PATH }}/lib
+          DYLD_LIBRARY_PATH: ${{ github.workspace }}/../Qt/${{ env.QT_VERSION }}/clang_64/lib
         run: |
           ./build/QT_Project_Tests/${{ env.MAIN_PROJECT_NAME }}_Tests.app/Contents/MacOS/${{ env.MAIN_PROJECT_NAME }}_Tests
