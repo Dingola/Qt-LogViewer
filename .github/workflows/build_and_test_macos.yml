@@ -19,7 +19,6 @@ env:
   BUILD_TEST_PROJECT: true
   THIRD_PARTY_INCLUDE_DIR: ${{ github.workspace }}/ThirdPartyDir
   QT_VERSION: "6.8.0"
-  CMAKE_PREFIX_PATH: ${{ github.workspace }}/../Qt/${{ env.QT_VERSION }}/clang_64
 
 #------------------------------------------------
 # Workflow jobs
@@ -28,7 +27,8 @@ jobs:
   build_and_test:
     name: Build and Test on macOS Latest
     runs-on: macos-latest
-
+    env:
+      CMAKE_PREFIX_PATH: ${{ github.workspace }}/../Qt/${{ env.QT_VERSION }}/clang_64
     steps:
       # Checkout the repository and submodules
       - name: Checkout repository (and submodules)
