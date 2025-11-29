@@ -27,6 +27,21 @@ function (build_third_party_project
 	THIRD_PARTY_DIR_PATH 
 	EXT_PROJ_BUILD_TYPE
 )
+	# Prepare forwardable Qt/CMake settings for the external project
+	set(_forward_args "")
+	if (DEFINED CMAKE_PREFIX_PATH AND NOT CMAKE_PREFIX_PATH STREQUAL "")
+		list(APPEND _forward_args "-DCMAKE_PREFIX_PATH:PATH=${CMAKE_PREFIX_PATH}")
+	endif()
+	if (DEFINED Qt6_DIR AND NOT Qt6_DIR STREQUAL "")
+		list(APPEND _forward_args "-DQt6_DIR:PATH=${Qt6_DIR}")
+	endif()
+	if (DEFINED QT_QMAKE_EXECUTABLE AND NOT QT_QMAKE_EXECUTABLE STREQUAL "")
+		list(APPEND _forward_args "-DQT_QMAKE_EXECUTABLE:FILEPATH=${QT_QMAKE_EXECUTABLE}")
+	endif()
+	if (DEFINED CMAKE_PROJECT_INCLUDE_BEFORE AND NOT CMAKE_PROJECT_INCLUDE_BEFORE STREQUAL "")
+		list(APPEND _forward_args "-DCMAKE_PROJECT_INCLUDE_BEFORE:FILEPATH=${CMAKE_PROJECT_INCLUDE_BEFORE}")
+	endif()
+
 	# Create content of the CMakeLists which is used for downloading and building the third party lib
 	set(CMAKELIST_CONTENT "
 		cmake_minimum_required(VERSION ${CMAKE_MINIMUM_REQUIRED_VERSION})
@@ -47,6 +62,7 @@ function (build_third_party_project
 			CMAKE_ARGS
 				-DCMAKE_INSTALL_PREFIX:PATH=${THIRD_PARTY_DIR_PATH}/${EXT_PROJ_TARGET}_install/
 				-DCMAKE_BUILD_TYPE=${EXT_PROJ_BUILD_TYPE}
+				${_forward_args}
 				${ARGN}
 		)
 	")
