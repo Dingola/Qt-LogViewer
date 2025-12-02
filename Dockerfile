@@ -11,15 +11,20 @@ ENV QT_COMPILER_DIR=gcc_64
 ENV BUILD_TYPE=Release
 ENV BUILD_APP_PROJECT=true
 ENV BUILD_TEST_PROJECT=true
-ENV $RUN_APP_ON_CONTAINER_START=false
+ENV RUN_APP_ON_CONTAINER_START=false
 ENV THIRD_PARTY_INCLUDE_DIR=/home/user/ThirdParty
-ENV PROJECT_NAME=QtTemplate
+ENV PROJECT_NAME=Qt-LogViewer
 ENV QT_QPA_PLATFORM=xcb
 ENV QT_DEBUG_PLUGINS=1
 
-# Install required system packages and CMake 3.28.0-rc3
-RUN apt-get update && apt-get install -y \
+# Install required system packages and CMake 3.29.3
+RUN apt-get update \
+ && apt-get install -y software-properties-common ca-certificates \
+ && add-apt-repository -y ppa:ubuntu-toolchain-r/test \
+ && apt-get update \
+ && apt-get install -y \
     build-essential \
+    gcc-11 g++-11 \
     wget \
     git \
     libgl1-mesa-dev \
@@ -57,14 +62,18 @@ RUN apt-get update && apt-get install -y \
     libxcb-xinerama0 \
     locales \
     || exit 1 \
-    && wget https://github.com/Kitware/CMake/releases/download/v3.28.0-rc3/cmake-3.28.0-rc3-linux-x86_64.sh -O /tmp/cmake.sh \
-    && chmod +x /tmp/cmake.sh \
-    && /tmp/cmake.sh --skip-license --prefix=/usr/local || exit 1
+ && wget https://github.com/Kitware/CMake/releases/download/v3.29.3/cmake-3.29.3-linux-x86_64.sh -O /tmp/cmake.sh \
+ && chmod +x /tmp/cmake.sh \
+ && /tmp/cmake.sh --skip-license --prefix=/usr/local || exit 1
 
 # Configure UTF-8 locale
 RUN locale-gen en_US.UTF-8 || exit 1
 ENV LANG=en_US.UTF-8
 ENV LC_ALL=en_US.UTF-8
+
+# Use GCC 11 toolchain for all builds (ensures C++20 headers like <source_location> are available)
+ENV CC=/usr/bin/gcc-11
+ENV CXX=/usr/bin/g++-11
 
 # Install aqtinstall for Qt installation
 RUN python3 -m pip install --no-cache-dir aqtinstall || exit 1
@@ -72,9 +81,9 @@ RUN python3 -m pip install --no-cache-dir aqtinstall || exit 1
 # Install Qt using aqtinstall
 RUN python3 -m aqt install-qt linux desktop ${QT_VERSION} ${QT_COMPILER} --outputdir /opt/Qt || exit 1
 
-# Set the QT6_DIR environment variable
-ENV QT6_DIR=/opt/Qt/${QT_VERSION}/${QT_COMPILER_DIR}
-ENV PATH="${QT6_DIR}/bin:${PATH}"
+# Define the Qt installation prefix and ensure PATH is set
+ENV QT_PREFIX=/opt/Qt/${QT_VERSION}/${QT_COMPILER_DIR}
+ENV PATH="${QT_PREFIX}/bin:${PATH}"
 
 # Create a working directory
 WORKDIR /app
@@ -89,6 +98,7 @@ RUN mkdir -p ${THIRD_PARTY_INCLUDE_DIR} || exit 1
 RUN if [ "$BUILD_APP_PROJECT" = "true" ]; then \
     cmake -B _build_app_release -S . \
         -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
+        -DCMAKE_PREFIX_PATH="/opt/Qt/${QT_VERSION}/${QT_COMPILER_DIR}" \
         -DTHIRD_PARTY_INCLUDE_DIR=${THIRD_PARTY_INCLUDE_DIR} \
         -DMAIN_PROJECT_NAME=${PROJECT_NAME} || exit 1 \
     && cmake --build _build_app_release --config ${BUILD_TYPE} || exit 1; \
@@ -98,6 +108,7 @@ RUN if [ "$BUILD_APP_PROJECT" = "true" ]; then \
 RUN if [ "$BUILD_TEST_PROJECT" = "true" ]; then \
     cmake -B _build_tests_release -S . \
         -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
+        -DCMAKE_PREFIX_PATH="/opt/Qt/${QT_VERSION}/${QT_COMPILER_DIR}" \
         -D${PROJECT_NAME}_BUILD_TARGET_TYPE=static_library \
         -D${PROJECT_NAME}_BUILD_TEST_PROJECT=true \
         -DTHIRD_PARTY_INCLUDE_DIR=${THIRD_PARTY_INCLUDE_DIR} \
@@ -117,7 +128,7 @@ RUN if [ "$BUILD_TEST_PROJECT" = "true" ]; then \
 CMD if [ "$RUN_APP_ON_CONTAINER_START" = "true" ] && [ "$BUILD_APP_PROJECT" = "true" ]; then \
         Xvfb :99 -screen 0 1920x1080x24 -nolisten tcp & \
         export DISPLAY=:99 && \
-        ./_build_app_release/QT_Project/QtTemplate; \
+        ./_build_app_release/QT_Project/${PROJECT_NAME}; \
     else \
         echo "No app project to run"; \
     fi
