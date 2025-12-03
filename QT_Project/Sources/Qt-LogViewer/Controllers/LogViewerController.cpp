@@ -615,7 +615,7 @@ auto LogViewerController::get_search_field(const QUuid& view_id) const -> QStrin
  */
 auto LogViewerController::is_search_regex() const -> bool
 {
-    return false;
+    return is_search_regex(m_current_view_id);
 }
 
 /**

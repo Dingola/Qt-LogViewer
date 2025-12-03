@@ -5,6 +5,8 @@
 
 #include "Qt-LogViewer/Models/LogSortFilterProxyModel.h"
 
+#include <QCollator>
+
 #include "Qt-LogViewer/Models/LogModel.h"
 
 /**
@@ -15,6 +17,8 @@ LogSortFilterProxyModel::LogSortFilterProxyModel(QObject* parent): QSortFilterPr
 {
     setSortRole(Qt::DisplayRole);
     setDynamicSortFilter(true);
+
+    m_collator.setCaseSensitivity(Qt::CaseInsensitive);
 }
 
 /**
@@ -26,6 +30,7 @@ auto LogSortFilterProxyModel::set_app_name_filter(const QString& app_name) -> vo
     if (m_app_name_filter != app_name)
     {
         m_app_name_filter = app_name;
+        recalc_active_filters();
         invalidateFilter();
     }
 }
@@ -46,6 +51,7 @@ auto LogSortFilterProxyModel::set_log_level_filters(const QSet<QString>& levels)
     if (m_log_level_filters != normalized_filters)
     {
         m_log_level_filters = normalized_filters;
+        recalc_active_filters();
         invalidateFilter();
     }
 }
@@ -78,6 +84,7 @@ auto LogSortFilterProxyModel::set_search_filter(const QString& search_text, cons
             m_search_regex = QRegularExpression();
         }
 
+        recalc_active_filters();
         invalidateFilter();
     }
 }
@@ -88,7 +95,8 @@ auto LogSortFilterProxyModel::set_search_filter(const QString& search_text, cons
  */
 auto LogSortFilterProxyModel::get_app_name_filter() const noexcept -> QString
 {
-    return m_app_name_filter;
+    QString value = m_app_name_filter;
+    return value;
 }
 
 /**
@@ -97,7 +105,8 @@ auto LogSortFilterProxyModel::get_app_name_filter() const noexcept -> QString
  */
 auto LogSortFilterProxyModel::get_log_level_filters() const noexcept -> QSet<QString>
 {
-    return m_log_level_filters;
+    QSet<QString> levels = m_log_level_filters;
+    return levels;
 }
 
 /**
@@ -106,7 +115,8 @@ auto LogSortFilterProxyModel::get_log_level_filters() const noexcept -> QSet<QSt
  */
 auto LogSortFilterProxyModel::get_search_text() const noexcept -> QString
 {
-    return m_search_text;
+    QString value = m_search_text;
+    return value;
 }
 
 /**
@@ -115,7 +125,17 @@ auto LogSortFilterProxyModel::get_search_text() const noexcept -> QString
  */
 auto LogSortFilterProxyModel::get_search_field() const noexcept -> QString
 {
-    return m_search_field;
+    QString value = m_search_field;
+    return value;
+}
+
+/**
+ * @brief Returns the internal collator used for string comparisons in sorting.
+ * @return Reference to the collator.
+ */
+auto LogSortFilterProxyModel::get_collator() const noexcept -> const QCollator&
+{
+    return m_collator;
 }
 
 /**
@@ -124,7 +144,18 @@ auto LogSortFilterProxyModel::get_search_field() const noexcept -> QString
  */
 auto LogSortFilterProxyModel::is_search_regex() const noexcept -> bool
 {
-    return m_use_regex;
+    bool value = m_use_regex;
+    return value;
+}
+
+/**
+ * @brief Indicates whether any filter (app, level, search) is currently active.
+ * @return True if at least one filter is active.
+ */
+auto LogSortFilterProxyModel::has_active_filters() const noexcept -> bool
+{
+    bool value = m_any_filter_active;
+    return value;
 }
 
 /**
@@ -136,7 +167,8 @@ auto LogSortFilterProxyModel::is_search_regex() const noexcept -> bool
 auto LogSortFilterProxyModel::filterAcceptsRow(int source_row,
                                                const QModelIndex& source_parent) const -> bool
 {
-    return row_passes_filter(source_row, source_parent);
+    bool accepted = row_passes_filter(source_row, source_parent);
+    return accepted;
 }
 
 /**
@@ -145,13 +177,44 @@ auto LogSortFilterProxyModel::filterAcceptsRow(int source_row,
  * @param right The right index to compare.
  * @return True if the left value is less than the right value.
  */
-auto LogSortFilterProxyModel::lessThan(const QModelIndex& left,
-                                       const QModelIndex& right) const -> bool
+auto LogSortFilterProxyModel::lessThan(const QModelIndex& source_left,
+                                       const QModelIndex& source_right) const -> bool
 {
-    QString lStr = sourceModel()->data(left, Qt::DisplayRole).toString();
-    QString rStr = sourceModel()->data(right, Qt::DisplayRole).toString();
+    bool is_less = false;
+    const bool both_timestamp_columns = (source_left.column() == LogModel::Timestamp) &&
+                                        (source_right.column() == LogModel::Timestamp);
 
-    return lStr.localeAwareCompare(rStr) < 0;
+    if (both_timestamp_columns)
+    {
+        const QVariant left_value_variant = sourceModel()->data(source_left, Qt::DisplayRole);
+        const QVariant right_value_variant = sourceModel()->data(source_right, Qt::DisplayRole);
+
+        const QDateTime left_datetime = left_value_variant.toDateTime();
+        const QDateTime right_datetime = right_value_variant.toDateTime();
+
+        if (left_datetime.isValid() && right_datetime.isValid())
+        {
+            is_less = (left_datetime < right_datetime);
+        }
+        else
+        {
+            const QString left_string =
+                sourceModel()->data(source_left, Qt::DisplayRole).toString();
+            const QString right_string =
+                sourceModel()->data(source_right, Qt::DisplayRole).toString();
+
+            is_less = (m_collator.compare(left_string, right_string) < 0);
+        }
+    }
+    else
+    {
+        const QString left_string = sourceModel()->data(source_left, Qt::DisplayRole).toString();
+        const QString right_string = sourceModel()->data(source_right, Qt::DisplayRole).toString();
+
+        is_less = (m_collator.compare(left_string, right_string) < 0);
+    }
+
+    return is_less;
 }
 
 /**
@@ -161,75 +224,150 @@ auto LogSortFilterProxyModel::row_passes_filter(int row, const QModelIndex& pare
 {
     bool accepted = true;
 
-    QModelIndex index_app = sourceModel()->index(row, LogModel::AppName, parent);
-    QModelIndex index_level = sourceModel()->index(row, LogModel::Level, parent);
-    QModelIndex index_message = sourceModel()->index(row, LogModel::Message, parent);
-
-    // App name filter
-    if (!m_app_name_filter.isEmpty())
+    if (!m_any_filter_active)
     {
-        QString app_name = sourceModel()->data(index_app, Qt::DisplayRole).toString();
-        if (app_name != m_app_name_filter)
-        {
-            accepted = false;
-        }
+        accepted = true;
     }
-
-    // Level filter
-    if (accepted && !m_log_level_filters.isEmpty())
+    else
     {
-        QString level = sourceModel()->data(index_level, Qt::DisplayRole).toString();
-        QString normalized_level = level.trimmed().toLower();
-        if (!m_log_level_filters.contains(normalized_level))
-        {
-            accepted = false;
-        }
-    }
+        QModelIndex index_app = sourceModel()->index(row, LogModel::AppName, parent);
+        QModelIndex index_level = sourceModel()->index(row, LogModel::Level, parent);
+        QModelIndex index_message = sourceModel()->index(row, LogModel::Message, parent);
 
-    // Search filter
-    if (accepted && !m_search_text.isEmpty())
-    {
-        QString value;
-        if (m_search_field.compare("All Fields", Qt::CaseInsensitive) == 0)
+        // App name filter
+        if (!m_app_name_filter.isEmpty())
         {
-            value = sourceModel()->data(index_message, Qt::DisplayRole).toString() + " " +
-                    sourceModel()->data(index_level, Qt::DisplayRole).toString() + " " +
-                    sourceModel()->data(index_app, Qt::DisplayRole).toString();
-        }
-        else if (m_search_field.compare("Message", Qt::CaseInsensitive) == 0)
-        {
-            value = sourceModel()->data(index_message, Qt::DisplayRole).toString();
-        }
-        else if (m_search_field.compare("Level", Qt::CaseInsensitive) == 0)
-        {
-            value = sourceModel()->data(index_level, Qt::DisplayRole).toString();
-        }
-        else if (m_search_field.compare("AppName", Qt::CaseInsensitive) == 0)
-        {
-            value = sourceModel()->data(index_app, Qt::DisplayRole).toString();
-        }
-        else
-        {
-            value = sourceModel()->data(index_message, Qt::DisplayRole).toString() + " " +
-                    sourceModel()->data(index_level, Qt::DisplayRole).toString() + " " +
-                    sourceModel()->data(index_app, Qt::DisplayRole).toString();
-        }
-
-        if (m_use_regex)
-        {
-            if (!m_search_regex.isValid() || !m_search_regex.match(value).hasMatch())
+            const QString app_name = sourceModel()->data(index_app, Qt::DisplayRole).toString();
+            if (app_name != m_app_name_filter)
             {
                 accepted = false;
             }
         }
-        else
+
+        // Level filter
+        if (accepted && !m_log_level_filters.isEmpty())
         {
-            if (!value.contains(m_search_text, Qt::CaseInsensitive))
+            const QString level = sourceModel()->data(index_level, Qt::DisplayRole).toString();
+            const QString normalized_level = level.trimmed().toLower();
+            if (!m_log_level_filters.contains(normalized_level))
             {
                 accepted = false;
+            }
+        }
+
+        // Search filter
+        if (accepted && !m_search_text.isEmpty())
+        {
+            const bool all_fields =
+                (m_search_field.compare("All Fields", Qt::CaseInsensitive) == 0);
+            const QString message_value =
+                sourceModel()->data(index_message, Qt::DisplayRole).toString();
+            const QString level_value =
+                sourceModel()->data(index_level, Qt::DisplayRole).toString();
+            const QString app_value = sourceModel()->data(index_app, Qt::DisplayRole).toString();
+
+            if (m_use_regex)
+            {
+                if (!m_search_regex.isValid())
+                {
+                    accepted = false;
+                }
+                else if (all_fields)
+                {
+                    // Any field matching is enough
+                    if (!m_search_regex.match(message_value).hasMatch() &&
+                        !m_search_regex.match(level_value).hasMatch() &&
+                        !m_search_regex.match(app_value).hasMatch())
+                    {
+                        accepted = false;
+                    }
+                }
+                else if (m_search_field.compare("Message", Qt::CaseInsensitive) == 0)
+                {
+                    if (!m_search_regex.match(message_value).hasMatch())
+                    {
+                        accepted = false;
+                    }
+                }
+                else if (m_search_field.compare("Level", Qt::CaseInsensitive) == 0)
+                {
+                    if (!m_search_regex.match(level_value).hasMatch())
+                    {
+                        accepted = false;
+                    }
+                }
+                else if (m_search_field.compare("AppName", Qt::CaseInsensitive) == 0)
+                {
+                    if (!m_search_regex.match(app_value).hasMatch())
+                    {
+                        accepted = false;
+                    }
+                }
+                else
+                {
+                    // Fallback treat as all fields
+                    if (!m_search_regex.match(message_value).hasMatch() &&
+                        !m_search_regex.match(level_value).hasMatch() &&
+                        !m_search_regex.match(app_value).hasMatch())
+                    {
+                        accepted = false;
+                    }
+                }
+            }
+            else
+            {
+                // Plain text search (case-insensitive)
+                if (all_fields)
+                {
+                    if (!message_value.contains(m_search_text, Qt::CaseInsensitive) &&
+                        !level_value.contains(m_search_text, Qt::CaseInsensitive) &&
+                        !app_value.contains(m_search_text, Qt::CaseInsensitive))
+                    {
+                        accepted = false;
+                    }
+                }
+                else if (m_search_field.compare("Message", Qt::CaseInsensitive) == 0)
+                {
+                    if (!message_value.contains(m_search_text, Qt::CaseInsensitive))
+                    {
+                        accepted = false;
+                    }
+                }
+                else if (m_search_field.compare("Level", Qt::CaseInsensitive) == 0)
+                {
+                    if (!level_value.contains(m_search_text, Qt::CaseInsensitive))
+                    {
+                        accepted = false;
+                    }
+                }
+                else if (m_search_field.compare("AppName", Qt::CaseInsensitive) == 0)
+                {
+                    if (!app_value.contains(m_search_text, Qt::CaseInsensitive))
+                    {
+                        accepted = false;
+                    }
+                }
+                else
+                {
+                    if (!message_value.contains(m_search_text, Qt::CaseInsensitive) &&
+                        !level_value.contains(m_search_text, Qt::CaseInsensitive) &&
+                        !app_value.contains(m_search_text, Qt::CaseInsensitive))
+                    {
+                        accepted = false;
+                    }
+                }
             }
         }
     }
 
     return accepted;
+}
+
+/**
+ * @brief Recomputes the internal flag indicating active filters.
+ */
+auto LogSortFilterProxyModel::recalc_active_filters() -> void
+{
+    m_any_filter_active =
+        !m_app_name_filter.isEmpty() || !m_log_level_filters.isEmpty() || !m_search_text.isEmpty();
 }

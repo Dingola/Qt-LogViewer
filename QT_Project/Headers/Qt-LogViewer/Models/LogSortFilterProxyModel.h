@@ -1,14 +1,15 @@
 #pragma once
 
-#include <QRegularExpression>
-#include <QSet>
-#include <QSortFilterProxyModel>
-#include <QString>
-
 /**
  * @file LogSortFilterProxyModel.h
  * @brief This file contains the definition of the LogSortFilterProxyModel class.
  */
+
+#include <QCollator>
+#include <QRegularExpression>
+#include <QSet>
+#include <QSortFilterProxyModel>
+#include <QString>
 
 /**
  * @class LogSortFilterProxyModel
@@ -16,6 +17,7 @@
  *
  * Supports filtering by application name, log level, search string (plain or regex),
  * and custom sorting (e.g., log levels, timestamps).
+ *
  */
 class LogSortFilterProxyModel: public QSortFilterProxyModel
 {
@@ -74,10 +76,22 @@ class LogSortFilterProxyModel: public QSortFilterProxyModel
         [[nodiscard]] auto get_search_field() const noexcept -> QString;
 
         /**
+         * @brief Returns the internal collator used for string comparisons in sorting.
+         * @return Reference to the collator.
+         */
+        [[nodiscard]] auto get_collator() const noexcept -> const QCollator&;
+
+        /**
          * @brief Returns whether the search text is treated as a regex.
          * @return True if using regex, false if plain text.
          */
         [[nodiscard]] auto is_search_regex() const noexcept -> bool;
+
+        /**
+         * @brief Indicates whether any filter (app, level, search) is currently active.
+         * @return True if at least one filter is active.
+         */
+        [[nodiscard]] auto has_active_filters() const noexcept -> bool;
 
     protected:
         /**
@@ -95,8 +109,8 @@ class LogSortFilterProxyModel: public QSortFilterProxyModel
          * @param right The right index to compare.
          * @return True if the left value is less than the right value.
          */
-        [[nodiscard]] auto lessThan(const QModelIndex& left,
-                                    const QModelIndex& right) const -> bool override;
+        [[nodiscard]] auto lessThan(const QModelIndex& source_left,
+                                    const QModelIndex& source_right) const -> bool override;
 
     private:
         /**
@@ -106,11 +120,22 @@ class LogSortFilterProxyModel: public QSortFilterProxyModel
          */
         [[nodiscard]] auto row_passes_filter(int row, const QModelIndex& parent) const -> bool;
 
+        /**
+         * @brief Recomputes the internal flag indicating active filters.
+         */
+        auto recalc_active_filters() -> void;
+
     private:
+        /**
+         * @brief Cached collator used in `lessThan` for case-insensitive string comparison.
+         * Reusing a collator avoids repeated construction costs in tight sort loops.
+         */
+        mutable QCollator m_collator;
         QString m_app_name_filter;
         QSet<QString> m_log_level_filters;
         QString m_search_text;
         QString m_search_field;
         bool m_use_regex = false;
         QRegularExpression m_search_regex;
+        bool m_any_filter_active = false;
 };
