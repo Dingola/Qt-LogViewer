@@ -219,3 +219,32 @@ target_link_libraries(${PROJECT_NAME} PUBLIC ${MAIN_PROJECT_NAME})
 target_include_directories(${PROJECT_NAME} PUBLIC 
 	${CMAKE_CURRENT_LIST_DIR} 
 	${CMAKE_SOURCE_DIR}/QT_Project/Headers)
+
+# Determine Qt installation prefix for locating translations
+get_filename_component(_qt_prefix "${Qt6_DIR}/../../.." ABSOLUTE)
+if(NOT EXISTS "${_qt_prefix}")
+    list(GET CMAKE_PREFIX_PATH 0 _first_prefix)
+    if(_first_prefix)
+        set(_qt_prefix "${_first_prefix}")
+    endif()
+endif()
+set(QT_TRANSLATIONS_DIR "${_qt_prefix}/translations")
+
+# Compute target runtime translations directory per platform using the TARGET name
+if(WIN32)
+    set(TEST_TRANSLATIONS_DIR "$<TARGET_FILE_DIR:${PROJECT_NAME}>/translations")
+elseif(APPLE)
+    set(TEST_TRANSLATIONS_DIR "$<TARGET_FILE_DIR:${PROJECT_NAME}>/../MacOS/translations")
+else()
+    set(TEST_TRANSLATIONS_DIR "$<TARGET_FILE_DIR:${PROJECT_NAME}>/translations")
+endif()
+
+# Post-build: ensure dir exists and copy qt_en.qm
+add_custom_command(TARGET ${PROJECT_NAME}
+    POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${TEST_TRANSLATIONS_DIR}"
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+            "${QT_TRANSLATIONS_DIR}/qt_en.qm"
+            "${TEST_TRANSLATIONS_DIR}/qt_en.qm"
+    COMMENT "Preparing test translations directory and copying qt_en.qm"
+)
