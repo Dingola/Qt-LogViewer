@@ -154,6 +154,13 @@ class MainWindow: public BaseMainWindow
         auto handle_log_file_open_requested(const LogFileInfo& log_file_info) -> void;
 
         /**
+         * @brief Handles requests to add a log file to the current view.
+         * @param log_file_info The LogFileInfo to add.
+         */
+        auto handle_add_log_file_to_current_view_requested(const LogFileInfo& log_file_info)
+            -> void;
+
+        /**
          * @brief Slot to handle changes in the current view ID.
          * @param view_id The new current view ID.
          */

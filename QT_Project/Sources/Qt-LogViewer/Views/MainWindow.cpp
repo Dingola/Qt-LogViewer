@@ -116,6 +116,8 @@ auto MainWindow::setup_log_file_explorer() -> void
 
     connect(m_log_file_explorer, &LogFileExplorer::open_file_requested, this,
             &MainWindow::handle_log_file_open_requested);
+    connect(m_log_file_explorer, &LogFileExplorer::add_to_current_view_requested, this,
+            &MainWindow::handle_add_log_file_to_current_view_requested);
     connect(m_log_file_explorer, &LogFileExplorer::remove_file_requested, m_controller,
             [this](const LogFileInfo& log_file_info) {
                 m_controller->remove_log_file(log_file_info);
@@ -606,6 +608,39 @@ auto MainWindow::handle_log_file_open_requested(const LogFileInfo& log_file_info
     log_view_widget->auto_resize_columns();
 
     update_pagination_widget();
+}
+
+/**
+ * @brief Handles requests to add a log file to the current view.
+ * @param log_file_info The LogFileInfo to add.
+ */
+auto MainWindow::handle_add_log_file_to_current_view_requested(const LogFileInfo& log_file_info)
+    -> void
+{
+    const QUuid current_view = m_controller->get_current_view();
+
+    if (!current_view.isNull())
+    {
+        const bool enqueued =
+            m_controller->load_log_file_async(current_view, log_file_info.get_file_path(), 1000);
+
+        if (enqueued)
+        {
+            statusBar()->showMessage(
+                tr("Queued file for current view: %1").arg(log_file_info.get_file_name()), 3000);
+        }
+        else
+        {
+            statusBar()->showMessage(
+                tr("File already present in current view: %1").arg(log_file_info.get_file_name()),
+                3000);
+        }
+    }
+    else
+    {
+        // No active view -> behave like "Open in New View"
+        handle_log_file_open_requested(log_file_info);
+    }
 }
 
 /**

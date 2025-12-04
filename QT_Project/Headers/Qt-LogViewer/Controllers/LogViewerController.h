@@ -76,6 +76,15 @@ class LogViewerController: public QObject
         auto load_log_file(const QString& file_path) -> QUuid;
 
         /**
+         * @brief Loads a single log file into an existing view (model/proxy).
+         * @param view_id The target view to load the file into.
+         * @param file_path The path to the log file.
+         * @return True if the file was loaded and entries appended; false if the file was already
+         * present or the view does not exist.
+         */
+        auto load_log_file(const QUuid& view_id, const QString& file_path) -> bool;
+
+        /**
          * @brief Loads log files from the specified file paths and creates a new view (model/proxy)
          * for them.
          * @param file_paths A vector of file paths to load logs from.
@@ -90,6 +99,18 @@ class LogViewerController: public QObject
          * @return QUuid of the created view.
          */
         auto load_log_file_async(const QString& file_path, qsizetype batch_size = 1000) -> QUuid;
+
+        /**
+         * @brief Starts streaming load of a single log file into an existing view (model/proxy).
+         *        The file will be streamed in the background according to the controller queue.
+         * @param view_id The target view to load the file into.
+         * @param file_path The path to the log file to stream.
+         * @param batch_size Number of entries per batch appended to the model.
+         * @return True if the file was enqueued for streaming; false if the file was already
+         * present or the view does not exist.
+         */
+        auto load_log_file_async(const QUuid& view_id, const QString& file_path,
+                                 qsizetype batch_size) -> bool;
 
         /**
          * @brief Starts streaming load of multiple log files into a single new view (model/proxy).

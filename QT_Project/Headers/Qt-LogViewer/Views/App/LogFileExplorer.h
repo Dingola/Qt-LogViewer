@@ -4,6 +4,9 @@
 #include <QPoint>
 #include <QTreeView>
 #include <QWidget>
+#include <functional>
+
+#include "Qt-LogViewer/Models/LogFileTreeItem.h"
 
 namespace Ui
 {
@@ -79,6 +82,28 @@ class LogFileExplorer: public QWidget
          */
         auto show_context_menu(const QPoint& pos) -> void;
 
+        /**
+         * @brief Tries to extract a LogFileInfo for the given index if the item type matches.
+         * @param index The model index to inspect.
+         * @param expected_type The expected LogFileTreeItem::Type (e.g., File, Group).
+         * @param out_info Output parameter that receives the LogFileInfo on success.
+         * @return True if the index is valid, the item type matches, and out_info was set; false
+         * otherwise.
+         */
+        [[nodiscard]] auto try_get_info_if_type(const QModelIndex& index,
+                                                LogFileTreeItem::Type expected_type,
+                                                LogFileInfo& out_info) const -> bool;
+
+        /**
+         * @brief Dispatches a callable for the current index if the item type matches.
+         * @param expected_type The expected LogFileTreeItem::Type.
+         * @param fn The callable to invoke with LogFileInfo when type matches.
+         * @return True if dispatched; false otherwise.
+         */
+        [[nodiscard]] auto dispatch_current_if_type(
+            LogFileTreeItem::Type expected_type,
+            const std::function<void(const LogFileInfo&)>& fn) const -> bool;
+
     protected:
         /**
          * @brief Handles change events to update the UI.
@@ -89,19 +114,26 @@ class LogFileExplorer: public QWidget
     signals:
         /**
          * @brief Emitted when a log file is selected in the tree view.
-         * @param file The selected LogFileInfo.
+         * @param log_file_info The selected LogFileInfo.
          */
         void file_selected(const LogFileInfo& log_file_info);
 
         /**
          * @brief Emitted when the user requests to open a log file via the context menu.
-         * @param file The LogFileInfo to open.
+         * @param log_file_info The LogFileInfo to open.
          */
         void open_file_requested(const LogFileInfo& log_file_info);
 
         /**
+         * @brief Emitted when the user requests to add a log file to the current view via the
+         * context menu.
+         * @param log_file_info The LogFileInfo to add to the current view.
+         */
+        void add_to_current_view_requested(const LogFileInfo& log_file_info);
+
+        /**
          * @brief Emitted when the user requests to remove a log file via the context menu.
-         * @param file The LogFileInfo to remove.
+         * @param log_file_info The LogFileInfo to remove.
          */
         void remove_file_requested(const LogFileInfo& log_file_info);
 

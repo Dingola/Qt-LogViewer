@@ -191,21 +191,50 @@ auto LogViewerController::load_log_file(const QString& file_path) -> QUuid
     LogFileInfo loaded_log_file(file_path, app_name);
     auto view_id = QUuid::createUuid();
 
-    auto* model = new LogModel(this);
-    model->add_entries(entries);
+    ensure_view_models(view_id);
 
-    auto* sort_proxy = new LogSortFilterProxyModel(this);
-    sort_proxy->setSourceModel(model);
-
-    auto* paging_proxy = new PagingProxyModel(this);
-    paging_proxy->setSourceModel(sort_proxy);
+    if (m_view_models.contains(view_id))
+    {
+        m_view_models[view_id]->add_entries(entries);
+    }
 
     m_loaded_log_files[view_id] = QList<LogFileInfo>{loaded_log_file};
-    m_view_models[view_id] = model;
-    m_sort_filter_models[view_id] = sort_proxy;
-    m_paging_models[view_id] = paging_proxy;
 
     return view_id;
+}
+
+/**
+ * @brief Loads a single log file into an existing view (model/proxy).
+ * @param view_id The target view to load the file into.
+ * @param file_path The path to the log file.
+ * @return True if the file was loaded and entries appended; false if the file was already present
+ * or the view does not exist.
+ */
+auto LogViewerController::load_log_file(const QUuid& view_id, const QString& file_path) -> bool
+{
+    bool success = false;
+
+    ensure_view_models(view_id);
+
+    if (m_view_models.contains(view_id) && !is_file_loaded(view_id, file_path))
+    {
+        auto entries = m_loader.load_log_file(file_path);
+        const QString app_name = (!entries.isEmpty()) ? entries.first().get_app_name()
+                                                      : LogLoader::identify_app(file_path);
+
+        m_view_models[view_id]->add_entries(entries);
+
+        LogFileInfo info(file_path, app_name);
+        if (!m_loaded_log_files.contains(view_id))
+        {
+            m_loaded_log_files[view_id] = QList<LogFileInfo>();
+        }
+        m_loaded_log_files[view_id].append(info);
+
+        success = true;
+    }
+
+    return success;
 }
 
 /**
@@ -220,7 +249,9 @@ auto LogViewerController::load_log_file(const QString& file_path) -> QUuid
 auto LogViewerController::load_log_files(const QVector<QString>& file_paths) -> QUuid
 {
     QList<LogFileInfo> loaded_log_files;
-    auto* model = new LogModel(this);
+    auto view_id = QUuid::createUuid();
+
+    ensure_view_models(view_id);
 
     for (const QString& file_path: file_paths)
     {
@@ -230,21 +261,14 @@ auto LogViewerController::load_log_files(const QVector<QString>& file_paths) -> 
 
         LogFileInfo log_file_info(file_path, app_name);
         loaded_log_files.append(log_file_info);
-        model->add_entries(entries);
+
+        if (m_view_models.contains(view_id))
+        {
+            m_view_models[view_id]->add_entries(entries);
+        }
     }
 
-    auto view_id = QUuid::createUuid();
-
-    auto* sort_proxy = new LogSortFilterProxyModel(this);
-    sort_proxy->setSourceModel(model);
-
-    auto* paging_proxy = new PagingProxyModel(this);
-    paging_proxy->setSourceModel(sort_proxy);
-
     m_loaded_log_files[view_id] = loaded_log_files;
-    m_view_models[view_id] = model;
-    m_sort_filter_models[view_id] = sort_proxy;
-    m_paging_models[view_id] = paging_proxy;
 
     return view_id;
 }
@@ -271,6 +295,43 @@ auto LogViewerController::load_log_file_async(const QString& file_path,
     try_start_next_async(m_active_batch_size);
 
     return view_id;
+}
+
+/**
+ * @brief Starts streaming load of a single log file into an existing view (model/proxy).
+ *        The file will be streamed in the background according to the controller queue.
+ * @param view_id The target view to load the file into.
+ * @param file_path The path to the log file to stream.
+ * @param batch_size Number of entries per batch appended to the model.
+ * @return True if the file was enqueued for streaming; false if the file was already present or the
+ * view does not exist.
+ */
+auto LogViewerController::load_log_file_async(const QUuid& view_id, const QString& file_path,
+                                              qsizetype batch_size) -> bool
+{
+    bool success = false;
+
+    ensure_view_models(view_id);
+
+    if (m_view_models.contains(view_id) && !is_file_loaded(view_id, file_path))
+    {
+        const QString app_name = LogLoader::identify_app(file_path);
+        LogFileInfo info(file_path, app_name);
+
+        if (!m_loaded_log_files.contains(view_id))
+        {
+            m_loaded_log_files[view_id] = QList<LogFileInfo>();
+        }
+        m_loaded_log_files[view_id].append(info);
+
+        enqueue_async(view_id, file_path);
+        m_active_batch_size = batch_size;
+        try_start_next_async(m_active_batch_size);
+
+        success = true;
+    }
+
+    return success;
 }
 
 /**

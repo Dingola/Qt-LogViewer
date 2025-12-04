@@ -114,38 +114,31 @@ auto LogFileExplorer::init_context_menu() -> void
 {
     m_context_menu = new QMenu(this);
 
-    auto open_action = new QAction(tr("Open"), m_context_menu);
+    auto open_action = new QAction(tr("Open in New View"), m_context_menu);
     m_context_menu->addAction(open_action);
     connect(open_action, &QAction::triggered, this, [this]() {
-        QModelIndex index = ui->treeView->currentIndex();
+        auto dispatched = dispatch_current_if_type(
+            LogFileTreeItem::Type::File,
+            [this](const LogFileInfo& info) { emit open_file_requested(info); });
+        Q_UNUSED(dispatched);
+    });
 
-        if (index.isValid())
-        {
-            auto* item = static_cast<LogFileTreeItem*>(index.internalPointer());
-
-            if (item != nullptr &&
-                item->data(0).value<LogFileTreeItem::Type>() == LogFileTreeItem::Type::File)
-            {
-                emit open_file_requested(item->data(1).value<LogFileInfo>());
-            }
-        }
+    auto add_to_current_view_action = new QAction(tr("Add to Current View"), m_context_menu);
+    m_context_menu->addAction(add_to_current_view_action);
+    connect(add_to_current_view_action, &QAction::triggered, this, [this]() {
+        auto dispatched = dispatch_current_if_type(
+            LogFileTreeItem::Type::File,
+            [this](const LogFileInfo& info) { emit add_to_current_view_requested(info); });
+        Q_UNUSED(dispatched);
     });
 
     auto remove_action = new QAction(tr("Remove"), m_context_menu);
     m_context_menu->addAction(remove_action);
     connect(remove_action, &QAction::triggered, this, [this]() {
-        QModelIndex index = ui->treeView->currentIndex();
-
-        if (index.isValid())
-        {
-            auto* item = static_cast<LogFileTreeItem*>(index.internalPointer());
-
-            if (item != nullptr &&
-                item->data(0).value<LogFileTreeItem::Type>() == LogFileTreeItem::Type::File)
-            {
-                emit remove_file_requested(item->data(1).value<LogFileInfo>());
-            }
-        }
+        auto dispatched = dispatch_current_if_type(
+            LogFileTreeItem::Type::File,
+            [this](const LogFileInfo& info) { emit remove_file_requested(info); });
+        Q_UNUSED(dispatched);
     });
 }
 
@@ -167,6 +160,66 @@ auto LogFileExplorer::show_context_menu(const QPoint& pos) -> void
             m_context_menu->exec(ui->treeView->viewport()->mapToGlobal(pos));
         }
     }
+}
+
+/**
+ * @brief Tries to extract a LogFileInfo for the given index if the item type matches.
+ * @param index The model index to inspect.
+ * @param expected_type The expected LogFileTreeItem::Type (e.g., File, Group).
+ * @param out_info Output parameter that receives the LogFileInfo on success.
+ * @return True if the index is valid, the item type matches, and out_info was set; false otherwise.
+ */
+[[nodiscard]] auto LogFileExplorer::try_get_info_if_type(const QModelIndex& index,
+                                                         LogFileTreeItem::Type expected_type,
+                                                         LogFileInfo& out_info) const -> bool
+{
+    bool success = false;
+
+    if (index.isValid())
+    {
+        auto* item = static_cast<LogFileTreeItem*>(index.internalPointer());
+
+        if (item != nullptr)
+        {
+            const auto type_variant = item->data(0);
+            if (type_variant.canConvert<LogFileTreeItem::Type>())
+            {
+                const auto item_type = type_variant.value<LogFileTreeItem::Type>();
+
+                if (item_type == expected_type)
+                {
+                    out_info = item->data(1).value<LogFileInfo>();
+                    success = true;
+                }
+            }
+        }
+    }
+
+    return success;
+}
+
+/**
+ * @brief Dispatches a callable for the current index if the item type matches.
+ * @param expected_type The expected LogFileTreeItem::Type.
+ * @param fn The callable to invoke with LogFileInfo when type matches.
+ * @return True if dispatched; false otherwise.
+ */
+[[nodiscard]] auto LogFileExplorer::dispatch_current_if_type(
+    LogFileTreeItem::Type expected_type,
+    const std::function<void(const LogFileInfo&)>& fn) const -> bool
+{
+    bool dispatched = false;
+
+    const QModelIndex index = ui->treeView->currentIndex();
+    LogFileInfo info;
+
+    if (try_get_info_if_type(index, expected_type, info))
+    {
+        fn(info);
+        dispatched = true;
+    }
+
+    return dispatched;
 }
 
 /**
