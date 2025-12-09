@@ -199,6 +199,7 @@ auto LogViewerController::load_log_file(const QString& file_path) -> QUuid
     }
 
     m_loaded_log_files[view_id] = QList<LogFileInfo>{loaded_log_file};
+    emit view_file_paths_changed(view_id, get_view_file_paths(view_id));
 
     return view_id;
 }
@@ -232,6 +233,7 @@ auto LogViewerController::load_log_file(const QUuid& view_id, const QString& fil
         m_loaded_log_files[view_id].append(info);
 
         success = true;
+        emit view_file_paths_changed(view_id, get_view_file_paths(view_id));
     }
 
     return success;
@@ -269,6 +271,7 @@ auto LogViewerController::load_log_files(const QVector<QString>& file_paths) -> 
     }
 
     m_loaded_log_files[view_id] = loaded_log_files;
+    emit view_file_paths_changed(view_id, get_view_file_paths(view_id));
 
     return view_id;
 }
@@ -289,6 +292,7 @@ auto LogViewerController::load_log_file_async(const QString& file_path,
     const QString app_name = LogLoader::identify_app(file_path);
     LogFileInfo loaded_log_file(file_path, app_name);
     m_loaded_log_files[view_id] = QList<LogFileInfo>{loaded_log_file};
+    emit view_file_paths_changed(view_id, get_view_file_paths(view_id));
 
     enqueue_async(view_id, file_path);
     m_active_batch_size = batch_size;
@@ -323,6 +327,7 @@ auto LogViewerController::load_log_file_async(const QUuid& view_id, const QStrin
             m_loaded_log_files[view_id] = QList<LogFileInfo>();
         }
         m_loaded_log_files[view_id].append(info);
+        emit view_file_paths_changed(view_id, get_view_file_paths(view_id));
 
         enqueue_async(view_id, file_path);
         m_active_batch_size = batch_size;
@@ -357,6 +362,8 @@ auto LogViewerController::load_log_files_async(const QVector<QString>& file_path
     }
 
     m_loaded_log_files[view_id] = files_info;
+    emit view_file_paths_changed(view_id, get_view_file_paths(view_id));
+
     m_active_batch_size = batch_size;
     try_start_next_async(m_active_batch_size);
 
@@ -818,6 +825,177 @@ auto LogViewerController::is_file_loaded(const QUuid& view_id,
 }
 
 /**
+ * @brief Applies a "show only file" filter for the specified view.
+ * @param view_id Target view id.
+ * @param file_path File path to show exclusively, or empty to reset.
+ *
+ * Behavior:
+ * - Non-empty file_path: activate show-only and ensure that file is visible (remove it from the
+ * hidden set).
+ * - Empty file_path: deactivate show-only and clear the hidden set so all files are visible again.
+ */
+auto LogViewerController::set_show_only_file(const QUuid& view_id, const QString& file_path) -> void
+{
+    auto* proxy = get_sort_filter_proxy(view_id);
+
+    if (proxy != nullptr)
+    {
+        proxy->set_show_only_file_path(file_path);
+
+        if (file_path.isEmpty())
+        {
+            // "Show All Files"
+            proxy->clear_hidden_files();
+        }
+        else
+        {
+            // Ensure the selected file is visible even if it was explicitly hidden
+            proxy->unhide_file(file_path);
+        }
+    }
+}
+
+/**
+ * @brief Toggles a file's visibility (hide/show) in the specified view.
+ *
+ * Behavior:
+ * - No show-only active:
+ *   - Toggle hide/unhide for the requested file.
+ * - Show-only is active for file A:
+ *   - Toggle on A:
+ *     - Clear show-only and hide all files (empty view).
+ *   - Toggle on a different file B:
+ *     - Clear show-only and make B visible. Convert current effective-hidden into explicit hidden
+ *       for all other files. Preserve previously explicit hidden files, excluding A and B.
+ *
+ * Explicit "Show only" action is handled via set_show_only_file(view_id, file_path).
+ *
+ * @param view_id Target view id.
+ * @param file_path Absolute file path to toggle.
+ */
+auto LogViewerController::toggle_file_visibility(const QUuid& view_id,
+                                                 const QString& file_path) -> void
+{
+    auto* proxy = get_sort_filter_proxy(view_id);
+
+    // Guard: no-op if proxy is invalid or path is empty.
+    const bool can_toggle = (proxy != nullptr) && !file_path.isEmpty();
+
+    if (can_toggle)
+    {
+        const QString show_only = proxy->get_show_only_file_path();
+        const QSet<QString> hidden = proxy->get_hidden_file_paths();
+        const bool is_hidden = hidden.contains(file_path);
+        const bool show_only_active = !show_only.isEmpty();
+        const bool toggling_show_only_target = (show_only == file_path);
+
+        if (!show_only_active)
+        {
+            // No show-only active: standard toggle for the requested file.
+            if (is_hidden)
+            {
+                proxy->unhide_file(file_path);
+            }
+            else
+            {
+                proxy->hide_file(file_path);
+            }
+        }
+        else
+        {
+            if (toggling_show_only_target)
+            {
+                // Toggling the current show-only file: clear show-only and hide all files (empty
+                // view).
+                proxy->set_show_only_file_path(QString());
+
+                const QVector<QString> files = get_view_file_paths(view_id);
+                QSet<QString> all_hidden;
+                for (const auto& p: files)
+                {
+                    all_hidden.insert(p);
+                }
+                proxy->set_hidden_file_paths(all_hidden);
+            }
+            else
+            {
+                // Toggling a different file while show-only is active:
+                // Clear show-only and make this file visible (unhide if necessary).
+                // Convert current effective-hidden into explicit hidden for all files except
+                // the previous show-only (show_only) and the requested file (file_path).
+                proxy->set_show_only_file_path(QString());
+
+                if (is_hidden)
+                {
+                    proxy->unhide_file(file_path);
+                }
+
+                const QVector<QString> files = get_view_file_paths(view_id);
+                QSet<QString> new_hidden;
+
+                // Hide all files except {show_only, file_path}
+                for (const auto& p: files)
+                {
+                    const bool keep_visible = (p == show_only) || (p == file_path);
+                    if (!keep_visible)
+                    {
+                        new_hidden.insert(p);
+                    }
+                }
+
+                // Preserve previously explicit hidden files, excluding {show_only, file_path}
+                for (const auto& h: hidden)
+                {
+                    const bool exclude = (h == show_only) || (h == file_path);
+                    if (!exclude)
+                    {
+                        new_hidden.insert(h);
+                    }
+                }
+
+                proxy->set_hidden_file_paths(new_hidden);
+            }
+        }
+    }
+}
+
+/**
+ * @brief Hides (excludes) a specific file in the specified view.
+ * @param view_id Target view id.
+ * @param file_path File path to hide.
+ */
+auto LogViewerController::hide_file(const QUuid& view_id, const QString& file_path) -> void
+{
+    auto* proxy = get_sort_filter_proxy(view_id);
+
+    if (proxy != nullptr)
+    {
+        proxy->hide_file(file_path);
+    }
+}
+
+/**
+ * @brief Returns absolute file paths loaded in the specified view.
+ * @param view_id The QUuid of the view.
+ * @return Vector of file paths loaded in the view (empty if none).
+ */
+auto LogViewerController::get_view_file_paths(const QUuid& view_id) const -> QVector<QString>
+{
+    QVector<QString> result;
+
+    if (m_loaded_log_files.contains(view_id))
+    {
+        const auto& infos = m_loaded_log_files[view_id];
+        for (const auto& info: infos)
+        {
+            result.append(info.get_file_path());
+        }
+    }
+
+    return result;
+}
+
+/**
  * @brief Removes a single log file from all views and from the LogFileTreeModel.
  *        If a view becomes empty, it is deleted and view_removed() is emitted.
  * @param file The LogFileInfo object to remove.
@@ -826,18 +1004,19 @@ auto LogViewerController::remove_log_file(const LogFileInfo& file) -> void
 {
     QList<QUuid> views_to_remove;
 
-    // Remove from all views
+    // Remove file from all views and purge associated model entries
     for (auto it = m_loaded_log_files.begin(); it != m_loaded_log_files.end(); ++it)
     {
         auto& log_file_list = it.value();
+
         log_file_list.erase(std::remove_if(log_file_list.begin(), log_file_list.end(),
                                            [&file](const LogFileInfo& info) {
                                                return info.get_file_path() == file.get_file_path();
                                            }),
                             log_file_list.end());
 
-        // Remove entries from the LogModel
         const QUuid& view_id = it.key();
+
         if (m_view_models.contains(view_id))
         {
             m_view_models[view_id]->remove_entries_by_file_path(file.get_file_path());
@@ -847,14 +1026,41 @@ auto LogViewerController::remove_log_file(const LogFileInfo& file) -> void
                 views_to_remove.append(view_id);
             }
         }
+
+        // Notify with updated file paths even if the view becomes empty
+        emit view_file_paths_changed(view_id, get_view_file_paths(view_id));
+
+        // Preserve hidden-effective state when the show-only target is removed:
+        // If show-only pointed to the removed file, clear show-only and mark all remaining files
+        // explicitly hidden.
+        auto* sort_proxy = get_sort_filter_proxy(view_id);
+        if (sort_proxy != nullptr)
+        {
+            const QString show_only_path = sort_proxy->get_show_only_file_path();
+            const bool show_only_target_removed = (show_only_path == file.get_file_path());
+
+            if (show_only_target_removed)
+            {
+                sort_proxy->set_show_only_file_path(QString());
+
+                const QVector<QString> remaining_files = get_view_file_paths(view_id);
+                QSet<QString> all_hidden;
+                for (const auto& p: remaining_files)
+                {
+                    all_hidden.insert(p);
+                }
+                sort_proxy->set_hidden_file_paths(all_hidden);
+            }
+        }
     }
 
-    // Remove from the tree model
+    // Remove file from the tree model
     if (m_file_tree_model != nullptr)
     {
         m_file_tree_model->remove_log_file(file);
     }
 
+    // Remove views that became empty and notify listeners
     for (const QUuid& view_id: views_to_remove)
     {
         remove_view(view_id);

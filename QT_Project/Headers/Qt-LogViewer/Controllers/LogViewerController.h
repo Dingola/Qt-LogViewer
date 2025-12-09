@@ -366,6 +366,48 @@ class LogViewerController: public QObject
         [[nodiscard]] auto is_file_loaded(const QUuid& view_id,
                                           const QString& file_path) const -> bool;
 
+        /**
+         * @brief Applies a "show only file" filter for the specified view.
+         *        Pass empty string to show all files.
+         * @param view_id Target view id.
+         * @param file_path File path to show exclusively, or empty to reset.
+         */
+        auto set_show_only_file(const QUuid& view_id, const QString& file_path) -> void;
+
+        /**
+         * @brief Toggles a file's visibility (hide/show) in the specified view.
+         *
+         * Behavior:
+         * - No show-only active:
+         *   - Toggle hide/unhide for the requested file.
+         * - Show-only is active for file A:
+         *   - Toggle on A:
+         *     - Clear show-only and hide all files (empty view).
+         *   - Toggle on a different file B:
+         *     - Clear show-only and make B visible. Convert current effective-hidden into explicit
+         * hidden for all other files. Preserve previously explicit hidden files, excluding A and B.
+         *
+         * Explicit "Show only" action is handled via set_show_only_file(view_id, file_path).
+         *
+         * @param view_id Target view id.
+         * @param file_path Absolute file path to toggle.
+         */
+        auto toggle_file_visibility(const QUuid& view_id, const QString& file_path) -> void;
+
+        /**
+         * @brief Hides (excludes) a specific file in the specified view.
+         * @param view_id Target view id.
+         * @param file_path File path to hide.
+         */
+        auto hide_file(const QUuid& view_id, const QString& file_path) -> void;
+
+        /**
+         * @brief Returns absolute file paths loaded in the specified view.
+         * @param view_id The QUuid of the view.
+         * @return Vector of file paths loaded in the view (empty if none).
+         */
+        [[nodiscard]] auto get_view_file_paths(const QUuid& view_id) const -> QVector<QString>;
+
     signals:
         /**
          * @brief Signal emitted when the current view ID changes.
@@ -401,6 +443,13 @@ class LogViewerController: public QObject
          */
         auto loading_error(const QUuid& view_id, const QString& file_path,
                            const QString& message) -> void;
+
+        /**
+         * @brief Emitted when the set of file paths for a view changes (add/remove).
+         * @param view_id The affected view.
+         * @param file_paths Current list of file paths in the view.
+         */
+        void view_file_paths_changed(const QUuid& view_id, const QVector<QString>& file_paths);
 
     public slots:
         /**
