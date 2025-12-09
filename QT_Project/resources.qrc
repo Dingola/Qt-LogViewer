@@ -16,5 +16,9 @@
 		<file>Resources/Icons/close.svg</file>
 		<file>Resources/Icons/branch-closed.svg</file>
 		<file>Resources/Icons/branch-open.svg</file>
+		<file>Resources/Icons/trash.svg</file>
+		<file>Resources/Icons/eye.svg</file>
+		<file>Resources/Icons/eye-off.svg</file>
+		<file>Resources/Icons/show-only.svg</file>
 	</qresource>
 </RCC>

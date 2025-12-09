@@ -125,8 +125,12 @@
     @ColorButtonBackgroundPressed: @Brand-Accent-750;
     @ColorButtonBackgroundDisabled: @Neutral-14;
 
-    @ColorToolButtonBackground: @Neutral-13;
+    @ColorToolButtonBackground: @Neutral-5;
     @ColorToolButtonBorderHover: @Brand-Accent-500;
+
+    @ColorToolButtonBackgroundInlineMenu: @Neutral-5;
+    @ColorToolButtonBackgroundInlineMenuHover: @Neutral-12;
+    @ColorToolButtonBackgroundInlineMenuPressed: @Neutral-4;
 
     /* Table */
     @ColorTableBackground: @Neutral-3;
@@ -258,6 +262,10 @@
 
     @ColorToolButtonBackground: @Neutral-6;
     @ColorToolButtonBorderHover: @Brand-Accent-500;
+
+    @ColorToolButtonBackgroundInlineMenu: @Neutral-6;
+    @ColorToolButtonBackgroundInlineMenuHover: @Neutral-17;
+    @ColorToolButtonBackgroundInlineMenuPressed: @Neutral-21;
 
     /* Table */
     @ColorTableBackground: @Neutral-6;
@@ -396,6 +404,9 @@ QComboBox::drop-down {
     subcontrol-position: top right;
     width: 20px;
 }
+/* TODO: 
+ * - ::down-arrow: use themed SVG, fix margins/alignment.
+ */
 QComboBox::down-arrow {
     image: url(:/Resources/down-arrow.svg);
     border: none;
@@ -481,6 +492,24 @@ QToolButton:disabled {
     border: 2px solid @ColorBorderDisabled;
 }
 
+QToolButton[variant="inline-menu"] {
+    min-width: 24px;
+    max-width: 24px;
+    min-height: 24px;
+    max-height: 24px;
+    padding: 0px;
+    border: none;
+    background-color: @ColorToolButtonBackgroundInlineMenu;
+}
+QToolButton[variant="inline-menu"]:hover {
+    background-color: @ColorToolButtonBackgroundInlineMenuHover;
+    border: none;
+}
+QToolButton[variant="inline-menu"]:pressed {
+    background-color: @ColorToolButtonBackgroundInlineMenuPressed;
+    border: none;
+}
+
 /* === TableView === */
 QTableView {
     background-color: @ColorTableBackground;
@@ -563,6 +592,16 @@ QMenu::item:selected {
 }
 QMenu::item:disabled {
     color: @ColorTextDisabled;
+}
+
+QMenu[variant="inline-menu"] {
+    margin-top: 4px;
+    min-width: 240px;
+    padding: 6px 10px;
+    border-radius: 8px;
+}
+QMenu[variant="inline-menu"]::item {
+    padding: 6px 20px;
 }
 
 /* === ScrollBar === */
@@ -865,6 +904,42 @@ LogViewWidget {
     background-color: @ColorLogViewWidgetBackground;
 }
 
+LogViewWidget QToolButton {
+    min-width: 80px;
+    max-width: 160px;
+    min-height: 0px;
+    max-height: 22px;
+    padding: 4px;
+    border: 1px solid @ColorBorder;
+    border-radius: 6px;
+    background-color: @ColorToolButtonBackground;
+    color: @ColorText;
+}
+
+/* TODO: 
+ * - Replace hover/pressed colors with themed vars.
+ * - Menu indicator: use themed SVG, fix margins/alignment.
+ */
+LogViewWidget QToolButton:hover {
+    border: 1px solid @Neutral-12;
+    background-color: @Neutral-12;
+    color: @ColorButtonText;
+}
+
+LogViewWidget QToolButton:pressed {
+    border: 1px solid @Neutral-12;
+    background-color: @Neutral-12;
+    color: @ColorButtonText;
+}
+
+LogViewWidget QToolButton#filesInViewToolButton::menu-indicator {
+    image: url(:/Resources/down-arrow.svg);
+    width: 10px;
+    height: 10px;
+    margin: 0 4px;
+    margin-bottom: 10px;
+}
+
 /* === LogFilterBarWidget === */
 LogFilterBarWidget {
     background-color: @ColorLogFilterBarWidgetBackground;
@@ -1026,4 +1101,18 @@ QWidget#windowtitlebar QPushButton {
 
 QWidget#windowtitlebar QPushButton:hover {
     background: @ColorWindowButtonBackgroundHover;
+}
+
+/* === Files In View Menu Item Widget === */
+FilesInViewMenuItemWidget {
+    qproperty-label_reserved_px: 100;
+
+    /* Global base + hover */
+    qproperty-icon_color: @Neutral-26;
+    qproperty-icon_color_hover: @Severity-Info;
+
+    /* Per-icon base overrides */
+    qproperty-icon_color_eye: @Severity-Info;
+    qproperty-icon_color_eye_off: @Severity-Warning;
+    qproperty-icon_color_trash: @Severity-Error;
 }
