@@ -7,6 +7,7 @@
 
 #include <QCollator>
 
+#include "Qt-LogViewer/Models/LogEntry.h"
 #include "Qt-LogViewer/Models/LogModel.h"
 
 /**
@@ -42,7 +43,6 @@ auto LogSortFilterProxyModel::set_app_name_filter(const QString& app_name) -> vo
 auto LogSortFilterProxyModel::set_log_level_filters(const QSet<QString>& levels) -> void
 {
     QSet<QString> normalized_filters;
-
     for (const auto& filter_level: levels)
     {
         normalized_filters.insert(filter_level.trimmed().toLower());
@@ -86,6 +86,90 @@ auto LogSortFilterProxyModel::set_search_filter(const QString& search_text, cons
 
         recalc_active_filters();
         invalidateFilter();
+    }
+}
+
+/**
+ * @brief Sets an optional "show only this file" filter for the proxy.
+ * @param file_path Absolute file path to show exclusively, or empty to clear.
+ */
+auto LogSortFilterProxyModel::set_show_only_file_path(const QString& file_path) -> void
+{
+    QString normalized = file_path;
+    if (m_show_only_file_path != normalized)
+    {
+        m_show_only_file_path = normalized;
+        recalc_active_filters();
+        invalidateFilter();
+        emit show_only_changed(file_path);
+    }
+}
+
+/**
+ * @brief Hides (excludes) a file from the proxy.
+ * @param file_path Absolute file path to hide.
+ */
+auto LogSortFilterProxyModel::hide_file(const QString& file_path) -> void
+{
+    if (!file_path.isEmpty())
+    {
+        if (!m_hidden_file_paths.contains(file_path))
+        {
+            m_hidden_file_paths.insert(file_path);
+            recalc_active_filters();
+            invalidateFilter();
+            emit file_visibility_changed(file_path);
+        }
+    }
+}
+
+/**
+ * @brief Removes a file from the hidden set.
+ * @param file_path Absolute file path to unhide.
+ */
+auto LogSortFilterProxyModel::unhide_file(const QString& file_path) -> void
+{
+    if (m_hidden_file_paths.contains(file_path))
+    {
+        m_hidden_file_paths.remove(file_path);
+        recalc_active_filters();
+        invalidateFilter();
+        emit file_visibility_changed(file_path);
+    }
+}
+
+/**
+ * @brief Replaces the entire hidden file set with the provided paths.
+ *
+ * Emits `file_visibility_changed(QString())` once and invalidates the filter.
+ * Passing an empty set clears all hidden files.
+ *
+ * @param file_paths Set of absolute file paths to hide.
+ */
+auto LogSortFilterProxyModel::set_hidden_file_paths(const QSet<QString>& file_paths) -> void
+{
+    const bool changed = (m_hidden_file_paths != file_paths);
+
+    if (changed)
+    {
+        m_hidden_file_paths = file_paths;
+        recalc_active_filters();
+        invalidateFilter();
+        emit file_visibility_changed(QString());
+    }
+}
+
+/**
+ * @brief Clears all hidden file paths.
+ */
+auto LogSortFilterProxyModel::clear_hidden_files() -> void
+{
+    if (!m_hidden_file_paths.isEmpty())
+    {
+        m_hidden_file_paths.clear();
+        recalc_active_filters();
+        invalidateFilter();
+        emit file_visibility_changed(QString());
     }
 }
 
@@ -149,12 +233,32 @@ auto LogSortFilterProxyModel::is_search_regex() const noexcept -> bool
 }
 
 /**
- * @brief Indicates whether any filter (app, level, search) is currently active.
+ * @brief Indicates whether any filter (app, level, search, file) is currently active.
  * @return True if at least one filter is active.
  */
 auto LogSortFilterProxyModel::has_active_filters() const noexcept -> bool
 {
     bool value = m_any_filter_active;
+    return value;
+}
+
+/**
+ * @brief Returns the current show-only file path.
+ * @return Absolute file path, or empty if disabled.
+ */
+auto LogSortFilterProxyModel::get_show_only_file_path() const noexcept -> QString
+{
+    QString value = m_show_only_file_path;
+    return value;
+}
+
+/**
+ * @brief Returns the current set of hidden file paths.
+ * @return Set of absolute file paths hidden by this proxy.
+ */
+auto LogSortFilterProxyModel::get_hidden_file_paths() const noexcept -> QSet<QString>
+{
+    QSet<QString> value = m_hidden_file_paths;
     return value;
 }
 
@@ -173,8 +277,8 @@ auto LogSortFilterProxyModel::filterAcceptsRow(int source_row,
 
 /**
  * @brief Custom sorting logic for columns.
- * @param left The left index to compare.
- * @param right The right index to compare.
+ * @param source_left The left index to compare.
+ * @param source_right The right index to compare.
  * @return True if the left value is less than the right value.
  */
 auto LogSortFilterProxyModel::lessThan(const QModelIndex& source_left,
@@ -218,142 +322,170 @@ auto LogSortFilterProxyModel::lessThan(const QModelIndex& source_left,
 }
 
 /**
- * @brief Checks if a specific row passes the current filters.
+ * @brief Checks if a specific row passes the current filters, including file filters.
  */
 auto LogSortFilterProxyModel::row_passes_filter(int row, const QModelIndex& parent) const -> bool
 {
     bool accepted = true;
 
-    if (!m_any_filter_active)
+    // Per-file filter (needs file path from the source model entry)
+    QString file_path;
+    const auto* log_model = qobject_cast<const LogModel*>(sourceModel());
+    if (log_model != nullptr)
     {
-        accepted = true;
+        if (row >= 0 && row < log_model->rowCount())
+        {
+            const LogEntry entry = log_model->get_entry(row);
+            file_path = entry.get_file_info().get_file_path();
+        }
     }
-    else
+
+    if (!m_show_only_file_path.isEmpty())
     {
-        QModelIndex index_app = sourceModel()->index(row, LogModel::AppName, parent);
-        QModelIndex index_level = sourceModel()->index(row, LogModel::Level, parent);
-        QModelIndex index_message = sourceModel()->index(row, LogModel::Message, parent);
-
-        // App name filter
-        if (!m_app_name_filter.isEmpty())
+        if (file_path != m_show_only_file_path)
         {
-            const QString app_name = sourceModel()->data(index_app, Qt::DisplayRole).toString();
-            if (app_name != m_app_name_filter)
-            {
-                accepted = false;
-            }
+            accepted = false;
         }
-
-        // Level filter
-        if (accepted && !m_log_level_filters.isEmpty())
+    }
+    if (accepted && !m_hidden_file_paths.isEmpty())
+    {
+        if (m_hidden_file_paths.contains(file_path))
         {
-            const QString level = sourceModel()->data(index_level, Qt::DisplayRole).toString();
-            const QString normalized_level = level.trimmed().toLower();
-            if (!m_log_level_filters.contains(normalized_level))
-            {
-                accepted = false;
-            }
+            accepted = false;
         }
+    }
 
-        // Search filter
-        if (accepted && !m_search_text.isEmpty())
+    if (accepted)
+    {
+        if (!m_any_filter_active)
         {
-            const bool all_fields =
-                (m_search_field.compare("All Fields", Qt::CaseInsensitive) == 0);
-            const QString message_value =
-                sourceModel()->data(index_message, Qt::DisplayRole).toString();
-            const QString level_value =
-                sourceModel()->data(index_level, Qt::DisplayRole).toString();
-            const QString app_value = sourceModel()->data(index_app, Qt::DisplayRole).toString();
+            accepted = true;
+        }
+        else
+        {
+            QModelIndex index_app = sourceModel()->index(row, LogModel::AppName, parent);
+            QModelIndex index_level = sourceModel()->index(row, LogModel::Level, parent);
+            QModelIndex index_message = sourceModel()->index(row, LogModel::Message, parent);
 
-            if (m_use_regex)
+            // App name filter
+            if (!m_app_name_filter.isEmpty())
             {
-                if (!m_search_regex.isValid())
+                const QString app_name = sourceModel()->data(index_app, Qt::DisplayRole).toString();
+                if (app_name != m_app_name_filter)
                 {
                     accepted = false;
                 }
-                else if (all_fields)
+            }
+
+            // Level filter
+            if (accepted && !m_log_level_filters.isEmpty())
+            {
+                const QString level = sourceModel()->data(index_level, Qt::DisplayRole).toString();
+                const QString normalized_level = level.trimmed().toLower();
+                if (!m_log_level_filters.contains(normalized_level))
                 {
-                    // Any field matching is enough
-                    if (!m_search_regex.match(message_value).hasMatch() &&
-                        !m_search_regex.match(level_value).hasMatch() &&
-                        !m_search_regex.match(app_value).hasMatch())
-                    {
-                        accepted = false;
-                    }
-                }
-                else if (m_search_field.compare("Message", Qt::CaseInsensitive) == 0)
-                {
-                    if (!m_search_regex.match(message_value).hasMatch())
-                    {
-                        accepted = false;
-                    }
-                }
-                else if (m_search_field.compare("Level", Qt::CaseInsensitive) == 0)
-                {
-                    if (!m_search_regex.match(level_value).hasMatch())
-                    {
-                        accepted = false;
-                    }
-                }
-                else if (m_search_field.compare("AppName", Qt::CaseInsensitive) == 0)
-                {
-                    if (!m_search_regex.match(app_value).hasMatch())
-                    {
-                        accepted = false;
-                    }
-                }
-                else
-                {
-                    // Fallback treat as all fields
-                    if (!m_search_regex.match(message_value).hasMatch() &&
-                        !m_search_regex.match(level_value).hasMatch() &&
-                        !m_search_regex.match(app_value).hasMatch())
-                    {
-                        accepted = false;
-                    }
+                    accepted = false;
                 }
             }
-            else
+
+            // Search filter
+            if (accepted && !m_search_text.isEmpty())
             {
-                // Plain text search (case-insensitive)
-                if (all_fields)
+                const bool all_fields =
+                    (m_search_field.compare("All Fields", Qt::CaseInsensitive) == 0);
+                const QString message_value =
+                    sourceModel()->data(index_message, Qt::DisplayRole).toString();
+                const QString level_value =
+                    sourceModel()->data(index_level, Qt::DisplayRole).toString();
+                const QString app_value =
+                    sourceModel()->data(index_app, Qt::DisplayRole).toString();
+
+                if (m_use_regex)
                 {
-                    if (!message_value.contains(m_search_text, Qt::CaseInsensitive) &&
-                        !level_value.contains(m_search_text, Qt::CaseInsensitive) &&
-                        !app_value.contains(m_search_text, Qt::CaseInsensitive))
+                    if (!m_search_regex.isValid())
                     {
                         accepted = false;
                     }
-                }
-                else if (m_search_field.compare("Message", Qt::CaseInsensitive) == 0)
-                {
-                    if (!message_value.contains(m_search_text, Qt::CaseInsensitive))
+                    else if (all_fields)
                     {
-                        accepted = false;
+                        if (!m_search_regex.match(message_value).hasMatch() &&
+                            !m_search_regex.match(level_value).hasMatch() &&
+                            !m_search_regex.match(app_value).hasMatch())
+                        {
+                            accepted = false;
+                        }
                     }
-                }
-                else if (m_search_field.compare("Level", Qt::CaseInsensitive) == 0)
-                {
-                    if (!level_value.contains(m_search_text, Qt::CaseInsensitive))
+                    else if (m_search_field.compare("Message", Qt::CaseInsensitive) == 0)
                     {
-                        accepted = false;
+                        if (!m_search_regex.match(message_value).hasMatch())
+                        {
+                            accepted = false;
+                        }
                     }
-                }
-                else if (m_search_field.compare("AppName", Qt::CaseInsensitive) == 0)
-                {
-                    if (!app_value.contains(m_search_text, Qt::CaseInsensitive))
+                    else if (m_search_field.compare("Level", Qt::CaseInsensitive) == 0)
                     {
-                        accepted = false;
+                        if (!m_search_regex.match(level_value).hasMatch())
+                        {
+                            accepted = false;
+                        }
+                    }
+                    else if (m_search_field.compare("AppName", Qt::CaseInsensitive) == 0)
+                    {
+                        if (!m_search_regex.match(app_value).hasMatch())
+                        {
+                            accepted = false;
+                        }
+                    }
+                    else
+                    {
+                        if (!m_search_regex.match(message_value).hasMatch() &&
+                            !m_search_regex.match(level_value).hasMatch() &&
+                            !m_search_regex.match(app_value).hasMatch())
+                        {
+                            accepted = false;
+                        }
                     }
                 }
                 else
                 {
-                    if (!message_value.contains(m_search_text, Qt::CaseInsensitive) &&
-                        !level_value.contains(m_search_text, Qt::CaseInsensitive) &&
-                        !app_value.contains(m_search_text, Qt::CaseInsensitive))
+                    if (all_fields)
                     {
-                        accepted = false;
+                        if (!message_value.contains(m_search_text, Qt::CaseInsensitive) &&
+                            !level_value.contains(m_search_text, Qt::CaseInsensitive) &&
+                            !app_value.contains(m_search_text, Qt::CaseInsensitive))
+                        {
+                            accepted = false;
+                        }
+                    }
+                    else if (m_search_field.compare("Message", Qt::CaseInsensitive) == 0)
+                    {
+                        if (!message_value.contains(m_search_text, Qt::CaseInsensitive))
+                        {
+                            accepted = false;
+                        }
+                    }
+                    else if (m_search_field.compare("Level", Qt::CaseInsensitive) == 0)
+                    {
+                        if (!level_value.contains(m_search_text, Qt::CaseInsensitive))
+                        {
+                            accepted = false;
+                        }
+                    }
+                    else if (m_search_field.compare("AppName", Qt::CaseInsensitive) == 0)
+                    {
+                        if (!app_value.contains(m_search_text, Qt::CaseInsensitive))
+                        {
+                            accepted = false;
+                        }
+                    }
+                    else
+                    {
+                        if (!message_value.contains(m_search_text, Qt::CaseInsensitive) &&
+                            !level_value.contains(m_search_text, Qt::CaseInsensitive) &&
+                            !app_value.contains(m_search_text, Qt::CaseInsensitive))
+                        {
+                            accepted = false;
+                        }
                     }
                 }
             }
@@ -368,6 +500,7 @@ auto LogSortFilterProxyModel::row_passes_filter(int row, const QModelIndex& pare
  */
 auto LogSortFilterProxyModel::recalc_active_filters() -> void
 {
-    m_any_filter_active =
-        !m_app_name_filter.isEmpty() || !m_log_level_filters.isEmpty() || !m_search_text.isEmpty();
+    m_any_filter_active = !m_app_name_filter.isEmpty() || !m_log_level_filters.isEmpty() ||
+                          !m_search_text.isEmpty() || !m_show_only_file_path.isEmpty() ||
+                          !m_hidden_file_paths.isEmpty();
 }

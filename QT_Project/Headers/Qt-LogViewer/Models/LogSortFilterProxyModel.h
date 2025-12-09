@@ -16,8 +16,7 @@
  * @brief Proxy model for filtering and sorting log entries in the LogModel.
  *
  * Supports filtering by application name, log level, search string (plain or regex),
- * and custom sorting (e.g., log levels, timestamps).
- *
+ * custom sorting (e.g., log levels, timestamps), and per-file filters (show-only and hide).
  */
 class LogSortFilterProxyModel: public QSortFilterProxyModel
 {
@@ -50,6 +49,42 @@ class LogSortFilterProxyModel: public QSortFilterProxyModel
          */
         auto set_search_filter(const QString& search_text, const QString& field,
                                bool use_regex) -> void;
+
+        /**
+         * @brief Sets an optional "show only this file" filter.
+         *        When set, only rows from this absolute file path are shown.
+         *        Pass empty string to clear the show-only filter.
+         * @param file_path Absolute file path to show exclusively, or empty to clear.
+         */
+        auto set_show_only_file_path(const QString& file_path) -> void;
+
+        /**
+         * @brief Hides (excludes) a file from the view. Call again with the same path to keep
+         * hidden.
+         * @param file_path Absolute file path to hide.
+         */
+        auto hide_file(const QString& file_path) -> void;
+
+        /**
+         * @brief Removes a file from the hidden set (if present).
+         * @param file_path Absolute file path to unhide.
+         */
+        auto unhide_file(const QString& file_path) -> void;
+
+        /**
+         * @brief Replaces the entire hidden file set with the provided paths.
+         *
+         * Emits `file_visibility_changed(QString())` once and invalidates the filter.
+         * Passing an empty set clears all hidden files.
+         *
+         * @param file_paths Set of absolute file paths to hide.
+         */
+        auto set_hidden_file_paths(const QSet<QString>& file_paths) -> void;
+
+        /**
+         * @brief Clears all hidden files.
+         */
+        auto clear_hidden_files() -> void;
 
         /**
          * @brief Returns the current application name filter.
@@ -88,10 +123,22 @@ class LogSortFilterProxyModel: public QSortFilterProxyModel
         [[nodiscard]] auto is_search_regex() const noexcept -> bool;
 
         /**
-         * @brief Indicates whether any filter (app, level, search) is currently active.
+         * @brief Indicates whether any filter (app, level, search, file) is currently active.
          * @return True if at least one filter is active.
          */
         [[nodiscard]] auto has_active_filters() const noexcept -> bool;
+
+        /**
+         * @brief Returns the current show-only file path.
+         * @return Absolute file path, or empty if disabled.
+         */
+        [[nodiscard]] auto get_show_only_file_path() const noexcept -> QString;
+
+        /**
+         * @brief Returns the current set of hidden file paths.
+         * @return Set of absolute file paths hidden by this proxy.
+         */
+        [[nodiscard]] auto get_hidden_file_paths() const noexcept -> QSet<QString>;
 
     protected:
         /**
@@ -105,8 +152,8 @@ class LogSortFilterProxyModel: public QSortFilterProxyModel
 
         /**
          * @brief Custom sorting logic for columns.
-         * @param left The left index to compare.
-         * @param right The right index to compare.
+         * @param source_left The left index to compare.
+         * @param source_right The right index to compare.
          * @return True if the left value is less than the right value.
          */
         [[nodiscard]] auto lessThan(const QModelIndex& source_left,
@@ -125,6 +172,19 @@ class LogSortFilterProxyModel: public QSortFilterProxyModel
          */
         auto recalc_active_filters() -> void;
 
+    signals:
+        /**
+         * @brief Emitted after a file's explicit visibility changed (hidden/unhidden).
+         * @param file_path The affected file path.
+         */
+        void file_visibility_changed(const QString& file_path);
+
+        /**
+         * @brief Emitted after the show-only target changed (activated or reset).
+         * @param file_path The new show-only target (empty when reset).
+         */
+        void show_only_changed(const QString& file_path);
+
     private:
         /**
          * @brief Cached collator used in `lessThan` for case-insensitive string comparison.
@@ -138,4 +198,6 @@ class LogSortFilterProxyModel: public QSortFilterProxyModel
         bool m_use_regex = false;
         QRegularExpression m_search_regex;
         bool m_any_filter_active = false;
+        QString m_show_only_file_path;
+        QSet<QString> m_hidden_file_paths;
 };
