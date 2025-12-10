@@ -2,8 +2,11 @@
 
 #include <QAbstractItemModel>
 #include <QMap>
+#include <QMenu>
+#include <QModelIndex>
 #include <QSet>
 #include <QString>
+#include <QToolButton>
 #include <QUuid>
 #include <QVector>
 #include <QWidget>
@@ -28,6 +31,7 @@ class LogTableView;
  * - Forward filter change signals.
  * - Manage a per-view identifier (QUuid) for controller coordination.
  * - Expose the internal table view for selection/model access.
+ * - Provide a "Files in View" menu for per-file actions (show-only, hide, remove).
  */
 class LogViewWidget: public QWidget
 {
@@ -148,6 +152,16 @@ class LogViewWidget: public QWidget
          */
         [[nodiscard]] auto get_table_view() const -> LogTableView*;
 
+        /**
+         * @brief Updates the list of file paths loaded in the current view.
+         *
+         * This list is used to populate the "Files in View" dropdown menu with per-file actions.
+         * Call this when the current view adds/removes files.
+         *
+         * @param file_paths Vector of absolute file paths currently loaded in this view.
+         */
+        auto set_view_file_paths(const QVector<QString>& file_paths) -> void;
+
     signals:
         /**
          * @brief Emitted when the application filter selection changes.
@@ -174,6 +188,24 @@ class LogViewWidget: public QWidget
          */
         void current_row_changed(const QModelIndex& current, const QModelIndex& previous);
 
+        /**
+         * @brief Emitted when the user requests to show only a specific file in the current view.
+         * @param file_path Target file path.
+         */
+        void show_only_file_requested(const QString& file_path);
+
+        /**
+         * @brief Emitted when the user requests to toggle a file's visibility (hide/show).
+         * @param file_path Target file path.
+         */
+        void toggle_visibility_requested(const QString& file_path);
+
+        /**
+         * @brief Emitted when the user requests to remove a specific file from the current view.
+         * @param file_path Target file path.
+         */
+        void remove_file_requested(const QString& file_path);
+
     protected:
         /**
          * @brief Handles language change and other UI change events.
@@ -182,6 +214,30 @@ class LogViewWidget: public QWidget
         auto changeEvent(QEvent* event) -> void override;
 
     private:
+        /**
+         * @brief Creates the "Files in View" tool button and attaches the dropdown menu.
+         *
+         * The button is inserted into the top-level layout and configured for instant popup.
+         */
+        auto setup_files_menu() -> void;
+
+        /**
+         * @brief Rebuilds the "Files in View" dropdown menu from `m_view_file_paths`.
+         *
+         * Adds a "Show All Files" action and one per-file row with inline actions
+         * (Show Only, Hide, Remove).
+         */
+        auto rebuild_files_menu() -> void;
+
+        /**
+         * @brief Refreshes the "Files in View" menu rows' visibility toggle presentation
+         *        based on the current proxy state. Private by design.
+         */
+        auto refresh_files_menu_states() -> void;
+
+    private:
         Ui::LogViewWidget* ui;
         QUuid m_view_id;
+        QMenu* m_files_menu = nullptr;
+        QVector<QString> m_view_file_paths;
 };
