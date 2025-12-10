@@ -629,9 +629,8 @@ auto MainWindow::handle_log_file_open_requested(const LogFileInfo& log_file_info
                 update_pagination_widget();
             });
     connect(log_view_widget, &LogViewWidget::remove_file_requested, this,
-            [this](const QString& file_path) {
-                LogFileInfo info(file_path, QString());
-                m_controller->remove_log_file(info);
+            [this, view_id](const QString& file_path) {
+                m_controller->remove_log_file(view_id, file_path);
                 update_pagination_widget();
             });
 

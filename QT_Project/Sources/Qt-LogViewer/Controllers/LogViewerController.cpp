@@ -1069,6 +1069,80 @@ auto LogViewerController::remove_log_file(const LogFileInfo& file) -> void
 }
 
 /**
+ * @brief Removes a single log file from the specified view only.
+ *
+ * If the target view becomes empty, it is removed and `view_removed(view_id)` is emitted.
+ *
+ * @param view_id The target view.
+ * @param file_path Absolute file path to remove from the view.
+ */
+auto LogViewerController::remove_log_file(const QUuid& view_id, const QString& file_path) -> void
+{
+    const bool has_valid_args = !view_id.isNull() && !file_path.isEmpty();
+    bool view_became_empty = false;
+
+    if (has_valid_args)
+    {
+        // Remove file from the loaded list for this view
+        if (m_loaded_log_files.contains(view_id))
+        {
+            auto& log_file_list = m_loaded_log_files[view_id];
+            log_file_list.erase(std::remove_if(log_file_list.begin(), log_file_list.end(),
+                                               [&file_path](const LogFileInfo& info) {
+                                                   return info.get_file_path() == file_path;
+                                               }),
+                                log_file_list.end());
+        }
+
+        // Remove entries from the model for this view
+        if (m_view_models.contains(view_id))
+        {
+            m_view_models[view_id]->remove_entries_by_file_path(file_path);
+            view_became_empty = m_view_models[view_id]->get_entries().isEmpty();
+        }
+
+        // Keep per-file filters consistent in this view
+        auto* sort_proxy = get_sort_filter_proxy(view_id);
+        if (sort_proxy != nullptr)
+        {
+            const QString show_only = sort_proxy->get_show_only_file_path();
+            const bool removed_was_show_only = (show_only == file_path);
+
+            if (removed_was_show_only)
+            {
+                sort_proxy->set_show_only_file_path(QString());
+
+                const QVector<QString> remaining = get_view_file_paths(view_id);
+                QSet<QString> all_hidden;
+                for (const auto& p: remaining)
+                {
+                    all_hidden.insert(p);
+                }
+                sort_proxy->set_hidden_file_paths(all_hidden);
+            }
+            else
+            {
+                QSet<QString> hidden = sort_proxy->get_hidden_file_paths();
+                if (hidden.contains(file_path))
+                {
+                    hidden.remove(file_path);
+                    sort_proxy->set_hidden_file_paths(hidden);
+                }
+            }
+        }
+
+        emit view_file_paths_changed(view_id, get_view_file_paths(view_id));
+    }
+
+    // Handle empty view cleanup outside the main branch to keep a single exit point
+    if (has_valid_args && view_became_empty)
+    {
+        remove_view(view_id);
+        emit view_removed(view_id);
+    }
+}
+
+/**
  * @brief Enqueues an asynchronous load request for a log file.
  * @param view_id The QUuid of the view to load into.
  * @param file_path The path to the log file.

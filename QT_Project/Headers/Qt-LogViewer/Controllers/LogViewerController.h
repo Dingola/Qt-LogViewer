@@ -459,6 +459,16 @@ class LogViewerController: public QObject
          */
         auto remove_log_file(const LogFileInfo& file) -> void;
 
+        /**
+         * @brief Removes a single log file from the specified view only.
+         *
+         * If the target view becomes empty, it is removed and `view_removed(view_id)` is emitted.
+         *
+         * @param view_id The target view.
+         * @param file_path Absolute file path to remove from the view.
+         */
+        auto remove_log_file(const QUuid& view_id, const QString& file_path) -> void;
+
     private:
         /**
          * @brief Enqueues an asynchronous load request for a log file.
