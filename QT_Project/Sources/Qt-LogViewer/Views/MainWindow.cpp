@@ -73,6 +73,18 @@ MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
             &MainWindow::handle_loading_finished);
     connect(m_controller, &LogViewerController::loading_error, this,
             &MainWindow::handle_loading_error);
+    connect(m_controller, &LogViewerController::view_file_paths_changed, this,
+            [this](const QUuid& view_id, const QVector<QString>& file_paths) {
+                const int tab_count = ui->tabWidgetLog->count();
+                for (int i = 0; i < tab_count; ++i)
+                {
+                    auto* view = qobject_cast<LogViewWidget*>(ui->tabWidgetLog->widget(i));
+                    if (view != nullptr && view->get_view_id() == view_id)
+                    {
+                        view->set_view_file_paths(file_paths);
+                    }
+                }
+            });
 
     setup_log_file_explorer();
     setup_log_level_pie_chart();
@@ -223,6 +235,8 @@ auto MainWindow::setup_tab_widget() -> void
         {
             QUuid view_id = log_view_widget->get_view_id();
             m_controller->set_current_view(view_id);
+            QVector<QString> file_paths = m_controller->get_view_file_paths(view_id);
+            log_view_widget->set_view_file_paths(file_paths);
             update_pagination_widget();
         }
     });
@@ -536,6 +550,9 @@ auto MainWindow::handle_current_view_id_changed(const QUuid& view_id) -> void
         log_view_widget->set_log_levels(log_level_filters);
         log_view_widget->set_log_level_counts(level_counts);
         log_view_widget->auto_resize_columns();
+
+        QVector<QString> file_paths = m_controller->get_view_file_paths(view_id);
+        log_view_widget->set_view_file_paths(file_paths);
     }
 
     update_pagination_widget();
@@ -601,6 +618,26 @@ auto MainWindow::handle_log_file_open_requested(const LogFileInfo& log_file_info
                 m_controller->set_log_level_filters(levels);
                 update_pagination_widget();
             });
+    connect(log_view_widget, &LogViewWidget::toggle_visibility_requested, this,
+            [this, view_id](const QString& file_path) {
+                m_controller->toggle_file_visibility(view_id, file_path);
+                update_pagination_widget();
+            });
+    connect(log_view_widget, &LogViewWidget::show_only_file_requested, this,
+            [this, view_id](const QString& file_path) {
+                m_controller->set_show_only_file(view_id, file_path);
+                update_pagination_widget();
+            });
+    connect(log_view_widget, &LogViewWidget::remove_file_requested, this,
+            [this](const QString& file_path) {
+                LogFileInfo info(file_path, QString());
+                m_controller->remove_log_file(info);
+                update_pagination_widget();
+            });
+
+    // Initialize the "Files in View" menu contents
+    QVector<QString> file_paths = m_controller->get_view_file_paths(view_id);
+    log_view_widget->set_view_file_paths(file_paths);
 
     QString tab_title = log_file_info.get_file_name();
     int tab_index = ui->tabWidgetLog->addTab(log_view_widget, tab_title);
