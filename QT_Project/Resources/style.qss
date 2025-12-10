@@ -769,6 +769,8 @@ TabWidget#tabWidgetLog TabBar::tab {
     padding: 0 12px;
     border-top-left-radius: 0px;
     border-top-right-radius: 0px;
+    min-width: 120px;
+    max-width: 180px;
 }
 
 /* === DockerWidget === */

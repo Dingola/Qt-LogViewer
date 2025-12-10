@@ -228,6 +228,7 @@ auto MainWindow::setup_filter_bar() -> void
 auto MainWindow::setup_tab_widget() -> void
 {
     ui->tabWidgetLog->setTabsClosable(true);
+    ui->tabWidgetLog->setElideMode(Qt::ElideRight);
 
     connect(ui->tabWidgetLog, &QTabWidget::currentChanged, this, [this](int index) {
         auto* log_view_widget = qobject_cast<LogViewWidget*>(ui->tabWidgetLog->widget(index));

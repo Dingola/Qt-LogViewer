@@ -25,6 +25,7 @@ LogFileExplorer::LogFileExplorer(LogFileTreeModel* model, QWidget* parent)
     ui->treeView->setExpandsOnDoubleClick(true);
     ui->treeView->setRootIsDecorated(true);
     ui->treeView->setContextMenuPolicy(Qt::CustomContextMenu);
+    ui->treeView->setTextElideMode(Qt::ElideMiddle);
     setAttribute(Qt::WA_StyledBackground, true);
     setup_connections();
     init_context_menu();
