@@ -205,6 +205,7 @@ auto PieChart::draw_segments(QPainter& painter, const QPointF& center, double ou
     boundary_angles.reserve(values_ordered.size());
 
     double current_angle = 0.0;
+    int non_zero_slices = 0;
 
     for (int i = 0; i < values_ordered.size(); ++i)
     {
@@ -212,17 +213,23 @@ auto PieChart::draw_segments(QPainter& painter, const QPointF& center, double ou
         double percent = (total_value > 0) ? value / static_cast<double>(total_value) : 0.0;
         double slice_angle = 360.0 * percent;
 
-        if (slice_angle > 0.0)
+        if (slice_angle > std::numeric_limits<double>::epsilon())
         {
             draw_slice(painter, center, outer_radius, inner_radius, current_angle, slice_angle,
                        ordered_segments.at(i));
             boundary_angles.append(current_angle);
+            non_zero_slices += 1;
         }
 
         current_angle += slice_angle;
     }
 
-    draw_gaps(painter, center, outer_radius, inner_radius, boundary_angles);
+    // Draw gaps only when there are at least two non-zero slices and gap angle is enabled
+    if (non_zero_slices > 1 && m_segment_gap_angle > 0)
+    {
+        draw_gaps(painter, center, outer_radius, inner_radius, boundary_angles);
+    }
+
     draw_inner_hole(painter, center, inner_radius);
 }
 

@@ -79,6 +79,9 @@ class PieChart: public QWidget
         /**
          * @brief Sets the gap angle (in degrees) between segments.
          *        0 = no gap, 2-8 = small gap.
+         *
+         * Note: Gaps are only drawn when there are at least two non-zero slices.
+         * If only a single slice is present (i.e., 100%), gaps are suppressed.
          */
         auto set_segment_gap_angle(int degrees) -> void;
 
@@ -112,6 +115,11 @@ class PieChart: public QWidget
 
         /**
          * @brief Draws all segments in fixed order with gaps and inner hole.
+         *
+         * Gaps are rendered only if there are at least two non-zero slices and
+         * the segment gap angle is greater than zero. A single 100% slice is
+         * rendered as a continuous ring without a gap.
+         *
          * @param painter The QPainter to draw with.
          * @param center The center point of the chart.
          * @param outer_radius The outer radius of the chart.
