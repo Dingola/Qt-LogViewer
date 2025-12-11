@@ -1,6 +1,9 @@
 #include "Qt-LogViewer/Views/Shared/PaginationWidget.h"
 
+#include <QCoreApplication>
+#include <QCursor>
 #include <QDebug>
+#include <QEnterEvent>
 #include <QHBoxLayout>
 #include <QIntValidator>
 #include <QLabel>
@@ -23,6 +26,10 @@ PaginationWidget::PaginationWidget(QWidget* parent): QWidget(parent), ui(new Ui:
     layout->setSpacing(4);
     ui->pageButtonsWidget->setLayout(layout);
 
+    // Ensure hover tracking for correct hover behavior without mouse movement
+    ui->pageButtonsWidget->setAttribute(Qt::WA_Hover, true);
+    ui->pageButtonsWidget->setMouseTracking(true);
+
     ui->labelItemsPerPage->setText(tr("Per page"));
 
     ui->lineEditJumpTo->setValidator(new QIntValidator(1, 999999, this));
@@ -44,6 +51,9 @@ PaginationWidget::PaginationWidget(QWidget* parent): QWidget(parent), ui(new Ui:
     connect(ui->buttonJumpPrev, &QToolButton::clicked, this, &PaginationWidget::onPrevClicked);
     connect(ui->buttonJumpNext, &QToolButton::clicked, this, &PaginationWidget::onNextClicked);
     connect(ui->lineEditJumpTo, &QLineEdit::editingFinished, this, &PaginationWidget::onJumpToPage);
+
+    // Create initial pool based on m_max_page_buttons
+    ensure_button_pool();
 
     update_pagination();
     update_controls_state();
@@ -89,6 +99,7 @@ auto PaginationWidget::set_pagination(int current_page, int total_pages) -> void
 
 /**
  * @brief Sets the maximum number of page buttons to display.
+ *        This value represents the total visible button slots, including first/last and ellipsis.
  * @param max_buttons The maximum number (minimum 3).
  */
 auto PaginationWidget::set_max_page_buttons(int max_buttons) -> void
@@ -101,6 +112,7 @@ auto PaginationWidget::set_max_page_buttons(int max_buttons) -> void
     if (m_max_page_buttons != max_buttons)
     {
         m_max_page_buttons = max_buttons;
+        ensure_button_pool();
         update_pagination();
     }
 }
@@ -126,68 +138,63 @@ auto PaginationWidget::get_total_pages() const -> int
  */
 auto PaginationWidget::get_items_per_page() const -> int
 {
-    int index = ui->comboBoxItemsPerPage->currentIndex();
-    return ui->comboBoxItemsPerPage->itemData(index).toInt();
+    const int index = ui->comboBoxItemsPerPage->currentIndex();
+    const int value = ui->comboBoxItemsPerPage->itemData(index).toInt();
+    return value;
 }
 
 /**
- * @brief Dynamically creates the page buttons.
+ * @brief Ensures the page buttons pool exists and matches the current max size.
+ *        If the pool needs to grow, new buttons are created and added once to the layout.
  */
-auto PaginationWidget::create_page_buttons() -> void
+auto PaginationWidget::ensure_button_pool() -> void
 {
-    clear_page_buttons_layout();
-    auto layout = qobject_cast<QHBoxLayout*>(ui->pageButtonsWidget->layout());
+    auto* layout = qobject_cast<QHBoxLayout*>(ui->pageButtonsWidget->layout());
 
-    if (layout != nullptr)
-    {
-        if (m_total_pages == 1)
-        {
-            add_single_page_button(layout);
-        }
-        else if (m_total_pages <= m_max_page_buttons)
-        {
-            add_simple_page_buttons(layout);
-        }
-        else if (m_max_page_buttons == 3)
-        {
-            add_three_page_buttons(layout);
-        }
-        else if (m_max_page_buttons == 4)
-        {
-            add_four_page_buttons(layout);
-        }
-        else
-        {
-            add_complex_page_buttons(layout);
-        }
-    }
-    else
+    if (layout == nullptr)
     {
         qWarning() << "[PaginationWidget] pageButtonsWidget layout is nullptr!";
     }
+    else
+    {
+        const int required = m_max_page_buttons;
+        const int current = static_cast<int>(m_page_buttons_pool.size());
+
+        if (current < required)
+        {
+            const int to_create = required - current;
+            for (int i = 0; i < to_create; ++i)
+            {
+                auto* btn = create_page_button();
+                m_page_buttons_pool.push_back(btn);
+                layout->addWidget(btn);
+                btn->setVisible(false);
+            }
+        }
+        else
+        {
+            for (auto* btn: m_page_buttons_pool)
+            {
+                btn->setVisible(false);
+            }
+        }
+    }
 }
 
 /**
- * @brief Helper to create a single page button.
- * @param page The page number.
- * @param enabled Whether the button is enabled.
- * @param checked Whether the button is checked (current page).
- * @return The created QToolButton.
+ * @brief Helper to create a single page button (pooled, reused).
  */
-auto PaginationWidget::create_page_button(int page, bool enabled,
-                                          bool checked) const -> QToolButton*
+auto PaginationWidget::create_page_button() const -> QToolButton*
 {
-    auto btn = new QToolButton(ui->pageButtonsWidget);
-    btn->setText(QString::number(page));
-    btn->setEnabled(enabled);
-    btn->setCheckable(true);
-    btn->setChecked(checked);
+    auto* btn = new QToolButton(ui->pageButtonsWidget);
     btn->setAutoRaise(true);
-    btn->setProperty("page", page);
-    btn->setProperty("isCurrentPage", checked);
-
+    btn->setCheckable(true);
+    btn->setFocusPolicy(Qt::NoFocus);
+    btn->setAttribute(Qt::WA_Hover, true);
+    btn->setMouseTracking(true);
+    btn->setProperty("page", -1);
+    btn->setProperty("isCurrentPage", false);
     connect(btn, &QToolButton::clicked, this, &PaginationWidget::onPageButtonClicked);
-
     return btn;
 }
 
@@ -199,12 +206,17 @@ auto PaginationWidget::update_pagination() -> void
     qDebug() << "[PaginationWidget] update_pagination: current_page=" << m_current_page
              << "total_pages=" << m_total_pages << "max_buttons=" << m_max_page_buttons;
 
-    create_page_buttons();
+    ensure_button_pool();
+    const auto model = build_display_model();
+    apply_display_model(model);
     update_controls_state();
 
     ui->lineEditJumpTo->blockSignals(true);
     ui->lineEditJumpTo->setText(QString::number(m_current_page));
     ui->lineEditJumpTo->blockSignals(false);
+
+    // Reseed hover to the correct button under the cursor after the model has been applied
+    seed_hover_state();
 }
 
 /**
@@ -212,7 +224,7 @@ auto PaginationWidget::update_pagination() -> void
  */
 auto PaginationWidget::update_controls_state() -> void
 {
-    bool only_one_page = (m_total_pages == 1);
+    const bool only_one_page = (m_total_pages == 1);
 
     if (ui->buttonPrev)
     {
@@ -241,67 +253,127 @@ auto PaginationWidget::update_controls_state() -> void
 }
 
 /**
- * @brief Creates an ellipsis button for pagination.
- * @return A new QToolButton configured as an ellipsis button.
+ * @brief Builds the ordered display model for the current pagination state.
+ * @return The model entries to render.
  */
-auto PaginationWidget::create_ellipsis_button() -> QToolButton*
+auto PaginationWidget::build_display_model() const -> std::vector<page_entry>
 {
-    auto button = new QToolButton(ui->pageButtonsWidget);
-    button->setText("...");
-    button->setEnabled(false);
-    button->setAutoRaise(true);
-    return button;
+    std::vector<page_entry> model;
+
+    if (m_total_pages == 1)
+    {
+        add_single_page_entries(model);
+    }
+    else if (m_total_pages <= m_max_page_buttons)
+    {
+        add_simple_page_entries(model);
+    }
+    else if (m_max_page_buttons == 3)
+    {
+        add_three_page_entries(model);
+    }
+    else if (m_max_page_buttons == 4)
+    {
+        add_four_page_entries(model);
+    }
+    else
+    {
+        add_complex_page_entries(model);
+    }
+
+    return model;
 }
 
 /**
- * @brief Clears the page buttons layout.
- * Deletes all buttons and layout items in the page buttons widget.
+ * @brief Applies the display model onto the pooled buttons.
+ * @param model The ordered list of entries to render.
  */
-auto PaginationWidget::clear_page_buttons_layout() -> void
+auto PaginationWidget::apply_display_model(const std::vector<page_entry>& model) -> void
 {
-    auto layout = qobject_cast<QHBoxLayout*>(ui->pageButtonsWidget->layout());
+    const int count = static_cast<int>(model.size());
+    const int pool = static_cast<int>(m_page_buttons_pool.size());
 
-    while (QLayoutItem* child = (layout != nullptr ? layout->takeAt(0) : nullptr))
+    for (int i = 0; i < pool; ++i)
     {
-        if (auto* button = qobject_cast<QToolButton*>(child->widget()))
+        if (i < count)
         {
-            delete button;
-            button = nullptr;
-        }
+            const auto& entry = model[static_cast<std::size_t>(i)];
+            QToolButton* btn = m_page_buttons_pool[static_cast<std::size_t>(i)];
 
-        delete child;
+            if (entry.is_ellipsis)
+            {
+                btn->setText("...");
+                btn->setEnabled(false);
+                btn->setChecked(false);
+                btn->setProperty("page", -1);
+                btn->setProperty("isCurrentPage", false);
+            }
+            else
+            {
+                btn->setText(QString::number(entry.page));
+                btn->setEnabled(true);  // active and inactive pages stay enabled
+                btn->setChecked(entry.checked);
+                btn->setProperty("page", entry.page);
+                btn->setProperty("isCurrentPage", entry.checked);
+            }
+
+            // Force restyling so QSS picks up dynamic property changes immediately
+            btn->style()->unpolish(btn);
+            btn->style()->polish(btn);
+            btn->update();
+
+            btn->setVisible(true);
+        }
+        else
+        {
+            m_page_buttons_pool[static_cast<std::size_t>(i)]->setVisible(false);
+        }
     }
 }
 
 /**
- * @brief Adds a single page button for the case of only one page.
- * @param layout The layout to add the button to.
+ * @brief Adds display entries for the case of only one page.
+ * @param model The model to append to.
  */
-auto PaginationWidget::add_single_page_button(QHBoxLayout* layout) -> void
+auto PaginationWidget::add_single_page_entries(std::vector<page_entry>& model) const -> void
 {
-    layout->addWidget(create_page_button(1, false, true));
+    page_entry entry;
+    entry.page = 1;
+    entry.is_ellipsis = false;
+    entry.enabled = true;
+    entry.checked = true;
+    model.push_back(entry);
 }
 
 /**
- * @brief Adds page buttons for the case where all pages fit without ellipsis.
- * @param layout The layout to add the buttons to.
+ * @brief Adds display entries for the case where all pages fit without ellipsis.
+ * @param model The model to append to.
  */
-auto PaginationWidget::add_simple_page_buttons(QHBoxLayout* layout) -> void
+auto PaginationWidget::add_simple_page_entries(std::vector<page_entry>& model) const -> void
 {
     for (int i = 1; i <= m_total_pages; ++i)
     {
-        bool checked = (i == m_current_page);
-        layout->addWidget(create_page_button(i, !checked, checked));
+        page_entry entry;
+        entry.page = i;
+        entry.is_ellipsis = false;
+        entry.checked = (i == m_current_page);
+        entry.enabled = true;
+        model.push_back(entry);
     }
 }
 
 /**
- * @brief Adds page buttons for the case of max_page_buttons == 3.
- * @param layout The layout to add the buttons to.
+ * @brief Adds display entries for the case of max_page_buttons == 3.
+ * @param model The model to append to.
  */
-auto PaginationWidget::add_three_page_buttons(QHBoxLayout* layout) -> void
+auto PaginationWidget::add_three_page_entries(std::vector<page_entry>& model) const -> void
 {
-    layout->addWidget(create_page_button(1, m_current_page != 1, m_current_page == 1));
+    page_entry first;
+    first.page = 1;
+    first.is_ellipsis = false;
+    first.checked = (m_current_page == 1);
+    first.enabled = true;
+    model.push_back(first);
 
     int middle_page = 0;
     if (m_current_page == 1)
@@ -317,79 +389,187 @@ auto PaginationWidget::add_three_page_buttons(QHBoxLayout* layout) -> void
         middle_page = m_current_page;
     }
 
-    layout->addWidget(create_page_button(middle_page, middle_page != m_current_page,
-                                         middle_page == m_current_page));
-    layout->addWidget(create_last_page_button());
+    page_entry middle;
+    middle.page = middle_page;
+    middle.is_ellipsis = false;
+    middle.checked = (middle_page == m_current_page);
+    middle.enabled = true;
+    model.push_back(middle);
+
+    page_entry last;
+    last.page = m_total_pages;
+    last.is_ellipsis = false;
+    last.checked = is_last_page();
+    last.enabled = true;
+    model.push_back(last);
 }
 
 /**
- * @brief Adds page buttons for the case of max_page_buttons == 4.
- * @param layout The layout to add the buttons to.
+ * @brief Adds display entries for the case of max_page_buttons == 4.
+ * @param model The model to append to.
  */
-auto PaginationWidget::add_four_page_buttons(QHBoxLayout* layout) -> void
+auto PaginationWidget::add_four_page_entries(std::vector<page_entry>& model) const -> void
 {
-    layout->addWidget(create_page_button(1, m_current_page != 1, m_current_page == 1));
+    page_entry first;
+    first.page = 1;
+    first.is_ellipsis = false;
+    first.checked = (m_current_page == 1);
+    first.enabled = true;
+    model.push_back(first);
 
     if (m_current_page == 1 || m_current_page == 2)
     {
-        layout->addWidget(create_page_button(2, m_current_page != 2, m_current_page == 2));
-        layout->addWidget(create_ellipsis_button());
-        layout->addWidget(
-            create_page_button(m_total_pages, m_current_page != m_total_pages, is_last_page()));
+        page_entry two;
+        two.page = 2;
+        two.is_ellipsis = false;
+        two.checked = (m_current_page == 2);
+        two.enabled = true;
+        model.push_back(two);
+
+        page_entry dots;
+        dots.is_ellipsis = true;
+        dots.page = -1;
+        dots.enabled = false;
+        dots.checked = false;
+        model.push_back(dots);
+
+        page_entry last;
+        last.page = m_total_pages;
+        last.is_ellipsis = false;
+        last.checked = is_last_page();
+        last.enabled = true;
+        model.push_back(last);
     }
     else if (is_last_page() || m_current_page == (m_total_pages - 1))
     {
-        layout->addWidget(create_ellipsis_button());
-        layout->addWidget(create_page_button(m_total_pages - 1,
-                                             m_current_page != (m_total_pages - 1),
-                                             m_current_page == (m_total_pages - 1)));
-        layout->addWidget(create_last_page_button());
+        page_entry dots;
+        dots.is_ellipsis = true;
+        dots.page = -1;
+        dots.enabled = false;
+        dots.checked = false;
+        model.push_back(dots);
+
+        page_entry prev_last;
+        prev_last.page = m_total_pages - 1;
+        prev_last.is_ellipsis = false;
+        prev_last.checked = (m_current_page == (m_total_pages - 1));
+        prev_last.enabled = true;
+        model.push_back(prev_last);
+
+        page_entry last;
+        last.page = m_total_pages;
+        last.is_ellipsis = false;
+        last.checked = is_last_page();
+        last.enabled = true;
+        model.push_back(last);
     }
     else
     {
-        int dist_to_start = m_current_page - 1;
-        int dist_to_end = m_total_pages - m_current_page;
+        const int dist_to_start = m_current_page - 1;
+        const int dist_to_end = m_total_pages - m_current_page;
+
         if (dist_to_start <= dist_to_end)
         {
-            layout->addWidget(create_page_button(m_current_page, false, true));
-            layout->addWidget(create_ellipsis_button());
-            layout->addWidget(create_last_page_button());
+            page_entry cur;
+            cur.page = m_current_page;
+            cur.is_ellipsis = false;
+            cur.checked = true;
+            cur.enabled = true;
+            model.push_back(cur);
+
+            page_entry dots;
+            dots.is_ellipsis = true;
+            dots.page = -1;
+            dots.enabled = false;
+            dots.checked = false;
+            model.push_back(dots);
+
+            page_entry last;
+            last.page = m_total_pages;
+            last.is_ellipsis = false;
+            last.checked = is_last_page();
+            last.enabled = true;
+            model.push_back(last);
         }
         else
         {
-            layout->addWidget(create_ellipsis_button());
-            layout->addWidget(create_page_button(m_current_page, false, true));
-            layout->addWidget(create_last_page_button());
+            page_entry dots;
+            dots.is_ellipsis = true;
+            dots.page = -1;
+            dots.enabled = false;
+            dots.checked = false;
+            model.push_back(dots);
+
+            page_entry cur;
+            cur.page = m_current_page;
+            cur.is_ellipsis = false;
+            cur.checked = true;
+            cur.enabled = true;
+            model.push_back(cur);
+
+            page_entry last;
+            last.page = m_total_pages;
+            last.is_ellipsis = false;
+            last.checked = is_last_page();
+            last.enabled = true;
+            model.push_back(last);
         }
     }
 }
 
 /**
- * @brief Adds page buttons for the general case (max_page_buttons > 4).
- * @param layout The layout to add the buttons to.
+ * @brief Adds display entries for the general case (max_page_buttons > 4).
+ * @param model The model to append to.
  */
-auto PaginationWidget::add_complex_page_buttons(QHBoxLayout* layout) -> void
+auto PaginationWidget::add_complex_page_entries(std::vector<page_entry>& model) const -> void
 {
-    auto [start, end] = calculate_middle_range(m_total_pages, m_max_page_buttons, m_current_page);
+    const auto range = calculate_middle_range(m_total_pages, m_max_page_buttons, m_current_page);
+    const int start = range.first;
+    const int end = range.second;
 
-    layout->addWidget(create_page_button(1, m_current_page != 1, m_current_page == 1));
+    page_entry first;
+    first.page = 1;
+    first.is_ellipsis = false;
+    first.checked = (m_current_page == 1);
+    first.enabled = true;
+    model.push_back(first);
 
     if (start > 2)
     {
-        layout->addWidget(create_ellipsis_button());
+        page_entry dots_left;
+        dots_left.is_ellipsis = true;
+        dots_left.page = -1;
+        dots_left.enabled = false;
+        dots_left.checked = false;
+        model.push_back(dots_left);
     }
 
     for (int i = start; i <= end; ++i)
     {
-        layout->addWidget(create_page_button(i, m_current_page != i, m_current_page == i));
+        page_entry mid;
+        mid.page = i;
+        mid.is_ellipsis = false;
+        mid.checked = (i == m_current_page);
+        mid.enabled = true;
+        model.push_back(mid);
     }
 
     if (end < m_total_pages - 1)
     {
-        layout->addWidget(create_ellipsis_button());
+        page_entry dots_right;
+        dots_right.is_ellipsis = true;
+        dots_right.page = -1;
+        dots_right.enabled = false;
+        dots_right.checked = false;
+        model.push_back(dots_right);
     }
 
-    layout->addWidget(create_last_page_button());
+    page_entry last;
+    last.page = m_total_pages;
+    last.is_ellipsis = false;
+    last.checked = is_last_page();
+    last.enabled = true;
+    model.push_back(last);
 }
 
 /**
@@ -434,6 +614,7 @@ auto PaginationWidget::calculate_middle_range(int total_pages, int max_btns,
         {
             left = 2;
         }
+
         start = left;
         end = right;
 
@@ -460,6 +641,7 @@ auto PaginationWidget::calculate_middle_range(int total_pages, int max_btns,
                 start = end - num_middle + 1;
             }
         }
+
         // If no ellipsis is needed, show all pages
         if (num_ellipsis == 0)
         {
@@ -477,21 +659,13 @@ auto PaginationWidget::calculate_middle_range(int total_pages, int max_btns,
  */
 auto PaginationWidget::is_last_page() const -> bool
 {
-    return m_current_page == m_total_pages;
-}
-
-/**
- * @brief Creates the last page button.
- * @return The created QToolButton for the last page.
- */
-auto PaginationWidget::create_last_page_button() const -> QToolButton*
-{
-    return create_page_button(m_total_pages, !is_last_page(), is_last_page());
+    const bool last = (m_current_page == m_total_pages);
+    return last;
 }
 
 /**
  * @brief Handles the paint event to enable QSS background and border styling.
- *        This ensures that custom QSS (e.g. background-color) is rendered.
+ *        This ensures that custom QSS (e.g., background-color) is rendered.
  * @param event The paint event.
  */
 void PaginationWidget::paintEvent(QPaintEvent* event)
@@ -518,6 +692,36 @@ auto PaginationWidget::changeEvent(QEvent* event) -> void
     }
 
     QWidget::changeEvent(event);
+}
+
+/**
+ * @brief Sends Leave to all page buttons and Enter to the one currently under the cursor.
+ *        This resets stale hover highlights and applies hover to the correct target immediately.
+ */
+auto PaginationWidget::seed_hover_state() -> void
+{
+    const auto buttons = ui->pageButtonsWidget->findChildren<QToolButton*>();
+
+    // Reset stale hover on all pooled buttons
+    for (auto* btn: buttons)
+    {
+        QEvent leave_ev(QEvent::Leave);
+        QCoreApplication::sendEvent(btn, &leave_ev);
+    }
+
+    const QPoint global_pos = QCursor::pos();
+    const QPoint local_pos = ui->pageButtonsWidget->mapFromGlobal(global_pos);
+    if (ui->pageButtonsWidget->rect().contains(local_pos))
+    {
+        QWidget* child = ui->pageButtonsWidget->childAt(local_pos);
+        auto* hovered_btn = qobject_cast<QToolButton*>(child);
+        if (hovered_btn != nullptr)
+        {
+            const QPointF child_local = hovered_btn->mapFromGlobal(global_pos);
+            QEnterEvent enter_ev(child_local, child_local, global_pos);
+            QCoreApplication::sendEvent(hovered_btn, &enter_ev);
+        }
+    }
 }
 
 /**
@@ -549,11 +753,10 @@ auto PaginationWidget::onNextClicked() -> void
  */
 auto PaginationWidget::onPageButtonClicked() -> void
 {
-    auto button = qobject_cast<QToolButton*>(sender());
+    auto* button = qobject_cast<QToolButton*>(sender());
 
     int page = 0;
-
-    if (button)
+    if (button != nullptr)
     {
         page = button->property("page").toInt();
     }
@@ -595,6 +798,6 @@ auto PaginationWidget::onJumpToPage() -> void
  */
 auto PaginationWidget::onItemsPerPageChanged(int index) -> void
 {
-    int value = ui->comboBoxItemsPerPage->itemData(index).toInt();
+    const int value = ui->comboBoxItemsPerPage->itemData(index).toInt();
     emit items_per_page_changed(value);
 }

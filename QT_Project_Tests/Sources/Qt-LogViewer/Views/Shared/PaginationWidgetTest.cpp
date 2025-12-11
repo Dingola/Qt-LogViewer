@@ -1,9 +1,36 @@
 #include "Qt-LogViewer/Views/Shared/PaginationWidgetTest.h"
 
 #include <QComboBox>
+#include <QCoreApplication>
 #include <QLineEdit>
 #include <QTest>
 #include <QToolButton>
+
+/**
+ * @brief Utility: returns only visible QToolButtons inside a given parent widget, preserving order.
+ */
+static auto get_visible_page_buttons(QWidget* parent) -> QList<QToolButton*>
+{
+    const QList<QToolButton*> all = parent->findChildren<QToolButton*>();
+    QList<QToolButton*> visible;
+    for (auto* b: all)
+    {
+        if (b != nullptr && !b->isHidden())
+        {
+            visible.push_back(b);
+        }
+    }
+    return visible;
+}
+
+/**
+ * @brief Utility: process Qt events and wait a short time to let UI settle.
+ */
+static auto settle_ui(int ms = 5) -> void
+{
+    QCoreApplication::processEvents(QEventLoop::AllEvents, ms);
+    QTest::qWait(ms);
+}
 
 /**
  * @brief Sets up the test fixture for each test.
@@ -60,6 +87,7 @@ TEST_F(PaginationWidgetTest, PageChangedSignalEmittedByButton)
 {
     QSignalSpy spy(m_widget, SIGNAL(page_changed(int)));
     m_widget->set_pagination(1, 3);
+    settle_ui();
 
     QToolButton* next_button = m_widget->findChild<QToolButton*>("buttonNext");
     ASSERT_NE(next_button, nullptr);
@@ -81,6 +109,7 @@ TEST_F(PaginationWidgetTest, PageChangedSignalEmittedByJumpTo)
 {
     QSignalSpy spy(m_widget, SIGNAL(page_changed(int)));
     m_widget->set_pagination(1, 5);
+    settle_ui();
 
     QLineEdit* jump_edit = m_widget->findChild<QLineEdit*>("lineEditJumpTo");
     ASSERT_NE(jump_edit, nullptr);
@@ -125,13 +154,13 @@ TEST_F(PaginationWidgetTest, PageButtonsWithThreeMaxButtons)
 {
     m_widget->set_max_page_buttons(3);
     m_widget->set_pagination(1, 10);
+    settle_ui();
 
     QWidget* page_buttons_widget = m_widget->findChild<QWidget*>("pageButtonsWidget");
     ASSERT_NE(page_buttons_widget, nullptr);
-    QList<QToolButton*> buttons = page_buttons_widget->findChildren<QToolButton*>();
+    const QList<QToolButton*> buttons = get_visible_page_buttons(page_buttons_widget);
 
-    // Should have exactly 3 buttons, no ellipsis
-    EXPECT_EQ(buttons.size(), 3);
+    ASSERT_EQ(buttons.size(), 3);
     EXPECT_EQ(buttons[0]->text(), "1");
     EXPECT_EQ(buttons[1]->text(), "2");
     EXPECT_EQ(buttons[2]->text(), "10");
@@ -145,13 +174,13 @@ TEST_F(PaginationWidgetTest, PageButtonsWithFourMaxButtons)
 {
     m_widget->set_max_page_buttons(4);
     m_widget->set_pagination(1, 10);
+    settle_ui();
 
     QWidget* page_buttons_widget = m_widget->findChild<QWidget*>("pageButtonsWidget");
     ASSERT_NE(page_buttons_widget, nullptr);
-    QList<QToolButton*> buttons = page_buttons_widget->findChildren<QToolButton*>();
+    const QList<QToolButton*> buttons = get_visible_page_buttons(page_buttons_widget);
 
-    // Should have exactly 4 buttons, one ellipsis
-    EXPECT_EQ(buttons.size(), 4);
+    ASSERT_EQ(buttons.size(), 4);
     EXPECT_EQ(buttons[0]->text(), "1");
     EXPECT_EQ(buttons[1]->text(), "2");
     EXPECT_EQ(buttons[2]->text(), "...");
@@ -166,13 +195,13 @@ TEST_F(PaginationWidgetTest, PageButtonsWithFiveMaxButtons)
 {
     m_widget->set_max_page_buttons(5);
     m_widget->set_pagination(1, 10);
+    settle_ui();
 
     QWidget* page_buttons_widget = m_widget->findChild<QWidget*>("pageButtonsWidget");
     ASSERT_NE(page_buttons_widget, nullptr);
-    QList<QToolButton*> buttons = page_buttons_widget->findChildren<QToolButton*>();
+    const QList<QToolButton*> buttons = get_visible_page_buttons(page_buttons_widget);
 
-    // Should have exactly 5 buttons, one ellipsis
-    EXPECT_EQ(buttons.size(), 5);
+    ASSERT_EQ(buttons.size(), 5);
     EXPECT_EQ(buttons[0]->text(), "1");
     EXPECT_EQ(buttons[1]->text(), "2");
     EXPECT_EQ(buttons[2]->text(), "3");
@@ -188,13 +217,13 @@ TEST_F(PaginationWidgetTest, PageButtonsWithSixMaxButtons)
 {
     m_widget->set_max_page_buttons(6);
     m_widget->set_pagination(1, 10);
+    settle_ui();
 
     QWidget* page_buttons_widget = m_widget->findChild<QWidget*>("pageButtonsWidget");
     ASSERT_NE(page_buttons_widget, nullptr);
-    QList<QToolButton*> buttons = page_buttons_widget->findChildren<QToolButton*>();
+    const QList<QToolButton*> buttons = get_visible_page_buttons(page_buttons_widget);
 
-    // Should have exactly 6 buttons, one ellipsis
-    EXPECT_EQ(buttons.size(), 6);
+    ASSERT_EQ(buttons.size(), 6);
     EXPECT_EQ(buttons[0]->text(), "1");
     EXPECT_EQ(buttons[1]->text(), "2");
     EXPECT_EQ(buttons[2]->text(), "3");
@@ -211,13 +240,13 @@ TEST_F(PaginationWidgetTest, PageButtonsWithSevenMaxButtons)
 {
     m_widget->set_max_page_buttons(7);
     m_widget->set_pagination(1, 20);
+    settle_ui();
 
     QWidget* page_buttons_widget = m_widget->findChild<QWidget*>("pageButtonsWidget");
     ASSERT_NE(page_buttons_widget, nullptr);
-    QList<QToolButton*> buttons = page_buttons_widget->findChildren<QToolButton*>();
+    const QList<QToolButton*> buttons = get_visible_page_buttons(page_buttons_widget);
 
-    // Should have exactly 7 buttons, one ellipsis
-    EXPECT_EQ(buttons.size(), 7);
+    ASSERT_EQ(buttons.size(), 7);
     EXPECT_EQ(buttons[0]->text(), "1");
     EXPECT_EQ(buttons[1]->text(), "2");
     EXPECT_EQ(buttons[2]->text(), "3");
@@ -235,13 +264,13 @@ TEST_F(PaginationWidgetTest, PageButtonsEllipsisBothEnds)
 {
     m_widget->set_max_page_buttons(7);
     m_widget->set_pagination(10, 20);
+    settle_ui();
 
     QWidget* page_buttons_widget = m_widget->findChild<QWidget*>("pageButtonsWidget");
     ASSERT_NE(page_buttons_widget, nullptr);
-    QList<QToolButton*> buttons = page_buttons_widget->findChildren<QToolButton*>();
+    const QList<QToolButton*> buttons = get_visible_page_buttons(page_buttons_widget);
 
-    // Should have exactly 7 buttons, two ellipsis
-    EXPECT_EQ(buttons.size(), 7);
+    ASSERT_EQ(buttons.size(), 7);
     EXPECT_EQ(buttons[0]->text(), "1");
     EXPECT_EQ(buttons[1]->text(), "...");
     EXPECT_EQ(buttons[5]->text(), "...");
@@ -257,13 +286,13 @@ TEST_F(PaginationWidgetTest, PageButtonsEllipsisAtStart)
 {
     m_widget->set_max_page_buttons(7);
     m_widget->set_pagination(20, 20);
+    settle_ui();
 
     QWidget* page_buttons_widget = m_widget->findChild<QWidget*>("pageButtonsWidget");
     ASSERT_NE(page_buttons_widget, nullptr);
-    QList<QToolButton*> buttons = page_buttons_widget->findChildren<QToolButton*>();
+    const QList<QToolButton*> buttons = get_visible_page_buttons(page_buttons_widget);
 
-    // Should have exactly 7 buttons, one ellipsis at start
-    EXPECT_EQ(buttons.size(), 7);
+    ASSERT_EQ(buttons.size(), 7);
     EXPECT_EQ(buttons[0]->text(), "1");
     EXPECT_EQ(buttons[1]->text(), "...");
     EXPECT_EQ(buttons[6]->text(), "20");
@@ -276,6 +305,7 @@ TEST_F(PaginationWidgetTest, PageButtonsEllipsisAtStart)
 TEST_F(PaginationWidgetTest, NavigationButtonsEnabledDisabled)
 {
     m_widget->set_pagination(1, 3);
+    settle_ui();
 
     QToolButton* prev_button = m_widget->findChild<QToolButton*>("buttonPrev");
     QToolButton* next_button = m_widget->findChild<QToolButton*>("buttonNext");
@@ -294,6 +324,7 @@ TEST_F(PaginationWidgetTest, NavigationButtonsEnabledDisabled)
 
     // On last page
     m_widget->set_pagination(3, 3);
+    settle_ui();
     EXPECT_TRUE(prev_button->isEnabled());
     EXPECT_FALSE(next_button->isEnabled());
     EXPECT_TRUE(jump_prev_button->isEnabled());
@@ -301,6 +332,7 @@ TEST_F(PaginationWidgetTest, NavigationButtonsEnabledDisabled)
 
     // Only one page
     m_widget->set_pagination(1, 1);
+    settle_ui();
     EXPECT_FALSE(prev_button->isEnabled());
     EXPECT_FALSE(next_button->isEnabled());
     EXPECT_FALSE(jump_prev_button->isEnabled());
@@ -314,6 +346,7 @@ TEST_F(PaginationWidgetTest, JumpToInputValidation)
 {
     QSignalSpy spy(m_widget, SIGNAL(page_changed(int)));
     m_widget->set_pagination(2, 5);
+    settle_ui();
 
     QLineEdit* jump_edit = m_widget->findChild<QLineEdit*>("lineEditJumpTo");
     ASSERT_NE(jump_edit, nullptr);
@@ -337,6 +370,7 @@ TEST_F(PaginationWidgetTest, JumpToInputValidation)
     // Input equals current page (no signal)
     jump_edit->setText("5");
     m_widget->set_pagination(5, 5);
+    settle_ui();
     QTest::keyClick(jump_edit, Qt::Key_Enter);
     EXPECT_EQ(spy.count(), 0);
 }
@@ -348,6 +382,7 @@ TEST_F(PaginationWidgetTest, PageChangedSignalEmittedOnlyOnChange)
 {
     QSignalSpy spy(m_widget, SIGNAL(page_changed(int)));
     m_widget->set_pagination(2, 5);
+    settle_ui();
 
     // Click next (should emit)
     QToolButton* next_button = m_widget->findChild<QToolButton*>("buttonNext");
@@ -363,6 +398,7 @@ TEST_F(PaginationWidgetTest, PageChangedSignalEmittedOnlyOnChange)
 
     // Click next on last page (should not emit)
     m_widget->set_pagination(5, 5);
+    settle_ui();
     QTest::mouseClick(next_button, Qt::LeftButton);
     EXPECT_EQ(spy.count(), 0);
 }
@@ -395,12 +431,14 @@ TEST_F(PaginationWidgetTest, NoDuplicatePageButtonsAfterUpdates)
 
     m_widget->set_max_page_buttons(7);
     m_widget->set_pagination(1, 10);
-    QList<QToolButton*> buttons1 = page_buttons_widget->findChildren<QToolButton*>();
-    int count1 = buttons1.size();
+    settle_ui();
+    const QList<QToolButton*> buttons1 = get_visible_page_buttons(page_buttons_widget);
+    const int count1 = buttons1.size();
 
     m_widget->set_pagination(5, 10);
-    QList<QToolButton*> buttons2 = page_buttons_widget->findChildren<QToolButton*>();
-    int count2 = buttons2.size();
+    settle_ui();
+    const QList<QToolButton*> buttons2 = get_visible_page_buttons(page_buttons_widget);
+    const int count2 = buttons2.size();
 
-    EXPECT_EQ(count1, count2);  // Button count should remain consistent
+    EXPECT_EQ(count1, count2);  // Visible button count should remain consistent
 }

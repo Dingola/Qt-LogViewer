@@ -5,6 +5,7 @@
 #include <QToolButton>
 #include <QWidget>
 #include <utility>
+#include <vector>
 
 namespace Ui
 {
@@ -43,7 +44,9 @@ class PaginationWidget: public QWidget
 
         /**
          * @brief Sets the maximum number of page buttons to display.
-         * @param max_buttons The maximum number (e.g. 7).
+         *        This value represents the total visible button slots, including first/last and
+         * ellipsis.
+         * @param max_buttons The maximum number (minimum 3).
          */
         auto set_max_page_buttons(int max_buttons) -> void;
 
@@ -64,15 +67,39 @@ class PaginationWidget: public QWidget
 
     private:
         /**
-         * @brief Dynamically creates the page buttons.
+         * @brief Internal display entry used to map a button slot to content.
          */
-        auto create_page_buttons() -> void;
+        struct page_entry {
+                int page = -1;             ///< Page number (>=1) or -1 for ellipsis.
+                bool is_ellipsis = false;  ///< True if this slot is the ellipsis "...".
+                bool enabled = true;       ///< Enabled state for the button.
+                bool checked = false;      ///< Checked state for the button (current page mark).
+        };
 
         /**
-         * @brief Helper to create a single page button.
+         * @brief Ensures the page buttons pool exists and matches the current max size.
+         *        If the pool needs to grow, new buttons are created and added once to the layout.
          */
-        [[nodiscard]] auto create_page_button(int page, bool enabled,
-                                              bool checked) const -> QToolButton*;
+        auto ensure_button_pool() -> void;
+
+        /**
+         * @brief Updates the button pool using the provided display model entries.
+         *        Buttons outside the model range are hidden.
+         * @param model The ordered list of entries to render.
+         */
+        auto apply_display_model(const std::vector<page_entry>& model) -> void;
+
+        /**
+         * @brief Builds the ordered display model for the current pagination state.
+         *        The model length is <= m_max_page_buttons.
+         * @return The model entries to render.
+         */
+        [[nodiscard]] auto build_display_model() const -> std::vector<page_entry>;
+
+        /**
+         * @brief Helper to create a single page button (pooled, reused).
+         */
+        [[nodiscard]] auto create_page_button() const -> QToolButton*;
 
         /**
          * @brief Updates the buttons and layout according to the current pagination state.
@@ -85,46 +112,34 @@ class PaginationWidget: public QWidget
         auto update_controls_state() -> void;
 
         /**
-         * @brief Creates the "..." button for pagination.
-         * @return The created QToolButton.
+         * @brief Adds display entries for the case of only one page.
+         * @param model The model to append to.
          */
-        [[nodiscard]] auto create_ellipsis_button() -> QToolButton*;
+        auto add_single_page_entries(std::vector<page_entry>& model) const -> void;
 
         /**
-         * @brief Clears the page buttons layout.
-         * Deletes all buttons and layout items in the page buttons widget.
+         * @brief Adds display entries for the case where all pages fit without ellipsis.
+         * @param model The model to append to.
          */
-        auto clear_page_buttons_layout() -> void;
+        auto add_simple_page_entries(std::vector<page_entry>& model) const -> void;
 
         /**
-         * @brief Adds a single page button for the case of only one page.
-         * @param layout The layout to add the button to.
+         * @brief Adds display entries for the case of max_page_buttons == 3.
+         * @param model The model to append to.
          */
-        auto add_single_page_button(QHBoxLayout* layout) -> void;
+        auto add_three_page_entries(std::vector<page_entry>& model) const -> void;
 
         /**
-         * @brief Adds page buttons for the case where all pages fit without ellipsis.
-         * @param layout The layout to add the buttons to.
+         * @brief Adds display entries for the case of max_page_buttons == 4.
+         * @param model The model to append to.
          */
-        auto add_simple_page_buttons(QHBoxLayout* layout) -> void;
+        auto add_four_page_entries(std::vector<page_entry>& model) const -> void;
 
         /**
-         * @brief Adds page buttons for the case of max_page_buttons == 3.
-         * @param layout The layout to add the buttons to.
+         * @brief Adds display entries for the general case (max_page_buttons > 4).
+         * @param model The model to append to.
          */
-        auto add_three_page_buttons(QHBoxLayout* layout) -> void;
-
-        /**
-         * @brief Adds page buttons for the case of max_page_buttons == 4.
-         * @param layout The layout to add the buttons to.
-         */
-        auto add_four_page_buttons(QHBoxLayout* layout) -> void;
-
-        /**
-         * @brief Adds page buttons for the general case (max_page_buttons > 4).
-         * @param layout The layout to add the buttons to.
-         */
-        auto add_complex_page_buttons(QHBoxLayout* layout) -> void;
+        auto add_complex_page_entries(std::vector<page_entry>& model) const -> void;
 
         /**
          * @brief Calculates the range of middle page buttons for complex pagination.
@@ -143,16 +158,17 @@ class PaginationWidget: public QWidget
         [[nodiscard]] auto is_last_page() const -> bool;
 
         /**
-         * @brief Creates the last page button.
-         * @return The created QToolButton for the last page.
-         */
-        [[nodiscard]] auto create_last_page_button() const -> QToolButton*;
-
-        /**
          * @brief Handles the paint event to enable QSS background and border styling.
          * @param event The paint event.
          */
         void paintEvent(QPaintEvent* event) override;
+
+        /**
+         * @brief Sends Leave to all page buttons and Enter to the one currently under the cursor.
+         *        This resets stale hover highlights and applies hover to the correct target
+         * immediately.
+         */
+        auto seed_hover_state() -> void;
 
     protected:
         /**
@@ -187,4 +203,6 @@ class PaginationWidget: public QWidget
         int m_current_page = 1;
         int m_total_pages = 1;
         int m_max_page_buttons = 7;
+
+        std::vector<QToolButton*> m_page_buttons_pool;  ///< Reusable buttons, added once to layout.
 };
