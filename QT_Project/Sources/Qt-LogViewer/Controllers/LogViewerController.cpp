@@ -1,3 +1,13 @@
+/**
+ * @file LogViewerController.cpp
+ * @brief Implements the LogViewerController which orchestrates log loading, view contexts,
+ * filtering, and streaming.
+ *
+ * This implementation uses LogViewContext to encapsulate per-view state and model/proxy chains.
+ * Public API remains stable while internal calls forward to the context for models, proxies,
+ * and loaded files. Visibility logic is kept in the proxy and not refactored at this stage.
+ */
+
 #include "Qt-LogViewer/Controllers/LogViewerController.h"
 
 #include <algorithm>
@@ -24,9 +34,13 @@ LogViewerController::LogViewerController(const QString& log_format, QObject* par
                 {
                     view_id = m_active_view_id;
                 }
-                if (!view_id.isNull() && m_view_models.contains(view_id))
+                if (!view_id.isNull())
                 {
-                    m_view_models[view_id]->add_entries(batch);
+                    auto* ctx = get_view_context(view_id);
+                    if (ctx != nullptr)
+                    {
+                        ctx->append_entries(batch);
+                    }
                 }
             });
 
@@ -84,7 +98,7 @@ auto LogViewerController::set_current_view(const QUuid& view_id) -> bool
 {
     bool success = false;
 
-    if (m_view_models.contains(view_id))
+    if (get_view_context(view_id) != nullptr)
     {
         m_current_view_id = view_id;
         success = true;
@@ -112,32 +126,17 @@ auto LogViewerController::remove_view(const QUuid& view_id) -> bool
 {
     bool removed = false;
 
-    if (m_view_models.contains(view_id))
+    if (m_view_contexts.contains(view_id))
     {
-        delete m_view_models[view_id];
-        m_view_models.remove(view_id);
+        delete m_view_contexts[view_id];
+        m_view_contexts.remove(view_id);
         removed = true;
-    }
-    if (m_sort_filter_models.contains(view_id))
-    {
-        delete m_sort_filter_models[view_id];
-        m_sort_filter_models.remove(view_id);
-    }
-    if (m_paging_models.contains(view_id))
-    {
-        delete m_paging_models[view_id];
-        m_paging_models.remove(view_id);
-    }
-    if (m_loaded_log_files.contains(view_id))
-    {
-        m_loaded_log_files.remove(view_id);
     }
     if (m_current_view_id == view_id)
     {
-        m_current_view_id = QUuid();  // Reset current view if it was removed
+        m_current_view_id = QUuid();
     }
 
-    // Also clear queued/active streaming work for this view
     cancel_loading(view_id);
 
     return removed;
@@ -158,7 +157,6 @@ auto LogViewerController::add_log_file_to_tree(const QString& file_path) -> void
     }
     else
     {
-        // Fallback: derive app name from file if the log line did not provide one
         const QString app_name = LogLoader::identify_app(file_path);
         info = LogFileInfo(file_path, app_name);
     }
@@ -180,7 +178,7 @@ auto LogViewerController::add_log_files_to_tree(const QVector<QString>& file_pat
 
 /**
  * @brief Loads a single log file and creates a new view (model/proxy) for it.
- * @param log_file The LogFileInfo to load and display.
+ * @param file_path The LogFileInfo to load and display.
  * @return QUuid of the created view, or an empty QUuid if the file is already loaded.
  */
 auto LogViewerController::load_log_file(const QString& file_path) -> QUuid
@@ -193,13 +191,13 @@ auto LogViewerController::load_log_file(const QString& file_path) -> QUuid
 
     ensure_view_models(view_id);
 
-    if (m_view_models.contains(view_id))
+    auto* ctx = get_view_context(view_id);
+    if (ctx != nullptr)
     {
-        m_view_models[view_id]->add_entries(entries);
+        ctx->append_entries(entries);
+        ctx->set_loaded_files(QList<LogFileInfo>{loaded_log_file});
+        emit view_file_paths_changed(view_id, ctx->get_file_paths());
     }
-
-    m_loaded_log_files[view_id] = QList<LogFileInfo>{loaded_log_file};
-    emit view_file_paths_changed(view_id, get_view_file_paths(view_id));
 
     return view_id;
 }
@@ -217,23 +215,19 @@ auto LogViewerController::load_log_file(const QUuid& view_id, const QString& fil
 
     ensure_view_models(view_id);
 
-    if (m_view_models.contains(view_id) && !is_file_loaded(view_id, file_path))
+    auto* ctx = get_view_context(view_id);
+
+    if (ctx != nullptr && !is_file_loaded(view_id, file_path))
     {
         auto entries = m_loader.load_log_file(file_path);
         const QString app_name = (!entries.isEmpty()) ? entries.first().get_app_name()
                                                       : LogLoader::identify_app(file_path);
 
-        m_view_models[view_id]->add_entries(entries);
-
-        LogFileInfo info(file_path, app_name);
-        if (!m_loaded_log_files.contains(view_id))
-        {
-            m_loaded_log_files[view_id] = QList<LogFileInfo>();
-        }
-        m_loaded_log_files[view_id].append(info);
+        ctx->append_entries(entries);
+        ctx->add_loaded_file(LogFileInfo(file_path, app_name));
 
         success = true;
-        emit view_file_paths_changed(view_id, get_view_file_paths(view_id));
+        emit view_file_paths_changed(view_id, ctx->get_file_paths());
     }
 
     return success;
@@ -244,9 +238,6 @@ auto LogViewerController::load_log_file(const QUuid& view_id, const QString& fil
  * them.
  * @param file_paths A vector of file paths to load logs from.
  * @return QUuid of the created view, or an empty QUuid if no files were loaded.
- *
- * This method uses the LogLoader service to parse log files and populate a new LogModel.
- * It also updates the LogFileTreeModel with information about the loaded log files.
  */
 auto LogViewerController::load_log_files(const QVector<QString>& file_paths) -> QUuid
 {
@@ -264,14 +255,19 @@ auto LogViewerController::load_log_files(const QVector<QString>& file_paths) -> 
         LogFileInfo log_file_info(file_path, app_name);
         loaded_log_files.append(log_file_info);
 
-        if (m_view_models.contains(view_id))
+        auto* ctx = get_view_context(view_id);
+        if (ctx != nullptr)
         {
-            m_view_models[view_id]->add_entries(entries);
+            ctx->append_entries(entries);
         }
     }
 
-    m_loaded_log_files[view_id] = loaded_log_files;
-    emit view_file_paths_changed(view_id, get_view_file_paths(view_id));
+    auto* ctx = get_view_context(view_id);
+    if (ctx != nullptr)
+    {
+        ctx->set_loaded_files(loaded_log_files);
+        emit view_file_paths_changed(view_id, ctx->get_file_paths());
+    }
 
     return view_id;
 }
@@ -288,11 +284,15 @@ auto LogViewerController::load_log_file_async(const QString& file_path,
     auto view_id = QUuid::createUuid();
     ensure_view_models(view_id);
 
-    // Track file in the view (no tree insert here to avoid duplicates)
     const QString app_name = LogLoader::identify_app(file_path);
     LogFileInfo loaded_log_file(file_path, app_name);
-    m_loaded_log_files[view_id] = QList<LogFileInfo>{loaded_log_file};
-    emit view_file_paths_changed(view_id, get_view_file_paths(view_id));
+
+    auto* ctx = get_view_context(view_id);
+    if (ctx != nullptr)
+    {
+        ctx->set_loaded_files(QList<LogFileInfo>{loaded_log_file});
+        emit view_file_paths_changed(view_id, ctx->get_file_paths());
+    }
 
     enqueue_async(view_id, file_path);
     m_active_batch_size = batch_size;
@@ -317,17 +317,17 @@ auto LogViewerController::load_log_file_async(const QUuid& view_id, const QStrin
 
     ensure_view_models(view_id);
 
-    if (m_view_models.contains(view_id) && !is_file_loaded(view_id, file_path))
+    if (!is_file_loaded(view_id, file_path))
     {
         const QString app_name = LogLoader::identify_app(file_path);
         LogFileInfo info(file_path, app_name);
 
-        if (!m_loaded_log_files.contains(view_id))
+        auto* ctx = get_view_context(view_id);
+        if (ctx != nullptr)
         {
-            m_loaded_log_files[view_id] = QList<LogFileInfo>();
+            ctx->add_loaded_file(info);
+            emit view_file_paths_changed(view_id, ctx->get_file_paths());
         }
-        m_loaded_log_files[view_id].append(info);
-        emit view_file_paths_changed(view_id, get_view_file_paths(view_id));
 
         enqueue_async(view_id, file_path);
         m_active_batch_size = batch_size;
@@ -361,8 +361,12 @@ auto LogViewerController::load_log_files_async(const QVector<QString>& file_path
         enqueue_async(view_id, file_path);
     }
 
-    m_loaded_log_files[view_id] = files_info;
-    emit view_file_paths_changed(view_id, get_view_file_paths(view_id));
+    auto* ctx = get_view_context(view_id);
+    if (ctx != nullptr)
+    {
+        ctx->set_loaded_files(files_info);
+        emit view_file_paths_changed(view_id, ctx->get_file_paths());
+    }
 
     m_active_batch_size = batch_size;
     try_start_next_async(m_active_batch_size);
@@ -376,13 +380,11 @@ auto LogViewerController::load_log_files_async(const QVector<QString>& file_path
  */
 auto LogViewerController::cancel_loading(const QUuid& view_id) -> void
 {
-    // Cancel active if it belongs to the view
     if (m_active_view_id == view_id)
     {
         m_loader.cancel_async();
     }
 
-    // Clear any queued items for the view
     clear_pending_for_view(view_id);
 }
 
@@ -402,9 +404,10 @@ auto LogViewerController::set_app_name_filter(const QString& app_name) -> void
  */
 auto LogViewerController::set_app_name_filter(const QUuid& view_id, const QString& app_name) -> void
 {
-    if (m_sort_filter_models.contains(view_id))
+    auto* proxy = get_sort_filter_proxy(view_id);
+    if (proxy != nullptr)
     {
-        m_sort_filter_models[view_id]->set_app_name_filter(app_name);
+        proxy->set_app_name_filter(app_name);
     }
 }
 
@@ -425,9 +428,10 @@ auto LogViewerController::set_log_level_filters(const QSet<QString>& levels) -> 
 auto LogViewerController::set_log_level_filters(const QUuid& view_id,
                                                 const QSet<QString>& levels) -> void
 {
-    if (m_sort_filter_models.contains(view_id))
+    auto* proxy = get_sort_filter_proxy(view_id);
+    if (proxy != nullptr)
     {
-        m_sort_filter_models[view_id]->set_log_level_filters(levels);
+        proxy->set_log_level_filters(levels);
     }
 }
 
@@ -453,9 +457,10 @@ auto LogViewerController::set_search_filter(const QString& search_text, const QS
 auto LogViewerController::set_search_filter(const QUuid& view_id, const QString& search_text,
                                             const QString& field, bool use_regex) -> void
 {
-    if (m_sort_filter_models.contains(view_id))
+    auto* proxy = get_sort_filter_proxy(view_id);
+    if (proxy != nullptr)
     {
-        m_sort_filter_models[view_id]->set_search_filter(search_text, field, use_regex);
+        proxy->set_search_filter(search_text, field, use_regex);
     }
 }
 
@@ -475,14 +480,15 @@ auto LogViewerController::get_log_model() -> LogModel*
  */
 auto LogViewerController::get_log_model(const QUuid& view_id) -> LogModel*
 {
-    return m_view_models.contains(view_id) ? m_view_models[view_id] : nullptr;
+    auto* ctx = get_view_context(view_id);
+    return (ctx != nullptr) ? ctx->get_model() : nullptr;
 }
 
 /**
  * @brief Returns the LogSortFilterProxyModel for the current view.
  * @return Pointer to the LogSortFilterProxyModel.
  */
-auto LogViewerController::get_sort_filter_proxy() -> LogSortFilterProxyModel*
+auto LogViewerController::get_sort_filter_proxy() const -> LogSortFilterProxyModel*
 {
     return get_sort_filter_proxy(m_current_view_id);
 }
@@ -492,9 +498,11 @@ auto LogViewerController::get_sort_filter_proxy() -> LogSortFilterProxyModel*
  * @param view_id The QUuid of the view.
  * @return Pointer to the LogSortFilterProxyModel, or nullptr if not found.
  */
-auto LogViewerController::get_sort_filter_proxy(const QUuid& view_id) -> LogSortFilterProxyModel*
+auto LogViewerController::get_sort_filter_proxy(const QUuid& view_id) const
+    -> LogSortFilterProxyModel*
 {
-    return m_sort_filter_models.contains(view_id) ? m_sort_filter_models[view_id] : nullptr;
+    auto* ctx = get_view_context(view_id);
+    return (ctx != nullptr) ? ctx->get_sort_proxy() : nullptr;
 }
 
 /**
@@ -513,7 +521,8 @@ auto LogViewerController::get_paging_proxy() -> PagingProxyModel*
  */
 auto LogViewerController::get_paging_proxy(const QUuid& view_id) -> PagingProxyModel*
 {
-    return m_paging_models.contains(view_id) ? m_paging_models[view_id] : nullptr;
+    auto* ctx = get_view_context(view_id);
+    return (ctx != nullptr) ? ctx->get_paging_proxy() : nullptr;
 }
 
 /**
@@ -534,11 +543,10 @@ auto LogViewerController::get_app_names(const QUuid& view_id) const -> QSet<QStr
 {
     QSet<QString> app_names;
 
-    if (m_view_models.contains(view_id))
+    auto* ctx = get_view_context(view_id);
+    if (ctx != nullptr)
     {
-        const auto* model = m_view_models[view_id];
-
-        for (const LogEntry& entry: model->get_entries())
+        for (const LogEntry& entry: ctx->get_entries())
         {
             app_names.insert(entry.get_app_name());
         }
@@ -563,9 +571,8 @@ auto LogViewerController::get_app_name_filter() const -> QString
  */
 auto LogViewerController::get_app_name_filter(const QUuid& view_id) const -> QString
 {
-    return m_sort_filter_models.contains(view_id)
-               ? m_sort_filter_models[view_id]->get_app_name_filter()
-               : QString();
+    auto* proxy = get_sort_filter_proxy(view_id);
+    return (proxy != nullptr) ? proxy->get_app_name_filter() : QString();
 }
 
 /**
@@ -631,9 +638,8 @@ auto LogViewerController::get_log_level_counts() const -> QMap<QString, int>
  */
 auto LogViewerController::get_log_level_filters(const QUuid& view_id) const -> QSet<QString>
 {
-    return m_sort_filter_models.contains(view_id)
-               ? m_sort_filter_models[view_id]->get_log_level_filters()
-               : QSet<QString>();
+    auto* proxy = get_sort_filter_proxy(view_id);
+    return (proxy != nullptr) ? proxy->get_log_level_filters() : QSet<QString>();
 }
 
 /**
@@ -652,8 +658,8 @@ auto LogViewerController::get_search_text() const -> QString
  */
 auto LogViewerController::get_search_text(const QUuid& view_id) const -> QString
 {
-    return m_sort_filter_models.contains(view_id) ? m_sort_filter_models[view_id]->get_search_text()
-                                                  : QString();
+    auto* proxy = get_sort_filter_proxy(view_id);
+    return (proxy != nullptr) ? proxy->get_search_text() : QString();
 }
 
 /**
@@ -672,9 +678,8 @@ auto LogViewerController::get_search_field() const -> QString
  */
 auto LogViewerController::get_search_field(const QUuid& view_id) const -> QString
 {
-    return m_sort_filter_models.contains(view_id)
-               ? m_sort_filter_models[view_id]->get_search_field()
-               : QString();
+    auto* proxy = get_sort_filter_proxy(view_id);
+    return (proxy != nullptr) ? proxy->get_search_field() : QString();
 }
 
 /**
@@ -693,8 +698,8 @@ auto LogViewerController::is_search_regex() const -> bool
  */
 auto LogViewerController::is_search_regex(const QUuid& view_id) const -> bool
 {
-    return m_sort_filter_models.contains(view_id) ? m_sort_filter_models[view_id]->is_search_regex()
-                                                  : false;
+    auto* proxy = get_sort_filter_proxy(view_id);
+    return (proxy != nullptr) ? proxy->is_search_regex() : false;
 }
 
 /**
@@ -726,10 +731,10 @@ auto LogViewerController::get_log_entries(const QUuid& view_id) const -> QVector
 {
     QVector<LogEntry> result;
 
-    if (m_view_models.contains(view_id))
+    auto* ctx = get_view_context(view_id);
+    if (ctx != nullptr)
     {
-        const auto* model = m_view_models[view_id];
-        result = model->get_entries();
+        result = ctx->get_entries();
     }
 
     return result;
@@ -756,11 +761,10 @@ auto LogViewerController::get_entries_for_file(const QUuid& view_id,
 {
     QVector<LogEntry> result;
 
-    if (m_view_models.contains(view_id))
+    auto* ctx = get_view_context(view_id);
+    if (ctx != nullptr)
     {
-        const auto* model = m_view_models[view_id];
-
-        for (const auto& entry: model->get_entries())
+        for (const auto& entry: ctx->get_entries())
         {
             if (entry.get_file_info().get_file_path() == file_info.get_file_path())
             {
@@ -773,7 +777,7 @@ auto LogViewerController::get_entries_for_file(const QUuid& view_id,
 }
 
 /**
- * @brief Checks if a log file is already loaded based on its file path.
+ * @brief Checks if a log file with the given file path is already loaded.
  * @param file_path The file path to check.
  * @return True if the file is already loaded, false otherwise.
  */
@@ -781,15 +785,19 @@ auto LogViewerController::is_file_loaded(const QString& file_path) const -> bool
 {
     bool found = false;
 
-    for (const auto& log_file_list: m_loaded_log_files)
+    for (auto it = m_view_contexts.begin(); it != m_view_contexts.end(); ++it)
     {
-        auto it = std::find_if(
-            log_file_list.begin(), log_file_list.end(),
-            [&file_path](const LogFileInfo& info) { return info.get_file_path() == file_path; });
-
-        if (it != log_file_list.end())
+        const auto* ctx = it.value();
+        if (ctx != nullptr)
         {
-            found = true;
+            const auto paths = ctx->get_file_paths();
+            const auto match =
+                std::find_if(paths.begin(), paths.end(),
+                             [&file_path](const QString& p) { return p == file_path; });
+            if (match != paths.end())
+            {
+                found = true;
+            }
         }
     }
 
@@ -807,15 +815,13 @@ auto LogViewerController::is_file_loaded(const QUuid& view_id,
 {
     bool found = false;
 
-    if (m_loaded_log_files.contains(view_id))
+    auto* ctx = get_view_context(view_id);
+    if (ctx != nullptr)
     {
-        const auto& log_file_list = m_loaded_log_files[view_id];
-
-        auto it = std::find_if(
-            log_file_list.begin(), log_file_list.end(),
-            [&file_path](const LogFileInfo& info) { return info.get_file_path() == file_path; });
-
-        if (it != log_file_list.end())
+        const auto paths = ctx->get_file_paths();
+        const auto it = std::find_if(paths.begin(), paths.end(),
+                                     [&file_path](const QString& p) { return p == file_path; });
+        if (it != paths.end())
         {
             found = true;
         }
@@ -844,12 +850,10 @@ auto LogViewerController::set_show_only_file(const QUuid& view_id, const QString
 
         if (file_path.isEmpty())
         {
-            // "Show All Files"
             proxy->clear_hidden_files();
         }
         else
         {
-            // Ensure the selected file is visible even if it was explicitly hidden
             proxy->unhide_file(file_path);
         }
     }
@@ -859,19 +863,11 @@ auto LogViewerController::set_show_only_file(const QUuid& view_id, const QString
  * @brief Toggles a file's visibility (hide/show) in the specified view.
  *
  * Behavior:
- * - No show-only active:
- *   - Toggle hide/unhide for the requested file.
- * - Show-only is active for file A:
- *   - Toggle on A:
- *     - Clear show-only and hide all files (empty view).
- *   - Toggle on a different file B:
- *     - Clear show-only and make B visible. Convert current effective-hidden into explicit hidden
- *       for all other files. Preserve previously explicit hidden files, excluding A and B.
- *
- * Explicit "Show only" action is handled via set_show_only_file(view_id, file_path).
- *
- * @param view_id Target view id.
- * @param file_path Absolute file path to toggle.
+ * - No show-only active: toggle hide/unhide for the requested file.
+ * - Show-only is active:
+ *   - Toggle on the show-only file: clear show-only and hide all files (empty view).
+ *   - Toggle on a different file: clear show-only, make the requested file visible, and convert
+ * effective-hidden into explicit hidden for all other files.
  */
 auto LogViewerController::toggle_file_visibility(const QUuid& view_id,
                                                  const QString& file_path) -> void
@@ -982,14 +978,11 @@ auto LogViewerController::hide_file(const QUuid& view_id, const QString& file_pa
 auto LogViewerController::get_view_file_paths(const QUuid& view_id) const -> QVector<QString>
 {
     QVector<QString> result;
+    auto* ctx = get_view_context(view_id);
 
-    if (m_loaded_log_files.contains(view_id))
+    if (ctx != nullptr)
     {
-        const auto& infos = m_loaded_log_files[view_id];
-        for (const auto& info: infos)
-        {
-            result.append(info.get_file_path());
-        }
+        result = ctx->get_file_paths();
     }
 
     return result;
@@ -1005,51 +998,52 @@ auto LogViewerController::remove_log_file(const LogFileInfo& file) -> void
     QList<QUuid> views_to_remove;
 
     // Remove file from all views and purge associated model entries
-    for (auto it = m_loaded_log_files.begin(); it != m_loaded_log_files.end(); ++it)
+    for (auto it = m_view_contexts.begin(); it != m_view_contexts.end(); ++it)
     {
-        auto& log_file_list = it.value();
-
-        log_file_list.erase(std::remove_if(log_file_list.begin(), log_file_list.end(),
-                                           [&file](const LogFileInfo& info) {
-                                               return info.get_file_path() == file.get_file_path();
-                                           }),
-                            log_file_list.end());
-
+        auto* ctx = it.value();
         const QUuid& view_id = it.key();
 
-        if (m_view_models.contains(view_id))
+        if (ctx != nullptr)
         {
-            m_view_models[view_id]->remove_entries_by_file_path(file.get_file_path());
+            QList<LogFileInfo> files = ctx->get_loaded_files();
+            files.erase(std::remove_if(files.begin(), files.end(),
+                                       [&file](const LogFileInfo& info) {
+                                           return info.get_file_path() == file.get_file_path();
+                                       }),
+                        files.end());
+            ctx->set_loaded_files(files);
 
-            if (m_view_models[view_id]->get_entries().isEmpty())
+            ctx->remove_entries_by_file_path(file.get_file_path());
+
+            if (ctx->get_entries().isEmpty())
             {
                 views_to_remove.append(view_id);
             }
-        }
 
-        // Notify with updated file paths even if the view becomes empty
-        emit view_file_paths_changed(view_id, get_view_file_paths(view_id));
+            // Notify with updated file paths even if the view becomes empty
+            emit view_file_paths_changed(view_id, ctx->get_file_paths());
 
-        // Preserve hidden-effective state when the show-only target is removed:
-        // If show-only pointed to the removed file, clear show-only and mark all remaining files
-        // explicitly hidden.
-        auto* sort_proxy = get_sort_filter_proxy(view_id);
-        if (sort_proxy != nullptr)
-        {
-            const QString show_only_path = sort_proxy->get_show_only_file_path();
-            const bool show_only_target_removed = (show_only_path == file.get_file_path());
-
-            if (show_only_target_removed)
+            // Preserve hidden-effective state when the show-only target is removed:
+            // If show-only pointed to the removed file, clear show-only and mark all remaining
+            // files explicitly hidden.
+            auto* sort_proxy = get_sort_filter_proxy(view_id);
+            if (sort_proxy != nullptr)
             {
-                sort_proxy->set_show_only_file_path(QString());
+                const QString show_only_path = sort_proxy->get_show_only_file_path();
+                const bool show_only_target_removed = (show_only_path == file.get_file_path());
 
-                const QVector<QString> remaining_files = get_view_file_paths(view_id);
-                QSet<QString> all_hidden;
-                for (const auto& p: remaining_files)
+                if (show_only_target_removed)
                 {
-                    all_hidden.insert(p);
+                    sort_proxy->set_show_only_file_path(QString());
+
+                    const QVector<QString> remaining_files = get_view_file_paths(view_id);
+                    QSet<QString> all_hidden;
+                    for (const auto& p: remaining_files)
+                    {
+                        all_hidden.insert(p);
+                    }
+                    sort_proxy->set_hidden_file_paths(all_hidden);
                 }
-                sort_proxy->set_hidden_file_paths(all_hidden);
             }
         }
     }
@@ -1084,21 +1078,20 @@ auto LogViewerController::remove_log_file(const QUuid& view_id, const QString& f
     if (has_valid_args)
     {
         // Remove file from the loaded list for this view
-        if (m_loaded_log_files.contains(view_id))
+        auto* ctx = get_view_context(view_id);
+        if (ctx != nullptr)
         {
-            auto& log_file_list = m_loaded_log_files[view_id];
-            log_file_list.erase(std::remove_if(log_file_list.begin(), log_file_list.end(),
-                                               [&file_path](const LogFileInfo& info) {
-                                                   return info.get_file_path() == file_path;
-                                               }),
-                                log_file_list.end());
-        }
+            QList<LogFileInfo> files = ctx->get_loaded_files();
+            files.erase(std::remove_if(files.begin(), files.end(),
+                                       [&file_path](const LogFileInfo& info) {
+                                           return info.get_file_path() == file_path;
+                                       }),
+                        files.end());
+            ctx->set_loaded_files(files);
 
-        // Remove entries from the model for this view
-        if (m_view_models.contains(view_id))
-        {
-            m_view_models[view_id]->remove_entries_by_file_path(file_path);
-            view_became_empty = m_view_models[view_id]->get_entries().isEmpty();
+            // Remove entries from the model for this view
+            ctx->remove_entries_by_file_path(file_path);
+            view_became_empty = ctx->get_entries().isEmpty();
         }
 
         // Keep per-file filters consistent in this view
@@ -1176,18 +1169,11 @@ auto LogViewerController::try_start_next_async(qsizetype batch_size) -> void
         m_loader.load_log_file_async(m_active_file_path, m_active_batch_size);
         started = true;
     }
-
-    if (!started)
-    {
-        // Nothing to start; remain idle.
-    }
 }
 
 /**
- * @brief Callback when an asynchronous load batch is received.
- * @param view_id The QUuid of the view receiving data.
- * @param file_path The path to the log file.
- * @param entries The batch of log entries.
+ * @brief Clears pending async requests for a specific view.
+ * @param view_id The QUuid of the view.
  */
 auto LogViewerController::clear_pending_for_view(const QUuid& view_id) -> void
 {
@@ -1202,11 +1188,6 @@ auto LogViewerController::clear_pending_for_view(const QUuid& view_id) -> void
     }
 
     m_async_queue = kept;
-
-    if (m_active_view_id == view_id)
-    {
-        // Active will be stopped by cancel, try to start next after it finishes via loader signal.
-    }
 }
 
 /**
@@ -1215,16 +1196,19 @@ auto LogViewerController::clear_pending_for_view(const QUuid& view_id) -> void
  */
 auto LogViewerController::ensure_view_models(const QUuid& view_id) -> void
 {
-    if (!m_view_models.contains(view_id))
+    if (!m_view_contexts.contains(view_id))
     {
-        auto* model = new LogModel(this);
-        auto* sort_proxy = new LogSortFilterProxyModel(this);
-        sort_proxy->setSourceModel(model);
-        auto* paging_proxy = new PagingProxyModel(this);
-        paging_proxy->setSourceModel(sort_proxy);
-
-        m_view_models[view_id] = model;
-        m_sort_filter_models[view_id] = sort_proxy;
-        m_paging_models[view_id] = paging_proxy;
+        auto* ctx = new LogViewContext(this);
+        m_view_contexts[view_id] = ctx;
     }
+}
+
+/**
+ * @brief Returns the context for a view or nullptr if not present.
+ * @param view_id The QUuid of the view.
+ * @return Pointer to LogViewContext.
+ */
+auto LogViewerController::get_view_context(const QUuid& view_id) const -> LogViewContext*
+{
+    return m_view_contexts.contains(view_id) ? m_view_contexts[view_id] : nullptr;
 }

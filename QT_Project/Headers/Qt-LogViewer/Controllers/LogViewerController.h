@@ -8,6 +8,7 @@
 #include <QUuid>
 #include <QVector>
 
+#include "Qt-LogViewer/Controllers/LogViewContext.h"
 #include "Qt-LogViewer/Models/LogFileInfo.h"
 #include "Qt-LogViewer/Models/LogFileTreeModel.h"
 #include "Qt-LogViewer/Models/LogModel.h"
@@ -190,14 +191,15 @@ class LogViewerController: public QObject
          * @brief Returns the LogSortFilterProxyModel for the current view.
          * @return Pointer to the LogSortFilterProxyModel.
          */
-        [[nodiscard]] auto get_sort_filter_proxy() -> LogSortFilterProxyModel*;
+        [[nodiscard]] auto get_sort_filter_proxy() const -> LogSortFilterProxyModel*;
 
         /**
          * @brief Returns the LogSortFilterProxyModel for the specified view.
          * @param view_id The QUuid of the view.
          * @return Pointer to the LogSortFilterProxyModel, or nullptr if not found.
          */
-        [[nodiscard]] auto get_sort_filter_proxy(const QUuid& view_id) -> LogSortFilterProxyModel*;
+        [[nodiscard]] auto get_sort_filter_proxy(const QUuid& view_id) const
+            -> LogSortFilterProxyModel*;
 
         /**
          * @brief Returns the PagingProxyModel for the current view.
@@ -497,13 +499,16 @@ class LogViewerController: public QObject
          */
         auto ensure_view_models(const QUuid& view_id) -> void;
 
+        /**
+         * @brief Returns the context for a view or nullptr if not present.
+         * @param view_id The QUuid of the view.
+         */
+        [[nodiscard]] auto get_view_context(const QUuid& view_id) const -> LogViewContext*;
+
     private:
         LogFileTreeModel* m_file_tree_model;
         LogLoader m_loader;
-        QMap<QUuid, QList<LogFileInfo>> m_loaded_log_files;
-        QMap<QUuid, LogModel*> m_view_models;
-        QMap<QUuid, LogSortFilterProxyModel*> m_sort_filter_models;
-        QMap<QUuid, PagingProxyModel*> m_paging_models;
+        QMap<QUuid, LogViewContext*> m_view_contexts;
         QUuid m_current_view_id;
 
         // Async orchestration (single active stream globally, queued requests)
