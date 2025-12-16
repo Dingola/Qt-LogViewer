@@ -7,6 +7,7 @@
 
 #include "Qt-LogViewer/Controllers/LogViewLoadQueue.h"
 
+#include <QDebug>
 #include <QList>
 
 #include "Qt-LogViewer/Services/LogLoadingService.h"
@@ -18,7 +19,36 @@
  */
 auto LogViewLoadQueue::enqueue(const QUuid& view_id, const QString& file_path) -> void
 {
-    m_queue.append(qMakePair(view_id, file_path));
+    bool already_pending = false;
+    const bool already_active = (m_active_view_id == view_id) && (m_active_file_path == file_path);
+
+    if (!already_active)
+    {
+        for (const auto& item: m_queue)
+        {
+            const bool same_view = (item.first == view_id);
+            const bool same_path = (item.second == file_path);
+            if (same_view && same_path)
+            {
+                already_pending = true;
+            }
+        }
+    }
+
+    const bool should_enqueue = !already_active && !already_pending;
+
+    if (should_enqueue)
+    {
+        m_queue.append(qMakePair(view_id, file_path));
+        qDebug().nospace() << "[Queue] enqueue view=" << view_id.toString() << " file=\""
+                           << file_path << "\" size=" << m_queue.size();
+    }
+    else
+    {
+        qDebug().nospace() << "[Queue] skip enqueue (duplicate) view=" << view_id.toString()
+                           << " file=\"" << file_path << "\" active=" << already_active
+                           << " pending_dup=" << already_pending << " size=" << m_queue.size();
+    }
 }
 
 /**
@@ -44,8 +74,20 @@ auto LogViewLoadQueue::try_start_next(LogLoadingService* loader, qsizetype batch
         m_active_file_path = next_item.second;
         m_active_batch_size = batch_size;
 
+        qDebug().nospace() << "[Queue] start_next view=" << m_active_view_id.toString()
+                           << " file=\"" << m_active_file_path << "\" batch=" << m_active_batch_size
+                           << " pending_left=" << m_queue.size();
+
         loader->load_log_file_async(m_active_file_path, m_active_batch_size);
         started = true;
+    }
+    else
+    {
+        qDebug().nospace() << "[Queue] start_next skipped has_loader=" << has_loader
+                           << " is_idle=" << is_idle << " has_pending=" << has_pending
+                           << " pending=" << m_queue.size()
+                           << " active_view=" << m_active_view_id.toString() << " active_file=\""
+                           << m_active_file_path << "\"";
     }
 
     return started;
@@ -68,7 +110,11 @@ auto LogViewLoadQueue::clear_pending_for_view(const QUuid& view_id) -> void
         }
     }
 
+    const int removed = m_queue.size() - kept.size();
     m_queue = kept;
+
+    qDebug().nospace() << "[Queue] clear_pending_for_view view=" << view_id.toString()
+                       << " removed=" << removed << " pending=" << m_queue.size();
 }
 
 /**
@@ -83,6 +129,8 @@ auto LogViewLoadQueue::cancel_if_active(LogLoadingService* loader, const QUuid& 
 
     if (can_cancel)
     {
+        qDebug().nospace() << "[Queue] cancel active view=" << view_id.toString() << " file=\""
+                           << m_active_file_path << "\"";
         loader->cancel_async();
         m_active_view_id = QUuid();
         m_active_file_path = QString();
@@ -102,10 +150,28 @@ auto LogViewLoadQueue::clear_active_if(const QString& file_path) -> void
 
     if (is_match)
     {
+        qDebug().nospace() << "[Queue] clear_active_if match file=\"" << file_path << "\"";
         m_active_view_id = QUuid();
         m_active_file_path = QString();
         m_active_batch_size = 1000;
     }
+    else
+    {
+        qDebug().nospace() << "[Queue] clear_active_if no-match file=\"" << file_path
+                           << "\" active_file=\"" << m_active_file_path << "\"";
+    }
+}
+
+/**
+ * @brief Unconditionally clears the active stream state.
+ */
+auto LogViewLoadQueue::clear_active() -> void
+{
+    qDebug().nospace() << "[Queue] clear_active force idle (was view="
+                       << m_active_view_id.toString() << " file=\"" << m_active_file_path << "\")";
+    m_active_view_id = QUuid();
+    m_active_file_path = QString();
+    m_active_batch_size = 1000;
 }
 
 /**

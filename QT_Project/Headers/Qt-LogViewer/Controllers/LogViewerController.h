@@ -9,12 +9,13 @@
 #include <QVector>
 
 #include "Qt-LogViewer/Controllers/LogViewContext.h"
+#include "Qt-LogViewer/Controllers/LogViewLoadQueue.h"
 #include "Qt-LogViewer/Models/LogFileInfo.h"
 #include "Qt-LogViewer/Models/LogFileTreeModel.h"
 #include "Qt-LogViewer/Models/LogModel.h"
 #include "Qt-LogViewer/Models/LogSortFilterProxyModel.h"
 #include "Qt-LogViewer/Models/PagingProxyModel.h"
-#include "Qt-LogViewer/Services/LogLoader.h"
+#include "Qt-LogViewer/Services/LogLoadingService.h"
 
 /**
  * @file LogViewerController.h
@@ -33,9 +34,9 @@ class LogViewerController: public QObject
         explicit LogViewerController(const QString& log_format, QObject* parent = nullptr);
 
         /**
-         * @brief Destroys the LogViewerController.
+         * @brief Destroys the LogViewerController. Cancels any ongoing streaming.
          */
-        ~LogViewerController() override = default;
+        ~LogViewerController() override;
 
         /**
          * @brief Sets the current view to the given QUuid if it exists.
@@ -71,7 +72,7 @@ class LogViewerController: public QObject
 
         /**
          * @brief Loads a single log file and creates a new view (model/proxy) for it.
-         * @param log_file The LogFileInfo to load and display.
+         * @param file_path The LogFileInfo to load and display.
          * @return QUuid of the created view, or an empty QUuid if the file is already loaded.
          */
         auto load_log_file(const QString& file_path) -> QUuid;
@@ -486,10 +487,8 @@ class LogViewerController: public QObject
         auto try_start_next_async(qsizetype batch_size) -> void;
 
         /**
-         * @brief Callback when an asynchronous load batch is received.
-         * @param view_id The QUuid of the view receiving data.
-         * @param file_path The path to the log file.
-         * @param entries The batch of log entries.
+         * @brief Clears all pending items for the specified view.
+         * @param view_id The QUuid of the view.
          */
         auto clear_pending_for_view(const QUuid& view_id) -> void;
 
@@ -507,13 +506,9 @@ class LogViewerController: public QObject
 
     private:
         LogFileTreeModel* m_file_tree_model;
-        LogLoader m_loader;
+        LogLoadingService m_loader;
         QMap<QUuid, LogViewContext*> m_view_contexts;
         QUuid m_current_view_id;
-
-        // Async orchestration (single active stream globally, queued requests)
-        QList<QPair<QUuid, QString>> m_async_queue;
-        QUuid m_active_view_id;
-        QString m_active_file_path;
-        qsizetype m_active_batch_size;
+        LogViewLoadQueue m_load_queue;
+        bool m_is_shutting_down{false};
 };

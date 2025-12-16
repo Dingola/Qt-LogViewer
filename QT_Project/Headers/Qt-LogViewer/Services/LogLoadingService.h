@@ -47,7 +47,7 @@ class LogLoadingService final: public QObject
         explicit LogLoadingService(const QString& log_format, QObject* parent = nullptr);
 
         /**
-         * @brief Default destructor.
+         * @brief Destructor. Ensures any ongoing async operation is cancelled.
          */
         ~LogLoadingService() override;
 
@@ -58,6 +58,14 @@ class LogLoadingService final: public QObject
          * @return Vector of parsed entries (empty on validation failure).
          */
         [[nodiscard]] auto load_log_file(const QString& file_path) -> QVector<LogEntry>;
+
+        /**
+         * @brief Reads only the first log entry from the given file (lightweight peek).
+         *        Performs pre-flight validation; returns default entry if invalid/unreadable.
+         * @param file_path Absolute file path to the log file.
+         * @return The first LogEntry if available; otherwise default-constructed LogEntry.
+         */
+        [[nodiscard]] auto read_first_log_entry(const QString& file_path) const -> LogEntry;
 
         /**
          * @brief Starts streaming load of a log file asynchronously.
@@ -126,7 +134,10 @@ class LogLoadingService final: public QObject
         void finished(const QString& file_path);
 
         /**
-         * @brief Emitted when the streaming thread becomes idle (safe to start next task).
+         * @brief Emitted when the underlying loader reports idle (safe to start next task).
+         *
+         * This is forwarded from `LogLoader::streaming_idle` to guarantee real worker-idle state.
+         * On validation failure (no loader run), this service may emit it itself.
          */
         void streaming_idle();
 
@@ -145,7 +156,8 @@ class LogLoadingService final: public QObject
 
         /**
          * @brief Handles a streaming error and optionally schedules a retry.
-         *        Emits `error` and `streaming_idle` when retries are exhausted or not applicable.
+         *        When retries are exhausted or not applicable, only emits `error` and resets
+         *        the retry state. The idle signal will be forwarded from the loader.
          * @param file_path File path that caused the error.
          * @param message Error message.
          */
@@ -156,6 +168,12 @@ class LogLoadingService final: public QObject
          * @param file_path File path for which to reset state.
          */
         auto reset_retry_state(const QString& file_path) -> void;
+
+        /**
+         * @brief Blocks the caller until the streaming worker is idle or timeout occurs.
+         * @param timeout_ms Maximum time to wait (ms).
+         */
+        auto wait_until_idle(int timeout_ms) -> void;
 
     private:
         LogLoader m_loader;

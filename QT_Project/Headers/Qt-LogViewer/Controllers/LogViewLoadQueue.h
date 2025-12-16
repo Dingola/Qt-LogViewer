@@ -35,6 +35,10 @@ class LogViewLoadQueue
     public:
         /**
          * @brief Enqueues a file to be streamed for a specific view.
+         *
+         * Idempotent per `(view_id, file_path)`: if the same pair is already pending or currently
+         * active, this method is a no-op to avoid duplicates causing the same file to start again.
+         *
          * @param view_id Target view id.
          * @param file_path Absolute file path.
          */
@@ -66,6 +70,14 @@ class LogViewLoadQueue
          * @param file_path File path reported as finished.
          */
         auto clear_active_if(const QString& file_path) -> void;
+
+        /**
+         * @brief Unconditionally clears the active stream state.
+         *
+         * Use this when a definitive "idle" signal is received from the loader/service,
+         * regardless of file path normalization differences.
+         */
+        auto clear_active() -> void;
 
         /**
          * @brief Returns the active view id (empty if none).
