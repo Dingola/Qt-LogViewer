@@ -107,7 +107,7 @@ auto LogLoadingService::validate_file(const QString& file_path) const -> bool
  */
 auto LogLoadingService::load_log_file(const QString& file_path) -> QList<LogEntry>
 {
-    QList<LogEntry> result;
+    QVector<LogEntry> result;
 
     if (validate_file(file_path))
     {
@@ -188,6 +188,42 @@ auto LogLoadingService::cancel_async() -> void
 {
     qDebug().nospace() << "[Service] cancel_async() requested";
     m_loader.cancel_async();
+}
+
+/**
+ * @brief Sets the maximum number of retries on streaming errors for the same file.
+ * @param max_retries Number of retry attempts (0 disables retry).
+ */
+auto LogLoadingService::set_max_retries(int max_retries) -> void
+{
+    m_max_retries = (max_retries < 0) ? 0 : max_retries;
+}
+
+/**
+ * @brief Returns the currently configured maximum number of retries.
+ * @return Maximum retry attempts.
+ */
+auto LogLoadingService::get_max_retries() const -> int
+{
+    return m_max_retries;
+}
+
+/**
+ * @brief Sets the delay between retries in milliseconds.
+ * @param delay_ms Delay in milliseconds (0 performs immediate retry).
+ */
+auto LogLoadingService::set_retry_delay_ms(int delay_ms) -> void
+{
+    m_retry_delay_ms = (delay_ms < 0) ? 0 : delay_ms;
+}
+
+/**
+ * @brief Returns the currently configured retry delay in milliseconds.
+ * @return Delay in milliseconds.
+ */
+auto LogLoadingService::get_retry_delay_ms() const -> int
+{
+    return m_retry_delay_ms;
 }
 
 /**
