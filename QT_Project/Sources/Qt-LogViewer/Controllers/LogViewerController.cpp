@@ -21,16 +21,15 @@
 LogViewerController::LogViewerController(const QString& log_format, QObject* parent)
     : QObject(parent),
       m_file_tree_model(new LogFileTreeModel(this)),
-      m_loader(log_format, this),
       m_current_view_id(),
-      m_load_queue(),
-      m_is_shutting_down(false)
+      m_is_shutting_down(false),
+      m_ingest(new LogIngestController(log_format, this))
 {
-    connect(&m_loader, &LogLoadingService::entry_batch_parsed, this,
-            [this](const QString& file_path, const QVector<LogEntry>& batch) {
+    // Batch parsed: append to the active view context.
+    connect(m_ingest, &LogIngestController::entry_batch_parsed, this,
+            [this](const QUuid& view_id, const QString& file_path, const QVector<LogEntry>& batch) {
                 if (!m_is_shutting_down)
                 {
-                    const QUuid view_id = m_load_queue.get_active_view_id();
                     qDebug().nospace() << "[Controller] batch for view=" << view_id.toString()
                                        << " file=\"" << file_path << "\" count=" << batch.size();
 
@@ -45,11 +44,12 @@ LogViewerController::LogViewerController(const QString& log_format, QObject* par
                 }
             });
 
-    connect(&m_loader, &LogLoadingService::progress, this,
-            [this](const QString& file_path, qint64 bytes_read, qint64 total_bytes) {
+    // Progress pass-through.
+    connect(m_ingest, &LogIngestController::progress, this,
+            [this](const QUuid& view_id, const QString& file_path, qint64 bytes_read,
+                   qint64 total_bytes) {
                 if (!m_is_shutting_down)
                 {
-                    const QUuid view_id = m_load_queue.get_active_view_id();
                     qDebug().nospace()
                         << "[Controller] progress view=" << view_id.toString() << " file=\""
                         << file_path << "\" " << bytes_read << '/' << total_bytes;
@@ -61,11 +61,11 @@ LogViewerController::LogViewerController(const QString& log_format, QObject* par
                 }
             });
 
-    connect(&m_loader, &LogLoadingService::error, this,
-            [this](const QString& file_path, const QString& message) {
+    // Error pass-through.
+    connect(m_ingest, &LogIngestController::error, this,
+            [this](const QUuid& view_id, const QString& file_path, const QString& message) {
                 if (!m_is_shutting_down)
                 {
-                    const QUuid view_id = m_load_queue.get_active_view_id();
                     qWarning().nospace()
                         << "[Controller] error view=" << view_id.toString() << " file=\""
                         << file_path << "\" msg=\"" << message << '"';
@@ -74,47 +74,44 @@ LogViewerController::LogViewerController(const QString& log_format, QObject* par
                     {
                         emit loading_error(view_id, file_path, message);
                     }
-
-                    // IMPORTANT: Do not clear active state here; wait for streaming_idle to ensure
-                    // any late batches are still routed to the active view.
+                    // IMPORTANT: Do not clear active state here; wait for idle to ensure
+                    // late batches are still routed to the active view.
                 }
             });
 
-    connect(&m_loader, &LogLoadingService::finished, this, [this](const QString& file_path) {
-        if (!m_is_shutting_down)
-        {
-            const QUuid view_id = m_load_queue.get_active_view_id();
-            qDebug().nospace() << "[Controller] finished view=" << view_id.toString() << " file=\""
-                               << file_path << '"';
+    // Finished pass-through.
+    connect(m_ingest, &LogIngestController::finished, this,
+            [this](const QUuid& view_id, const QString& file_path) {
+                if (!m_is_shutting_down)
+                {
+                    qDebug().nospace() << "[Controller] finished view=" << view_id.toString()
+                                       << " file=\"" << file_path << '"';
 
-            if (!view_id.isNull())
-            {
-                emit loading_finished(view_id, file_path);
-            }
-
-            // IMPORTANT: Do not clear active state here; wait for streaming_idle to avoid
-            // dropping a late-arriving last batch for very small files.
-        }
-    });
+                    if (!view_id.isNull())
+                    {
+                        emit loading_finished(view_id, file_path);
+                    }
+                    // IMPORTANT: Do not clear active state here; wait for idle to avoid
+                    // dropping a late-arriving last batch for very small files.
+                }
+            });
 
     // Advance queue only after thread cleanup (safe to start next).
-    connect(&m_loader, &LogLoadingService::streaming_idle, this, [this]() {
+    connect(m_ingest, &LogIngestController::idle, this, [this]() {
         if (!m_is_shutting_down)
         {
             qDebug().nospace() << "[Controller] streaming_idle: force idle then try start next. "
-                               << "pending=" << m_load_queue.get_pending_count();
-
-            // Clear active only when the loader reports true idle.
-            m_load_queue.clear_active();
+                               << "pending=" << m_ingest->get_pending_count();
 
             // Start next first, then read new active view id (fix ordering).
-            const bool started =
-                m_load_queue.try_start_next(&m_loader, m_load_queue.get_active_batch_size());
+            const bool started = (m_ingest->start_next_if_idle(m_ingest->get_active_batch_size()),
+                                  !m_ingest->get_active_view_id().isNull());
+
             if (started)
             {
-                const QUuid new_active = m_load_queue.get_active_view_id();
+                const QUuid new_active = m_ingest->get_active_view_id();
                 qDebug().nospace() << "[Controller] started next view=" << new_active.toString()
-                                   << " file=\"" << m_load_queue.get_active_file_path() << '"';
+                                   << " file=\"" << m_ingest->get_active_file_path() << '"';
 
                 if (!new_active.isNull() && (m_current_view_id != new_active))
                 {
@@ -136,8 +133,6 @@ LogViewerController::LogViewerController(const QString& log_format, QObject* par
 LogViewerController::~LogViewerController()
 {
     m_is_shutting_down = true;
-    QObject::disconnect(&m_loader, nullptr, this, nullptr);
-    m_loader.cancel_async();
 }
 
 /**
@@ -199,7 +194,7 @@ auto LogViewerController::remove_view(const QUuid& view_id) -> bool
  */
 auto LogViewerController::add_log_file_to_tree(const QString& file_path) -> void
 {
-    LogEntry entry = m_loader.read_first_log_entry(file_path);
+    LogEntry entry = m_ingest->read_first_log_entry(file_path);
     LogFileInfo info;
 
     if (!entry.get_app_name().isEmpty())
@@ -234,7 +229,7 @@ auto LogViewerController::add_log_files_to_tree(const QVector<QString>& file_pat
  */
 auto LogViewerController::load_log_file(const QString& file_path) -> QUuid
 {
-    auto entries = m_loader.load_log_file(file_path);
+    auto entries = m_ingest->load_file_sync(file_path);
     QString app_name =
         (!entries.isEmpty()) ? entries.first().get_app_name() : LogLoader::identify_app(file_path);
     LogFileInfo loaded_log_file(file_path, app_name);
@@ -270,7 +265,7 @@ auto LogViewerController::load_log_file(const QUuid& view_id, const QString& fil
 
     if (ctx != nullptr && !is_file_loaded(view_id, file_path))
     {
-        auto entries = m_loader.load_log_file(file_path);
+        auto entries = m_ingest->load_file_sync(file_path);
         const QString app_name = (!entries.isEmpty()) ? entries.first().get_app_name()
                                                       : LogLoader::identify_app(file_path);
 
@@ -299,7 +294,7 @@ auto LogViewerController::load_log_files(const QVector<QString>& file_paths) -> 
 
     for (const QString& file_path: file_paths)
     {
-        auto entries = m_loader.load_log_file(file_path);
+        auto entries = m_ingest->load_file_sync(file_path);
         QString app_name = (!entries.isEmpty()) ? entries.first().get_app_name()
                                                 : LogLoader::identify_app(file_path);
 
@@ -428,7 +423,7 @@ auto LogViewerController::load_log_files_async(const QVector<QString>& file_path
  */
 auto LogViewerController::cancel_loading(const QUuid& view_id) -> void
 {
-    m_load_queue.cancel_if_active(&m_loader, view_id);
+    m_ingest->cancel_for_view(view_id);
 }
 
 /**
@@ -1179,7 +1174,7 @@ auto LogViewerController::remove_log_file(const QUuid& view_id, const QString& f
  */
 auto LogViewerController::enqueue_async(const QUuid& view_id, const QString& file_path) -> void
 {
-    m_load_queue.enqueue(view_id, file_path);
+    m_ingest->enqueue_stream(view_id, file_path);
 }
 
 /**
@@ -1188,15 +1183,12 @@ auto LogViewerController::enqueue_async(const QUuid& view_id, const QString& fil
  */
 auto LogViewerController::try_start_next_async(qsizetype batch_size) -> void
 {
-    const bool started = m_load_queue.try_start_next(&m_loader, batch_size);
+    m_ingest->start_next_if_idle(batch_size);
 
-    if (started)
+    const QUuid active_view_id = m_ingest->get_active_view_id();
+    if (!active_view_id.isNull() && (m_current_view_id != active_view_id))
     {
-        const QUuid active_view_id = m_load_queue.get_active_view_id();
-        if (!active_view_id.isNull() && (m_current_view_id != active_view_id))
-        {
-            set_current_view(active_view_id);
-        }
+        set_current_view(active_view_id);
     }
 }
 
@@ -1206,7 +1198,7 @@ auto LogViewerController::try_start_next_async(qsizetype batch_size) -> void
  */
 auto LogViewerController::clear_pending_for_view(const QUuid& view_id) -> void
 {
-    m_load_queue.clear_pending_for_view(view_id);
+    m_ingest->cancel_for_view(view_id);
 }
 
 /**

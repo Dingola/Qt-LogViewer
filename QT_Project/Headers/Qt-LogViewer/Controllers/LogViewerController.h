@@ -8,6 +8,7 @@
 #include <QUuid>
 #include <QVector>
 
+#include "Qt-LogViewer/Controllers/LogIngestController.h"
 #include "Qt-LogViewer/Controllers/LogViewContext.h"
 #include "Qt-LogViewer/Controllers/LogViewLoadQueue.h"
 #include "Qt-LogViewer/Models/LogFileInfo.h"
@@ -506,9 +507,8 @@ class LogViewerController: public QObject
 
     private:
         LogFileTreeModel* m_file_tree_model;
-        LogLoadingService m_loader;
         QMap<QUuid, LogViewContext*> m_view_contexts;
         QUuid m_current_view_id;
-        LogViewLoadQueue m_load_queue;
         bool m_is_shutting_down{false};
+        LogIngestController* m_ingest{nullptr};
 };
