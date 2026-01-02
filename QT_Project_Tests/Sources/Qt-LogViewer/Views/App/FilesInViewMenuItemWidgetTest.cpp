@@ -1,4 +1,4 @@
-#include "Qt-LogViewer/Views/Shared/FilesInViewMenuItemWidgetTest.h"
+#include "Qt-LogViewer/Views/App/FilesInViewMenuItemWidgetTest.h"
 
 #include <QFileInfo>
 #include <QFontMetrics>
