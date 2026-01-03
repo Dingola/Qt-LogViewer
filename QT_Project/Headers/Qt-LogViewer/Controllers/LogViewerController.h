@@ -11,6 +11,7 @@
 #include "Qt-LogViewer/Controllers/LogIngestController.h"
 #include "Qt-LogViewer/Controllers/LogViewContext.h"
 #include "Qt-LogViewer/Controllers/LogViewLoadQueue.h"
+#include "Qt-LogViewer/Controllers/ViewRegistry.h"
 #include "Qt-LogViewer/Models/LogFileInfo.h"
 #include "Qt-LogViewer/Models/LogFileTreeModel.h"
 #include "Qt-LogViewer/Models/LogModel.h"
@@ -507,8 +508,7 @@ class LogViewerController: public QObject
 
     private:
         LogFileTreeModel* m_file_tree_model;
-        QMap<QUuid, LogViewContext*> m_view_contexts;
-        QUuid m_current_view_id;
         bool m_is_shutting_down{false};
         LogIngestController* m_ingest{nullptr};
+        ViewRegistry* m_views{nullptr};
 };
