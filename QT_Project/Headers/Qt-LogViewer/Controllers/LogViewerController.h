@@ -8,6 +8,7 @@
 #include <QUuid>
 #include <QVector>
 
+#include "Qt-LogViewer/Controllers/FilterCoordinator.h"
 #include "Qt-LogViewer/Controllers/LogIngestController.h"
 #include "Qt-LogViewer/Controllers/LogViewContext.h"
 #include "Qt-LogViewer/Controllers/LogViewLoadQueue.h"
@@ -511,4 +512,5 @@ class LogViewerController: public QObject
         bool m_is_shutting_down{false};
         LogIngestController* m_ingest{nullptr};
         ViewRegistry* m_views{nullptr};
+        FilterCoordinator* m_filters{nullptr};
 };

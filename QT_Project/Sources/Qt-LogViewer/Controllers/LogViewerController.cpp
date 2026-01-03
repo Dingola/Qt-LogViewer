@@ -23,7 +23,8 @@ LogViewerController::LogViewerController(const QString& log_format, QObject* par
       m_file_tree_model(new LogFileTreeModel(this)),
       m_is_shutting_down(false),
       m_ingest(new LogIngestController(log_format, this)),
-      m_views(new ViewRegistry(this))
+      m_views(new ViewRegistry(this)),
+      m_filters(new FilterCoordinator(m_views, this))
 {
     connect(m_views, &ViewRegistry::current_view_id_changed, this,
             [this](const QUuid& view_id) { emit current_view_id_changed(view_id); });
@@ -412,12 +413,7 @@ auto LogViewerController::set_app_name_filter(const QString& app_name) -> void
  */
 auto LogViewerController::set_app_name_filter(const QUuid& view_id, const QString& app_name) -> void
 {
-    auto* proxy = get_sort_filter_proxy(view_id);
-
-    if (proxy != nullptr)
-    {
-        proxy->set_app_name_filter(app_name);
-    }
+    m_filters->set_app_name(view_id, app_name);
 }
 
 /**
@@ -437,12 +433,7 @@ auto LogViewerController::set_log_level_filters(const QSet<QString>& levels) -> 
 auto LogViewerController::set_log_level_filters(const QUuid& view_id,
                                                 const QSet<QString>& levels) -> void
 {
-    auto* proxy = get_sort_filter_proxy(view_id);
-
-    if (proxy != nullptr)
-    {
-        proxy->set_log_level_filters(levels);
-    }
+    m_filters->set_log_levels(view_id, levels);
 }
 
 /**
@@ -467,12 +458,7 @@ auto LogViewerController::set_search_filter(const QString& search_text, const QS
 auto LogViewerController::set_search_filter(const QUuid& view_id, const QString& search_text,
                                             const QString& field, bool use_regex) -> void
 {
-    auto* proxy = get_sort_filter_proxy(view_id);
-
-    if (proxy != nullptr)
-    {
-        proxy->set_search_filter(search_text, field, use_regex);
-    }
+    m_filters->set_search(view_id, search_text, field, use_regex);
 }
 
 /**
@@ -585,8 +571,7 @@ auto LogViewerController::get_app_name_filter() const -> QString
  */
 auto LogViewerController::get_app_name_filter(const QUuid& view_id) const -> QString
 {
-    auto* proxy = get_sort_filter_proxy(view_id);
-    QString filter = (proxy != nullptr) ? proxy->get_app_name_filter() : QString();
+    QString filter = m_filters->get_app_name(view_id);
     return filter;
 }
 
@@ -598,15 +583,8 @@ auto LogViewerController::get_app_name_filter(const QUuid& view_id) const -> QSt
  */
 auto LogViewerController::get_available_log_levels(const QUuid& view_id) const -> QVector<QString>
 {
-    QVector<QString> log_levels;
-
-    log_levels << "Trace"
-               << "Debug"
-               << "Info"
-               << "Warning"
-               << "Error"
-               << "Fatal";
-
+    QVector<QString> log_levels = FilterCoordinator::get_available_log_levels();
+    Q_UNUSED(view_id);
     return log_levels;
 }
 
@@ -626,15 +604,8 @@ auto LogViewerController::get_log_level_filters() const -> QSet<QString>
  */
 auto LogViewerController::get_log_level_counts(const QUuid& view_id) const -> QMap<QString, int>
 {
-    QVector<LogEntry> log_entries = get_log_entries(view_id);
-    QMap<QString, int> level_counts;
-
-    for (const auto& entry: log_entries)
-    {
-        level_counts[entry.get_level()]++;
-    }
-
-    return level_counts;
+    QMap<QString, int> counts = m_filters->get_log_level_counts(view_id);
+    return counts;
 }
 
 /**
@@ -643,7 +614,8 @@ auto LogViewerController::get_log_level_counts(const QUuid& view_id) const -> QM
  */
 auto LogViewerController::get_log_level_counts() const -> QMap<QString, int>
 {
-    return get_log_level_counts(m_views->get_current_view());
+    QMap<QString, int> counts = get_log_level_counts(m_views->get_current_view());
+    return counts;
 }
 
 /**
@@ -653,8 +625,7 @@ auto LogViewerController::get_log_level_counts() const -> QMap<QString, int>
  */
 auto LogViewerController::get_log_level_filters(const QUuid& view_id) const -> QSet<QString>
 {
-    auto* proxy = get_sort_filter_proxy(view_id);
-    QSet<QString> levels = (proxy != nullptr) ? proxy->get_log_level_filters() : QSet<QString>();
+    QSet<QString> levels = m_filters->get_log_levels(view_id);
     return levels;
 }
 
@@ -674,8 +645,7 @@ auto LogViewerController::get_search_text() const -> QString
  */
 auto LogViewerController::get_search_text(const QUuid& view_id) const -> QString
 {
-    auto* proxy = get_sort_filter_proxy(view_id);
-    QString text = (proxy != nullptr) ? proxy->get_search_text() : QString();
+    QString text = m_filters->get_search_text(view_id);
     return text;
 }
 
@@ -695,8 +665,7 @@ auto LogViewerController::get_search_field() const -> QString
  */
 auto LogViewerController::get_search_field(const QUuid& view_id) const -> QString
 {
-    auto* proxy = get_sort_filter_proxy(view_id);
-    QString field = (proxy != nullptr) ? proxy->get_search_field() : QString();
+    QString field = m_filters->get_search_field(view_id);
     return field;
 }
 
@@ -716,8 +685,7 @@ auto LogViewerController::is_search_regex() const -> bool
  */
 auto LogViewerController::is_search_regex(const QUuid& view_id) const -> bool
 {
-    auto* proxy = get_sort_filter_proxy(view_id);
-    bool regex = (proxy != nullptr) ? proxy->is_search_regex() : false;
+    bool regex = m_filters->is_search_regex(view_id);
     return regex;
 }
 
@@ -843,21 +811,7 @@ auto LogViewerController::is_file_loaded(const QUuid& view_id,
  */
 auto LogViewerController::set_show_only_file(const QUuid& view_id, const QString& file_path) -> void
 {
-    auto* proxy = get_sort_filter_proxy(view_id);
-
-    if (proxy != nullptr)
-    {
-        proxy->set_show_only_file_path(file_path);
-
-        if (file_path.isEmpty())
-        {
-            proxy->clear_hidden_files();
-        }
-        else
-        {
-            proxy->unhide_file(file_path);
-        }
-    }
+    m_filters->set_show_only(view_id, file_path);
 }
 
 /**
@@ -873,82 +827,7 @@ auto LogViewerController::set_show_only_file(const QUuid& view_id, const QString
 auto LogViewerController::toggle_file_visibility(const QUuid& view_id,
                                                  const QString& file_path) -> void
 {
-    auto* proxy = get_sort_filter_proxy(view_id);
-
-    const bool can_toggle = (proxy != nullptr) && !file_path.isEmpty();
-
-    if (can_toggle)
-    {
-        const QString show_only = proxy->get_show_only_file_path();
-        const QSet<QString> hidden = proxy->get_hidden_file_paths();
-        const bool is_hidden = hidden.contains(file_path);
-        const bool show_only_active = !show_only.isEmpty();
-        const bool toggling_show_only_target = (show_only == file_path);
-
-        if (!show_only_active)
-        {
-            // No show-only active: standard toggle for the requested file.
-            if (is_hidden)
-            {
-                proxy->unhide_file(file_path);
-            }
-            else
-            {
-                proxy->hide_file(file_path);
-            }
-        }
-        else
-        {
-            if (toggling_show_only_target)
-            {
-                // Toggling the current show-only file: clear show-only and hide all files (empty
-                // view).
-                proxy->set_show_only_file_path(QString());
-
-                const QVector<QString> files = get_view_file_paths(view_id);
-                QSet<QString> all_hidden;
-                for (const auto& p: files)
-                {
-                    all_hidden.insert(p);
-                }
-                proxy->set_hidden_file_paths(all_hidden);
-            }
-            else
-            {
-                // Clear show-only, make requested file visible and convert effective-hidden to
-                // explicit.
-                proxy->set_show_only_file_path(QString());
-
-                if (is_hidden)
-                {
-                    proxy->unhide_file(file_path);
-                }
-
-                const QVector<QString> files = get_view_file_paths(view_id);
-                QSet<QString> new_hidden;
-
-                for (const auto& p: files)
-                {
-                    const bool keep_visible = (p == show_only) || (p == file_path);
-                    if (!keep_visible)
-                    {
-                        new_hidden.insert(p);
-                    }
-                }
-
-                for (const auto& h: hidden)
-                {
-                    const bool exclude = (h == show_only) || (h == file_path);
-                    if (!exclude)
-                    {
-                        new_hidden.insert(h);
-                    }
-                }
-
-                proxy->set_hidden_file_paths(new_hidden);
-            }
-        }
-    }
+    m_filters->toggle_visibility(view_id, file_path);
 }
 
 /**
@@ -958,12 +837,7 @@ auto LogViewerController::toggle_file_visibility(const QUuid& view_id,
  */
 auto LogViewerController::hide_file(const QUuid& view_id, const QString& file_path) -> void
 {
-    auto* proxy = get_sort_filter_proxy(view_id);
-
-    if (proxy != nullptr)
-    {
-        proxy->hide_file(file_path);
-    }
+    m_filters->hide_file(view_id, file_path);
 }
 
 /**
