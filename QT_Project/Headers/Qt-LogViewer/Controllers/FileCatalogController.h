@@ -19,7 +19,7 @@
  * - Add multiple files by looping over `add_file`.
  * - Remove files from the catalog model.
  */
-class FileCatalogController final: public QObject
+class FileCatalogController: public QObject
 {
         Q_OBJECT
 

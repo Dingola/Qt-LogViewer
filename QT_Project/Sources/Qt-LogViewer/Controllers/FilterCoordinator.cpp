@@ -1,6 +1,11 @@
 /**
  * @file FilterCoordinator.cpp
- * @brief Implements FilterCoordinator which delegates per-view filtering and visibility operations.
+ * @brief Implements `FilterCoordinator` which delegates per-view filtering and file visibility
+ * operations.
+ *
+ * This class forwards filter and visibility requests to the `LogSortFilterProxyModel` of a given
+ * view and uses `ViewRegistry` to query current entries and file paths when computing counts or
+ * performing visibility updates that depend on the view's loaded files.
  */
 
 #include "Qt-LogViewer/Controllers/FilterCoordinator.h"
@@ -280,6 +285,57 @@ auto FilterCoordinator::get_available_log_levels() -> QVector<QString>
                << "Fatal";
 
     return log_levels;
+}
+
+/**
+ * @brief Adjust visibility state for a view when a file is removed.
+ * @param view_id Target view id.
+ * @param file_path Removed absolute file path.
+ */
+auto FilterCoordinator::adjust_visibility_on_file_removed(const QUuid& view_id,
+                                                          const QString& file_path) -> void
+{
+    auto* proxy = get_sort_filter_proxy(view_id);
+    if (proxy != nullptr)
+    {
+        const QString show_only_path = proxy->get_show_only_file_path();
+        const bool removed_was_show_only = (show_only_path == file_path);
+
+        if (removed_was_show_only)
+        {
+            proxy->set_show_only_file_path(QString());
+
+            const QVector<QString> remaining = m_views->get_file_paths(view_id);
+            QSet<QString> all_hidden;
+            for (const auto& p: remaining)
+            {
+                all_hidden.insert(p);
+            }
+            proxy->set_hidden_file_paths(all_hidden);
+        }
+        else
+        {
+            QSet<QString> hidden = proxy->get_hidden_file_paths();
+            if (hidden.contains(file_path))
+            {
+                hidden.remove(file_path);
+                proxy->set_hidden_file_paths(hidden);
+            }
+        }
+    }
+}
+
+/**
+ * @brief Adjust visibility across all views when a file is removed globally.
+ * @param file_path Removed absolute file path.
+ */
+auto FilterCoordinator::adjust_visibility_on_global_file_removed(const QString& file_path) -> void
+{
+    const QVector<QUuid> ids = m_views->get_all_view_ids();
+    for (const QUuid& view_id: ids)
+    {
+        adjust_visibility_on_file_removed(view_id, file_path);
+    }
 }
 
 /**

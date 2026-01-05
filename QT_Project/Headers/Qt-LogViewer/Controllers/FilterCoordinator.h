@@ -13,7 +13,7 @@
 
 /**
  * @file FilterCoordinator.h
- * @brief Coordinates per-view filtering and visibility operations using `ViewRegistry` and proxies.
+ * @brief Coordinates per-view filtering and file visibility using `ViewRegistry` and proxies.
  *
  * Responsibilities:
  * - Delegate application-name, log-level, and search filters to a view's `LogSortFilterProxyModel`.
@@ -21,8 +21,9 @@
  * - Provide query helpers for current filters and search parameters.
  * - Compute per-view log level counts based on current entries from `ViewRegistry`.
  * - Expose static available log levels identical across views.
+ * - Adjust per-view visibility state when files are removed (show-only reset, hidden set updates).
  */
-class FilterCoordinator final: public QObject
+class FilterCoordinator: public QObject
 {
         Q_OBJECT
 
@@ -44,7 +45,7 @@ class FilterCoordinator final: public QObject
         /**
          * @brief Set log level filters for a specific view.
          * @param view_id Target view.
-         * @param levels Set of log level names.
+         * @param levels Set of log level names (e.g., "Info", "Error").
          */
         auto set_log_levels(const QUuid& view_id, const QSet<QString>& levels) -> void;
 
@@ -68,7 +69,7 @@ class FilterCoordinator final: public QObject
 
         /**
          * @brief Toggle visibility of a file in the specified view (hide/unhide).
-         *        Honors current "show only" rules exactly as in the facade logic.
+         *        Honors current "show only" rules.
          * @param view_id Target view.
          * @param file_path Absolute file path to toggle.
          */
@@ -84,7 +85,7 @@ class FilterCoordinator final: public QObject
         /**
          * @brief Get current application name filter for a view.
          * @param view_id Target view.
-         * @return Application name filter.
+         * @return Application name filter string (empty if none).
          */
         [[nodiscard]] auto get_app_name(const QUuid& view_id) const -> QString;
 
@@ -98,14 +99,14 @@ class FilterCoordinator final: public QObject
         /**
          * @brief Get current search text for a view.
          * @param view_id Target view.
-         * @return Search text.
+         * @return Search text string.
          */
         [[nodiscard]] auto get_search_text(const QUuid& view_id) const -> QString;
 
         /**
          * @brief Get current search field for a view.
          * @param view_id Target view.
-         * @return Search field.
+         * @return Search field string.
          */
         [[nodiscard]] auto get_search_field(const QUuid& view_id) const -> QString;
 
@@ -128,6 +129,28 @@ class FilterCoordinator final: public QObject
          * @return Vector of log level names.
          */
         [[nodiscard]] static auto get_available_log_levels() -> QVector<QString>;
+
+        /**
+         * @brief Adjust visibility state for a view when a file is removed.
+         *
+         * Behavior:
+         * - If the removed file was the current show-only target, clear show-only and hide all
+         * remaining files (empty view).
+         * - Otherwise, remove the file from the hidden set if present.
+         *
+         * @param view_id Target view id.
+         * @param file_path Removed absolute file path.
+         */
+        auto adjust_visibility_on_file_removed(const QUuid& view_id,
+                                               const QString& file_path) -> void;
+
+        /**
+         * @brief Adjust visibility across all views when a file is removed globally.
+         *
+         * For each view applies the same rules as `adjust_visibility_on_file_removed`.
+         * @param file_path Removed absolute file path.
+         */
+        auto adjust_visibility_on_global_file_removed(const QString& file_path) -> void;
 
     private:
         /**
