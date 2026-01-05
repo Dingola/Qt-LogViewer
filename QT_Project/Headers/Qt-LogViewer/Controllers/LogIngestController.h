@@ -16,7 +16,7 @@
  *        maps low-level loader signals to per-view signals, and provides helpers to enqueue,
  *        start-next and cancel streaming for specific views.
  */
-class LogIngestController final: public QObject
+class LogIngestController: public QObject
 {
         Q_OBJECT
 
