@@ -2,10 +2,6 @@
  * @file LogViewerController.cpp
  * @brief Implements the LogViewerController which orchestrates log loading, view contexts,
  * filtering, and streaming.
- *
- * This implementation uses LogViewContext to encapsulate per-view state and model/proxy chains.
- * Public API remains stable while internal calls forward to the context for models, proxies,
- * and loaded files. Visibility logic is kept in the proxy and not refactored at this stage.
  */
 
 #include "Qt-LogViewer/Controllers/LogViewerController.h"
@@ -20,9 +16,9 @@
  */
 LogViewerController::LogViewerController(const QString& log_format, QObject* parent)
     : QObject(parent),
-      m_file_tree_model(new LogFileTreeModel(this)),
       m_is_shutting_down(false),
       m_ingest(new LogIngestController(log_format, this)),
+      m_catalog(new FileCatalogController(m_ingest, this)),
       m_views(new ViewRegistry(this)),
       m_filters(new FilterCoordinator(m_views, this))
 {
@@ -189,20 +185,10 @@ auto LogViewerController::remove_view(const QUuid& view_id) -> bool
  */
 auto LogViewerController::add_log_file_to_tree(const QString& file_path) -> void
 {
-    LogEntry entry = m_ingest->read_first_log_entry(file_path);
-    LogFileInfo info;
-
-    if (!entry.get_app_name().isEmpty())
+    if (m_catalog != nullptr)
     {
-        info = entry.get_file_info();
+        m_catalog->add_file(file_path);
     }
-    else
-    {
-        const QString app_name = LogLoader::identify_app(file_path);
-        info = LogFileInfo(file_path, app_name);
-    }
-
-    m_file_tree_model->add_log_file(info);
 }
 
 /**
@@ -211,9 +197,9 @@ auto LogViewerController::add_log_file_to_tree(const QString& file_path) -> void
  */
 auto LogViewerController::add_log_files_to_tree(const QVector<QString>& file_paths) -> void
 {
-    for (const auto& file_path: file_paths)
+    if (m_catalog != nullptr)
     {
-        add_log_file_to_tree(file_path);
+        m_catalog->add_files(file_paths);
     }
 }
 
@@ -330,12 +316,10 @@ auto LogViewerController::load_log_file_async(const QString& file_path,
 
 /**
  * @brief Starts streaming load of a single log file into an existing view (model/proxy).
- *        The file will be streamed in the background according to the controller queue.
  * @param view_id The target view to load the file into.
  * @param file_path The path to the log file to stream.
  * @param batch_size Number of entries per batch appended to the model.
- * @return True if the file was enqueued for streaming; false if the file was already present or the
- * view does not exist.
+ * @return True if the file was enqueued; false if already present or view missing.
  */
 auto LogViewerController::load_log_file_async(const QUuid& view_id, const QString& file_path,
                                               qsizetype batch_size) -> bool
@@ -362,7 +346,6 @@ auto LogViewerController::load_log_file_async(const QUuid& view_id, const QStrin
 
 /**
  * @brief Starts streaming load of multiple log files into a single new view (model/proxy).
- *        Files are streamed sequentially in the background.
  * @param file_paths Paths to stream.
  * @param batch_size Number of entries per batch appended to the model.
  * @return QUuid of the created view.
@@ -577,9 +560,8 @@ auto LogViewerController::get_app_name_filter(const QUuid& view_id) const -> QSt
 
 /**
  * @brief Returns the available log levels for the specified view.
- *        Currently returns the same static set for all views.
  * @param view_id The QUuid of the view.
- * @return QVector of log level names (e.g., "Trace", "Debug", ...).
+ * @return Vector of log level names (same list for all views).
  */
 auto LogViewerController::get_available_log_levels(const QUuid& view_id) const -> QVector<QString>
 {
@@ -697,7 +679,8 @@ auto LogViewerController::is_search_regex(const QUuid& view_id) const -> bool
  */
 auto LogViewerController::get_log_file_tree_model() -> LogFileTreeModel*
 {
-    return m_file_tree_model;
+    LogFileTreeModel* model = (m_catalog != nullptr) ? m_catalog->get_model() : nullptr;
+    return model;
 }
 
 /**
@@ -803,11 +786,6 @@ auto LogViewerController::is_file_loaded(const QUuid& view_id,
  * @brief Applies a "show only file" filter for the specified view.
  * @param view_id Target view id.
  * @param file_path File path to show exclusively, or empty to reset.
- *
- * Behavior:
- * - Non-empty file_path: activate show-only and ensure that file is visible (remove it from the
- * hidden set).
- * - Empty file_path: deactivate show-only and clear the hidden set so all files are visible again.
  */
 auto LogViewerController::set_show_only_file(const QUuid& view_id, const QString& file_path) -> void
 {
@@ -816,13 +794,8 @@ auto LogViewerController::set_show_only_file(const QUuid& view_id, const QString
 
 /**
  * @brief Toggles a file's visibility (hide/show) in the specified view.
- *
- * Behavior:
- * - No show-only active: toggle hide/unhide for the requested file.
- * - Show-only is active:
- *   - Toggle on the show-only file: clear show-only and hide all files (empty view).
- *   - Toggle on a different file: clear show-only, make the requested file visible, and convert
- * effective-hidden into explicit hidden for all files.
+ * @param view_id Target view id.
+ * @param file_path Absolute file path to toggle.
  */
 auto LogViewerController::toggle_file_visibility(const QUuid& view_id,
                                                  const QString& file_path) -> void
@@ -908,10 +881,10 @@ auto LogViewerController::remove_log_file(const LogFileInfo& file) -> void
         }
     }
 
-    // Remove file from the tree model
-    if (m_file_tree_model != nullptr)
+    // Remove file from the tree model (delegated to catalog)
+    if (m_catalog != nullptr)
     {
-        m_file_tree_model->remove_log_file(file);
+        m_catalog->remove_file(file);
     }
 
     // Remove views that became empty and notify listeners
@@ -924,11 +897,10 @@ auto LogViewerController::remove_log_file(const LogFileInfo& file) -> void
 
 /**
  * @brief Removes a single log file from the specified view only.
- *
- * If the target view becomes empty, it is removed and `view_removed(view_id)` is emitted.
- *
  * @param view_id The target view.
  * @param file_path Absolute file path to remove from the view.
+ *
+ * If the target view becomes empty, it is removed and `view_removed(view_id)` is emitted.
  */
 auto LogViewerController::remove_log_file(const QUuid& view_id, const QString& file_path) -> void
 {

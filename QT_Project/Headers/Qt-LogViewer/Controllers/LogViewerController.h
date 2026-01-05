@@ -8,6 +8,7 @@
 #include <QUuid>
 #include <QVector>
 
+#include "Qt-LogViewer/Controllers/FileCatalogController.h"
 #include "Qt-LogViewer/Controllers/FilterCoordinator.h"
 #include "Qt-LogViewer/Controllers/LogIngestController.h"
 #include "Qt-LogViewer/Controllers/LogViewContext.h"
@@ -508,9 +509,9 @@ class LogViewerController: public QObject
         [[nodiscard]] auto get_view_context(const QUuid& view_id) const -> LogViewContext*;
 
     private:
-        LogFileTreeModel* m_file_tree_model;
         bool m_is_shutting_down{false};
         LogIngestController* m_ingest{nullptr};
+        FileCatalogController* m_catalog{nullptr};
         ViewRegistry* m_views{nullptr};
         FilterCoordinator* m_filters{nullptr};
 };
