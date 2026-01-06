@@ -5,6 +5,7 @@
 
 #include "Qt-LogViewer/Models/LogSortFilterProxyModel.h"
 
+#include <QAbstractProxyModel>
 #include <QCollator>
 
 #include "Qt-LogViewer/Models/LogEntry.h"
@@ -86,6 +87,17 @@ auto LogSortFilterProxyModel::set_search_filter(const QString& search_text, cons
 
         recalc_active_filters();
         invalidateFilter();
+
+        // Force repaint of all cells for updated highlight ranges.
+        // Emit dataChanged for HighlightRangesRole across the entire proxy range.
+        const int rows = rowCount();
+        const int cols = columnCount();
+        if (rows > 0 && cols > 0)
+        {
+            const QModelIndex top_left = index(0, 0);
+            const QModelIndex bottom_right = index(rows - 1, cols - 1);
+            emit dataChanged(top_left, bottom_right, {HighlightRangesRole});
+        }
     }
 }
 
@@ -259,6 +271,103 @@ auto LogSortFilterProxyModel::get_show_only_file_path() const noexcept -> QStrin
 auto LogSortFilterProxyModel::get_hidden_file_paths() const noexcept -> QSet<QString>
 {
     QSet<QString> value = m_hidden_file_paths;
+    return value;
+}
+
+/**
+ * @brief Intercept data() calls to provide highlight ranges via the custom role.
+ *
+ * Instead of using a pre-computed cache, this computes highlight ranges on-demand
+ * for each cell. This ensures ranges are always correct for the current search text.
+ *
+ * @param index The proxy index to query.
+ * @param role The role being requested.
+ * @return QVariant carrying either delegate highlight info or a normal role value.
+ */
+auto LogSortFilterProxyModel::data(const QModelIndex& index, int role) const -> QVariant
+{
+    QVariant value;
+
+    if (role == HighlightRangesRole)
+    {
+        if (index.isValid() && !m_search_text.isEmpty())
+        {
+            const QModelIndex src_index = mapToSource(index);
+            const int source_column = src_index.column();
+
+            // Check if this column should be searched
+            const bool all_fields =
+                (m_search_field.compare("All Fields", Qt::CaseInsensitive) == 0);
+            const bool should_check =
+                all_fields ||
+                ((m_search_field.compare("Message", Qt::CaseInsensitive) == 0) &&
+                 (source_column == LogModel::Message)) ||
+                ((m_search_field.compare("Level", Qt::CaseInsensitive) == 0) &&
+                 (source_column == LogModel::Level)) ||
+                ((m_search_field.compare("AppName", Qt::CaseInsensitive) == 0) &&
+                 (source_column == LogModel::AppName));
+
+            if (should_check)
+            {
+                const QString cell_text =
+                    QSortFilterProxyModel::data(index, Qt::DisplayRole).toString();
+
+                QVariantList list;
+
+                if (m_use_regex && m_search_regex.isValid())
+                {
+                    QRegularExpressionMatchIterator it = m_search_regex.globalMatch(cell_text);
+                    while (it.hasNext())
+                    {
+                        QRegularExpressionMatch match = it.next();
+                        const int start = match.capturedStart();
+                        const int len = match.capturedLength();
+                        if (start >= 0 && len > 0)
+                        {
+                            QVariantMap item;
+                            item.insert(QStringLiteral("start"), start);
+                            item.insert(QStringLiteral("length"), len);
+                            list.append(item);
+                        }
+                    }
+                }
+                else
+                {
+                    const QString lower_text = cell_text.toLower();
+                    const QString lower_search = m_search_text.toLower();
+                    const int search_len = lower_search.length();
+                    int pos = 0;
+
+                    while (pos < lower_text.length())
+                    {
+                        const int found = lower_text.indexOf(lower_search, pos);
+                        if (found >= 0)
+                        {
+                            QVariantMap item;
+                            item.insert(QStringLiteral("start"), found);
+                            item.insert(QStringLiteral("length"), search_len);
+                            list.append(item);
+                            pos = found + qMax(1, search_len);
+                        }
+                        else
+                        {
+                            pos = lower_text.length();
+                        }
+                    }
+                }
+
+                if (!list.isEmpty())
+                {
+                    value = list;
+                }
+            }
+        }
+    }
+    else
+    {
+        value = QSortFilterProxyModel::data(index, role);
+    }
+
     return value;
 }
 

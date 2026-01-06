@@ -5,11 +5,16 @@
  * @brief This file contains the definition of the LogSortFilterProxyModel class.
  */
 
+#include <QAbstractItemModel>
 #include <QCollator>
+#include <QHash>
+#include <QMap>
+#include <QPair>
 #include <QRegularExpression>
 #include <QSet>
 #include <QSortFilterProxyModel>
 #include <QString>
+#include <QVector>
 
 /**
  * @class LogSortFilterProxyModel
@@ -17,12 +22,29 @@
  *
  * Supports filtering by application name, log level, search string (plain or regex),
  * custom sorting (e.g., log levels, timestamps), and per-file filters (show-only and hide).
+ *
+ * Additionally this proxy computes and exposes match ranges for the active search text so
+ * delegates can perform lightweight highlighting without containing any search logic.
  */
 class LogSortFilterProxyModel: public QSortFilterProxyModel
 {
         Q_OBJECT
 
     public:
+        /**
+         * @brief Role used to request highlight ranges for a cell.
+         *
+         * The role returns a QVariantList of QVariantMaps. Each map has keys:
+         * - "start" (int) : index of first matching character in the cell text (source text).
+         * - "length" (int): number of characters that match.
+         *
+         * The indexes are relative to the source model string for that cell.
+         */
+        enum CustomRoles
+        {
+            HighlightRangesRole = Qt::UserRole + 1
+        };
+
         /**
          * @brief Constructs a LogSortFilterProxyModel object.
          * @param parent The parent QObject.
@@ -159,6 +181,16 @@ class LogSortFilterProxyModel: public QSortFilterProxyModel
         [[nodiscard]] auto lessThan(const QModelIndex& source_left,
                                     const QModelIndex& source_right) const -> bool override;
 
+        /**
+         * @brief Intercept data() calls to provide highlight ranges via
+         *        `HighlightRangesRole`.
+         *
+         * Delegates should request `HighlightRangesRole` on the proxy index to obtain a
+         * QVariantList of QVariantMap entries with keys "start" and "length".
+         */
+        [[nodiscard]] auto data(const QModelIndex& index,
+                                int role = Qt::DisplayRole) const -> QVariant override;
+
     private:
         /**
          * @brief Checks if a specific row passes the current filters.
@@ -200,4 +232,6 @@ class LogSortFilterProxyModel: public QSortFilterProxyModel
         bool m_any_filter_active = false;
         QString m_show_only_file_path;
         QSet<QString> m_hidden_file_paths;
+        // Highlight cache: source_row -> (source_column -> vector of (start,length))
+        QHash<int, QMap<int, QVector<QPair<int, int>>>> m_highlight_map;
 };
