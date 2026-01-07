@@ -83,6 +83,12 @@
     @ColorBorder: @Neutral-9;
     @ColorBorderDisabled: @Neutral-11;
 
+    /* ToolTip */
+    @ColorToolTipBackground: @Neutral-14;
+    @ColorToolTipText: @ColorText;
+    @ColorToolTipBorder: @Neutral-9;
+    @ToolTipBorderWidthPx: 1;
+
     /* Inputs / Bars */
     @ColorLogFilterBarBackground: @Neutral-3;
     @ColorLineEditBackground: @Neutral-5;
@@ -229,6 +235,12 @@
     @ColorBorder: @Neutral-21;
     @ColorBorderDisabled: @Neutral-22;
 
+    /* ToolTip */
+    @ColorToolTipBackground: @Neutral-17;
+    @ColorToolTipText: @Neutral-7;
+    @ColorToolTipBorder: @Neutral-21;
+    @ToolTipBorderWidthPx: 1;
+
     /* Inputs / Bars */
     @ColorLogFilterBarBackground: @Neutral-19;
     @ColorLineEditBackground: @Neutral-6;
@@ -370,6 +382,14 @@ QWidget {
     color: @ColorText;
     font-family: "Segoe UI", sans-serif;
     font-size: 11pt;
+}
+
+/* === ToolTips === */
+QToolTip {
+    background-color: @ColorToolTipBackground;
+    color: @ColorToolTipText;
+    border: @ToolTipBorderWidthPx solid @ColorToolTipBorder;
+    padding: 4px;
 }
 
 /* === Labels === */
