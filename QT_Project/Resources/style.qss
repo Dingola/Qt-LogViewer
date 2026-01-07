@@ -29,6 +29,7 @@
     @Neutral-1: #1A2021;
     @Neutral-2: #272B36;
     @Neutral-3: #262C35;
+    @Neutral-3-1: #282f38;
     @Neutral-4: #2B303B;
     @Neutral-5: #2E3842;
     @Neutral-6: #ffffff;
@@ -204,6 +205,17 @@
 
     /* Log View Widget */
     @ColorLogViewWidgetBackground: @Neutral-3;
+
+    /* SearchBar */
+    @ColorSearchBarClearIconColor: @ColorTabWidgetCloseIconColorHover;
+    @ColorSearchBarClearIconColorHover: @Severity-Error;
+    @ColorSearchBarClearIconPx: 16;
+    @SearchBarClearButtonPadding: 8;
+
+    @SearchBarClearButtonDiameterPx: 20;
+    @SearchBarClearButtonRadiusPx: 10;
+    @ColorSearchBarClearButtonBg: @Neutral-3;
+    @ColorSearchBarClearButtonBgHover: @Neutral-3-1;
 }
 
 @Variables[Name="Light"] {
@@ -339,6 +351,17 @@
 
     /* Log View Widget */
     @ColorLogViewWidgetBackground: @Neutral-19;
+
+    /* SearchBar */
+    @ColorSearchBarClearIconColor: @ColorTabWidgetCloseIconColorHover;
+    @ColorSearchBarClearIconColorHover: @Severity-Error;
+    @ColorSearchBarClearIconPx: 16;
+    @SearchBarClearButtonPadding: 8;
+
+    @SearchBarClearButtonDiameterPx: 20;
+    @SearchBarClearButtonRadiusPx: 10;
+    @ColorSearchBarClearButtonBg: @Neutral-19;
+    @ColorSearchBarClearButtonBgHover: @Neutral-18;
 }
 
 /* === Global === */
@@ -1066,6 +1089,13 @@ QLabel#labelItemsPerPage {
 }
 
 /* === Log Search Bar Widget === */
+SearchBarWidget {
+    qproperty-clear_icon_color: @ColorSearchBarClearIconColor;
+    qproperty-clear_icon_color_hover: @ColorSearchBarClearIconColorHover;
+    qproperty-clear_icon_px: @ColorSearchBarClearIconPx;
+    qproperty-clear_button_padding: @SearchBarClearButtonPadding;
+}
+
 QComboBox#comboBoxSearchArea {
     min-height: 28px;
     max-height: 28px;
@@ -1080,6 +1110,22 @@ QPushButton#pushButtonSearch {
     border: none;
     border-radius: 6px;
     padding: 9px 14px;
+}
+
+QToolButton#searchClearButton {
+    background-color: @ColorSearchBarClearButtonBg;
+    border: none;
+    border-radius: @SearchBarClearButtonRadiusPx;
+    padding: 0px;
+    margin-top: 4px;
+    min-width: @SearchBarClearButtonDiameterPx;
+    max-width: @SearchBarClearButtonDiameterPx;
+    min-height: @SearchBarClearButtonDiameterPx;
+    max-height: @SearchBarClearButtonDiameterPx;
+}
+
+QToolButton#searchClearButton:hover {
+    background-color: @ColorSearchBarClearButtonBgHover;
 }
 
 /* === Window Title Bar === */
