@@ -229,6 +229,7 @@ auto MainWindow::setup_tab_widget() -> void
 {
     ui->tabWidgetLog->setTabsClosable(true);
     ui->tabWidgetLog->setElideMode(Qt::ElideRight);
+    ui->tabWidgetLog->tabBar()->setMovable(true);
 
     connect(ui->tabWidgetLog, &QTabWidget::currentChanged, this, [this](int index) {
         auto* log_view_widget = qobject_cast<LogViewWidget*>(ui->tabWidgetLog->widget(index));
