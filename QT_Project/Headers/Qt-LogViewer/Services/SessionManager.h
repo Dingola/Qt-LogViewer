@@ -6,6 +6,7 @@
 #include <QVector>
 
 #include "Qt-LogViewer/Models/LogFileInfo.h"
+#include "Qt-LogViewer/Models/SessionTypes.h"
 #include "Qt-LogViewer/Services/SessionRepository.h"
 
 /**
@@ -27,26 +28,6 @@
 class SessionManager: public QObject
 {
         Q_OBJECT
-
-    public:
-        /**
-         * @brief Describes a single recent log file item.
-         */
-        struct RecentLogFileRecord {
-                QString file_path;
-                QString app_name;
-                QDateTime last_opened;
-        };
-
-        /**
-         * @brief Describes a single recent session metadata item.
-         */
-        struct RecentSessionRecord {
-                QString id;
-                QString name;
-                QDateTime created_at;
-                QDateTime last_opened;
-        };
 
     public:
         /**
