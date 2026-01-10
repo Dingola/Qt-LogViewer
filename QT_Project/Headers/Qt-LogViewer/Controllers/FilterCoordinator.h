@@ -7,9 +7,13 @@
 #include <QUuid>
 #include <QVector>
 
-#include "Qt-LogViewer/Controllers/ViewRegistry.h"
+struct FilterState;
+class ViewRegistry;
+class LogSortFilterProxyModel;
+
 #include "Qt-LogViewer/Models/LogEntry.h"
 #include "Qt-LogViewer/Models/LogSortFilterProxyModel.h"
+#include "Qt-LogViewer/Models/SessionTypes.h"
 
 /**
  * @file FilterCoordinator.h
@@ -22,6 +26,11 @@
  * - Compute per-view log level counts based on current entries from `ViewRegistry`.
  * - Expose static available log levels identical across views.
  * - Adjust per-view visibility state when files are removed (show-only reset, hidden set updates).
+ *
+ * Round-trip guarantee:
+ * - `export_filters()` and `import_filters()` provide a reversible snapshot of a view's filter
+ *   configuration. Applying an exported `FilterState` via `import_filters()` yields the same
+ *   effective filter and visibility settings on the target view.
  */
 class FilterCoordinator: public QObject
 {
@@ -151,6 +160,24 @@ class FilterCoordinator: public QObject
          * @param file_path Removed absolute file path.
          */
         auto adjust_visibility_on_global_file_removed(const QString& file_path) -> void;
+
+        /**
+         * @brief Export the current filter and visibility state for `view_id`.
+         * @param view_id Target view id.
+         * @return FilterState snapshot that can be round-tripped via `import_filters()`.
+         */
+        [[nodiscard]] auto export_filters(const QUuid& view_id) const -> FilterState;
+
+        /**
+         * @brief Import (apply) a previously exported filter state onto `view_id`.
+         * @param view_id Target view id.
+         * @param state FilterState previously obtained via `export_filters()`.
+         *
+         * Round-trip guarantee:
+         * Applying the exported state reconstructs the same effective filter/visibility
+         * configuration, assuming the view's file set has not changed in-between.
+         */
+        auto import_filters(const QUuid& view_id, const FilterState& state) -> void;
 
     private:
         /**

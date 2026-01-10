@@ -8,6 +8,8 @@
 #include <QDebug>
 #include <algorithm>
 
+#include "Qt-LogViewer/Controllers/FilterCoordinator.h"
+
 /**
  * @brief Construct a new ViewRegistry.
  * @param parent Optional QObject parent for ownership.
@@ -245,4 +247,109 @@ auto ViewRegistry::remove_entries_by_file(const QUuid& view_id, const QString& f
         ctx->remove_entries_by_file_path(file_path);
         emit view_file_paths_changed(view_id, ctx->get_file_paths());
     }
+}
+
+/**
+ * @brief Export a view's state including loaded files, filters, paging and sort.
+ * @param view_id Target view id.
+ * @param filters Coordinator used to read current filter/visibility on the view.
+ * @return SessionViewState snapshot, including a suggested tab title.
+ */
+auto ViewRegistry::export_view_state(const QUuid& view_id,
+                                     const FilterCoordinator& filters) const -> SessionViewState
+{
+    SessionViewState state;
+    state.id = view_id;
+
+    auto* ctx = get_context(view_id);
+    if (ctx != nullptr)
+    {
+        // Loaded files
+        state.loaded_files = ctx->get_loaded_files();
+
+        // Filters via coordinator
+        const FilterState fs = filters.export_filters(view_id);
+        state.filters = fs;
+
+        // Paging
+        auto* paging = ctx->get_paging_proxy();
+        if (paging != nullptr)
+        {
+            state.page_size = paging->get_page_size();
+            state.current_page = paging->get_current_page();
+        }
+
+        // Sort
+        auto* sort_proxy = ctx->get_sort_proxy();
+        if (sort_proxy != nullptr)
+        {
+            state.sort_column = sort_proxy->get_sort_column();
+            state.sort_order = sort_proxy->get_sort_order();
+        }
+
+        // Tab title: first file name or composed from loaded files
+        if (!state.loaded_files.isEmpty())
+        {
+            const QString first_name = state.loaded_files.first().get_file_name();
+            state.tab_title = first_name;
+
+            if (state.loaded_files.size() > 1)
+            {
+                state.tab_title =
+                    QStringLiteral("%1 (+%2)").arg(first_name).arg(state.loaded_files.size() - 1);
+            }
+        }
+    }
+
+    return state;
+}
+
+/**
+ * @brief Import a view state: ensure/create view, set loaded files, reapply filters, and
+ * paging/sort.
+ * @param state Serialized view state to apply.
+ * @param filters Coordinator used to apply filters.
+ * @return QUuid The (ensured) view id of the imported state.
+ *
+ * Round-trip guarantee:
+ * Applying an exported `SessionViewState` reconstructs the same logical view configuration,
+ * assuming the referenced files exist and are accessible on the current machine.
+ */
+auto ViewRegistry::import_view_state(const SessionViewState& state,
+                                     FilterCoordinator& filters) -> QUuid
+{
+    QUuid view_id = state.id.isNull() ? create_view() : state.id;
+    ensure_view(view_id);
+
+    // Loaded files
+    set_loaded_files(view_id, state.loaded_files);
+
+    // Filters
+    filters.import_filters(view_id, state.filters);
+
+    // Paging and sort
+    auto* ctx = get_context(view_id);
+    if (ctx != nullptr)
+    {
+        auto* paging = ctx->get_paging_proxy();
+        if (paging != nullptr)
+        {
+            if (state.page_size > 0)
+            {
+                paging->set_page_size(state.page_size);
+            }
+            if (state.current_page > 0)
+            {
+                paging->set_current_page(state.current_page);
+            }
+        }
+
+        auto* sort_proxy = ctx->get_sort_proxy();
+        if (sort_proxy != nullptr)
+        {
+            sort_proxy->sort(state.sort_column, state.sort_order);
+        }
+    }
+
+    return view_id;
 }

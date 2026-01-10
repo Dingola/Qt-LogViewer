@@ -7,9 +7,12 @@
 #include <QUuid>
 #include <QVector>
 
+class FilterCoordinator;
+
 #include "Qt-LogViewer/Controllers/LogViewContext.h"
 #include "Qt-LogViewer/Models/LogEntry.h"
 #include "Qt-LogViewer/Models/LogFileInfo.h"
+#include "Qt-LogViewer/Models/SessionTypes.h"
 
 /**
  * @file ViewRegistry.h
@@ -20,6 +23,11 @@
  * - Provide lookup helpers for contexts, entries and loaded file paths.
  * - Mutate per-view loaded-files and remove per-view entries by file path.
  * - Emit lifecycle signals consumed by the facade (LogViewerController).
+ *
+ * Serialization helpers:
+ * - `export_view_state()` captures a view's loaded files, filters, paging and sorting into
+ *   `SessionViewState` with a tab-title suggestion. It provides round-trip safety with
+ *   `import_view_state()` when applied onto a compatible environment.
  */
 class ViewRegistry: public QObject
 {
@@ -127,6 +135,28 @@ class ViewRegistry: public QObject
          * @param file_path Absolute file path to remove.
          */
         auto remove_entries_by_file(const QUuid& view_id, const QString& file_path) -> void;
+
+        /**
+         * @brief Export a view's state including loaded files, filters, paging and sort.
+         * @param view_id Target view id.
+         * @param filters Coordinator used to read current filter/visibility on the view.
+         * @return SessionViewState snapshot, including a suggested tab title.
+         */
+        [[nodiscard]] auto export_view_state(
+            const QUuid& view_id, const FilterCoordinator& filters) const -> SessionViewState;
+
+        /**
+         * @brief Import a view state: ensure/create view, set loaded files, reapply filters,
+         *        and paging/sort.
+         * @param state Serialized view state to apply.
+         * @param filters Coordinator used to apply filters.
+         * @return QUuid The (ensured) view id of the imported state.
+         *
+         * Round-trip guarantee:
+         * Applying an exported `SessionViewState` reconstructs the same logical view configuration,
+         * assuming the referenced files exist and are accessible on the current machine.
+         */
+        auto import_view_state(const SessionViewState& state, FilterCoordinator& filters) -> QUuid;
 
     signals:
         /**

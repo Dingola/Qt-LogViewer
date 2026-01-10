@@ -162,6 +162,18 @@ class LogSortFilterProxyModel: public QSortFilterProxyModel
          */
         [[nodiscard]] auto get_hidden_file_paths() const noexcept -> QSet<QString>;
 
+        /**
+         * @brief Returns the current sort column.
+         * @return Column index, or -1 if unsorted.
+         */
+        [[nodiscard]] auto get_sort_column() const noexcept -> int;
+
+        /**
+         * @brief Returns the current sort order.
+         * @return Qt::SortOrder currently applied.
+         */
+        [[nodiscard]] auto get_sort_order() const noexcept -> Qt::SortOrder;
+
     protected:
         /**
          * @brief Determines whether the given row should be included in the filtered model.

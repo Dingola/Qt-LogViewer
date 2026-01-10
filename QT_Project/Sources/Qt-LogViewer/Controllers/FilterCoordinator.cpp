@@ -12,6 +12,8 @@
 
 #include <algorithm>
 
+#include "Qt-LogViewer/Controllers/ViewRegistry.h"
+
 /**
  * @brief Construct a new FilterCoordinator.
  * @param views Non-owning pointer to the `ViewRegistry` used for context/proxy lookups.
@@ -349,4 +351,59 @@ auto FilterCoordinator::get_sort_filter_proxy(const QUuid& view_id) const
     auto* ctx = m_views != nullptr ? m_views->get_context(view_id) : nullptr;
     LogSortFilterProxyModel* proxy = (ctx != nullptr) ? ctx->get_sort_proxy() : nullptr;
     return proxy;
+}
+
+/**
+ * @brief Export the current filter and visibility state for `view_id`.
+ * @param view_id Target view id.
+ * @return FilterState snapshot that can be round-tripped via `import_filters()`.
+ */
+auto FilterCoordinator::export_filters(const QUuid& view_id) const -> FilterState
+{
+    FilterState state;
+
+    auto* proxy = get_sort_filter_proxy(view_id);
+    if (proxy != nullptr)
+    {
+        state.app_name = proxy->get_app_name_filter();
+        state.log_levels = proxy->get_log_level_filters();
+        state.search_text = proxy->get_search_text();
+        state.search_field = proxy->get_search_field();
+        state.use_regex = proxy->is_search_regex();
+        state.show_only_file = proxy->get_show_only_file_path();
+        state.hidden_files = proxy->get_hidden_file_paths();
+    }
+
+    return state;
+}
+
+/**
+ * @brief Import (apply) a previously exported filter state onto `view_id`.
+ * @param view_id Target view id.
+ * @param state FilterState previously obtained via `export_filters()`.
+ *
+ * Round-trip guarantee:
+ * Applying the exported state reconstructs the same effective filter/visibility
+ * configuration, assuming the view's file set has not changed in-between.
+ */
+auto FilterCoordinator::import_filters(const QUuid& view_id, const FilterState& state) -> void
+{
+    auto* proxy = get_sort_filter_proxy(view_id);
+
+    if (proxy != nullptr)
+    {
+        proxy->set_app_name_filter(state.app_name);
+        proxy->set_log_level_filters(state.log_levels);
+        proxy->set_search_filter(state.search_text, state.search_field, state.use_regex);
+
+        // Visibility: show-only and hidden set
+        proxy->set_show_only_file_path(state.show_only_file);
+        proxy->set_hidden_file_paths(state.hidden_files);
+
+        // If show-only is active, ensure the target is not hidden.
+        if (!state.show_only_file.isEmpty())
+        {
+            proxy->unhide_file(state.show_only_file);
+        }
+    }
 }

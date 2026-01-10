@@ -275,6 +275,26 @@ auto LogSortFilterProxyModel::get_hidden_file_paths() const noexcept -> QSet<QSt
 }
 
 /**
+ * @brief Returns the current sort column.
+ * @return Column index, or -1 if unsorted.
+ */
+auto LogSortFilterProxyModel::get_sort_column() const noexcept -> int
+{
+    int col = sortColumn();
+    return col;
+}
+
+/**
+ * @brief Returns the current sort order.
+ * @return Qt::SortOrder currently applied.
+ */
+auto LogSortFilterProxyModel::get_sort_order() const noexcept -> Qt::SortOrder
+{
+    Qt::SortOrder order = sortOrder();
+    return order;
+}
+
+/**
  * @brief Intercept data() calls to provide highlight ranges via the custom role.
  *
  * Instead of using a pre-computed cache, this computes highlight ranges on-demand
