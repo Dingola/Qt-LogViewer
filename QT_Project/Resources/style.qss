@@ -222,6 +222,30 @@
     @SearchBarClearButtonRadiusPx: 10;
     @ColorSearchBarClearButtonBg: @Neutral-3;
     @ColorSearchBarClearButtonBgHover: @Neutral-3-1;
+
+    /* StartPage */
+    @StartPageGroupBoxBackground: @Neutral-3;
+    @StartPageListBackground: @Neutral-3;
+    @StartPageListLeftBorderColor: @Brand-Accent-500;
+
+    @StartPageTextColor: @ColorText;
+    @StartPageItemTextColor: @ColorText;
+    @StartPageItemAccentTextColor: @ColorButtonText;
+
+    @StartPageItemHoverBackground: @Brand-Accent-600;
+    @StartPageItemSelectedBackground: @Brand-Accent-700;
+
+    @StartPageItemHoverBorderColor: @Brand-Accent-500;
+    @StartPageItemSelectedBorderColor: @Brand-Accent-500;
+
+    @StartPageWelcomeFontSizePt: 18pt;
+    @StartPageWelcomeFontWeight: 800;
+
+    @StartPageGroupBoxTitleFontSizePt: 12pt;
+    @StartPageGroupBoxTitleFontWeight: 700;
+
+    @StartPageItemFontSizePt: 12pt;
+    @StartPageItemFontWeight: 500;
 }
 
 @Variables[Name="Light"] {
@@ -374,6 +398,30 @@
     @SearchBarClearButtonRadiusPx: 10;
     @ColorSearchBarClearButtonBg: @Neutral-19;
     @ColorSearchBarClearButtonBgHover: @Neutral-18;
+
+    /* StartPage */
+    @StartPageGroupBoxBackground: @Neutral-6;
+    @StartPageListBackground: @Neutral-6;
+    @StartPageListLeftBorderColor: @Brand-Accent-300;
+
+    @StartPageTextColor: @ColorText;
+    @StartPageItemTextColor: @ColorText;
+    @StartPageItemAccentTextColor: @ColorText;
+
+    @StartPageItemHoverBackground: @Brand-Accent-100;
+    @StartPageItemSelectedBackground: @Brand-Accent-200;
+
+    @StartPageItemHoverBorderColor: @Brand-Accent-200;
+    @StartPageItemSelectedBorderColor: @Brand-Accent-300;
+
+    @StartPageWelcomeFontSizePt: 18pt;
+    @StartPageWelcomeFontWeight: 800;
+
+    @StartPageGroupBoxTitleFontSizePt: 12pt;
+    @StartPageGroupBoxTitleFontWeight: 700;
+
+    @StartPageItemFontSizePt: 12pt;
+    @StartPageItemFontWeight: 500;
 }
 
 /* === Global === */
@@ -1183,4 +1231,78 @@ FilesInViewMenuItemWidget {
     qproperty-icon_color_eye: @Severity-Info;
     qproperty-icon_color_eye_off: @Severity-Warning;
     qproperty-icon_color_trash: @Severity-Error;
+}
+
+/* === StartPageWidget === */
+QWidget#StartPageWidget {
+}
+
+StartPageWidget QLabel#welcomeLabel {
+    font-size: @StartPageWelcomeFontSizePt;
+    font-weight: @StartPageWelcomeFontWeight;
+    color: @StartPageTextColor;
+    padding: 6px;
+}
+
+StartPageWidget QGroupBox {
+    border: none;
+    border-radius: 8px;
+    background: @StartPageGroupBoxBackground;
+    margin-top: 0px;
+    padding-top: 25px;
+}
+StartPageWidget QGroupBox::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top left;
+    padding: 0px;
+    margin-left: 10px;
+    margin-top: 10px;
+    color: @StartPageTextColor;
+    background: transparent;
+    font-size: @StartPageGroupBoxTitleFontSizePt;
+    font-weight: @StartPageGroupBoxTitleFontWeight;
+}
+
+StartPageWidget QListView {
+    background: @StartPageListBackground;
+    border: none;
+    border-left: 2px solid @StartPageListLeftBorderColor;
+    outline: none;
+    alternate-background-color: transparent;
+    padding: 0px;
+    margin-left: 10px;
+}
+
+StartPageWidget QListView::item {
+    background: transparent;
+    color: @StartPageItemTextColor;
+    padding: 6px;
+    margin-left: 4px;
+    border: 1px solid transparent;
+    font-size: @StartPageItemFontSizePt;
+    font-weight: @StartPageItemFontWeight;
+}
+
+StartPageWidget QListView::item:hover {
+    background: @StartPageItemHoverBackground;
+    color: @StartPageItemAccentTextColor;
+    border: 1px solid @StartPageItemHoverBorderColor;
+}
+
+StartPageWidget QListView::item:selected {
+    background: @StartPageItemSelectedBackground;
+    color: @StartPageItemAccentTextColor;
+    border: 1px solid @StartPageItemSelectedBorderColor;
+}
+
+StartPageWidget QListView::item:selected:focus {
+    background: @StartPageItemSelectedBackground;
+    color: @StartPageItemAccentTextColor;
+    border: 1px solid @StartPageItemSelectedBorderColor;
+}
+
+StartPageWidget QListView::item:!selected:focus {
+    background: transparent;
+    color: @StartPageItemTextColor;
+    border: 1px solid transparent;
 }
