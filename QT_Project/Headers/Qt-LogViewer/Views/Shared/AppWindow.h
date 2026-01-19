@@ -17,6 +17,7 @@
  * Note: Windows-only implementation: all WinAPI code is #ifdef Q_OS_WIN.
  */
 
+#include <QCloseEvent>
 #include <QIcon>
 #include <QPointer>
 #include <QWidget>
@@ -185,6 +186,13 @@ class AppWindow: public QWidget
          */
         auto nativeEvent(const QByteArray& eventType, void* message,
                          qintptr* result) -> bool override;
+
+        /**
+         * @brief Handle close events to perform any necessary cleanup.
+         *
+         * @param event The close event.
+         */
+        auto closeEvent(QCloseEvent* event) -> void override;
 
     private:  // private methods (cross-platform)
         /**

@@ -82,9 +82,24 @@ auto BaseMainWindow::save_window_settings() -> void
 {
     if (m_preferences != nullptr)
     {
-        m_preferences->set_mainwindow_geometry(saveGeometry());
+        QWidget* tlw = topLevelWidget();
+        QByteArray geometry;
+        int wnd_state = 0;
+
+        if (tlw != nullptr && tlw != this)
+        {
+            geometry = tlw->saveGeometry();
+            wnd_state = static_cast<int>(tlw->windowState());
+        }
+        else
+        {
+            geometry = saveGeometry();
+            wnd_state = static_cast<int>(windowState());
+        }
+
+        m_preferences->set_mainwindow_geometry(geometry);
         m_preferences->set_mainwindow_state(saveState());
-        m_preferences->set_mainwindow_windowstate(windowState());
+        m_preferences->set_mainwindow_windowstate(wnd_state);
     }
     else
     {
@@ -101,15 +116,24 @@ auto BaseMainWindow::save_window_settings() -> void
  */
 auto BaseMainWindow::restore_window_settings() -> void
 {
-    if (m_preferences)
+    if (m_preferences != nullptr)
     {
         const QByteArray geometry = m_preferences->get_mainwindow_geometry();
         const QByteArray state = m_preferences->get_mainwindow_state();
         int window_state = m_preferences->get_mainwindow_windowstate();
 
+        QWidget* tlw = topLevelWidget();
+
         if (!geometry.isEmpty())
         {
-            restoreGeometry(geometry);
+            if (tlw != nullptr && tlw != this)
+            {
+                tlw->restoreGeometry(geometry);
+            }
+            else
+            {
+                restoreGeometry(geometry);
+            }
         }
 
         if (!state.isEmpty())
@@ -119,7 +143,14 @@ auto BaseMainWindow::restore_window_settings() -> void
 
         if (window_state == Qt::WindowMaximized)
         {
-            showMaximized();
+            if (tlw != nullptr && tlw != this)
+            {
+                tlw->showMaximized();
+            }
+            else
+            {
+                showMaximized();
+            }
         }
     }
     else

@@ -1086,6 +1086,22 @@ auto AppWindow::nativeEvent(const QByteArray& eventType, void* message, qintptr*
 
 #endif  // Q_OS_WIN
 
+/**
+ * @brief Handle close events to perform any necessary cleanup.
+ *
+ * @param event The close event.
+ */
+auto AppWindow::closeEvent(QCloseEvent* event) -> void
+{
+    if (m_content_widget != nullptr)
+    {
+        QCloseEvent forward;
+        QCoreApplication::sendEvent(m_content_widget, &forward);
+    }
+
+    QWidget::closeEvent(event);
+}
+
 #ifndef Q_OS_WIN
 /**
  * @brief Native event handler (non-Windows platforms).
