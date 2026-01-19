@@ -108,6 +108,32 @@ class SessionManager: public QObject
         auto save_session(const QString& session_id, const QJsonObject& session_obj) -> void;
 
         /**
+         * @brief Returns the current session id in use (in-memory only).
+         *
+         * This value represents the session currently active in the application runtime.
+         * It is distinct from the persisted "last session id" used for reopen flows.
+         *
+         * @return Current session id or empty string if not set.
+         */
+        [[nodiscard]] auto get_current_session_id() const -> QString;
+
+        /**
+         * @brief Sets the current session id in use (in-memory).
+         *
+         * This does not persist the id into the root document. Use set_last_session_id()
+         * to persist the last session id if desired.
+         *
+         * @param session_id The session identifier to set as current.
+         */
+        auto set_current_session_id(const QString& session_id) -> void;
+
+        /**
+         * @brief Checks if there is a current session id set (in-memory).
+         * @return True if a current session id is set; false otherwise.
+         */
+        [[nodiscard]] auto has_current_session() const -> bool;
+
+        /**
          * @brief Returns the last session id stored in the root document (optional).
          * @return Last session id or empty string if not set.
          */
@@ -216,4 +242,5 @@ class SessionManager: public QObject
         QVector<RecentLogFileRecord> m_recent_files;
         QVector<RecentSessionRecord> m_recent_sessions;
         QString m_last_session_id;
+        QString m_current_session_id;
 };

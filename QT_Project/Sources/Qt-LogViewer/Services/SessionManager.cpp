@@ -60,7 +60,8 @@ SessionManager::SessionManager(SessionRepository* repository, QObject* parent)
       m_repository(repository),
       m_recent_files(),
       m_recent_sessions(),
-      m_last_session_id()
+      m_last_session_id(),
+      m_current_session_id()
 {}
 
 /**
@@ -75,6 +76,7 @@ auto SessionManager::initialize_from_storage() -> void
     m_recent_files.clear();
     m_recent_sessions.clear();
     m_last_session_id.clear();
+    m_current_session_id.clear();
 
     if (root.contains(QString::fromLatin1(k_recent_files_key)))
     {
@@ -260,6 +262,33 @@ auto SessionManager::save_session(const QString& session_id, const QJsonObject& 
     {
         m_repository->save_session(session_id, session_obj);
     }
+}
+
+/**
+ * @brief Returns the current session id in use (in-memory only).
+ * @return Current session id or empty string if not set.
+ */
+auto SessionManager::get_current_session_id() const -> QString
+{
+    return m_current_session_id;
+}
+
+/**
+ * @brief Sets the current session id in use (in-memory).
+ * @param session_id The session identifier to set as current.
+ */
+auto SessionManager::set_current_session_id(const QString& session_id) -> void
+{
+    m_current_session_id = session_id;
+}
+
+/**
+ * @brief Checks if there is a current session id set (in-memory).
+ * @return True if a current session id is set; false otherwise.
+ */
+auto SessionManager::has_current_session() const -> bool
+{
+    return !m_current_session_id.isEmpty();
 }
 
 /**
