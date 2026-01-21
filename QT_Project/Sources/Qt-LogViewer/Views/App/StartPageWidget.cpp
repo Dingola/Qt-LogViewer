@@ -27,6 +27,7 @@ StartPageWidget::StartPageWidget(QWidget* parent): QWidget(parent), ui(new Ui::S
     ui->setupUi(this);
     setup_table_views();
     setup_connections();
+    update_buttons_state();
 }
 
 /**
@@ -43,19 +44,38 @@ StartPageWidget::~StartPageWidget()
  */
 auto StartPageWidget::set_recent_files_model(QAbstractItemModel* model) -> void
 {
-    if (ui->recentFilesView != nullptr)
-    {
-        ui->recentFilesView->setModel(model);
+    ui->recentFilesView->setModel(model);
 
-        if (auto* lv = qobject_cast<QListView*>(ui->recentFilesView); lv != nullptr)
-        {
-            lv->setItemDelegate(new RecentItemDelegate(RecentLogFilesModel::FileNameRole,
-                                                       RecentLogFilesModel::FilePathRole,
-                                                       RecentLogFilesModel::LastOpenedRole, lv));
-            lv->setUniformItemSizes(true);
-            lv->setSpacing(4);
-        }
+    if (auto* lv = qobject_cast<QListView*>(ui->recentFilesView); lv != nullptr)
+    {
+        lv->setItemDelegate(new RecentItemDelegate(RecentLogFilesModel::FileNameRole,
+                                                   RecentLogFilesModel::FilePathRole,
+                                                   RecentLogFilesModel::LastOpenedRole, lv));
+        lv->setUniformItemSizes(true);
+        lv->setSpacing(4);
     }
+
+    QAbstractItemModel* files_model = ui->recentFilesView->model();
+    if (files_model != nullptr && files_model->rowCount() > 0)
+    {
+        const QModelIndex first = files_model->index(0, 0);
+        ui->recentFilesView->selectionModel()->setCurrentIndex(first,
+                                                               QItemSelectionModel::ClearAndSelect);
+    }
+
+    if (ui->recentFilesView->selectionModel() != nullptr)
+    {
+        connect(ui->recentFilesView->selectionModel(), &QItemSelectionModel::selectionChanged, this,
+                [this]() { update_buttons_state(); });
+        connect(files_model, &QAbstractItemModel::modelReset, this,
+                [this]() { update_buttons_state(); });
+        connect(files_model, &QAbstractItemModel::rowsInserted, this,
+                [this]() { update_buttons_state(); });
+        connect(files_model, &QAbstractItemModel::rowsRemoved, this,
+                [this]() { update_buttons_state(); });
+    }
+
+    update_buttons_state();
 }
 
 /**
@@ -64,19 +84,38 @@ auto StartPageWidget::set_recent_files_model(QAbstractItemModel* model) -> void
  */
 auto StartPageWidget::set_recent_sessions_model(QAbstractItemModel* model) -> void
 {
-    if (ui->recentSessionsView != nullptr)
-    {
-        ui->recentSessionsView->setModel(model);
+    ui->recentSessionsView->setModel(model);
 
-        if (auto* lv = qobject_cast<QListView*>(ui->recentSessionsView); lv != nullptr)
-        {
-            lv->setItemDelegate(new RecentItemDelegate(RecentSessionsModel::NameRole,
-                                                       RecentSessionsModel::IdRole,
-                                                       RecentSessionsModel::LastOpenedRole, lv));
-            lv->setUniformItemSizes(true);
-            lv->setSpacing(4);
-        }
+    if (auto* lv = qobject_cast<QListView*>(ui->recentSessionsView); lv != nullptr)
+    {
+        lv->setItemDelegate(new RecentItemDelegate(RecentSessionsModel::NameRole,
+                                                   RecentSessionsModel::IdRole,
+                                                   RecentSessionsModel::LastOpenedRole, lv));
+        lv->setUniformItemSizes(true);
+        lv->setSpacing(4);
     }
+
+    QAbstractItemModel* session_model = ui->recentSessionsView->model();
+    if (session_model != nullptr && session_model->rowCount() > 0)
+    {
+        const QModelIndex first = session_model->index(0, 0);
+        ui->recentSessionsView->selectionModel()->setCurrentIndex(
+            first, QItemSelectionModel::ClearAndSelect);
+    }
+
+    if (ui->recentSessionsView->selectionModel() != nullptr)
+    {
+        connect(ui->recentSessionsView->selectionModel(), &QItemSelectionModel::selectionChanged,
+                this, [this]() { update_buttons_state(); });
+        connect(session_model, &QAbstractItemModel::modelReset, this,
+                [this]() { update_buttons_state(); });
+        connect(session_model, &QAbstractItemModel::rowsInserted, this,
+                [this]() { update_buttons_state(); });
+        connect(session_model, &QAbstractItemModel::rowsRemoved, this,
+                [this]() { update_buttons_state(); });
+    }
+
+    update_buttons_state();
 }
 
 /**
@@ -127,61 +166,73 @@ auto StartPageWidget::setup_table_views() -> void
  */
 auto StartPageWidget::setup_connections() -> void
 {
-    if (ui->openFileButton != nullptr)
-    {
-        connect(ui->openFileButton, &QPushButton::clicked, this,
-                [this]() { emit open_log_file_requested(); });
-    }
+    connect(ui->openFileButton, &QPushButton::clicked, this,
+            &StartPageWidget::open_log_file_requested);
 
-    if (ui->openSelectedFileButton != nullptr)
-    {
-        connect(ui->openSelectedFileButton, &QPushButton::clicked, this, [this]() {
-            const QString path = get_selected_recent_file_path();
-            if (!path.isEmpty())
+    connect(ui->openSelectedFileButton, &QPushButton::clicked, this, [this]() {
+        const QString path = get_selected_recent_file_path();
+        if (!path.isEmpty())
+        {
+            emit open_recent_file_requested(path);
+        }
+    });
+
+    connect(ui->clearRecentFilesButton, &QPushButton::clicked, this,
+            &StartPageWidget::clear_recent_files_requested);
+
+    connect(ui->openSessionButton, &QPushButton::clicked, this, [this]() {
+        const QString id = get_selected_recent_session_id();
+        if (!id.isEmpty())
+        {
+            emit open_session_requested(id);
+        }
+    });
+
+    connect(ui->openSelectedSessionButton, &QPushButton::clicked, this, [this]() {
+        const QString id = get_selected_recent_session_id();
+        if (!id.isEmpty())
+        {
+            emit open_recent_session_requested(id);
+        }
+    });
+
+    connect(ui->reopenSessionButton, &QPushButton::clicked, this,
+            &StartPageWidget::reopen_last_session_requested);
+
+    connect(ui->deleteSessionButton, &QPushButton::clicked, this, [this]() {
+        const QString id = get_selected_recent_session_id();
+        if (!id.isEmpty())
+        {
+            emit delete_session_requested(id);
+        }
+    });
+
+    connect(ui->recentFilesView, &QListView::doubleClicked, this, [this](const QModelIndex& index) {
+        if (index.isValid() && ui->recentFilesView->model() != nullptr)
+        {
+            const QVariant file_path_data =
+                ui->recentFilesView->model()->data(index, RecentLogFilesModel::FilePathRole);
+            const QString file_path = file_path_data.toString();
+            if (!file_path.isEmpty())
             {
-                emit open_recent_file_requested(path);
+                emit open_recent_file_requested(file_path);
             }
-        });
-    }
+        }
+    });
 
-    if (ui->clearRecentFilesButton != nullptr)
-    {
-        connect(ui->clearRecentFilesButton, &QPushButton::clicked, this,
-                [this]() { emit clear_recent_files_requested(); });
-    }
-
-    if (ui->openSessionButton != nullptr)
-    {
-        connect(ui->openSessionButton, &QPushButton::clicked, this, [this]() {
-            const QString id = get_selected_recent_session_id();
-            if (!id.isEmpty())
-            {
-                emit open_session_requested(id);
-            }
-        });
-    }
-
-    if (ui->openSelectedSessionButton != nullptr)
-    {
-        connect(ui->openSelectedSessionButton, &QPushButton::clicked, this, [this]() {
-            const QString id = get_selected_recent_session_id();
-            if (!id.isEmpty())
-            {
-                emit open_recent_session_requested(id);
-            }
-        });
-    }
-
-    if (ui->deleteSessionButton != nullptr)
-    {
-        connect(ui->deleteSessionButton, &QPushButton::clicked, this, [this]() {
-            const QString id = get_selected_recent_session_id();
-            if (!id.isEmpty())
-            {
-                emit delete_session_requested(id);
-            }
-        });
-    }
+    connect(ui->recentSessionsView, &QListView::doubleClicked, this,
+            [this](const QModelIndex& index) {
+                if (index.isValid() && ui->recentSessionsView->model() != nullptr)
+                {
+                    const QVariant session_id_data =
+                        ui->recentSessionsView->model()->data(index, RecentSessionsModel::IdRole);
+                    const QString session_id = session_id_data.toString();
+                    if (!session_id.isEmpty())
+                    {
+                        emit open_recent_session_requested(session_id);
+                    }
+                }
+            });
 }
 
 /**
@@ -195,10 +246,10 @@ auto StartPageWidget::get_selected_recent_file_path() const -> QString
     const auto* view = ui->recentFilesView;
     if (view != nullptr)
     {
-        const QItemSelectionModel* sel = view->selectionModel();
-        if (sel != nullptr)
+        const QItemSelectionModel* files_selection_model = view->selectionModel();
+        if (files_selection_model != nullptr)
         {
-            const QModelIndex index = sel->currentIndex();
+            const QModelIndex index = files_selection_model->currentIndex();
             if (index.isValid() && view->model() != nullptr)
             {
                 const QVariant v = view->model()->data(index, Qt::UserRole + 1);
@@ -235,4 +286,44 @@ auto StartPageWidget::get_selected_recent_session_id() const -> QString
     }
 
     return id;
+}
+
+/**
+ * @brief Update enabled state of action buttons based on models and selection.
+ */
+auto StartPageWidget::update_buttons_state() -> void
+{
+    bool files_has_items = false;
+    bool files_has_selection = false;
+
+    auto* files_model = ui->recentFilesView->model();
+    files_has_items = (files_model != nullptr) && (files_model->rowCount() > 0);
+
+    const QItemSelectionModel* files_selection_model = ui->recentFilesView->selectionModel();
+    files_has_selection =
+        (files_selection_model != nullptr) && files_selection_model->hasSelection();
+
+    bool sessions_has_items = false;
+    bool sessions_has_selection = false;
+
+    auto* session_model = ui->recentSessionsView->model();
+    sessions_has_items = (session_model != nullptr) && (session_model->rowCount() > 0);
+
+    const QItemSelectionModel* session_mselection_model = ui->recentSessionsView->selectionModel();
+    sessions_has_selection =
+        (session_mselection_model != nullptr) && session_mselection_model->hasSelection();
+
+    const bool enable_open_selected_file = files_has_items && files_has_selection;
+    const bool enable_clear_recent_files = files_has_items;
+
+    const bool enable_open_selected_session = sessions_has_items && sessions_has_selection;
+    const bool enable_delete_session = sessions_has_items && sessions_has_selection;
+
+    ui->openSelectedFileButton->setEnabled(enable_open_selected_file);
+    ui->clearRecentFilesButton->setEnabled(enable_clear_recent_files);
+    ui->openSelectedSessionButton->setEnabled(enable_open_selected_session);
+    ui->deleteSessionButton->setEnabled(enable_delete_session);
+
+    const bool enable_reopen_last_session = sessions_has_items;
+    ui->reopenSessionButton->setEnabled(enable_reopen_last_session);
 }

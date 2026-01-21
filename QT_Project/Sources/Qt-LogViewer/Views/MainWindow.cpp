@@ -116,6 +116,8 @@ MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
             &MainWindow::handle_open_session_dialog);
     connect(start_page, &StartPageWidget::open_recent_session_requested, this,
             &MainWindow::handle_open_recent_session);
+    connect(start_page, &StartPageWidget::reopen_last_session_requested, this,
+            &MainWindow::handle_reopen_last_session);
     connect(start_page, &StartPageWidget::delete_session_requested, this,
             &MainWindow::handle_delete_session);
     central_stack->addWidget(start_page);

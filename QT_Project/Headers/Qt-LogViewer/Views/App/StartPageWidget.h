@@ -77,6 +77,11 @@ class StartPageWidget: public QWidget
         void open_recent_session_requested(const QString& session_id);
 
         /**
+         * @brief User requested to reopen the last session.
+         */
+        void reopen_last_session_requested();
+
+        /**
          * @brief User requested to delete a specific session.
          * @param session_id Selected session id.
          */
@@ -104,6 +109,11 @@ class StartPageWidget: public QWidget
          * @return Selected session id or empty.
          */
         [[nodiscard]] auto get_selected_recent_session_id() const -> QString;
+
+        /**
+         * @brief Update enabled state of action buttons based on models and selection.
+         */
+        auto update_buttons_state() -> void;
 
     private:
         Ui::StartPageWidget* ui{nullptr};
