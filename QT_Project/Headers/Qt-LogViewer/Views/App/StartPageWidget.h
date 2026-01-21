@@ -71,6 +71,12 @@ class StartPageWidget: public QWidget
         void open_session_requested(const QString& session_id);
 
         /**
+         * @brief User requested to open a specific recent session.
+         * @param session_id Selected session id.
+         */
+        void open_recent_session_requested(const QString& session_id);
+
+        /**
          * @brief User requested to delete a specific session.
          * @param session_id Selected session id.
          */

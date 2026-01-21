@@ -46,6 +46,14 @@ SessionRepository::SessionRepository(QString app_config_subdir, QObject* parent)
 {}
 
 /**
+ * @brief Convenience constructor using default subdirectory.
+ * @param parent Optional QObject parent.
+ */
+SessionRepository::SessionRepository(QObject* parent)
+    : SessionRepository(QStringLiteral("Qt-LogViewer"), parent)
+{}
+
+/**
  * @brief Returns the schema version handled by this repository.
  * @return Integer schema version.
  */

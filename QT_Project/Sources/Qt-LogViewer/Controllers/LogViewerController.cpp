@@ -163,6 +163,22 @@ auto LogViewerController::get_current_view() const -> QUuid
 }
 
 /**
+ * @brief Returns all registered view ids.
+ * @return Vector of QUuid representing all views currently tracked.
+ */
+auto LogViewerController::get_all_view_ids() const -> QVector<QUuid>
+{
+    QVector<QUuid> ids;
+
+    if (m_views != nullptr)
+    {
+        ids = m_views->get_all_view_ids();
+    }
+
+    return ids;
+}
+
+/**
  * @brief Removes a view and all associated models and proxies.
  * @param view_id The QUuid of the view to remove.
  * @return True if the view was removed, false if not found.
@@ -264,26 +280,31 @@ auto LogViewerController::load_log_file(const QUuid& view_id, const QString& fil
  */
 auto LogViewerController::load_log_files(const QVector<QString>& file_paths) -> QUuid
 {
-    QList<LogFileInfo> loaded_log_files;
-    QUuid view_id = m_views->create_view();
+    QUuid view_id;
 
-    for (const QString& file_path: file_paths)
+    if (!file_paths.isEmpty())
     {
-        auto entries = m_ingest->load_file_sync(file_path);
-        QString app_name = (!entries.isEmpty()) ? entries.first().get_app_name()
-                                                : LogLoader::identify_app(file_path);
+        QList<LogFileInfo> loaded_log_files;
+        view_id = m_views->create_view();
 
-        LogFileInfo log_file_info(file_path, app_name);
-        loaded_log_files.append(log_file_info);
-
-        auto* ctx = m_views->get_context(view_id);
-        if (ctx != nullptr)
+        for (const QString& file_path: file_paths)
         {
-            ctx->append_entries(entries);
-        }
-    }
+            QVector<LogEntry> entries = m_ingest->load_file_sync(file_path);
+            QString app_name = (!entries.isEmpty()) ? entries.first().get_app_name()
+                                                    : LogLoader::identify_app(file_path);
 
-    m_views->set_loaded_files(view_id, loaded_log_files);
+            LogFileInfo log_file_info(file_path, app_name);
+            loaded_log_files.append(log_file_info);
+
+            auto* ctx = m_views->get_context(view_id);
+            if (ctx != nullptr)
+            {
+                ctx->append_entries(entries);
+            }
+        }
+
+        m_views->set_loaded_files(view_id, loaded_log_files);
+    }
 
     return view_id;
 }
@@ -353,20 +374,23 @@ auto LogViewerController::load_log_file_async(const QUuid& view_id, const QStrin
 auto LogViewerController::load_log_files_async(const QVector<QString>& file_paths,
                                                qsizetype batch_size) -> QUuid
 {
-    QUuid view_id = m_views->create_view();
+    QUuid view_id;
 
-    QList<LogFileInfo> files_info;
-
-    for (const QString& file_path: file_paths)
+    if (!file_paths.isEmpty())
     {
-        const QString app_name = LogLoader::identify_app(file_path);
-        files_info.append(LogFileInfo(file_path, app_name));
-        enqueue_async(view_id, file_path);
+        view_id = m_views->create_view();
+        QList<LogFileInfo> files_info;
+
+        for (const QString& file_path: file_paths)
+        {
+            const QString app_name = LogLoader::identify_app(file_path);
+            files_info.append(LogFileInfo(file_path, app_name));
+            enqueue_async(view_id, file_path);
+        }
+
+        m_views->set_loaded_files(view_id, files_info);
+        try_start_next_async(batch_size);
     }
-
-    m_views->set_loaded_files(view_id, files_info);
-
-    try_start_next_async(batch_size);
 
     return view_id;
 }
@@ -821,6 +845,75 @@ auto LogViewerController::hide_file(const QUuid& view_id, const QString& file_pa
 auto LogViewerController::get_view_file_paths(const QUuid& view_id) const -> QVector<QString>
 {
     QVector<QString> result = m_views->get_file_paths(view_id);
+    return result;
+}
+
+/**
+ * @brief Exports a view's state (loaded files, filters, paging, sort) into a serializable snapshot.
+ * @param view_id Target view id (use `get_current_view()` for the active view).
+ * @return SessionViewState snapshot (empty/default if view not found).
+ */
+auto LogViewerController::export_view_state(const QUuid& view_id) const -> SessionViewState
+{
+    SessionViewState state;
+
+    if (!view_id.isNull())
+    {
+        state = m_views->export_view_state(view_id, *m_filters);
+    }
+
+    return state;
+}
+
+/**
+ * @brief Imports a single view state (files, filters, paging, sort) and returns the ensured view
+ * id.
+ * @param state The view state to apply.
+ * @return QUuid of the imported/ensured view.
+ */
+auto LogViewerController::import_view_state(const SessionViewState& state) -> QUuid
+{
+    QUuid result;
+
+    if (m_views != nullptr && m_filters != nullptr)
+    {
+        result = m_views->import_view_state(state, *m_filters);
+
+        // Update explorer tree
+        if (m_catalog != nullptr && !state.loaded_files.isEmpty())
+        {
+            QVector<QString> paths;
+            paths.reserve(state.loaded_files.size());
+            for (const auto& lf: state.loaded_files)
+            {
+                const QString p = lf.get_file_path();
+                if (!p.isEmpty())
+                {
+                    paths.append(p);
+                }
+            }
+
+            if (!paths.isEmpty())
+            {
+                add_log_files_to_tree(paths);
+            }
+        }
+
+        if (!result.isNull())
+        {
+            for (const auto& lf: state.loaded_files)
+            {
+                const QString path = lf.get_file_path();
+                if (!path.isEmpty())
+                {
+                    ensure_view_models(result);
+                    enqueue_async(result, path);
+                    try_start_next_async(1000);
+                }
+            }
+        }
+    }
+
     return result;
 }
 

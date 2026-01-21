@@ -10,9 +10,13 @@
 #include "Qt-LogViewer/Controllers/LogViewerController.h"
 #include "Qt-LogViewer/Models/LogEntry.h"
 #include "Qt-LogViewer/Models/LogFileInfo.h"
+#include "Qt-LogViewer/Models/RecentLogFilesModel.h"
+#include "Qt-LogViewer/Models/RecentSessionsModel.h"
+#include "Qt-LogViewer/Services/SessionManager.h"
 #include "Qt-LogViewer/Services/StylesheetLoader.h"
 #include "Qt-LogViewer/Views/App/LogFileExplorer.h"
 #include "Qt-LogViewer/Views/App/LogLevelPieChartWidget.h"
+#include "Qt-LogViewer/Views/App/StartPageWidget.h"
 #include "Qt-LogViewer/Views/Shared/BaseMainWindow.h"
 #include "Qt-LogViewer/Views/Shared/DockWidget.h"
 
@@ -85,8 +89,25 @@ class MainWindow: public BaseMainWindow
 
         /**
          * @brief Initializes the main menu bar and its actions.
+         *
+         * Adds File menu entries and views menu. Also creates Recent Files / Recent Sessions
+         * submenus and session-related actions (Save/Open/Reopen Last Session).
          */
         auto initialize_menu() -> void;
+
+        /**
+         * @brief Rebuilds the Recent Files and Recent Sessions submenus from models.
+         *
+         * Idempotent; clears and repopulates actions on each call.
+         */
+        auto rebuild_recent_menus() -> void;
+
+        /**
+         * @brief Shows the start page if there is no current session.
+         *
+         * Hides certain dock widgets and disables related actions when no session is active.
+         */
+        auto show_start_page_if_needed() -> void;
 
         /**
          * @brief Updates the log details view when a row is selected.
@@ -126,6 +147,26 @@ class MainWindow: public BaseMainWindow
          * @param event The change event.
          */
         auto changeEvent(QEvent* event) -> void override;
+
+        /**
+         * @brief Handles the show event to apply the current theme.
+         *
+         * This method is called when the main window is shown. It applies the current theme if it
+         * has not been applied yet.
+         *
+         * @param event The show event.
+         */
+        void showEvent(QShowEvent* event) override;
+
+        /**
+         * @brief Handles the close event to save window settings.
+         *
+         * This method is called when the main window is closed. It saves the current window
+         * geometry, state, and window state to preferences.
+         *
+         * @param event The close event.
+         */
+        auto closeEvent(QCloseEvent* event) -> void override;
 
     private slots:
         /**
@@ -197,20 +238,92 @@ class MainWindow: public BaseMainWindow
         auto handle_loading_error(const QUuid& view_id, const QString& file_path,
                                   const QString& message) -> void;
 
+        /**
+         * @brief Open selected recent file from menu or start page.
+         * @param file_path Absolute file path.
+         */
+        auto handle_open_recent_file(const QString& file_path) -> void;
+
+        /**
+         * @brief Open selected recent session by id from menu or start page.
+         * @param session_id Session identifier.
+         */
+        auto handle_open_session(const QString& session_id) -> void;
+
+        /**
+         * @brief Open selected recent session by id from menu or start page.
+         * @param session_id Session identifier.
+         */
+        auto handle_open_recent_session(const QString& session_id) -> void;
+
+        /**
+         * @brief Clear recent files list via session manager.
+         */
+        auto handle_clear_recent_files() -> void;
+
+        /**
+         * @brief Save current session snapshot (single-view example).
+         */
+        auto handle_save_session() -> void;
+
+        /**
+         * @brief Delete session by id via session manager.
+         * @param session_id Session identifier.
+         */
+        auto handle_delete_session(const QString& session_id) -> void;
+
+        /**
+         * @brief Opens a session file via file dialog.
+         */
+        auto handle_open_session_dialog() -> void;
+
+        /**
+         * @brief Reopen last session id if available.
+         */
+        auto handle_reopen_last_session() -> void;
+
+        /**
+         * @brief Restores a session from JSON data.
+         * @param session_id The session identifier.
+         * @param obj The JSON object containing session data.
+         */
+        auto restore_session_from_json(const QString& session_id, const QJsonObject& obj) -> void;
+
     private:
         Ui::MainWindow* ui;
         LogViewerSettings* m_log_viewer_settings = nullptr;
         LogViewerController* m_controller = nullptr;
+
         QAction* m_action_open_log_file = nullptr;
         QAction* m_action_quit = nullptr;
         QAction* m_action_show_log_file_explorer = nullptr;
         QAction* m_action_show_log_details = nullptr;
         QAction* m_action_show_log_level_pie_chart = nullptr;
         QAction* m_action_settings = nullptr;
+
+        // Session-related
+        SessionManager* m_session_manager = nullptr;
+        RecentLogFilesModel* m_recent_files_model = nullptr;
+        RecentSessionsModel* m_recent_sessions_model = nullptr;
+
+        // File menu submenus
+        QMenu* m_file_menu = nullptr;
+        QMenu* m_recent_files_menu = nullptr;
+        QMenu* m_recent_sessions_menu = nullptr;
+        QAction* m_action_save_session = nullptr;
+        QAction* m_action_open_session = nullptr;
+        QAction* m_action_reopen_last_session = nullptr;
+
+        // Docks
         DockWidget* m_log_details_dock_widget = nullptr;
         DockWidget* m_log_file_explorer_dock_widget = nullptr;
         DockWidget* m_log_level_pie_chart_dock_widget = nullptr;
+
+        // Views
         QPlainTextEdit* m_log_details_text_edit = nullptr;
         LogFileExplorer* m_log_file_explorer = nullptr;
         LogLevelPieChartWidget* m_log_level_pie_chart_widget = nullptr;
+
+        // Start page (tab area filler)
+        StartPageWidget* m_start_page_widget = nullptr;
 };

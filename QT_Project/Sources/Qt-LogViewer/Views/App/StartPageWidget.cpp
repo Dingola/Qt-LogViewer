@@ -167,7 +167,7 @@ auto StartPageWidget::setup_connections() -> void
             const QString id = get_selected_recent_session_id();
             if (!id.isEmpty())
             {
-                emit open_session_requested(id);
+                emit open_recent_session_requested(id);
             }
         });
     }

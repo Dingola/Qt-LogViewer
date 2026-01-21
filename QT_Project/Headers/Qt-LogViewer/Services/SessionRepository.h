@@ -39,6 +39,12 @@ class SessionRepository: public QObject
                                    QObject* parent = nullptr);
 
         /**
+         * @brief Convenience constructor using default subdirectory.
+         * @param parent Optional QObject parent.
+         */
+        explicit SessionRepository(QObject* parent);
+
+        /**
          * @brief Returns the absolute path of the root JSON file.
          * @return Absolute file path to the root document.
          */

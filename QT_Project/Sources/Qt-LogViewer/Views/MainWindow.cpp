@@ -1,16 +1,20 @@
 #include "Qt-LogViewer/Views/MainWindow.h"
 
 #include <QAction>
+#include <QCoreApplication>
 #include <QDragEnterEvent>
 #include <QDropEvent>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QIcon>
 #include <QItemSelectionModel>
+#include <QJsonArray>
+#include <QJsonObject>
 #include <QMenu>
 #include <QMessageBox>
 #include <QMimeData>
 #include <QSet>
+#include <QStackedWidget>
 #include <QStringList>
 #include <QTimer>
 #include <QUrl>
@@ -18,9 +22,11 @@
 #include "Qt-LogViewer/Models/LogModel.h"
 #include "Qt-LogViewer/Models/LogSortFilterProxyModel.h"
 #include "Qt-LogViewer/Services/LogViewerSettings.h"
+#include "Qt-LogViewer/Services/SessionRepository.h"
 #include "Qt-LogViewer/Services/Translator.h"
 #include "Qt-LogViewer/Views/App/Dialogs/SettingsDialog.h"
 #include "Qt-LogViewer/Views/App/LogViewWidget.h"
+#include "Qt-LogViewer/Views/App/StartPageWidget.h"
 #include "ui_MainWindow.h"
 
 namespace
@@ -28,6 +34,11 @@ namespace
 constexpr auto k_open_log_files_text = QT_TRANSLATE_NOOP("MainWindow", "Open Log Files");
 constexpr auto k_open_log_file_text = QT_TRANSLATE_NOOP("MainWindow", "Open Log File...");
 constexpr auto k_file_menu_text = QT_TRANSLATE_NOOP("MainWindow", "&File");
+constexpr auto k_recent_files_text = QT_TRANSLATE_NOOP("MainWindow", "Recent Files");
+constexpr auto k_recent_sessions_text = QT_TRANSLATE_NOOP("MainWindow", "Recent Sessions");
+constexpr auto k_save_session_text = QT_TRANSLATE_NOOP("MainWindow", "Save Session...");
+constexpr auto k_open_session_text = QT_TRANSLATE_NOOP("MainWindow", "Open Session...");
+constexpr auto k_reopen_last_session_text = QT_TRANSLATE_NOOP("MainWindow", "Reopen Last Session");
 constexpr auto k_loaded_log_files_status = QT_TRANSLATE_NOOP("MainWindow", "Loaded %1 log file(s)");
 constexpr auto k_quit_text = QT_TRANSLATE_NOOP("MainWindow", "&Quit");
 constexpr auto k_views_menu_text = QT_TRANSLATE_NOOP("MainWindow", "&Views");
@@ -62,6 +73,53 @@ MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
     setContentsMargins(9, 9, 9, 9);
     setWindowIcon(QIcon(":/Resources/Icons/App/AppIcon.svg"));
 
+    // Replace central widget with QStackedWidget to allow Start Page
+    QWidget* old_central = this->takeCentralWidget();
+    auto* central_stack = new QStackedWidget(this);
+    setCentralWidget(central_stack);
+    if (old_central != nullptr)
+    {
+        central_stack->addWidget(old_central);
+    }
+
+    // Initialize session manager and recent models
+    m_session_manager = new SessionManager(new SessionRepository(this), this);
+    m_session_manager->initialize_from_storage();
+
+    m_recent_files_model = new RecentLogFilesModel(this);
+    m_recent_sessions_model = new RecentSessionsModel(this);
+    m_recent_files_model->set_items(m_session_manager->get_recent_log_files());
+    m_recent_sessions_model->set_items(m_session_manager->get_recent_sessions());
+
+    connect(m_session_manager, &SessionManager::recent_log_files_changed, this,
+            [this](const QVector<RecentLogFileRecord>& items) {
+                m_recent_files_model->set_items(items);
+                rebuild_recent_menus();
+            });
+    connect(m_session_manager, &SessionManager::recent_sessions_changed, this,
+            [this](const QVector<RecentSessionRecord>& items) {
+                m_recent_sessions_model->set_items(items);
+                rebuild_recent_menus();
+            });
+
+    // Start page widget (stack page 1)
+    auto* start_page = new StartPageWidget(central_stack);
+    start_page->set_recent_files_model(m_recent_files_model);
+    start_page->set_recent_sessions_model(m_recent_sessions_model);
+    connect(start_page, &StartPageWidget::open_log_file_requested, this,
+            &MainWindow::handle_open_log_file_dialog_requested);
+    connect(start_page, &StartPageWidget::open_recent_file_requested, this,
+            &MainWindow::handle_open_recent_file);
+    connect(start_page, &StartPageWidget::clear_recent_files_requested, this,
+            &MainWindow::handle_clear_recent_files);
+    connect(start_page, &StartPageWidget::open_session_requested, this,
+            &MainWindow::handle_open_session_dialog);
+    connect(start_page, &StartPageWidget::open_recent_session_requested, this,
+            &MainWindow::handle_open_recent_session);
+    connect(start_page, &StartPageWidget::delete_session_requested, this,
+            &MainWindow::handle_delete_session);
+    central_stack->addWidget(start_page);
+
     m_controller->set_current_view(m_controller->load_log_files({}));
     connect(m_controller, &LogViewerController::current_view_id_changed, this,
             &MainWindow::handle_current_view_id_changed);
@@ -94,6 +152,7 @@ MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
     setup_tab_widget();
 
     initialize_menu();
+    rebuild_recent_menus();
 
     QTimer::singleShot(0, this, [this] { this->resizeEvent(nullptr); });
     qDebug() << "MainWindow constructor finished";
@@ -261,23 +320,47 @@ auto MainWindow::setup_tab_widget() -> void
 
 /**
  * @brief Initializes the main menu bar and its actions.
+ *
+ * Adds File menu entries and views menu. Also creates Recent Files / Recent Sessions
+ * submenus and session-related actions (Save/Open/Reopen Last Session).
  */
 auto MainWindow::initialize_menu() -> void
 {
     // File menu
-    auto file_menu = new QMenu(tr(k_file_menu_text), this);
+    m_file_menu = new QMenu(tr(k_file_menu_text), this);
 
     // Action to open log files
     m_action_open_log_file = new QAction(tr(k_open_log_file_text), this);
     m_action_open_log_file->setShortcut(QKeySequence::Open);
-    file_menu->addAction(m_action_open_log_file);
-    ui->menubar->addMenu(file_menu);
+    m_file_menu->addAction(m_action_open_log_file);
+    ui->menubar->addMenu(m_file_menu);
 
     connect(m_action_open_log_file, &QAction::triggered, this,
             &MainWindow::handle_open_log_file_dialog_requested);
 
+    // Recent submenus
+    m_recent_files_menu = new QMenu(tr(k_recent_files_text), this);
+    m_recent_sessions_menu = new QMenu(tr(k_recent_sessions_text), this);
+    m_file_menu->addMenu(m_recent_files_menu);
+    m_file_menu->addMenu(m_recent_sessions_menu);
+
+    // Session actions
+    m_action_save_session = new QAction(tr(k_save_session_text), this);
+    m_action_open_session = new QAction(tr(k_open_session_text), this);
+    m_action_reopen_last_session = new QAction(tr(k_reopen_last_session_text), this);
+    m_file_menu->addSeparator();
+    m_file_menu->addAction(m_action_save_session);
+    m_file_menu->addAction(m_action_open_session);
+    m_file_menu->addAction(m_action_reopen_last_session);
+
+    connect(m_action_save_session, &QAction::triggered, this, [this]() { handle_save_session(); });
+    connect(m_action_open_session, &QAction::triggered, this,
+            [this]() { handle_open_session_dialog(); });
+    connect(m_action_reopen_last_session, &QAction::triggered, this,
+            [this]() { handle_reopen_last_session(); });
+
     // Separator before the quit action
-    file_menu->addSeparator();
+    m_file_menu->addSeparator();
     // Action to quit the application
     m_action_quit = new QAction(tr(k_quit_text), this);
 #ifdef Q_OS_WIN
@@ -285,10 +368,10 @@ auto MainWindow::initialize_menu() -> void
 #else
     m_action_quit->setShortcut(QKeySequence::Quit);
 #endif
-    file_menu->addAction(m_action_quit);
-    ui->menubar->addMenu(file_menu);
+    m_file_menu->addAction(m_action_quit);
+    ui->menubar->addMenu(m_file_menu);
 
-    connect(m_action_quit, &QAction::triggered, this, &QWidget::close);
+    connect(m_action_quit, &QAction::triggered, this, &QApplication::closeAllWindows);
 
     // Views menu
     auto views_menu = new QMenu(tr(k_views_menu_text), this);
@@ -327,12 +410,10 @@ auto MainWindow::initialize_menu() -> void
 
     // Settings menu
     auto settings_menu = new QMenu(tr("&Settings"), this);
-
     m_action_settings = new QAction(tr("Settings..."), this);
     m_action_settings->setShortcut(QKeySequence(QStringLiteral("Ctrl+,")));
     settings_menu->addAction(m_action_settings);
     ui->menubar->addMenu(settings_menu);
-
     connect(m_action_settings, &QAction::triggered, this,
             &MainWindow::handle_show_settings_dialog_requested);
 
@@ -340,7 +421,6 @@ auto MainWindow::initialize_menu() -> void
     auto help_menu = new QMenu(tr("&Help"), this);
     auto about_action = new QAction(tr("About %1").arg(QCoreApplication::applicationName()), this);
     auto about_qt_action = new QAction(tr("About Qt"), this);
-
     help_menu->addAction(about_action);
     help_menu->addAction(about_qt_action);
     ui->menubar->addMenu(help_menu);
@@ -355,6 +435,118 @@ auto MainWindow::initialize_menu() -> void
                                .arg(QCoreApplication::applicationName(), QT_VERSION_STR));
     });
     connect(about_qt_action, &QAction::triggered, this, [this] { QMessageBox::aboutQt(this); });
+}
+
+/**
+ * @brief Rebuilds the Recent Files and Recent Sessions submenus from models.
+ *
+ * Idempotent; clears and repopulates actions on each call.
+ */
+auto MainWindow::rebuild_recent_menus() -> void
+{
+    if (m_recent_files_menu != nullptr)
+    {
+        m_recent_files_menu->clear();
+        for (int row = 0; row < m_recent_files_model->rowCount(); ++row)
+        {
+            const QModelIndex idx = m_recent_files_model->index(row, RecentLogFilesModel::FileName);
+            const QString title = m_recent_files_model->data(idx, Qt::DisplayRole).toString();
+            const QString path =
+                m_recent_files_model->data(idx, RecentLogFilesModel::FilePathRole).toString();
+            QAction* act = m_recent_files_menu->addAction(title);
+            connect(act, &QAction::triggered, this,
+                    [this, path]() { handle_open_recent_file(path); });
+        }
+        m_recent_files_menu->addSeparator();
+        QAction* clear_act = m_recent_files_menu->addAction(tr("Clear Recent Files"));
+        connect(clear_act, &QAction::triggered, this, [this]() { handle_clear_recent_files(); });
+    }
+
+    if (m_recent_sessions_menu != nullptr)
+    {
+        m_recent_sessions_menu->clear();
+        for (int row = 0; row < m_recent_sessions_model->rowCount(); ++row)
+        {
+            const QModelIndex idx = m_recent_sessions_model->index(row, RecentSessionsModel::Name);
+            const QString title = m_recent_sessions_model->data(idx, Qt::DisplayRole).toString();
+            const int IdRole = Qt::UserRole + 3;
+            const QString id = m_recent_sessions_model->data(idx, IdRole).toString();
+            QAction* act = m_recent_sessions_menu->addAction(title);
+            connect(act, &QAction::triggered, this, [this, id]() { handle_open_session(id); });
+        }
+    }
+}
+
+/**
+ * @brief Shows the start page if there is no current session.
+ *
+ * Hides certain dock widgets and disables related actions when no session is active.
+ */
+auto MainWindow::show_start_page_if_needed() -> void
+{
+    const bool has_session =
+        (m_session_manager != nullptr) ? m_session_manager->has_current_session() : false;
+
+    auto* central_stack = qobject_cast<QStackedWidget*>(this->centralWidget());
+    if (central_stack != nullptr)
+    {
+        central_stack->setCurrentIndex(has_session ? 0 : 1);
+    }
+
+    if (!has_session)
+    {
+        if (m_log_file_explorer_dock_widget != nullptr)
+        {
+            m_log_file_explorer_dock_widget->setVisible(false);
+        }
+        if (m_log_details_dock_widget != nullptr)
+        {
+            m_log_details_dock_widget->setVisible(false);
+        }
+        if (m_log_level_pie_chart_dock_widget != nullptr)
+        {
+            m_log_level_pie_chart_dock_widget->setVisible(false);
+        }
+
+        if (m_action_show_log_file_explorer != nullptr)
+        {
+            const bool prev = m_action_show_log_file_explorer->blockSignals(true);
+            m_action_show_log_file_explorer->setChecked(false);
+            m_action_show_log_file_explorer->blockSignals(prev);
+            m_action_show_log_file_explorer->setEnabled(false);
+        }
+        if (m_action_show_log_details != nullptr)
+        {
+            const bool prev = m_action_show_log_details->blockSignals(true);
+            m_action_show_log_details->setChecked(false);
+            m_action_show_log_details->blockSignals(prev);
+            m_action_show_log_details->setEnabled(false);
+        }
+        if (m_action_show_log_level_pie_chart != nullptr)
+        {
+            const bool prev = m_action_show_log_level_pie_chart->blockSignals(true);
+            m_action_show_log_level_pie_chart->setChecked(false);
+            m_action_show_log_level_pie_chart->blockSignals(prev);
+            m_action_show_log_level_pie_chart->setEnabled(false);
+        }
+    }
+    else
+    {
+        if (m_action_show_log_file_explorer != nullptr)
+        {
+            m_action_show_log_file_explorer->setEnabled(true);
+        }
+        if (m_action_show_log_details != nullptr)
+        {
+            m_action_show_log_details->setEnabled(true);
+        }
+        if (m_action_show_log_level_pie_chart != nullptr)
+        {
+            m_action_show_log_level_pie_chart->setEnabled(true);
+        }
+
+        restore_window_settings();
+    }
 }
 
 /**
@@ -397,9 +589,9 @@ auto MainWindow::update_log_details(const QModelIndex& current) -> void
  */
 auto MainWindow::update_pagination_widget() -> void
 {
-    auto* proxy = m_controller->get_paging_proxy();
     int total_pages = 0;
     int current_page = 0;
+    auto* proxy = m_controller->get_paging_proxy();
 
     if (proxy != nullptr)
     {
@@ -449,13 +641,18 @@ void MainWindow::resizeEvent(QResizeEvent* event)
 {
     QMainWindow::resizeEvent(event);
 
-    if (ui != nullptr)
+    if (ui != nullptr && ui->tabWidgetLog != nullptr)
     {
-        auto* log_view_widget = qobject_cast<LogViewWidget*>(ui->tabWidgetLog->currentWidget());
-
-        if (log_view_widget != nullptr)
+        const int tab_count = ui->tabWidgetLog->count();
+        if (tab_count > 0)
         {
-            log_view_widget->auto_resize_columns();
+            QWidget* current = ui->tabWidgetLog->currentWidget();
+            auto* log_view_widget = qobject_cast<LogViewWidget*>(current);
+
+            if (log_view_widget != nullptr)
+            {
+                log_view_widget->auto_resize_columns();
+            }
         }
     }
 }
@@ -471,6 +668,7 @@ auto MainWindow::changeEvent(QEvent* event) -> void
         ui->retranslateUi(this);
         ui->menubar->clear();
         initialize_menu();
+        rebuild_recent_menus();
         m_log_file_explorer_dock_widget->setWindowTitle(tr("Log File Explorer"));
         m_log_details_dock_widget->setWindowTitle(tr("Log Details"));
         ui->logFilterBarWidget->set_app_names(m_controller->get_app_names());
@@ -478,6 +676,34 @@ auto MainWindow::changeEvent(QEvent* event) -> void
     }
 
     BaseMainWindow::changeEvent(event);
+}
+
+/**
+ * @brief Handles show events to display the start page if needed.
+ * @param event The show event.
+ */
+void MainWindow::showEvent(QShowEvent* event)
+{
+    BaseMainWindow::showEvent(event);
+    show_start_page_if_needed();
+}
+
+/**
+ * @brief Handles the close event to save window settings.
+ *
+ * This method is called when the main window is closed. It saves the current window
+ * geometry, state, and window state to preferences.
+ *
+ * @param event The close event.
+ */
+auto MainWindow::closeEvent(QCloseEvent* event) -> void
+{
+    if (m_session_manager != nullptr && m_session_manager->has_current_session())
+    {
+        handle_save_session();
+    }
+
+    BaseMainWindow::closeEvent(event);
 }
 
 /**
@@ -489,11 +715,70 @@ void MainWindow::handle_open_log_file_dialog_requested()
     QStringList files = QFileDialog::getOpenFileNames(this, tr(k_open_log_files_text), QString(),
                                                       tr("Log Files (*.log *.txt);;All Files (*)"));
     qDebug() << "Files selected:" << files;
-    m_controller->add_log_files_to_tree(files);
+
+    if (m_session_manager != nullptr && !m_session_manager->has_current_session())
+    {
+        const QString new_session_id = QUuid::createUuid().toString(QUuid::WithoutBraces);
+        m_session_manager->set_current_session_id(new_session_id);
+        m_session_manager->upsert_session_metadata(new_session_id, tr("Untitled Session"), true);
+
+        // Persist an initial empty session so it is loadable from Recent Sessions
+        QJsonObject session_obj;
+        session_obj.insert(QStringLiteral("schema_version"), 1);
+        session_obj.insert(QStringLiteral("name"), tr("Untitled Session"));
+        session_obj.insert(QStringLiteral("id"), new_session_id);
+        m_session_manager->save_session(new_session_id, session_obj);
+
+        auto* central_stack = qobject_cast<QStackedWidget*>(this->centralWidget());
+        if (central_stack != nullptr)
+        {
+            central_stack->setCurrentIndex(0);
+        }
+    }
+
+    QVector<QString> valid_files;
+    QStringList invalid_files;
+
+    for (const QString& path: files)
+    {
+        QFileInfo fi(path);
+        const bool ok = fi.exists() && fi.isFile() && fi.isReadable();
+        if (ok)
+        {
+            valid_files.append(fi.absoluteFilePath());
+        }
+        else
+        {
+            invalid_files.append(path);
+        }
+    }
+
+    if (!invalid_files.isEmpty())
+    {
+        QMessageBox::warning(this, tr("Invalid Files"),
+                             tr("The following files could not be opened or are invalid:\n%1")
+                                 .arg(invalid_files.join(QStringLiteral("\n"))));
+    }
+
+    if (!valid_files.isEmpty())
+    {
+        m_controller->add_log_files_to_tree(valid_files);
+
+        for (const QString& file: valid_files)
+        {
+            LogFileInfo log_file_info(file);
+            m_session_manager->add_recent_log_file(log_file_info);
+        }
+
+        handle_save_session();
+        rebuild_recent_menus();
+    }
+
+    show_start_page_if_needed();
 }
 
 /**
- * @brief Opens the settings dialog for changing application settings.
+ * @brief Shows the settings dialog for changing application settings.
  */
 void MainWindow::handle_show_settings_dialog_requested()
 {
@@ -591,7 +876,452 @@ auto MainWindow::handle_view_removed(const QUuid& view_id) -> void
 }
 
 /**
- * @brief Handles open log file requests and creates a new tab with a LogTableView.
+ * @brief Open selected session by id from menu or start page.
+ * @param session_id Session identifier.
+ */
+auto MainWindow::handle_open_session(const QString& session_id) -> void
+{
+    if (!session_id.isEmpty())
+    {
+        const QJsonObject obj = m_session_manager->load_session(session_id);
+        if (!obj.isEmpty())
+        {
+            restore_session_from_json(session_id, obj);
+        }
+        else
+        {
+            QMessageBox::warning(this, tr("Open Session"),
+                                 tr("Selected session could not be loaded:\n%1").arg(session_id));
+        }
+    }
+}
+
+/**
+ * @brief Open selected recent session by id from menu or start page.
+ * @param session_id Session identifier.
+ */
+auto MainWindow::handle_open_recent_session(const QString& session_id) -> void
+{
+    if (!session_id.isEmpty())
+    {
+        const QJsonObject obj = m_session_manager->load_session(session_id);
+        if (!obj.isEmpty())
+        {
+            restore_session_from_json(session_id, obj);
+        }
+        else
+        {
+            QMessageBox::warning(
+                this, tr("Open Session"),
+                tr("Selected recent session could not be loaded:\n%1").arg(session_id));
+        }
+    }
+    else
+    {
+        QMessageBox::warning(this, tr("Open Session"), tr("No recent session selected."));
+    }
+}
+
+/**
+ * @brief Clear recent files list via session manager.
+ */
+auto MainWindow::handle_clear_recent_files() -> void
+{
+    m_session_manager->clear_recent_log_files();
+}
+
+/**
+ * @brief Save current session snapshot.
+ */
+auto MainWindow::handle_save_session() -> void
+{
+    const QVector<QUuid> view_ids = m_controller->get_all_view_ids();
+
+    QVector<QUuid> nonempty_view_ids;
+    nonempty_view_ids.reserve(view_ids.size());
+    for (const QUuid& vid: view_ids)
+    {
+        if (!m_controller->get_view_file_paths(vid).isEmpty())
+        {
+            nonempty_view_ids.append(vid);
+        }
+    }
+
+    if (!nonempty_view_ids.isEmpty())
+    {
+        QJsonObject session_obj;
+        session_obj.insert(QStringLiteral("schema_version"), 1);
+
+        const QString current_session_id = (m_session_manager != nullptr)
+                                               ? m_session_manager->get_current_session_id()
+                                               : QString();
+
+        QString session_name = QStringLiteral("Session");
+        QJsonArray views_array;
+
+        for (const QUuid& vid: nonempty_view_ids)
+        {
+            const SessionViewState state = m_controller->export_view_state(vid);
+
+            QJsonObject view_obj;
+            view_obj.insert(QStringLiteral("id"), vid.toString(QUuid::WithoutBraces));
+
+            QJsonArray files_arr;
+            for (const auto& lf: state.loaded_files)
+            {
+                QJsonObject fobj;
+                fobj.insert(QStringLiteral("file_path"), lf.get_file_path());
+                fobj.insert(QStringLiteral("app_name"), lf.get_app_name());
+                files_arr.append(fobj);
+            }
+            view_obj.insert(QStringLiteral("loaded_files"), files_arr);
+
+            QJsonObject filters_obj;
+            filters_obj.insert(QStringLiteral("app_name"), state.filters.app_name);
+            QJsonArray levels_arr;
+            for (const auto& lvl: state.filters.log_levels)
+            {
+                levels_arr.append(lvl);
+            }
+            filters_obj.insert(QStringLiteral("log_levels"), levels_arr);
+            filters_obj.insert(QStringLiteral("search_text"), state.filters.search_text);
+            filters_obj.insert(QStringLiteral("search_field"), state.filters.search_field);
+            filters_obj.insert(QStringLiteral("use_regex"), state.filters.use_regex);
+            filters_obj.insert(QStringLiteral("show_only_file"), state.filters.show_only_file);
+            QJsonArray hidden_arr;
+            for (const auto& hf: state.filters.hidden_files)
+            {
+                hidden_arr.append(hf);
+            }
+            filters_obj.insert(QStringLiteral("hidden_files"), hidden_arr);
+            view_obj.insert(QStringLiteral("filters"), filters_obj);
+
+            view_obj.insert(QStringLiteral("page_size"), static_cast<int>(state.page_size));
+            view_obj.insert(QStringLiteral("current_page"), static_cast<int>(state.current_page));
+            view_obj.insert(QStringLiteral("sort_column"), static_cast<int>(state.sort_column));
+            view_obj.insert(QStringLiteral("sort_order"), state.sort_order == Qt::AscendingOrder
+                                                              ? QStringLiteral("asc")
+                                                              : QStringLiteral("desc"));
+
+            view_obj.insert(QStringLiteral("tab_title"), state.tab_title);
+
+            if (views_array.isEmpty() && !state.tab_title.isEmpty())
+            {
+                session_name = state.tab_title;
+            }
+
+            views_array.append(view_obj);
+        }
+
+        if (m_session_manager != nullptr && !current_session_id.isEmpty())
+        {
+            const QJsonObject existing_obj = m_session_manager->load_session(current_session_id);
+            const QString existing_name =
+                existing_obj.value(QStringLiteral("name")).toString(QString());
+            if (!existing_name.isEmpty())
+            {
+                session_name = existing_name;
+            }
+        }
+
+        session_obj.insert(QStringLiteral("name"), session_name);
+        session_obj.insert(QStringLiteral("views"), views_array);
+
+        QString session_id = current_session_id;
+        if (session_id.isEmpty())
+        {
+            const QUuid first_view_id = nonempty_view_ids.first();
+            session_id = first_view_id.toString(QUuid::WithoutBraces);
+            if (m_session_manager != nullptr)
+            {
+                m_session_manager->set_current_session_id(session_id);
+            }
+        }
+
+        m_session_manager->save_session(session_id, session_obj);
+        m_session_manager->upsert_session_metadata(session_id, session_name, false);
+
+        rebuild_recent_menus();
+    }
+}
+
+/**
+ * @brief Delete session by id via session manager.
+ * @param session_id Session identifier.
+ */
+auto MainWindow::handle_delete_session(const QString& session_id) -> void
+{
+    const bool ok = (!session_id.isEmpty() && m_session_manager != nullptr) &&
+                    m_session_manager->delete_session(session_id);
+
+    if (ok)
+    {
+        if (m_session_manager->get_current_session_id() == session_id)
+        {
+            m_session_manager->set_current_session_id(QString());
+        }
+
+        while (ui->tabWidgetLog->count() > 0)
+        {
+            ui->tabWidgetLog->removeTab(0);
+        }
+
+        rebuild_recent_menus();
+        show_start_page_if_needed();
+    }
+}
+
+/**
+ * @brief Opens a session file via file dialog.
+ */
+auto MainWindow::handle_open_session_dialog() -> void
+{
+    const QString session_file = QFileDialog::getOpenFileName(
+        this, tr("Open Session"), QString(), tr("Session Files (*.json);;All Files (*)"));
+
+    if (session_file.isEmpty())
+    {
+        return;
+    }
+
+    QFileInfo fi(session_file);
+    const bool ok = fi.exists() && fi.isFile() && fi.isReadable();
+
+    if (!ok)
+    {
+        QMessageBox::warning(this, tr("Open Session"),
+                             tr("Failed to open session file:\n%1").arg(session_file));
+        return;
+    }
+
+    const QString session_id = fi.completeBaseName();
+    const QJsonObject obj = m_session_manager->load_session(session_id);
+
+    if (obj.isEmpty())
+    {
+        QMessageBox::warning(
+            this, tr("Open Session"),
+            tr("Session file is invalid or could not be loaded:\n%1").arg(session_file));
+        return;
+    }
+
+    // Set current and last session
+    m_session_manager->set_current_session_id(session_id);
+    m_session_manager->set_last_session_id(session_id);
+
+    // Update MRU metadata (name if present)
+    const QString session_name = obj.value(QStringLiteral("name")).toString(tr("Session"));
+    m_session_manager->upsert_session_metadata(session_id, session_name, true);
+
+    auto* central_stack = qobject_cast<QStackedWidget*>(this->centralWidget());
+    if (central_stack != nullptr)
+    {
+        central_stack->setCurrentIndex(0);
+    }
+
+    rebuild_recent_menus();
+    show_start_page_if_needed();
+}
+
+/**
+ * @brief Reopen last session id if available.
+ */
+auto MainWindow::handle_reopen_last_session() -> void
+{
+    const QString id = m_session_manager->get_last_session_id();
+    if (!id.isEmpty())
+    {
+        handle_open_session(id);
+    }
+}
+
+/**
+ * @brief Restores a session from JSON data.
+ * @param session_id The session identifier.
+ * @param obj The JSON object containing session data.
+ */
+auto MainWindow::restore_session_from_json(const QString& session_id,
+                                           const QJsonObject& obj) -> void
+{
+    if (session_id.isEmpty() || obj.isEmpty())
+    {
+        QMessageBox::warning(this, tr("Open Session"), tr("Session data is invalid or empty."));
+        return;
+    }
+
+    m_session_manager->set_current_session_id(session_id);
+    m_session_manager->set_last_session_id(session_id);
+
+    const QString session_name = obj.value(QStringLiteral("name")).toString(tr("Session"));
+    m_session_manager->upsert_session_metadata(session_id, session_name, true);
+
+    auto* central_stack = qobject_cast<QStackedWidget*>(this->centralWidget());
+    if (central_stack != nullptr)
+    {
+        central_stack->setCurrentIndex(0);
+    }
+
+    while (ui->tabWidgetLog->count() > 0)
+    {
+        ui->tabWidgetLog->removeTab(0);
+    }
+
+    const QJsonArray views_array = obj.value(QStringLiteral("views")).toArray();
+    for (const auto& v: views_array)
+    {
+        const QJsonObject view_obj = v.toObject();
+
+        SessionViewState state;
+        const QString vid_str = view_obj.value(QStringLiteral("id")).toString();
+        state.id = QUuid::fromString(QLatin1String("{") + vid_str + QLatin1String("}"));
+        state.tab_title = view_obj.value(QStringLiteral("tab_title")).toString();
+
+        const QJsonArray files_arr = view_obj.value(QStringLiteral("loaded_files")).toArray();
+        for (const auto& f: files_arr)
+        {
+            const QJsonObject fobj = f.toObject();
+            const QString fp = fobj.value(QStringLiteral("file_path")).toString();
+            const QString an = fobj.value(QStringLiteral("app_name")).toString();
+            if (!fp.isEmpty())
+            {
+                state.loaded_files.append(LogFileInfo(fp, an));
+            }
+        }
+
+        const QJsonObject filters_obj = view_obj.value(QStringLiteral("filters")).toObject();
+        state.filters.app_name = filters_obj.value(QStringLiteral("app_name")).toString();
+        state.filters.search_text = filters_obj.value(QStringLiteral("search_text")).toString();
+        state.filters.search_field = filters_obj.value(QStringLiteral("search_field")).toString();
+        state.filters.use_regex = filters_obj.value(QStringLiteral("use_regex")).toBool();
+        state.filters.show_only_file =
+            filters_obj.value(QStringLiteral("show_only_file")).toString();
+
+        const QJsonArray levels_arr = filters_obj.value(QStringLiteral("log_levels")).toArray();
+        for (const auto& lv: levels_arr)
+        {
+            state.filters.log_levels.insert(lv.toString());
+        }
+        const QJsonArray hidden_arr = filters_obj.value(QStringLiteral("hidden_files")).toArray();
+        for (const auto& hf: hidden_arr)
+        {
+            state.filters.hidden_files.insert(hf.toString());
+        }
+
+        state.page_size =
+            static_cast<qsizetype>(view_obj.value(QStringLiteral("page_size")).toInt());
+        state.current_page =
+            static_cast<int>(view_obj.value(QStringLiteral("current_page")).toInt());
+        state.sort_column = static_cast<int>(view_obj.value(QStringLiteral("sort_column")).toInt());
+        const QString sort_order =
+            view_obj.value(QStringLiteral("sort_order")).toString(QStringLiteral("asc"));
+        state.sort_order = (sort_order.compare(QStringLiteral("desc"), Qt::CaseInsensitive) == 0)
+                               ? Qt::DescendingOrder
+                               : Qt::AscendingOrder;
+
+        const QUuid view_id = m_controller->import_view_state(state);
+
+        auto* log_view_widget = new LogViewWidget(ui->tabWidgetLog);
+        log_view_widget->set_view_id(view_id);
+
+        auto* paging_proxy = m_controller->get_paging_proxy(view_id);
+        log_view_widget->set_model(paging_proxy);
+
+        const QSet<QString> app_names = m_controller->get_app_names(view_id);
+        log_view_widget->set_app_names(app_names);
+        log_view_widget->set_current_app_name_filter(state.filters.app_name);
+        log_view_widget->set_available_log_levels(m_controller->get_available_log_levels(view_id));
+        log_view_widget->set_log_levels(state.filters.log_levels);
+
+        const QMap<QString, int> level_counts = m_controller->get_log_level_counts(view_id);
+        log_view_widget->set_log_level_counts(level_counts);
+
+        connect(log_view_widget, &LogViewWidget::current_row_changed, this,
+                &MainWindow::update_log_details);
+        connect(log_view_widget, &LogViewWidget::app_filter_changed, this,
+                [this](const QString& app) {
+                    m_controller->set_app_name_filter(app);
+                    update_pagination_widget();
+                });
+        connect(log_view_widget, &LogViewWidget::log_level_filter_changed, this,
+                [this](const QSet<QString>& levels) {
+                    m_controller->set_log_level_filters(levels);
+                    update_pagination_widget();
+                });
+        connect(log_view_widget, &LogViewWidget::toggle_visibility_requested, this,
+                [this, view_id](const QString& file_path) {
+                    m_controller->toggle_file_visibility(view_id, file_path);
+                    update_pagination_widget();
+                });
+        connect(log_view_widget, &LogViewWidget::show_only_file_requested, this,
+                [this, view_id](const QString& file_path) {
+                    m_controller->set_show_only_file(view_id, file_path);
+                    update_pagination_widget();
+                });
+        connect(log_view_widget, &LogViewWidget::remove_file_requested, this,
+                [this, view_id](const QString& file_path) {
+                    m_controller->remove_log_file(view_id, file_path);
+                    update_pagination_widget();
+                });
+
+        const QVector<QString> view_paths = m_controller->get_view_file_paths(view_id);
+        log_view_widget->set_view_file_paths(view_paths);
+
+        const QString tab_title = state.tab_title.isEmpty() && !view_paths.isEmpty()
+                                      ? QFileInfo(view_paths.first()).fileName()
+                                      : state.tab_title;
+        const int tab_index = ui->tabWidgetLog->addTab(log_view_widget, tab_title);
+        ui->tabWidgetLog->setCurrentIndex(tab_index);
+
+        log_view_widget->auto_resize_columns();
+    }
+
+    rebuild_recent_menus();
+    update_pagination_widget();
+    show_start_page_if_needed();
+}
+
+/**
+ * @brief Open selected recent file from menu or start page.
+ * @param file_path Absolute file path.
+ */
+auto MainWindow::handle_open_recent_file(const QString& file_path) -> void
+{
+    if (!file_path.isEmpty())
+    {
+        if (m_session_manager != nullptr && !m_session_manager->has_current_session())
+        {
+            const QString new_session_id = QUuid::createUuid().toString(QUuid::WithoutBraces);
+            m_session_manager->set_current_session_id(new_session_id);
+            m_session_manager->upsert_session_metadata(new_session_id, tr("Untitled Session"),
+                                                       true);
+
+            QJsonObject session_obj;
+            session_obj.insert(QStringLiteral("schema_version"), 1);
+            session_obj.insert(QStringLiteral("name"), tr("Untitled Session"));
+            session_obj.insert(QStringLiteral("id"), new_session_id);
+            session_obj.insert(QStringLiteral("views"), QJsonArray());
+            m_session_manager->save_session(new_session_id, session_obj);
+
+            auto* central_stack = qobject_cast<QStackedWidget*>(this->centralWidget());
+            if (central_stack != nullptr)
+            {
+                central_stack->setCurrentIndex(0);
+            }
+        }
+
+        m_controller->add_log_files_to_tree({file_path});
+
+        LogFileInfo log_file_info(file_path);
+        m_session_manager->add_recent_log_file(log_file_info);
+
+        handle_save_session();
+        rebuild_recent_menus();
+        show_start_page_if_needed();
+    }
+}
+
+/**
+ * @brief Handles open log file requests and creates a new tab with a LogViewWidget.
  *        Uses streaming loading to keep the UI responsive.
  * @param log_file_info The LogFileInfo to load and display.
  */
@@ -676,21 +1406,19 @@ auto MainWindow::handle_add_log_file_to_current_view_requested(const LogFileInfo
     }
     else
     {
-        // No active view -> behave like "Open in New View"
         handle_log_file_open_requested(log_file_info);
     }
 }
 
 /**
- * @brief Handles loading progress updates for a log file.
- * @param view_id The QUuid of the view being loaded.
- * @param bytes_read The number of bytes read so far.
- * @param total_bytes The total number of bytes to read.
+ * @brief Handles streaming progress for a specific view.
+ * @param view_id The target view.
+ * @param bytes_read Bytes read so far.
+ * @param total_bytes Total file size in bytes.
  */
 auto MainWindow::handle_loading_progress(const QUuid& view_id, qint64 bytes_read,
                                          qint64 total_bytes) -> void
 {
-    // Update status bar and pagination for the active view
     bool is_current = (view_id == m_controller->get_current_view());
     int percent = 0;
 
@@ -723,7 +1451,6 @@ auto MainWindow::handle_loading_finished(const QUuid& view_id, const QString& fi
 
     if (is_current)
     {
-        // Refresh filters and charts now that data is available
         handle_current_view_id_changed(view_id);
         update_pagination_widget();
     }
@@ -732,7 +1459,7 @@ auto MainWindow::handle_loading_finished(const QUuid& view_id, const QString& fi
 }
 
 /**
- * @brief Handles loading errors for a log file.
+ * @brief Handles streaming errors.
  * @param view_id The QUuid of the view that encountered an error.
  * @param file_path The path of the log file that failed to load.
  * @param message The error message.

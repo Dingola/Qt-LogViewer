@@ -56,6 +56,12 @@ class LogViewerController: public QObject
         [[nodiscard]] auto get_current_view() const -> QUuid;
 
         /**
+         * @brief Returns all registered view ids.
+         * @return Vector of QUuid representing all views currently tracked.
+         */
+        [[nodiscard]] auto get_all_view_ids() const -> QVector<QUuid>;
+
+        /**
          * @brief Removes a view and all associated models and proxies.
          * @param view_id The QUuid of the view to remove.
          * @return True if the view was removed, false if not found.
@@ -414,6 +420,22 @@ class LogViewerController: public QObject
          * @return Vector of file paths loaded in the view (empty if none).
          */
         [[nodiscard]] auto get_view_file_paths(const QUuid& view_id) const -> QVector<QString>;
+
+        /**
+         * @brief Exports a view's state (loaded files, filters, paging, sort) into a serializable
+         * snapshot.
+         * @param view_id Target view id (use `get_current_view()` for the active view).
+         * @return SessionViewState snapshot (empty/default if view not found).
+         */
+        [[nodiscard]] auto export_view_state(const QUuid& view_id) const -> SessionViewState;
+
+        /**
+         * @brief Imports a single view state (files, filters, paging, sort) and returns the ensured
+         * view id.
+         * @param state The view state to apply.
+         * @return QUuid of the imported/ensured view.
+         */
+        auto import_view_state(const SessionViewState& state) -> QUuid;
 
     signals:
         /**
