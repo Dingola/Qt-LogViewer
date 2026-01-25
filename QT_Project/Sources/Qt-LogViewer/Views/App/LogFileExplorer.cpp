@@ -1,6 +1,8 @@
 #include "Qt-LogViewer/Views/App/LogFileExplorer.h"
 
 #include <QCursor>
+#include <QInputDialog>
+#include <QMessageBox>
 #include <QModelIndex>
 #include <QTreeView>
 
@@ -11,6 +13,7 @@
 
 /**
  * @brief Constructs a LogFileExplorer widget.
+ * @param model The LogFileTreeModel to use, or nullptr to create a new one.
  * @param parent The parent widget, or nullptr.
  */
 LogFileExplorer::LogFileExplorer(LogFileTreeModel* model, QWidget* parent)
@@ -77,7 +80,20 @@ auto LogFileExplorer::set_log_files(const QList<LogFileInfo>& log_file_infos) ->
 }
 
 /**
- * @brief Sets up connections for selection changes.
+ * @brief Expands the tree to show a specific session.
+ * @param session_id The session identifier to expand.
+ */
+auto LogFileExplorer::expand_session(const QString& session_id) -> void
+{
+    const QModelIndex session_index = m_model->get_session_index(session_id);
+    if (session_index.isValid())
+    {
+        ui->treeView->expand(session_index);
+    }
+}
+
+/**
+ * @brief Sets up connections for signals and slots.
  */
 auto LogFileExplorer::setup_connections() -> void
 {
@@ -85,62 +101,163 @@ auto LogFileExplorer::setup_connections() -> void
             [this](const QModelIndex& current, const QModelIndex&) {
                 if (current.isValid())
                 {
-                    auto* item = static_cast<LogFileTreeItem*>(current.internalPointer());
-                    if (item != nullptr &&
-                        item->data(0).value<LogFileTreeItem::Type>() == LogFileTreeItem::Type::File)
+                    const auto type = get_item_type(current);
+
+                    if (type == LogFileTreeItem::Type::File)
                     {
+                        auto* item = static_cast<LogFileTreeItem*>(current.internalPointer());
                         emit file_selected(item->data(1).value<LogFileInfo>());
+                    }
+                    else if (type == LogFileTreeItem::Type::Session)
+                    {
+                        const QString session_id =
+                            current.data(LogFileTreeModel::SessionIdRole).toString();
+                        emit session_selected(session_id);
                     }
                 }
             });
+
     connect(ui->treeView, &QTreeView::doubleClicked, this, [this](const QModelIndex& index) {
         if (index.isValid())
         {
-            auto* item = static_cast<LogFileTreeItem*>(index.internalPointer());
-            if (item != nullptr &&
-                item->data(0).value<LogFileTreeItem::Type>() == LogFileTreeItem::Type::File)
+            const auto type = get_item_type(index);
+
+            if (type == LogFileTreeItem::Type::File)
             {
+                auto* item = static_cast<LogFileTreeItem*>(index.internalPointer());
                 emit open_file_requested(item->data(1).value<LogFileInfo>());
             }
+            // Note: Session double-click triggers edit mode via Qt::ItemIsEditable flag
         }
     });
+
     connect(ui->treeView, &QTreeView::customContextMenuRequested, this,
             &LogFileExplorer::show_context_menu);
+
+    connect(m_model, &QAbstractItemModel::dataChanged, this,
+            [this](const QModelIndex& top_left, const QModelIndex& bottom_right,
+                   const QList<int>& roles) {
+                Q_UNUSED(bottom_right);
+
+                // Only react to display/edit role changes
+                if (!roles.isEmpty() && !roles.contains(Qt::DisplayRole) &&
+                    !roles.contains(Qt::EditRole))
+                {
+                    return;
+                }
+
+                if (top_left.isValid())
+                {
+                    const auto type = get_item_type(top_left);
+
+                    if (type == LogFileTreeItem::Type::Session)
+                    {
+                        const QString session_id =
+                            top_left.data(LogFileTreeModel::SessionIdRole).toString();
+                        const QString new_name = top_left.data(Qt::DisplayRole).toString();
+
+                        if (!session_id.isEmpty() && !new_name.isEmpty())
+                        {
+                            emit rename_session_requested(session_id, new_name);
+                        }
+                    }
+                }
+            });
 }
 
 /**
- * @brief Initializes the context menu for the tree view.
+ * @brief Initializes the context menus for different item types.
  */
 auto LogFileExplorer::init_context_menu() -> void
 {
-    m_context_menu = new QMenu(this);
+    // File context menu
+    m_file_context_menu = new QMenu(this);
 
-    auto open_action = new QAction(tr("Open in New View"), m_context_menu);
-    m_context_menu->addAction(open_action);
+    auto* open_action = new QAction(tr("Open in New View"), m_file_context_menu);
+    m_file_context_menu->addAction(open_action);
     connect(open_action, &QAction::triggered, this, [this]() {
-        auto dispatched = dispatch_current_if_type(
-            LogFileTreeItem::Type::File,
-            [this](const LogFileInfo& info) { emit open_file_requested(info); });
-        Q_UNUSED(dispatched);
+        dispatch_current_if_type(LogFileTreeItem::Type::File, [this](const LogFileInfo& info) {
+            emit open_file_requested(info);
+        });
     });
 
-    auto add_to_current_view_action = new QAction(tr("Add to Current View"), m_context_menu);
-    m_context_menu->addAction(add_to_current_view_action);
-    connect(add_to_current_view_action, &QAction::triggered, this, [this]() {
-        auto dispatched = dispatch_current_if_type(
-            LogFileTreeItem::Type::File,
-            [this](const LogFileInfo& info) { emit add_to_current_view_requested(info); });
-        Q_UNUSED(dispatched);
+    auto* add_to_view_action = new QAction(tr("Add to Current View"), m_file_context_menu);
+    m_file_context_menu->addAction(add_to_view_action);
+    connect(add_to_view_action, &QAction::triggered, this, [this]() {
+        dispatch_current_if_type(LogFileTreeItem::Type::File, [this](const LogFileInfo& info) {
+            emit add_to_current_view_requested(info);
+        });
     });
 
-    auto remove_action = new QAction(tr("Remove"), m_context_menu);
-    m_context_menu->addAction(remove_action);
-    connect(remove_action, &QAction::triggered, this, [this]() {
-        auto dispatched = dispatch_current_if_type(
-            LogFileTreeItem::Type::File,
-            [this](const LogFileInfo& info) { emit remove_file_requested(info); });
-        Q_UNUSED(dispatched);
+    auto* remove_file_action = new QAction(tr("Remove"), m_file_context_menu);
+    m_file_context_menu->addAction(remove_file_action);
+    connect(remove_file_action, &QAction::triggered, this, [this]() {
+        dispatch_current_if_type(LogFileTreeItem::Type::File, [this](const LogFileInfo& info) {
+            emit remove_file_requested(info);
+        });
     });
+
+    // Session context menu
+    m_session_context_menu = new QMenu(this);
+
+    auto* rename_session_action = new QAction(tr("Rename Session"), m_session_context_menu);
+    m_session_context_menu->addAction(rename_session_action);
+    connect(rename_session_action, &QAction::triggered, this, [this]() {
+        const QModelIndex index = ui->treeView->currentIndex();
+        if (index.isValid() && get_item_type(index) == LogFileTreeItem::Type::Session)
+        {
+            const QString session_id = index.data(LogFileTreeModel::SessionIdRole).toString();
+            const QString current_name = index.data(Qt::DisplayRole).toString();
+
+            bool ok = false;
+            const QString new_name =
+                QInputDialog::getText(this, tr("Rename Session"), tr("Session name:"),
+                                      QLineEdit::Normal, current_name, &ok);
+            if (ok && !new_name.isEmpty())
+            {
+                emit rename_session_requested(session_id, new_name);
+            }
+        }
+    });
+
+    m_session_context_menu->addSeparator();
+
+    auto* close_session_action = new QAction(tr("Close Session"), m_session_context_menu);
+    m_session_context_menu->addAction(close_session_action);
+    connect(close_session_action, &QAction::triggered, this, [this]() {
+        const QModelIndex index = ui->treeView->currentIndex();
+        if (index.isValid() && get_item_type(index) == LogFileTreeItem::Type::Session)
+        {
+            const QString session_id = index.data(LogFileTreeModel::SessionIdRole).toString();
+            emit close_session_requested(session_id);
+        }
+    });
+
+    auto* delete_session_action = new QAction(tr("Delete Session..."), m_session_context_menu);
+    m_session_context_menu->addAction(delete_session_action);
+    connect(delete_session_action, &QAction::triggered, this, [this]() {
+        const QModelIndex index = ui->treeView->currentIndex();
+        if (index.isValid() && get_item_type(index) == LogFileTreeItem::Type::Session)
+        {
+            const QString session_id = index.data(LogFileTreeModel::SessionIdRole).toString();
+            const QString session_name = index.data(Qt::DisplayRole).toString();
+
+            const QMessageBox::StandardButton reply = QMessageBox::question(
+                this, tr("Delete Session"),
+                tr("Are you sure you want to permanently delete the session \"%1\"?\n\n"
+                   "This action cannot be undone.")
+                    .arg(session_name),
+                QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+
+            if (reply == QMessageBox::Yes)
+            {
+                emit delete_session_requested(session_id);
+            }
+        }
+    });
+
+    // Group context menu (empty for now, can be extended later)
+    m_group_context_menu = new QMenu(this);
 }
 
 /**
@@ -149,50 +266,72 @@ auto LogFileExplorer::init_context_menu() -> void
  */
 auto LogFileExplorer::show_context_menu(const QPoint& pos) -> void
 {
-    QModelIndex index = ui->treeView->indexAt(pos);
+    const QModelIndex index = ui->treeView->indexAt(pos);
 
     if (index.isValid())
     {
-        auto* item = static_cast<LogFileTreeItem*>(index.internalPointer());
+        const auto type = get_item_type(index);
+        const QPoint global_pos = ui->treeView->viewport()->mapToGlobal(pos);
 
-        if (item != nullptr &&
-            item->data(0).value<LogFileTreeItem::Type>() == LogFileTreeItem::Type::File)
+        if (type == LogFileTreeItem::Type::File)
         {
-            m_context_menu->exec(ui->treeView->viewport()->mapToGlobal(pos));
+            m_file_context_menu->exec(global_pos);
+        }
+        else if (type == LogFileTreeItem::Type::Session)
+        {
+            m_session_context_menu->exec(global_pos);
+        }
+        else if (type == LogFileTreeItem::Type::Group)
+        {
+            if (!m_group_context_menu->isEmpty())
+            {
+                m_group_context_menu->exec(global_pos);
+            }
         }
     }
 }
 
 /**
- * @brief Tries to extract a LogFileInfo for the given index if the item type matches.
- * @param index The model index to inspect.
- * @param expected_type The expected LogFileTreeItem::Type (e.g., File, Group).
- * @param out_info Output parameter that receives the LogFileInfo on success.
- * @return True if the index is valid, the item type matches, and out_info was set; false otherwise.
+ * @brief Gets the item type at the given index.
+ * @param index The model index.
+ * @return The item type, or Group if invalid.
  */
-[[nodiscard]] auto LogFileExplorer::try_get_info_if_type(const QModelIndex& index,
-                                                         LogFileTreeItem::Type expected_type,
-                                                         LogFileInfo& out_info) const -> bool
+auto LogFileExplorer::get_item_type(const QModelIndex& index) const -> LogFileTreeItem::Type
 {
-    bool success = false;
+    LogFileTreeItem::Type type = LogFileTreeItem::Type::Group;
 
     if (index.isValid())
     {
-        auto* item = static_cast<LogFileTreeItem*>(index.internalPointer());
-
-        if (item != nullptr)
+        const QVariant type_var = index.data(LogFileTreeModel::ItemTypeRole);
+        if (type_var.canConvert<LogFileTreeItem::Type>())
         {
-            const auto type_variant = item->data(0);
-            if (type_variant.canConvert<LogFileTreeItem::Type>())
-            {
-                const auto item_type = type_variant.value<LogFileTreeItem::Type>();
+            type = type_var.value<LogFileTreeItem::Type>();
+        }
+    }
 
-                if (item_type == expected_type)
-                {
-                    out_info = item->data(1).value<LogFileInfo>();
-                    success = true;
-                }
-            }
+    return type;
+}
+
+/**
+ * @brief Tries to extract a LogFileInfo for the given index if the item type matches.
+ * @param index The model index to inspect.
+ * @param expected_type The expected LogFileTreeItem::Type.
+ * @param out_info Output parameter that receives the LogFileInfo on success.
+ * @return True if successful; false otherwise.
+ */
+auto LogFileExplorer::try_get_info_if_type(const QModelIndex& index,
+                                           LogFileTreeItem::Type expected_type,
+                                           LogFileInfo& out_info) const -> bool
+{
+    bool success = false;
+
+    if (index.isValid() && get_item_type(index) == expected_type)
+    {
+        if (expected_type == LogFileTreeItem::Type::File)
+        {
+            auto* item = static_cast<LogFileTreeItem*>(index.internalPointer());
+            out_info = item->data(1).value<LogFileInfo>();
+            success = true;
         }
     }
 
@@ -205,12 +344,11 @@ auto LogFileExplorer::show_context_menu(const QPoint& pos) -> void
  * @param fn The callable to invoke with LogFileInfo when type matches.
  * @return True if dispatched; false otherwise.
  */
-[[nodiscard]] auto LogFileExplorer::dispatch_current_if_type(
+auto LogFileExplorer::dispatch_current_if_type(
     LogFileTreeItem::Type expected_type,
     const std::function<void(const LogFileInfo&)>& fn) const -> bool
 {
     bool dispatched = false;
-
     const QModelIndex index = ui->treeView->currentIndex();
     LogFileInfo info;
 
