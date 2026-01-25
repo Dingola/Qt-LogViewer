@@ -100,6 +100,25 @@ auto LogFileTreeItem::data(int column) const -> QVariant
 }
 
 /**
+ * @brief Sets the data for the given column.
+ * @param column The column index.
+ * @param value The value to set.
+ * @return True if the data was set successfully; false otherwise.
+ */
+auto LogFileTreeItem::set_data(int column, const QVariant& value) -> bool
+{
+    bool success = false;
+
+    if (column >= 0 && column < m_item_data.size())
+    {
+        m_item_data[column] = value;
+        success = true;
+    }
+
+    return success;
+}
+
+/**
  * @brief Returns the parent item.
  * @return Pointer to the parent item, or nullptr.
  */

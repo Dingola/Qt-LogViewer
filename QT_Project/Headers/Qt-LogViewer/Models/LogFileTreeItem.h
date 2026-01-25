@@ -17,8 +17,9 @@ class LogFileTreeItem
          */
         enum class Type
         {
-            Group,  ///< Represents an application group node.
-            File    ///< Represents a log file node.
+            Group,   ///< Represents an application group node.
+            File,    ///< Represents a log file node.
+            Session  ///< Represents a session node.
         };
 
         /**
@@ -71,6 +72,14 @@ class LogFileTreeItem
          * @return The data for the column.
          */
         [[nodiscard]] auto data(int column) const -> QVariant;
+
+        /**
+         * @brief Sets the data for the given column.
+         * @param column The column index.
+         * @param value The value to set.
+         * @return True if the data was set successfully; false otherwise.
+         */
+        auto set_data(int column, const QVariant& value) -> bool;
 
         /**
          * @brief Returns the parent item.
