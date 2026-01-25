@@ -56,6 +56,48 @@ auto FileCatalogController::add_files(const QVector<QString>& file_paths) -> voi
 }
 
 /**
+ * @brief Add a single log file into a specific session.
+ * @param session_id The session identifier.
+ * @param file_path Absolute path to the log file.
+ */
+auto FileCatalogController::add_file_to_session(const QString& session_id,
+                                                const QString& file_path) -> void
+{
+    LogEntry entry;
+    if (m_ingest != nullptr)
+    {
+        entry = m_ingest->read_first_log_entry(file_path);
+    }
+
+    LogFileInfo info;
+    if (!entry.get_app_name().isEmpty())
+    {
+        info = entry.get_file_info();
+    }
+    else
+    {
+        const QString app_name = LogLoader::identify_app(file_path);
+        info = LogFileInfo(file_path, app_name);
+    }
+
+    m_model->add_log_file(session_id, info);
+}
+
+/**
+ * @brief Add multiple log files into a specific session.
+ * @param session_id The session identifier.
+ * @param file_paths Absolute paths to the log files.
+ */
+auto FileCatalogController::add_files_to_session(const QString& session_id,
+                                                 const QVector<QString>& file_paths) -> void
+{
+    for (const auto& file_path: file_paths)
+    {
+        add_file_to_session(session_id, file_path);
+    }
+}
+
+/**
  * @brief Remove a single log file from the catalog.
  * @param file_info File info to remove.
  */

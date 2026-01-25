@@ -51,6 +51,21 @@ class FileCatalogController: public QObject
         auto add_files(const QVector<QString>& file_paths) -> void;
 
         /**
+         * @brief Add a single log file into a specific session.
+         * @param session_id The session identifier.
+         * @param file_path Absolute path to the log file.
+         */
+        auto add_file_to_session(const QString& session_id, const QString& file_path) -> void;
+
+        /**
+         * @brief Add multiple log files into a specific session.
+         * @param session_id The session identifier.
+         * @param file_paths Absolute paths to the log files.
+         */
+        auto add_files_to_session(const QString& session_id,
+                                  const QVector<QString>& file_paths) -> void;
+
+        /**
          * @brief Remove a single log file from the catalog.
          * @param file_info File info to remove.
          */
