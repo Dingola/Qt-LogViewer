@@ -25,7 +25,6 @@
 #include "Qt-LogViewer/Services/SessionRepository.h"
 #include "Qt-LogViewer/Services/Translator.h"
 #include "Qt-LogViewer/Views/App/Dialogs/SettingsDialog.h"
-#include "Qt-LogViewer/Views/App/LogViewWidget.h"
 #include "Qt-LogViewer/Views/App/StartPageWidget.h"
 #include "ui_MainWindow.h"
 
@@ -45,6 +44,7 @@ constexpr auto k_views_menu_text = QT_TRANSLATE_NOOP("MainWindow", "&Views");
 constexpr auto k_show_log_file_explorer_text =
     QT_TRANSLATE_NOOP("MainWindow", "Show Log File Explorer");
 constexpr auto k_show_log_details_text = QT_TRANSLATE_NOOP("MainWindow", "Show Log Details");
+constexpr auto k_untitled_session_text = QT_TRANSLATE_NOOP("MainWindow", "Untitled Session");
 }  // namespace
 
 /**
@@ -53,6 +53,7 @@ constexpr auto k_show_log_details_text = QT_TRANSLATE_NOOP("MainWindow", "Show L
  * Initializes the main window, sets up the user interface, menu, status bar, and connects all
  * signals/slots.
  *
+ * @param settings The application settings.
  * @param parent The parent widget, or nullptr if this is a top-level window.
  */
 MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
@@ -102,6 +103,28 @@ MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
                 rebuild_recent_menus();
             });
 
+    setup_log_file_explorer();
+    setup_log_level_pie_chart();
+    setup_pagination_widget();
+    setup_log_details_dock();
+    setup_filter_bar();
+    setup_tab_widget();
+
+    m_session_controller = new SessionController(
+        m_session_manager, m_controller->get_log_file_tree_model(), m_controller, this);
+
+    // Connect session controller signals
+    connect(m_session_controller, &SessionController::expand_session_requested, m_log_file_explorer,
+            &LogFileExplorer::expand_session);
+    connect(m_session_controller, &SessionController::all_sessions_removed, this,
+            &MainWindow::handle_all_sessions_removed);
+    connect(m_session_controller, &SessionController::current_session_changed, this,
+            [this](const QString&) { show_start_page_if_needed(); });
+    connect(m_session_controller, &SessionController::session_renamed, this,
+            [this](const QString&, const QString&) { rebuild_recent_menus(); });
+    connect(m_session_controller, &SessionController::session_deleted, this,
+            [this](const QString&) { rebuild_recent_menus(); });
+
     // Start page widget (stack page 1)
     auto* start_page = new StartPageWidget(central_stack);
     start_page->set_recent_files_model(m_recent_files_model);
@@ -146,13 +169,6 @@ MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
                 }
             });
 
-    setup_log_file_explorer();
-    setup_log_level_pie_chart();
-    setup_pagination_widget();
-    setup_log_details_dock();
-    setup_filter_bar();
-    setup_tab_widget();
-
     initialize_menu();
     rebuild_recent_menus();
 
@@ -196,6 +212,14 @@ auto MainWindow::setup_log_file_explorer() -> void
                 m_controller->remove_log_file(log_file_info);
                 update_pagination_widget();
             });
+
+    // Session actions from LogFileExplorer - delegate to SessionController
+    connect(m_log_file_explorer, &LogFileExplorer::rename_session_requested, this,
+            &MainWindow::handle_rename_session);
+    connect(m_log_file_explorer, &LogFileExplorer::close_session_requested, this,
+            &MainWindow::handle_close_session);
+    connect(m_log_file_explorer, &LogFileExplorer::delete_session_requested, this,
+            &MainWindow::handle_delete_session);
 }
 
 /**
@@ -312,6 +336,7 @@ auto MainWindow::setup_tab_widget() -> void
         }
     });
     connect(ui->tabWidgetLog, &TabWidget::close_tab_requested, this, [this](int index) {
+        Q_UNUSED(index);
         if (ui->tabWidgetLog->count() == 0)
         {
             m_log_level_pie_chart_widget->set_log_level_counts({});
@@ -481,13 +506,10 @@ auto MainWindow::rebuild_recent_menus() -> void
 
 /**
  * @brief Shows the start page if there is no current session.
- *
- * Hides certain dock widgets and disables related actions when no session is active.
  */
 auto MainWindow::show_start_page_if_needed() -> void
 {
-    const bool has_session =
-        (m_session_manager != nullptr) ? m_session_manager->has_current_session() : false;
+    const bool has_session = m_session_controller->has_current_session();
 
     auto* central_stack = qobject_cast<QStackedWidget*>(this->centralWidget());
     if (central_stack != nullptr)
@@ -632,7 +654,12 @@ void MainWindow::dropEvent(QDropEvent* event)
     }
 
     qDebug() << "Files dropped:" << files;
-    m_controller->add_log_files_to_tree(files);
+
+    const QString session_id =
+        m_session_controller->ensure_current_session(tr(k_untitled_session_text));
+    m_session_controller->add_files_to_current_session(files);
+    m_session_controller->request_expand_session(session_id);
+    show_start_page_if_needed();
 }
 
 /**
@@ -692,17 +719,13 @@ void MainWindow::showEvent(QShowEvent* event)
 
 /**
  * @brief Handles the close event to save window settings.
- *
- * This method is called when the main window is closed. It saves the current window
- * geometry, state, and window state to preferences.
- *
  * @param event The close event.
  */
 auto MainWindow::closeEvent(QCloseEvent* event) -> void
 {
-    if (m_session_manager != nullptr && m_session_manager->has_current_session())
+    if (m_session_controller->has_current_session())
     {
-        handle_save_session();
+        m_session_controller->save_current_session();
     }
 
     BaseMainWindow::closeEvent(event);
@@ -718,26 +741,38 @@ void MainWindow::handle_open_log_file_dialog_requested()
                                                       tr("Log Files (*.log *.txt);;All Files (*)"));
     qDebug() << "Files selected:" << files;
 
-    if (m_session_manager != nullptr && !m_session_manager->has_current_session())
+    if (!files.isEmpty())
     {
-        const QString new_session_id = QUuid::createUuid().toString(QUuid::WithoutBraces);
-        m_session_manager->set_current_session_id(new_session_id);
-        m_session_manager->upsert_session_metadata(new_session_id, tr("Untitled Session"), true);
+        const QString session_id =
+            m_session_controller->ensure_current_session(tr(k_untitled_session_text));
 
-        // Persist an initial empty session so it is loadable from Recent Sessions
-        QJsonObject session_obj;
-        session_obj.insert(QStringLiteral("schema_version"), 1);
-        session_obj.insert(QStringLiteral("name"), tr("Untitled Session"));
-        session_obj.insert(QStringLiteral("id"), new_session_id);
-        m_session_manager->save_session(new_session_id, session_obj);
+        QVector<QString> valid_files = validate_file_paths(files);
 
-        auto* central_stack = qobject_cast<QStackedWidget*>(this->centralWidget());
-        if (central_stack != nullptr)
+        if (!valid_files.isEmpty())
         {
-            central_stack->setCurrentIndex(0);
-        }
-    }
+            m_session_controller->add_files_to_current_session(valid_files);
 
+            for (const QString& file: valid_files)
+            {
+                m_session_controller->add_recent_log_file(LogFileInfo(file));
+            }
+
+            m_session_controller->request_expand_session(session_id);
+            m_session_controller->save_current_session();
+            rebuild_recent_menus();
+        }
+
+        show_start_page_if_needed();
+    }
+}
+
+/**
+ * @brief Validates a list of file paths and returns only valid ones.
+ * @param files The list of file paths to validate.
+ * @return Vector of valid file paths.
+ */
+auto MainWindow::validate_file_paths(const QStringList& files) -> QVector<QString>
+{
     QVector<QString> valid_files;
     QStringList invalid_files;
 
@@ -762,21 +797,7 @@ void MainWindow::handle_open_log_file_dialog_requested()
                                  .arg(invalid_files.join(QStringLiteral("\n"))));
     }
 
-    if (!valid_files.isEmpty())
-    {
-        m_controller->add_log_files_to_tree(valid_files);
-
-        for (const QString& file: valid_files)
-        {
-            LogFileInfo log_file_info(file);
-            m_session_manager->add_recent_log_file(log_file_info);
-        }
-
-        handle_save_session();
-        rebuild_recent_menus();
-    }
-
-    show_start_page_if_needed();
+    return valid_files;
 }
 
 /**
@@ -885,7 +906,7 @@ auto MainWindow::handle_open_session(const QString& session_id) -> void
 {
     if (!session_id.isEmpty())
     {
-        const QJsonObject obj = m_session_manager->load_session(session_id);
+        const QJsonObject obj = m_session_controller->load_session(session_id);
         if (!obj.isEmpty())
         {
             restore_session_from_json(session_id, obj);
@@ -904,173 +925,40 @@ auto MainWindow::handle_open_session(const QString& session_id) -> void
  */
 auto MainWindow::handle_open_recent_session(const QString& session_id) -> void
 {
-    if (!session_id.isEmpty())
-    {
-        const QJsonObject obj = m_session_manager->load_session(session_id);
-        if (!obj.isEmpty())
-        {
-            restore_session_from_json(session_id, obj);
-        }
-        else
-        {
-            QMessageBox::warning(
-                this, tr("Open Session"),
-                tr("Selected recent session could not be loaded:\n%1").arg(session_id));
-        }
-    }
-    else
-    {
-        QMessageBox::warning(this, tr("Open Session"), tr("No recent session selected."));
-    }
+    handle_open_session(session_id);
 }
 
 /**
- * @brief Clear recent files list via session manager.
+ * @brief Clear recent files list via session controller.
  */
 auto MainWindow::handle_clear_recent_files() -> void
 {
-    m_session_manager->clear_recent_log_files();
+    m_session_controller->clear_recent_log_files();
 }
 
 /**
- * @brief Save current session snapshot.
+ * @brief Save current session snapshot via session controller.
  */
 auto MainWindow::handle_save_session() -> void
 {
-    const QVector<QUuid> view_ids = m_controller->get_all_view_ids();
-
-    QVector<QUuid> nonempty_view_ids;
-    nonempty_view_ids.reserve(view_ids.size());
-    for (const QUuid& vid: view_ids)
-    {
-        if (!m_controller->get_view_file_paths(vid).isEmpty())
-        {
-            nonempty_view_ids.append(vid);
-        }
-    }
-
-    if (!nonempty_view_ids.isEmpty())
-    {
-        QJsonObject session_obj;
-        session_obj.insert(QStringLiteral("schema_version"), 1);
-
-        const QString current_session_id = (m_session_manager != nullptr)
-                                               ? m_session_manager->get_current_session_id()
-                                               : QString();
-
-        QString session_name = QStringLiteral("Session");
-        QJsonArray views_array;
-
-        for (const QUuid& vid: nonempty_view_ids)
-        {
-            const SessionViewState state = m_controller->export_view_state(vid);
-
-            QJsonObject view_obj;
-            view_obj.insert(QStringLiteral("id"), vid.toString(QUuid::WithoutBraces));
-
-            QJsonArray files_arr;
-            for (const auto& lf: state.loaded_files)
-            {
-                QJsonObject fobj;
-                fobj.insert(QStringLiteral("file_path"), lf.get_file_path());
-                fobj.insert(QStringLiteral("app_name"), lf.get_app_name());
-                files_arr.append(fobj);
-            }
-            view_obj.insert(QStringLiteral("loaded_files"), files_arr);
-
-            QJsonObject filters_obj;
-            filters_obj.insert(QStringLiteral("app_name"), state.filters.app_name);
-            QJsonArray levels_arr;
-            for (const auto& lvl: state.filters.log_levels)
-            {
-                levels_arr.append(lvl);
-            }
-            filters_obj.insert(QStringLiteral("log_levels"), levels_arr);
-            filters_obj.insert(QStringLiteral("search_text"), state.filters.search_text);
-            filters_obj.insert(QStringLiteral("search_field"), state.filters.search_field);
-            filters_obj.insert(QStringLiteral("use_regex"), state.filters.use_regex);
-            filters_obj.insert(QStringLiteral("show_only_file"), state.filters.show_only_file);
-            QJsonArray hidden_arr;
-            for (const auto& hf: state.filters.hidden_files)
-            {
-                hidden_arr.append(hf);
-            }
-            filters_obj.insert(QStringLiteral("hidden_files"), hidden_arr);
-            view_obj.insert(QStringLiteral("filters"), filters_obj);
-
-            view_obj.insert(QStringLiteral("page_size"), static_cast<int>(state.page_size));
-            view_obj.insert(QStringLiteral("current_page"), static_cast<int>(state.current_page));
-            view_obj.insert(QStringLiteral("sort_column"), static_cast<int>(state.sort_column));
-            view_obj.insert(QStringLiteral("sort_order"), state.sort_order == Qt::AscendingOrder
-                                                              ? QStringLiteral("asc")
-                                                              : QStringLiteral("desc"));
-
-            view_obj.insert(QStringLiteral("tab_title"), state.tab_title);
-
-            if (views_array.isEmpty() && !state.tab_title.isEmpty())
-            {
-                session_name = state.tab_title;
-            }
-
-            views_array.append(view_obj);
-        }
-
-        if (m_session_manager != nullptr && !current_session_id.isEmpty())
-        {
-            const QJsonObject existing_obj = m_session_manager->load_session(current_session_id);
-            const QString existing_name =
-                existing_obj.value(QStringLiteral("name")).toString(QString());
-            if (!existing_name.isEmpty())
-            {
-                session_name = existing_name;
-            }
-        }
-
-        session_obj.insert(QStringLiteral("name"), session_name);
-        session_obj.insert(QStringLiteral("views"), views_array);
-
-        QString session_id = current_session_id;
-        if (session_id.isEmpty())
-        {
-            const QUuid first_view_id = nonempty_view_ids.first();
-            session_id = first_view_id.toString(QUuid::WithoutBraces);
-            if (m_session_manager != nullptr)
-            {
-                m_session_manager->set_current_session_id(session_id);
-            }
-        }
-
-        m_session_manager->save_session(session_id, session_obj);
-        m_session_manager->upsert_session_metadata(session_id, session_name, false);
-
-        rebuild_recent_menus();
-    }
+    m_session_controller->save_current_session();
+    rebuild_recent_menus();
 }
 
 /**
- * @brief Delete session by id via session manager.
+ * @brief Delete session by id via session controller.
  * @param session_id Session identifier.
  */
 auto MainWindow::handle_delete_session(const QString& session_id) -> void
 {
-    const bool ok = (!session_id.isEmpty() && m_session_manager != nullptr) &&
-                    m_session_manager->delete_session(session_id);
+    m_session_controller->delete_session(session_id);
 
-    if (ok)
+    if (m_session_controller->get_session_count() == 0)
     {
-        if (m_session_manager->get_current_session_id() == session_id)
-        {
-            m_session_manager->set_current_session_id(QString());
-        }
-
-        while (ui->tabWidgetLog->count() > 0)
-        {
-            ui->tabWidgetLog->removeTab(0);
-        }
-
-        rebuild_recent_menus();
-        show_start_page_if_needed();
+        close_all_tabs();
     }
+
+    show_start_page_if_needed();
 }
 
 /**
@@ -1081,48 +969,22 @@ auto MainWindow::handle_open_session_dialog() -> void
     const QString session_file = QFileDialog::getOpenFileName(
         this, tr("Open Session"), QString(), tr("Session Files (*.json);;All Files (*)"));
 
-    if (session_file.isEmpty())
+    if (!session_file.isEmpty())
     {
-        return;
+        QFileInfo fi(session_file);
+        const bool ok = fi.exists() && fi.isFile() && fi.isReadable();
+
+        if (ok)
+        {
+            const QString session_id = fi.completeBaseName();
+            handle_open_session(session_id);
+        }
+        else
+        {
+            QMessageBox::warning(this, tr("Open Session"),
+                                 tr("Failed to open session file:\n%1").arg(session_file));
+        }
     }
-
-    QFileInfo fi(session_file);
-    const bool ok = fi.exists() && fi.isFile() && fi.isReadable();
-
-    if (!ok)
-    {
-        QMessageBox::warning(this, tr("Open Session"),
-                             tr("Failed to open session file:\n%1").arg(session_file));
-        return;
-    }
-
-    const QString session_id = fi.completeBaseName();
-    const QJsonObject obj = m_session_manager->load_session(session_id);
-
-    if (obj.isEmpty())
-    {
-        QMessageBox::warning(
-            this, tr("Open Session"),
-            tr("Session file is invalid or could not be loaded:\n%1").arg(session_file));
-        return;
-    }
-
-    // Set current and last session
-    m_session_manager->set_current_session_id(session_id);
-    m_session_manager->set_last_session_id(session_id);
-
-    // Update MRU metadata (name if present)
-    const QString session_name = obj.value(QStringLiteral("name")).toString(tr("Session"));
-    m_session_manager->upsert_session_metadata(session_id, session_name, true);
-
-    auto* central_stack = qobject_cast<QStackedWidget*>(this->centralWidget());
-    if (central_stack != nullptr)
-    {
-        central_stack->setCurrentIndex(0);
-    }
-
-    rebuild_recent_menus();
-    show_start_page_if_needed();
 }
 
 /**
@@ -1130,7 +992,7 @@ auto MainWindow::handle_open_session_dialog() -> void
  */
 auto MainWindow::handle_reopen_last_session() -> void
 {
-    const QString id = m_session_manager->get_last_session_id();
+    const QString id = m_session_controller->get_last_session_id();
     if (!id.isEmpty())
     {
         handle_open_session(id);
@@ -1145,201 +1007,158 @@ auto MainWindow::handle_reopen_last_session() -> void
 auto MainWindow::restore_session_from_json(const QString& session_id,
                                            const QJsonObject& obj) -> void
 {
-    if (session_id.isEmpty() || obj.isEmpty())
+    if (!session_id.isEmpty() && !obj.isEmpty())
     {
-        QMessageBox::warning(this, tr("Open Session"), tr("Session data is invalid or empty."));
-        return;
-    }
+        auto* central_stack = qobject_cast<QStackedWidget*>(this->centralWidget());
+        if (central_stack != nullptr)
+        {
+            central_stack->setCurrentIndex(0);
+        }
 
-    m_session_manager->set_current_session_id(session_id);
-    m_session_manager->set_last_session_id(session_id);
+        close_all_tabs();
 
-    const QString session_name = obj.value(QStringLiteral("name")).toString(tr("Session"));
-    m_session_manager->upsert_session_metadata(session_id, session_name, true);
-
-    auto* central_stack = qobject_cast<QStackedWidget*>(this->centralWidget());
-    if (central_stack != nullptr)
-    {
-        central_stack->setCurrentIndex(0);
-    }
-
-    while (ui->tabWidgetLog->count() > 0)
-    {
-        ui->tabWidgetLog->removeTab(0);
-    }
-
-    const QJsonArray views_array = obj.value(QStringLiteral("views")).toArray();
-    for (const auto& v: views_array)
-    {
-        const QJsonObject view_obj = v.toObject();
-
-        SessionViewState state;
-        const QString vid_str = view_obj.value(QStringLiteral("id")).toString();
-        state.id = QUuid::fromString(QLatin1String("{") + vid_str + QLatin1String("}"));
-        state.tab_title = view_obj.value(QStringLiteral("tab_title")).toString();
-
-        const QJsonArray files_arr = view_obj.value(QStringLiteral("loaded_files")).toArray();
-        for (const auto& f: files_arr)
+        // First, restore explorer files (files that were only in the tree, not in views)
+        const QJsonArray explorer_files_array =
+            obj.value(QStringLiteral("explorer_files")).toArray();
+        for (const auto& f: explorer_files_array)
         {
             const QJsonObject fobj = f.toObject();
-            const QString fp = fobj.value(QStringLiteral("file_path")).toString();
-            const QString an = fobj.value(QStringLiteral("app_name")).toString();
-            if (!fp.isEmpty())
+            const QString file_path = fobj.value(QStringLiteral("file_path")).toString();
+            const QString app_name = fobj.value(QStringLiteral("app_name")).toString();
+
+            if (!file_path.isEmpty())
             {
-                state.loaded_files.append(LogFileInfo(fp, an));
+                auto* tree_model = m_controller->get_log_file_tree_model();
+                if (tree_model != nullptr)
+                {
+                    tree_model->add_log_file(session_id, LogFileInfo(file_path, app_name));
+                }
             }
         }
 
-        const QJsonObject filters_obj = view_obj.value(QStringLiteral("filters")).toObject();
-        state.filters.app_name = filters_obj.value(QStringLiteral("app_name")).toString();
-        state.filters.search_text = filters_obj.value(QStringLiteral("search_text")).toString();
-        state.filters.search_field = filters_obj.value(QStringLiteral("search_field")).toString();
-        state.filters.use_regex = filters_obj.value(QStringLiteral("use_regex")).toBool();
-        state.filters.show_only_file =
-            filters_obj.value(QStringLiteral("show_only_file")).toString();
-
-        const QJsonArray levels_arr = filters_obj.value(QStringLiteral("log_levels")).toArray();
-        for (const auto& lv: levels_arr)
+        // Then restore views (tabs)
+        const QJsonArray views_array = obj.value(QStringLiteral("views")).toArray();
+        for (const auto& v: views_array)
         {
-            state.filters.log_levels.insert(lv.toString());
-        }
-        const QJsonArray hidden_arr = filters_obj.value(QStringLiteral("hidden_files")).toArray();
-        for (const auto& hf: hidden_arr)
-        {
-            state.filters.hidden_files.insert(hf.toString());
+            const QJsonObject view_obj = v.toObject();
+            restore_view_from_json(session_id, view_obj);
         }
 
-        state.page_size =
-            static_cast<qsizetype>(view_obj.value(QStringLiteral("page_size")).toInt());
-        state.current_page =
-            static_cast<int>(view_obj.value(QStringLiteral("current_page")).toInt());
-        state.sort_column = static_cast<int>(view_obj.value(QStringLiteral("sort_column")).toInt());
-        const QString sort_order =
-            view_obj.value(QStringLiteral("sort_order")).toString(QStringLiteral("asc"));
-        state.sort_order = (sort_order.compare(QStringLiteral("desc"), Qt::CaseInsensitive) == 0)
-                               ? Qt::DescendingOrder
-                               : Qt::AscendingOrder;
-
-        const QUuid view_id = m_controller->import_view_state(state);
-
-        auto* log_view_widget = new LogViewWidget(ui->tabWidgetLog);
-        log_view_widget->set_view_id(view_id);
-
-        auto* paging_proxy = m_controller->get_paging_proxy(view_id);
-        log_view_widget->set_model(paging_proxy);
-
-        const QSet<QString> app_names = m_controller->get_app_names(view_id);
-        log_view_widget->set_app_names(app_names);
-        log_view_widget->set_current_app_name_filter(state.filters.app_name);
-        log_view_widget->set_available_log_levels(m_controller->get_available_log_levels(view_id));
-        log_view_widget->set_log_levels(state.filters.log_levels);
-
-        const QMap<QString, int> level_counts = m_controller->get_log_level_counts(view_id);
-        log_view_widget->set_log_level_counts(level_counts);
-
-        connect(log_view_widget, &LogViewWidget::current_row_changed, this,
-                &MainWindow::update_log_details);
-        connect(log_view_widget, &LogViewWidget::app_filter_changed, this,
-                [this](const QString& app) {
-                    m_controller->set_app_name_filter(app);
-                    update_pagination_widget();
-                });
-        connect(log_view_widget, &LogViewWidget::log_level_filter_changed, this,
-                [this](const QSet<QString>& levels) {
-                    m_controller->set_log_level_filters(levels);
-                    update_pagination_widget();
-                });
-        connect(log_view_widget, &LogViewWidget::toggle_visibility_requested, this,
-                [this, view_id](const QString& file_path) {
-                    m_controller->toggle_file_visibility(view_id, file_path);
-                    update_pagination_widget();
-                });
-        connect(log_view_widget, &LogViewWidget::show_only_file_requested, this,
-                [this, view_id](const QString& file_path) {
-                    m_controller->set_show_only_file(view_id, file_path);
-                    update_pagination_widget();
-                });
-        connect(log_view_widget, &LogViewWidget::remove_file_requested, this,
-                [this, view_id](const QString& file_path) {
-                    m_controller->remove_log_file(view_id, file_path);
-                    update_pagination_widget();
-                });
-
-        const QVector<QString> view_paths = m_controller->get_view_file_paths(view_id);
-        log_view_widget->set_view_file_paths(view_paths);
-
-        const QString tab_title = state.tab_title.isEmpty() && !view_paths.isEmpty()
-                                      ? QFileInfo(view_paths.first()).fileName()
-                                      : state.tab_title;
-        const int tab_index = ui->tabWidgetLog->addTab(log_view_widget, tab_title);
-        ui->tabWidgetLog->setCurrentIndex(tab_index);
-
-        log_view_widget->auto_resize_columns();
-    }
-
-    rebuild_recent_menus();
-    update_pagination_widget();
-    show_start_page_if_needed();
-}
-
-/**
- * @brief Open selected recent file from menu or start page.
- * @param file_path Absolute file path.
- */
-auto MainWindow::handle_open_recent_file(const QString& file_path) -> void
-{
-    if (!file_path.isEmpty())
-    {
-        if (m_session_manager != nullptr && !m_session_manager->has_current_session())
-        {
-            const QString new_session_id = QUuid::createUuid().toString(QUuid::WithoutBraces);
-            m_session_manager->set_current_session_id(new_session_id);
-            m_session_manager->upsert_session_metadata(new_session_id, tr("Untitled Session"),
-                                                       true);
-
-            QJsonObject session_obj;
-            session_obj.insert(QStringLiteral("schema_version"), 1);
-            session_obj.insert(QStringLiteral("name"), tr("Untitled Session"));
-            session_obj.insert(QStringLiteral("id"), new_session_id);
-            session_obj.insert(QStringLiteral("views"), QJsonArray());
-            m_session_manager->save_session(new_session_id, session_obj);
-
-            auto* central_stack = qobject_cast<QStackedWidget*>(this->centralWidget());
-            if (central_stack != nullptr)
-            {
-                central_stack->setCurrentIndex(0);
-            }
-        }
-
-        m_controller->add_log_files_to_tree({file_path});
-
-        LogFileInfo log_file_info(file_path);
-        m_session_manager->add_recent_log_file(log_file_info);
-
-        handle_save_session();
+        m_session_controller->request_expand_session(session_id);
         rebuild_recent_menus();
+        update_pagination_widget();
         show_start_page_if_needed();
     }
+    else
+    {
+        QMessageBox::warning(this, tr("Open Session"), tr("Session data is invalid or empty."));
+    }
 }
 
 /**
- * @brief Handles open log file requests and creates a new tab with a LogViewWidget.
- *        Uses streaming loading to keep the UI responsive.
- * @param log_file_info The LogFileInfo to load and display.
+ * @brief Restores a single view from JSON.
+ * @param session_id The session identifier.
+ * @param view_obj The view JSON object.
  */
-auto MainWindow::handle_log_file_open_requested(const LogFileInfo& log_file_info) -> void
+auto MainWindow::restore_view_from_json(const QString& session_id,
+                                        const QJsonObject& view_obj) -> void
 {
-    auto view_id = m_controller->load_log_file_async(log_file_info.get_file_path(), 1000);
-    m_controller->set_current_view(view_id);
+    SessionViewState state = parse_view_state_from_json(view_obj);
 
+    const QUuid view_id = m_controller->import_view_state_for_session(session_id, state);
+
+    auto* log_view_widget = create_log_view_widget_for_view(view_id, state);
+
+    const QVector<QString> view_paths = m_controller->get_view_file_paths(view_id);
+    log_view_widget->set_view_file_paths(view_paths);
+
+    const QString tab_title = state.tab_title.isEmpty() && !view_paths.isEmpty()
+                                  ? QFileInfo(view_paths.first()).fileName()
+                                  : state.tab_title;
+    const int tab_index = ui->tabWidgetLog->addTab(log_view_widget, tab_title);
+    ui->tabWidgetLog->setCurrentIndex(tab_index);
+
+    log_view_widget->auto_resize_columns();
+}
+
+/**
+ * @brief Parses a SessionViewState from a JSON object.
+ * @param view_obj The view JSON object.
+ * @return The parsed SessionViewState.
+ */
+auto MainWindow::parse_view_state_from_json(const QJsonObject& view_obj) -> SessionViewState
+{
+    SessionViewState state;
+
+    const QString vid_str = view_obj.value(QStringLiteral("id")).toString();
+    state.id = QUuid::fromString(QLatin1String("{") + vid_str + QLatin1String("}"));
+    state.tab_title = view_obj.value(QStringLiteral("tab_title")).toString();
+
+    const QJsonArray files_arr = view_obj.value(QStringLiteral("loaded_files")).toArray();
+    for (const auto& f: files_arr)
+    {
+        const QJsonObject fobj = f.toObject();
+        const QString fp = fobj.value(QStringLiteral("file_path")).toString();
+        const QString an = fobj.value(QStringLiteral("app_name")).toString();
+        if (!fp.isEmpty())
+        {
+            state.loaded_files.append(LogFileInfo(fp, an));
+        }
+    }
+
+    const QJsonObject filters_obj = view_obj.value(QStringLiteral("filters")).toObject();
+    state.filters.app_name = filters_obj.value(QStringLiteral("app_name")).toString();
+    state.filters.search_text = filters_obj.value(QStringLiteral("search_text")).toString();
+    state.filters.search_field = filters_obj.value(QStringLiteral("search_field")).toString();
+    state.filters.use_regex = filters_obj.value(QStringLiteral("use_regex")).toBool();
+    state.filters.show_only_file = filters_obj.value(QStringLiteral("show_only_file")).toString();
+
+    const QJsonArray levels_arr = filters_obj.value(QStringLiteral("log_levels")).toArray();
+    for (const auto& lv: levels_arr)
+    {
+        state.filters.log_levels.insert(lv.toString());
+    }
+    const QJsonArray hidden_arr = filters_obj.value(QStringLiteral("hidden_files")).toArray();
+    for (const auto& hf: hidden_arr)
+    {
+        state.filters.hidden_files.insert(hf.toString());
+    }
+
+    state.page_size = static_cast<qsizetype>(view_obj.value(QStringLiteral("page_size")).toInt());
+    state.current_page = static_cast<int>(view_obj.value(QStringLiteral("current_page")).toInt());
+    state.sort_column = static_cast<int>(view_obj.value(QStringLiteral("sort_column")).toInt());
+    const QString sort_order =
+        view_obj.value(QStringLiteral("sort_order")).toString(QStringLiteral("asc"));
+    state.sort_order = (sort_order.compare(QStringLiteral("desc"), Qt::CaseInsensitive) == 0)
+                           ? Qt::DescendingOrder
+                           : Qt::AscendingOrder;
+
+    return state;
+}
+
+/**
+ * @brief Creates a LogViewWidget for a view and connects its signals.
+ * @param view_id The view ID.
+ * @param state The session view state.
+ * @return Pointer to the created LogViewWidget.
+ */
+auto MainWindow::create_log_view_widget_for_view(const QUuid& view_id,
+                                                 const SessionViewState& state) -> LogViewWidget*
+{
     auto* log_view_widget = new LogViewWidget(ui->tabWidgetLog);
     log_view_widget->set_view_id(view_id);
 
     auto* paging_proxy = m_controller->get_paging_proxy(view_id);
     log_view_widget->set_model(paging_proxy);
 
-    QVector<QString> available_log_levels = m_controller->get_available_log_levels({});
-    log_view_widget->set_available_log_levels(available_log_levels);
+    const QSet<QString> app_names = m_controller->get_app_names(view_id);
+    log_view_widget->set_app_names(app_names);
+    log_view_widget->set_current_app_name_filter(state.filters.app_name);
+    log_view_widget->set_available_log_levels(m_controller->get_available_log_levels(view_id));
+    log_view_widget->set_log_levels(state.filters.log_levels);
+
+    const QMap<QString, int> level_counts = m_controller->get_log_level_counts(view_id);
+    log_view_widget->set_log_level_counts(level_counts);
 
     connect(log_view_widget, &LogViewWidget::current_row_changed, this,
             &MainWindow::update_log_details);
@@ -1368,7 +1187,56 @@ auto MainWindow::handle_log_file_open_requested(const LogFileInfo& log_file_info
                 update_pagination_widget();
             });
 
-    // Initialize the "Files in View" menu contents
+    return log_view_widget;
+}
+
+/**
+ * @brief Closes all tabs in the tab widget.
+ */
+auto MainWindow::close_all_tabs() -> void
+{
+    while (ui->tabWidgetLog->count() > 0)
+    {
+        ui->tabWidgetLog->removeTab(0);
+    }
+}
+
+/**
+ * @brief Open selected recent file from menu or start page.
+ * @param file_path Absolute file path.
+ */
+auto MainWindow::handle_open_recent_file(const QString& file_path) -> void
+{
+    if (!file_path.isEmpty())
+    {
+        const QString session_id =
+            m_session_controller->ensure_current_session(tr(k_untitled_session_text));
+
+        m_session_controller->add_file_to_session(session_id, file_path);
+        m_session_controller->add_recent_log_file(LogFileInfo(file_path));
+        m_session_controller->request_expand_session(session_id);
+        m_session_controller->save_current_session();
+
+        rebuild_recent_menus();
+        show_start_page_if_needed();
+    }
+}
+
+/**
+ * @brief Handles open log file requests and creates a new tab with a LogViewWidget.
+ * @param log_file_info The LogFileInfo to load and display.
+ */
+auto MainWindow::handle_log_file_open_requested(const LogFileInfo& log_file_info) -> void
+{
+    const QString session_id =
+        m_session_controller->ensure_current_session(tr(k_untitled_session_text));
+
+    auto view_id = m_controller->load_log_file_async(log_file_info.get_file_path(), 1000);
+    m_controller->set_current_view(view_id);
+
+    SessionViewState empty_state;
+    auto* log_view_widget = create_log_view_widget_for_view(view_id, empty_state);
+
     QVector<QString> file_paths = m_controller->get_view_file_paths(view_id);
     log_view_widget->set_view_file_paths(file_paths);
 
@@ -1377,7 +1245,10 @@ auto MainWindow::handle_log_file_open_requested(const LogFileInfo& log_file_info
     ui->tabWidgetLog->setCurrentIndex(tab_index);
     log_view_widget->auto_resize_columns();
 
+    m_session_controller->request_expand_session(session_id);
+
     update_pagination_widget();
+    show_start_page_if_needed();
 }
 
 /**
@@ -1446,7 +1317,7 @@ auto MainWindow::handle_loading_progress(const QUuid& view_id, qint64 bytes_read
  */
 auto MainWindow::handle_loading_finished(const QUuid& view_id, const QString& file_path) -> void
 {
-    bool is_current = (view_id == m_controller->get_current_view());
+    const bool is_current = (view_id == m_controller->get_current_view());
     QFileInfo info(file_path);
     statusBar()->showMessage(tr("Loaded %1 (%2 bytes)").arg(info.fileName()).arg(info.size()),
                              4000);
@@ -1456,8 +1327,6 @@ auto MainWindow::handle_loading_finished(const QUuid& view_id, const QString& fi
         handle_current_view_id_changed(view_id);
         update_pagination_widget();
     }
-
-    Q_UNUSED(file_path);
 }
 
 /**
@@ -1469,9 +1338,60 @@ auto MainWindow::handle_loading_finished(const QUuid& view_id, const QString& fi
 auto MainWindow::handle_loading_error(const QUuid& view_id, const QString& file_path,
                                       const QString& message) -> void
 {
-    bool is_current = (view_id == m_controller->get_current_view());
+    Q_UNUSED(view_id);
     statusBar()->clearMessage();
 
     QMessageBox::critical(this, tr("Load Error"),
                           tr("Failed to load file:\n%1\n\n%2").arg(file_path, message));
+}
+
+/**
+ * @brief Handles rename session requests from the LogFileExplorer.
+ * @param session_id The session identifier.
+ * @param new_name The new session name.
+ */
+auto MainWindow::handle_rename_session(const QString& session_id, const QString& new_name) -> void
+{
+    m_session_controller->rename_session(session_id, new_name);
+}
+
+/**
+ * @brief Handles the signal when all sessions are removed from the tree model.
+ */
+auto MainWindow::handle_all_sessions_removed() -> void
+{
+    close_all_tabs();
+
+    // Clear all views to prevent stale data
+    m_session_controller->clear_all_views();
+
+    // Reset UI state
+    ui->logFilterBarWidget->set_app_names({});
+    ui->logFilterBarWidget->set_log_levels({});
+    m_log_level_pie_chart_widget->set_log_level_counts({});
+    update_pagination_widget();
+
+    show_start_page_if_needed();
+}
+
+/**
+ * @brief Handles close session requests from the LogFileExplorer.
+ * @param session_id The session identifier.
+ */
+auto MainWindow::handle_close_session(const QString& session_id) -> void
+{
+    close_all_tabs();
+
+    m_session_controller->close_session(session_id);
+
+    if (m_session_controller->get_session_count() == 0)
+    {
+        // Reset UI state
+        ui->logFilterBarWidget->set_app_names({});
+        ui->logFilterBarWidget->set_log_levels({});
+        m_log_level_pie_chart_widget->set_log_level_counts({});
+        update_pagination_widget();
+    }
+
+    show_start_page_if_needed();
 }

@@ -8,6 +8,7 @@
 #include <QVector>
 
 #include "Qt-LogViewer/Controllers/LogViewerController.h"
+#include "Qt-LogViewer/Controllers/SessionController.h"
 #include "Qt-LogViewer/Models/LogEntry.h"
 #include "Qt-LogViewer/Models/LogFileInfo.h"
 #include "Qt-LogViewer/Models/RecentLogFilesModel.h"
@@ -16,6 +17,7 @@
 #include "Qt-LogViewer/Services/StylesheetLoader.h"
 #include "Qt-LogViewer/Views/App/LogFileExplorer.h"
 #include "Qt-LogViewer/Views/App/LogLevelPieChartWidget.h"
+#include "Qt-LogViewer/Views/App/LogViewWidget.h"
 #include "Qt-LogViewer/Views/App/StartPageWidget.h"
 #include "Qt-LogViewer/Views/Shared/BaseMainWindow.h"
 #include "Qt-LogViewer/Views/Shared/DockWidget.h"
@@ -140,6 +142,42 @@ class MainWindow: public BaseMainWindow
          * @param event The resize event.
          */
         void resizeEvent(QResizeEvent* event) override;
+
+        /**
+         * @brief Validates a list of file paths and returns only valid ones.
+         * @param files The list of file paths to validate.
+         * @return Vector of valid file paths.
+         */
+        [[nodiscard]] auto validate_file_paths(const QStringList& files) -> QVector<QString>;
+
+        /**
+         * @brief Restores a single view from JSON.
+         * @param session_id The session identifier.
+         * @param view_obj The view JSON object.
+         */
+        auto restore_view_from_json(const QString& session_id, const QJsonObject& view_obj) -> void;
+
+        /**
+         * @brief Parses a SessionViewState from a JSON object.
+         * @param view_obj The view JSON object.
+         * @return The parsed SessionViewState.
+         */
+        [[nodiscard]] auto parse_view_state_from_json(const QJsonObject& view_obj)
+            -> SessionViewState;
+
+        /**
+         * @brief Creates a LogViewWidget for a view and connects its signals.
+         * @param view_id The view ID.
+         * @param state The session view state.
+         * @return Pointer to the created LogViewWidget.
+         */
+        auto create_log_view_widget_for_view(const QUuid& view_id,
+                                             const SessionViewState& state) -> LogViewWidget*;
+
+        /**
+         * @brief Closes all tabs in the tab widget.
+         */
+        auto close_all_tabs() -> void;
 
     protected:
         /**
@@ -289,6 +327,24 @@ class MainWindow: public BaseMainWindow
          */
         auto restore_session_from_json(const QString& session_id, const QJsonObject& obj) -> void;
 
+        /**
+         * @brief Handles rename session requests from the LogFileExplorer.
+         * @param session_id The session identifier.
+         * @param new_name The new session name.
+         */
+        auto handle_rename_session(const QString& session_id, const QString& new_name) -> void;
+
+        /**
+         * @brief Handles the signal when all sessions are removed from the tree model.
+         */
+        auto handle_all_sessions_removed() -> void;
+
+        /**
+         * @brief Handles close session requests from the LogFileExplorer (removes from view only).
+         * @param session_id The session identifier.
+         */
+        auto handle_close_session(const QString& session_id) -> void;
+
     private:
         Ui::MainWindow* ui;
         LogViewerSettings* m_log_viewer_settings = nullptr;
@@ -305,6 +361,7 @@ class MainWindow: public BaseMainWindow
         SessionManager* m_session_manager = nullptr;
         RecentLogFilesModel* m_recent_files_model = nullptr;
         RecentSessionsModel* m_recent_sessions_model = nullptr;
+        SessionController* m_session_controller{nullptr};
 
         // File menu submenus
         QMenu* m_file_menu = nullptr;
