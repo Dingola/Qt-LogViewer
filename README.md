@@ -36,15 +36,40 @@
 <br><br>
 
 ## [Description]
-A Qt-based desktop application for viewing, searching and filtering log files with a user-friendly interface.
-
+Qt-LogViewer is a Qt-based desktop application to quickly open, view, search, and filter large log files. It supports multiple views (tabs),
+per-view filters (application name, log levels, search with optional regex), pagination for large datasets, and a session system that lets
+you save and restore your workspace. A file explorer groups logs by application and sessions, and async loading streams data into views
+to keep the UI responsive.
+<br>
 This solution is divided into two parts: the main project and a test project. By default, only the main project is built. 
 The test project can be built if desired, controlled by a CMake boolean variable `<PROJECT_NAME>_BUILD_TEST_PROJECT`. 
 Additionally, the CMake variable `<PROJECT_NAME>_BUILD_TARGET_TYPE` must be set to `static_library` for the test project to be executed.
-
 <br>
-
+Features:
+- Multi-view tabs with independent filters and paging
+- Per-view filtering by application name and log levels
+- Search filtering with optional regex and field selection
+- Async log loading and batch appending to models
+- Log file explorer with sessions, application groups, and file actions
+- Session management: create, rename, save, reopen, and delete
+- Recent files and recent sessions menus and start page integration
+- Windows-specific frameless window with native title bar behavior and optional Mica/corner features
+- Theming via QSS with runtime variable substitution and theme switching
+- Basic translations infrastructure (language loading and switching)
+- Code coverage and CI workflows (Linux, macOS, Windows)
+<br>
+Screenshots:
+![Start Page Screenshot](QT_Project/Resources/Images/StartPage.png)
 ![Qt-LogViewer Screenshot](QT_Project/Resources/Images/Qt-LogViewer.png)
+![Qt-LogViewer Screenshot](QT_Project/Resources/Images/Qt-LogViewer_2.png)
+
+Planned TODOs:
+- Improve parser and live streaming of logs
+- Translation and UI design improvements
+- CSV and other import options
+- PDF export
+- SSH support
+- Additional enhancements across performance and UX
 <br><br>
 
 ## 📊 [Code Coverage Graphs]
