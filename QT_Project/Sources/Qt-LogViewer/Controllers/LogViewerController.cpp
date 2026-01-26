@@ -196,6 +196,36 @@ auto LogViewerController::remove_view(const QUuid& view_id) -> bool
 }
 
 /**
+ * @brief Removes all views and clears all associated models and proxies.
+ *
+ * This method is used when closing a session to ensure no stale data remains.
+ * Emits `view_removed` for each removed view.
+ */
+auto LogViewerController::clear_all_views() -> void
+{
+    // Cancel any pending async loads
+    if (m_ingest != nullptr)
+    {
+        const QVector<QUuid> ids = m_views->get_all_view_ids();
+        for (const QUuid& view_id: ids)
+        {
+            m_ingest->cancel_for_view(view_id);
+        }
+    }
+
+    // Remove all views (this also emits view_removed for each)
+    if (m_views != nullptr)
+    {
+        const QVector<QUuid> ids = m_views->get_all_view_ids();
+        for (const QUuid& view_id: ids)
+        {
+            m_views->remove_view(view_id);
+            emit view_removed(view_id);
+        }
+    }
+}
+
+/**
  * @brief Adds a single log file to the LogFileTreeModel.
  * @param file_path The path to the log file.
  */
@@ -216,6 +246,34 @@ auto LogViewerController::add_log_files_to_tree(const QVector<QString>& file_pat
     if (m_catalog != nullptr)
     {
         m_catalog->add_files(file_paths);
+    }
+}
+
+/**
+ * @brief Adds a single log file to a specific session in the LogFileTreeModel.
+ * @param session_id The session identifier.
+ * @param file_path The path to the log file.
+ */
+auto LogViewerController::add_log_file_to_session(const QString& session_id,
+                                                  const QString& file_path) -> void
+{
+    if (m_catalog != nullptr)
+    {
+        m_catalog->add_file_to_session(session_id, file_path);
+    }
+}
+
+/**
+ * @brief Adds multiple log files to a specific session in the LogFileTreeModel.
+ * @param session_id The session identifier.
+ * @param file_paths The vector of log file paths.
+ */
+auto LogViewerController::add_log_files_to_session(const QString& session_id,
+                                                   const QVector<QString>& file_paths) -> void
+{
+    if (m_catalog != nullptr)
+    {
+        m_catalog->add_files_to_session(session_id, file_paths);
     }
 }
 
@@ -896,6 +954,59 @@ auto LogViewerController::import_view_state(const SessionViewState& state) -> QU
             if (!paths.isEmpty())
             {
                 add_log_files_to_tree(paths);
+            }
+        }
+
+        if (!result.isNull())
+        {
+            for (const auto& lf: state.loaded_files)
+            {
+                const QString path = lf.get_file_path();
+                if (!path.isEmpty())
+                {
+                    ensure_view_models(result);
+                    enqueue_async(result, path);
+                    try_start_next_async(1000);
+                }
+            }
+        }
+    }
+
+    return result;
+}
+
+/**
+ * @brief Imports a single view state for a specific session.
+ * @param session_id The session identifier for the tree model.
+ * @param state The view state to apply.
+ * @return QUuid of the imported/ensured view.
+ */
+auto LogViewerController::import_view_state_for_session(const QString& session_id,
+                                                        const SessionViewState& state) -> QUuid
+{
+    QUuid result;
+
+    if (m_views != nullptr && m_filters != nullptr)
+    {
+        result = m_views->import_view_state(state, *m_filters);
+
+        // Update explorer tree with session context
+        if (m_catalog != nullptr && !state.loaded_files.isEmpty() && !session_id.isEmpty())
+        {
+            QVector<QString> paths;
+            paths.reserve(state.loaded_files.size());
+            for (const auto& lf: state.loaded_files)
+            {
+                const QString p = lf.get_file_path();
+                if (!p.isEmpty())
+                {
+                    paths.append(p);
+                }
+            }
+
+            if (!paths.isEmpty())
+            {
+                add_log_files_to_session(session_id, paths);
             }
         }
 

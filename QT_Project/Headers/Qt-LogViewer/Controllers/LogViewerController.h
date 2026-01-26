@@ -69,6 +69,14 @@ class LogViewerController: public QObject
         auto remove_view(const QUuid& view_id) -> bool;
 
         /**
+         * @brief Removes all views and clears all associated models and proxies.
+         *
+         * This method is used when closing a session to ensure no stale data remains.
+         * Emits `view_removed` for each removed view.
+         */
+        auto clear_all_views() -> void;
+
+        /**
          * @brief Adds a single log file to the LogFileTreeModel.
          * @param file_path The path to the log file.
          */
@@ -79,6 +87,21 @@ class LogViewerController: public QObject
          * @param file_paths The vector of log file paths.
          */
         auto add_log_files_to_tree(const QVector<QString>& file_paths) -> void;
+
+        /**
+         * @brief Adds a single log file to a specific session in the LogFileTreeModel.
+         * @param session_id The session identifier.
+         * @param file_path The path to the log file.
+         */
+        auto add_log_file_to_session(const QString& session_id, const QString& file_path) -> void;
+
+        /**
+         * @brief Adds multiple log files to a specific session in the LogFileTreeModel.
+         * @param session_id The session identifier.
+         * @param file_paths The vector of log file paths.
+         */
+        auto add_log_files_to_session(const QString& session_id,
+                                      const QVector<QString>& file_paths) -> void;
 
         /**
          * @brief Loads a single log file and creates a new view (model/proxy) for it.
@@ -436,6 +459,15 @@ class LogViewerController: public QObject
          * @return QUuid of the imported/ensured view.
          */
         auto import_view_state(const SessionViewState& state) -> QUuid;
+
+        /**
+         * @brief Imports a single view state for a specific session.
+         * @param session_id The session identifier for the tree model.
+         * @param state The view state to apply.
+         * @return QUuid of the imported/ensured view.
+         */
+        auto import_view_state_for_session(const QString& session_id,
+                                           const SessionViewState& state) -> QUuid;
 
     signals:
         /**
