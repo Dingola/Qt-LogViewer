@@ -441,16 +441,21 @@ TEST_F(LogViewerControllerTest, RemoveLogFileRemovesFromTreeModel)
     QTemporaryFile* temp_file = create_temp_file({"2024-01-01 17:00:00 INFO TreeEntry AppI"});
     ASSERT_NE(temp_file, nullptr);
 
-    m_controller->add_log_file_to_tree(temp_file->fileName());
-    LogFileInfo info(temp_file->fileName(), "AppI");
-
     auto* tree_model = m_controller->get_log_file_tree_model();
     ASSERT_NE(tree_model, nullptr);
 
+    // Ensure a session exists; global add targets all sessions
+    ASSERT_TRUE(tree_model->add_session("S", "S"));
+    const QModelIndex s_index = tree_model->get_session_index("S");
+    ASSERT_TRUE(s_index.isValid());
+
+    m_controller->add_log_file_to_tree(temp_file->fileName());
+    LogFileInfo info(temp_file->fileName(), "AppI");
+
     bool found = false;
-    for (int i = 0; i < tree_model->rowCount() && !found; ++i)
+    for (int i = 0; i < tree_model->rowCount(s_index) && !found; ++i)
     {
-        QModelIndex index = tree_model->index(i, 0);
+        QModelIndex index = tree_model->index(i, 0, s_index);
         QVariant data = tree_model->data(index, Qt::DisplayRole);
         if (data.toString().contains("AppI"))
         {
@@ -462,9 +467,9 @@ TEST_F(LogViewerControllerTest, RemoveLogFileRemovesFromTreeModel)
     m_controller->remove_log_file(info);
 
     found = false;
-    for (int i = 0; i < tree_model->rowCount() && !found; ++i)
+    for (int i = 0; i < tree_model->rowCount(s_index) && !found; ++i)
     {
-        QModelIndex index = tree_model->index(i, 0);
+        QModelIndex index = tree_model->index(i, 0, s_index);
         QVariant data = tree_model->data(index, Qt::DisplayRole);
         if (data.toString().contains("AppI"))
         {
@@ -609,15 +614,21 @@ TEST_F(LogViewerControllerTest, AddLogFileToTree)
     QTemporaryFile* temp_file = create_temp_file({"2024-01-01 13:00:00 INFO Added AppD"});
     ASSERT_NE(temp_file, nullptr);
 
-    m_controller->add_log_file_to_tree(temp_file->fileName());
     auto* tree_model = m_controller->get_log_file_tree_model();
     ASSERT_NE(tree_model, nullptr);
 
+    // Ensure a session exists; global add targets all sessions
+    ASSERT_TRUE(tree_model->add_session("S", "S"));
+    const QModelIndex s_index = tree_model->get_session_index("S");
+    ASSERT_TRUE(s_index.isValid());
+
+    m_controller->add_log_file_to_tree(temp_file->fileName());
+
     bool found = false;
 
-    for (int i = 0; i < tree_model->rowCount() && !found; ++i)
+    for (int i = 0; i < tree_model->rowCount(s_index) && !found; ++i)
     {
-        QModelIndex index = tree_model->index(i, 0);
+        QModelIndex index = tree_model->index(i, 0, s_index);
         QVariant data = tree_model->data(index, Qt::DisplayRole);
 
         if (data.toString().contains("AppD"))
@@ -639,16 +650,22 @@ TEST_F(LogViewerControllerTest, AddLogFilesToTree)
     ASSERT_NE(temp_file1, nullptr);
     ASSERT_NE(temp_file2, nullptr);
 
-    QVector<QString> files = {temp_file1->fileName(), temp_file2->fileName()};
-    m_controller->add_log_files_to_tree(files);
     auto* tree_model = m_controller->get_log_file_tree_model();
     ASSERT_NE(tree_model, nullptr);
 
+    // Ensure a session exists; global add targets all sessions
+    ASSERT_TRUE(tree_model->add_session("S", "S"));
+    const QModelIndex s_index = tree_model->get_session_index("S");
+    ASSERT_TRUE(s_index.isValid());
+
+    QVector<QString> files = {temp_file1->fileName(), temp_file2->fileName()};
+    m_controller->add_log_files_to_tree(files);
+
     bool found_e = false, found_f = false;
 
-    for (int i = 0; i < tree_model->rowCount(); ++i)
+    for (int i = 0; i < tree_model->rowCount(s_index); ++i)
     {
-        QModelIndex index = tree_model->index(i, 0);
+        QModelIndex index = tree_model->index(i, 0, s_index);
         QVariant data = tree_model->data(index, Qt::DisplayRole);
 
         if (data.toString().contains("AppE"))
