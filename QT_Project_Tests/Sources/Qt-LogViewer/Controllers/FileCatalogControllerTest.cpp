@@ -86,7 +86,7 @@ auto FileCatalogControllerTest::root_row_count(LogFileTreeModel* model) -> int
 }
 
 /**
- * @brief add_file should parse first entry via ingest and add one item to the model.
+ * @brief add_file should parse first entry via ingest and add one group to the session.
  */
 TEST_F(FileCatalogControllerTest, AddFileUsesParsedAppNameAndAddsToModel)
 {
@@ -94,16 +94,22 @@ TEST_F(FileCatalogControllerTest, AddFileUsesParsedAppNameAndAddsToModel)
     auto* model = m_ctrl->get_model();
     ASSERT_NE(model, nullptr);
 
-    const int before = root_row_count(model);
+    // Create a session so that add_file (all-sessions overload) has a target
+    ASSERT_TRUE(model->add_session("S", "S"));
+    const QModelIndex s_index = model->get_session_index("S");
+    ASSERT_TRUE(s_index.isValid());
 
+    const int before_groups = model->rowCount(s_index);
+
+    // add_file uses ingest to parse "TestApp" and adds under the only session
     m_ctrl->add_file(m_temp1);
 
-    const int after = root_row_count(model);
-    EXPECT_EQ(after, before + 1);
+    const int after_groups = model->rowCount(s_index);
+    EXPECT_EQ(after_groups, before_groups + 1);
 }
 
 /**
- * @brief add_files should add multiple items to the model.
+ * @brief add_files should add both files under the same app group within the session.
  */
 TEST_F(FileCatalogControllerTest, AddFilesAddsMultiple)
 {
@@ -111,28 +117,38 @@ TEST_F(FileCatalogControllerTest, AddFilesAddsMultiple)
     auto* model = m_ctrl->get_model();
     ASSERT_NE(model, nullptr);
 
-    const int before = root_row_count(model);
+    ASSERT_TRUE(model->add_session("S", "S"));
+    const QModelIndex s_index = model->get_session_index("S");
+    ASSERT_TRUE(s_index.isValid());
+
+    const int before_groups = model->rowCount(s_index);
 
     QVector<QString> files;
     files << m_temp1 << m_temp2;
     m_ctrl->add_files(files);
 
-    const int after = root_row_count(model);
-    // Same app name "TestApp" -> one new group at root
-    EXPECT_EQ(after, before + 1);
+    // Same app name "TestApp" -> exactly one new group in session
+    const int after_groups = model->rowCount(s_index);
+    EXPECT_EQ(after_groups, before_groups + 1);
 
-    // Verify the group has two children (the two files)
-    // We assume the newly added group is at the last root index.
+    // Find the "TestApp" group and validate it has two files
+    int testapp_row = -1;
+    for (int i = 0; i < model->rowCount(s_index); ++i)
+    {
+        const auto idx = model->index(i, LogFileTreeModel::Column::Name, s_index);
+        if (model->data(idx, Qt::DisplayRole).toString() == "TestApp")
+        {
+            testapp_row = i;
+        }
+    }
+    ASSERT_NE(testapp_row, -1);
     const QModelIndex group_idx =
-        model->index(after - 1, LogFileTreeModel::Column::Name, QModelIndex());
-    ASSERT_TRUE(group_idx.isValid());
-
-    const int group_child_count = model->rowCount(group_idx);
-    EXPECT_EQ(group_child_count, 2);
+        model->index(testapp_row, LogFileTreeModel::Column::Name, s_index);
+    EXPECT_EQ(model->rowCount(group_idx), 2);
 }
 
 /**
- * @brief remove_file should remove previously added file from the model.
+ * @brief remove_file should remove previously added file and drop its group when empty.
  */
 TEST_F(FileCatalogControllerTest, RemoveFileRemovesFromModel)
 {
@@ -140,16 +156,20 @@ TEST_F(FileCatalogControllerTest, RemoveFileRemovesFromModel)
     auto* model = m_ctrl->get_model();
     ASSERT_NE(model, nullptr);
 
+    ASSERT_TRUE(model->add_session("S", "S"));
+    const QModelIndex s_index = model->get_session_index("S");
+    ASSERT_TRUE(s_index.isValid());
+
     // Add one file via ingest-parsed entry ("TestApp" from temp content)
     m_ctrl->add_file(m_temp1);
-    const int after_add = root_row_count(model);
+    const int groups_after_add = model->rowCount(s_index);
 
     // Build matching LogFileInfo to remove (path + app name "TestApp")
     const LogFileInfo info(m_temp1, QStringLiteral("TestApp"));
     m_ctrl->remove_file(info);
 
-    const int after_remove = root_row_count(model);
-    EXPECT_EQ(after_remove, after_add - 1);
+    const int groups_after_remove = model->rowCount(s_index);
+    EXPECT_EQ(groups_after_remove, groups_after_add - 1);
 }
 
 /**
@@ -164,11 +184,15 @@ TEST_F(FileCatalogControllerTest, AddFileWithNullIngestFallsBackAndAdds)
     auto* model = m_ctrl->get_model();
     ASSERT_NE(model, nullptr);
 
-    const int before = root_row_count(model);
+    ASSERT_TRUE(model->add_session("S", "S"));
+    const QModelIndex s_index = model->get_session_index("S");
+    ASSERT_TRUE(s_index.isValid());
+
+    const int before_groups = model->rowCount(s_index);
 
     const QString path = make_nonexistent_path(QStringLiteral("fb"));
     m_ctrl->add_file(path);
 
-    const int after = root_row_count(model);
-    EXPECT_EQ(after, before + 1);
+    const int after_groups = model->rowCount(s_index);
+    EXPECT_EQ(after_groups, before_groups + 1);
 }
