@@ -383,4 +383,7 @@ class MainWindow: public BaseMainWindow
 
         // Start page (tab area filler)
         StartPageWidget* m_start_page_widget = nullptr;
+
+        // Stores the last known dock layout/state while a session is active.
+        QByteArray m_last_session_dock_state;
 };

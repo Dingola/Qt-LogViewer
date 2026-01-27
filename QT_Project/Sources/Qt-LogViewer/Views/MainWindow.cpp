@@ -405,35 +405,64 @@ auto MainWindow::initialize_menu() -> void
 
     m_action_show_log_file_explorer = new QAction(tr(k_show_log_file_explorer_text), this);
     m_action_show_log_file_explorer->setCheckable(true);
-    m_action_show_log_file_explorer->setChecked(true);
     views_menu->addAction(m_action_show_log_file_explorer);
 
     m_action_show_log_details = new QAction(tr(k_show_log_details_text), this);
     m_action_show_log_details->setCheckable(true);
-    m_action_show_log_details->setChecked(true);
     views_menu->addAction(m_action_show_log_details);
 
     m_action_show_log_level_pie_chart = new QAction(tr("Show Log Level Pie Chart"), this);
     m_action_show_log_level_pie_chart->setCheckable(true);
-    m_action_show_log_level_pie_chart->setChecked(true);
     views_menu->addAction(m_action_show_log_level_pie_chart);
 
     ui->menubar->addMenu(views_menu);
 
+    // Update docks on toggle and, if a session is active, cache the new dock layout
+    auto cache_dock_state_if_session = [this]() -> void {
+        if (m_session_controller != nullptr && m_session_controller->has_current_session())
+        {
+            m_last_session_dock_state = saveState();
+        }
+    };
+
     connect(m_action_show_log_file_explorer, &QAction::toggled, this,
-            [this](bool checked) { m_log_file_explorer_dock_widget->setVisible(checked); });
-    connect(m_log_file_explorer_dock_widget, &DockWidget::closed, this,
-            [this]() { m_action_show_log_file_explorer->setChecked(false); });
+            [this, cache_dock_state_if_session](bool checked) {
+                m_log_file_explorer_dock_widget->setVisible(checked);
+                cache_dock_state_if_session();
+            });
+    connect(m_log_file_explorer_dock_widget, &DockWidget::closed, this, [this]() {
+        m_action_show_log_file_explorer->setChecked(false);
+        if (m_session_controller != nullptr && m_session_controller->has_current_session())
+        {
+            m_last_session_dock_state = saveState();
+        }
+    });
 
     connect(m_action_show_log_details, &QAction::toggled, this,
-            [this](bool checked) { m_log_details_dock_widget->setVisible(checked); });
-    connect(m_log_details_dock_widget, &DockWidget::closed, this,
-            [this]() { m_action_show_log_details->setChecked(false); });
+            [this, cache_dock_state_if_session](bool checked) {
+                m_log_details_dock_widget->setVisible(checked);
+                cache_dock_state_if_session();
+            });
+    connect(m_log_details_dock_widget, &DockWidget::closed, this, [this]() {
+        m_action_show_log_details->setChecked(false);
+        if (m_session_controller != nullptr && m_session_controller->has_current_session())
+        {
+            m_last_session_dock_state = saveState();
+        }
+    });
 
     connect(m_action_show_log_level_pie_chart, &QAction::toggled, this,
-            [this](bool checked) { m_log_level_pie_chart_dock_widget->setVisible(checked); });
-    connect(m_log_level_pie_chart_dock_widget, &DockWidget::closed, this,
-            [this]() { m_action_show_log_level_pie_chart->setChecked(false); });
+            [this, cache_dock_state_if_session](bool checked) {
+                m_log_level_pie_chart_dock_widget->setVisible(checked);
+                cache_dock_state_if_session();
+            });
+    connect(m_log_level_pie_chart_dock_widget, &DockWidget::closed, this, [this]() {
+        m_action_show_log_level_pie_chart->setChecked(false);
+        if (m_session_controller != nullptr && m_session_controller->has_current_session())
+        {
+            m_last_session_dock_state = saveState();
+        }
+    });
 
     // Settings menu
     auto settings_menu = new QMenu(tr("&Settings"), this);
@@ -462,6 +491,29 @@ auto MainWindow::initialize_menu() -> void
                                .arg(QCoreApplication::applicationName(), QT_VERSION_STR));
     });
     connect(about_qt_action, &QAction::triggered, this, [this] { QMessageBox::aboutQt(this); });
+
+    // Sync action checkmarks with current dock visibility
+    // (these may be overridden later by show_start_page_if_needed based on session presence)
+    if (m_log_file_explorer_dock_widget != nullptr && m_action_show_log_file_explorer != nullptr)
+    {
+        const bool prev = m_action_show_log_file_explorer->blockSignals(true);
+        m_action_show_log_file_explorer->setChecked(m_log_file_explorer_dock_widget->isVisible());
+        m_action_show_log_file_explorer->blockSignals(prev);
+    }
+    if (m_log_details_dock_widget != nullptr && m_action_show_log_details != nullptr)
+    {
+        const bool prev = m_action_show_log_details->blockSignals(true);
+        m_action_show_log_details->setChecked(m_log_details_dock_widget->isVisible());
+        m_action_show_log_details->blockSignals(prev);
+    }
+    if (m_log_level_pie_chart_dock_widget != nullptr &&
+        m_action_show_log_level_pie_chart != nullptr)
+    {
+        const bool prev = m_action_show_log_level_pie_chart->blockSignals(true);
+        m_action_show_log_level_pie_chart->setChecked(
+            m_log_level_pie_chart_dock_widget->isVisible());
+        m_action_show_log_level_pie_chart->blockSignals(prev);
+    }
 }
 
 /**
@@ -519,6 +571,14 @@ auto MainWindow::show_start_page_if_needed() -> void
 
     if (!has_session)
     {
+        // Capture current (restored) dock state ONCE when transitioning to StartPage,
+        // so we can later restore it and also persist it if the app closes while on StartPage.
+        if (m_last_session_dock_state.isEmpty())
+        {
+            m_last_session_dock_state = saveState();
+        }
+
+        // Transient UI for StartPage: hide docks and present actions as unchecked and disabled.
         if (m_log_file_explorer_dock_widget != nullptr)
         {
             m_log_file_explorer_dock_widget->setVisible(false);
@@ -556,6 +616,12 @@ auto MainWindow::show_start_page_if_needed() -> void
     }
     else
     {
+        // Back to a session: re-enable actions and restore the last-session dock layout.
+        if (!m_last_session_dock_state.isEmpty())
+        {
+            restoreState(m_last_session_dock_state);
+        }
+
         if (m_action_show_log_file_explorer != nullptr)
         {
             m_action_show_log_file_explorer->setEnabled(true);
@@ -569,7 +635,29 @@ auto MainWindow::show_start_page_if_needed() -> void
             m_action_show_log_level_pie_chart->setEnabled(true);
         }
 
-        restore_window_settings();
+        // Sync action checkmarks with the restored dock visibility without emitting toggles.
+        if (m_log_file_explorer_dock_widget != nullptr &&
+            m_action_show_log_file_explorer != nullptr)
+        {
+            const bool prev = m_action_show_log_file_explorer->blockSignals(true);
+            m_action_show_log_file_explorer->setChecked(
+                m_log_file_explorer_dock_widget->isVisible());
+            m_action_show_log_file_explorer->blockSignals(prev);
+        }
+        if (m_log_details_dock_widget != nullptr && m_action_show_log_details != nullptr)
+        {
+            const bool prev = m_action_show_log_details->blockSignals(true);
+            m_action_show_log_details->setChecked(m_log_details_dock_widget->isVisible());
+            m_action_show_log_details->blockSignals(prev);
+        }
+        if (m_log_level_pie_chart_dock_widget != nullptr &&
+            m_action_show_log_level_pie_chart != nullptr)
+        {
+            const bool prev = m_action_show_log_level_pie_chart->blockSignals(true);
+            m_action_show_log_level_pie_chart->setChecked(
+                m_log_level_pie_chart_dock_widget->isVisible());
+            m_action_show_log_level_pie_chart->blockSignals(prev);
+        }
     }
 }
 
@@ -726,6 +814,16 @@ auto MainWindow::closeEvent(QCloseEvent* event) -> void
     if (m_session_controller->has_current_session())
     {
         m_session_controller->save_current_session();
+    }
+    else
+    {
+        // If we are on StartPage, restore the last-session dock state just before saving window
+        // settings, so BaseMainWindow persists the session layout instead of the StartPage-off
+        // layout.
+        if (!m_last_session_dock_state.isEmpty())
+        {
+            restoreState(m_last_session_dock_state);
+        }
     }
 
     BaseMainWindow::closeEvent(event);
