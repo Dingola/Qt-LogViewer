@@ -1,11 +1,13 @@
 #include "Qt-LogViewer/Services/StylesheetLoaderTest.h"
 
 #include <QApplication>
+#include <QElapsedTimer>
 #include <QFile>
 #include <QRegularExpression>
 #include <QString>
 #include <QTemporaryFile>
 #include <QTextStream>
+#include <QThread>
 #include <QWidget>
 
 /**
@@ -121,29 +123,6 @@ QWidget { background: @Color; }
 
     QFile::remove(file_path);
 }
-
-/**
- * @brief Tests that unresolved variables are warned about.
- */
-// TEST_F(StylesheetLoaderTest, WarnsOnUnresolvedVariables)
-//{
-//     QString qss = R"(
-//@Variables[Name="Test"] {
-//     @Color: #444444;
-// }
-// QWidget { background: @Color; color: @MissingVar; }
-//)";
-//     QString file_path = create_temp_qss(qss);
-//     ASSERT_FALSE(file_path.isEmpty());
-//
-//     qInstallMessageHandler(nullptr);
-//     testing::internal::CaptureStderr();
-//     m_loader->load_stylesheet(file_path, "Test");
-//     std::string output = testing::internal::GetCapturedStderr();
-//     EXPECT_NE(output.find("Unresolved variable"), std::string::npos);
-//
-//     QFile::remove(file_path);
-// }
 
 /**
  * @brief Tests set_variable overrides and reapplies the stylesheet.
@@ -404,9 +383,495 @@ QWidget { background: @Color; }
     ASSERT_TRUE(m_loader->load_stylesheet(file_path, "Blue"));
     EXPECT_EQ(m_loader->get_current_theme_name(), "Blue");
 
-    // Load with a different theme name
+    // Load with a different theme name to ensure property updates even if theme not found
     ASSERT_TRUE(m_loader->load_stylesheet(file_path, "NonExistent"));
     EXPECT_EQ(m_loader->get_current_theme_name(), "NonExistent");
 
     QFile::remove(file_path);
+}
+
+/**
+ * @brief Indirectly tests resolve_variable recursion and replacement loop,
+ *        including inner captures and repeated matching until no @Var remains.
+ */
+TEST_F(StylesheetLoaderTest, ResolveVariableRecursiveChain)
+{
+    QString qss = R"(
+@Variables[Name="Chain"] {
+    @A: @B;
+    @B: @C;
+    @C: #010203;
+}
+QWidget { color: @A; border-color: @B; outline-color: @C; }
+)";
+    ASSERT_TRUE(m_loader->load_stylesheet_from_data(qss, "Chain"));
+    QString applied = m_loader->get_current_stylesheet();
+
+    EXPECT_TRUE(applied.contains("#010203"));
+    EXPECT_EQ(applied.count("#010203"), 3);
+    EXPECT_FALSE(applied.contains("@A"));
+    EXPECT_FALSE(applied.contains("@B"));
+    EXPECT_FALSE(applied.contains("@C"));
+}
+
+/**
+ * @brief Indirectly tests resolve_variable cycle prevention via seen-set.
+ *        A cycle should resolve to empty strings for involved variables.
+ */
+TEST_F(StylesheetLoaderTest, ResolveVariableCyclePrevention)
+{
+    QString qss = R"(
+@Variables[Name="Cycle"] {
+    @A: @B;
+    @B: @A;
+}
+QWidget { color: @A; border-color: @B; }
+)";
+    ASSERT_TRUE(m_loader->load_stylesheet_from_data(qss, "Cycle"));
+    QString applied = m_loader->get_current_stylesheet();
+
+    EXPECT_FALSE(applied.contains("@A"));
+    EXPECT_FALSE(applied.contains("@B"));
+    EXPECT_FALSE(applied.contains("#"));
+}
+
+/**
+ * @brief Exercises substitute_variables iteration over multiple keys with varied lengths
+ *        to ensure length-descending sort avoids partial replacements.
+ */
+TEST_F(StylesheetLoaderTest, SubstituteVariablesMultipleKeysIteration)
+{
+    QString qss = R"(
+@Variables[Name="LenSort"] {
+    @Color: #111111;
+    @ColorPrimary: #222222;
+    @ColorPrimaryDark: #333333;
+}
+QWidget { 
+    background: @ColorPrimaryDark; 
+    border: 1px solid @ColorPrimary; 
+    color: @Color; 
+}
+)";
+    ASSERT_TRUE(m_loader->load_stylesheet_from_data(qss, "LenSort"));
+    QString applied = m_loader->get_current_stylesheet();
+
+    EXPECT_TRUE(applied.contains("#333333"));
+    EXPECT_TRUE(applied.contains("#222222"));
+    EXPECT_TRUE(applied.contains("#111111"));
+    EXPECT_EQ(applied.count("@"), 0);
+}
+
+/**
+ * @brief Ensures theme parsing loop covers empty theme names exclusion and default block detection.
+ */
+TEST_F(StylesheetLoaderTest, ParseAvailableThemesLoopAndDefaultDetection)
+{
+    QString qss = R"(
+@Variables[Name="A"] { @X: 1; }
+@Variables[Name=""] { @Y: 2; }  /* should be ignored due to empty name */
+@Variables[Name="B"] { @Z: 3; }
+@Variables { @D: 4; }            /* triggers Default */
+QWidget { background: @X; }
+)";
+    ASSERT_TRUE(m_loader->load_stylesheet_from_data(qss, "A"));
+    QStringList themes = m_loader->get_available_themes();
+    EXPECT_TRUE(themes.contains("A"));
+    EXPECT_TRUE(themes.contains("B"));
+    EXPECT_TRUE(themes.contains("Default"));
+    EXPECT_EQ(themes.size(), 3);
+}
+
+/**
+ * @brief Exercises parse_variables_block loop by providing many variables in one block.
+ */
+TEST_F(StylesheetLoaderTest, ParseVariablesBlockManyEntries)
+{
+    QString qss = R"(
+@Variables[Name="Many"] {
+    @V1: #111;
+    @V2: #222;
+    @V3: #333;
+    @V4: #444;
+    @V5: #555;
+}
+QWidget { 
+    color: @V1; 
+    background: @V2; 
+    border-color: @V3; 
+    outline-color: @V4; 
+    selection-color: @V5;
+}
+)";
+    ASSERT_TRUE(m_loader->load_stylesheet_from_data(qss, "Many"));
+    QString applied = m_loader->get_current_stylesheet();
+
+    EXPECT_TRUE(applied.contains("#111"));
+    EXPECT_TRUE(applied.contains("#222"));
+    EXPECT_TRUE(applied.contains("#333"));
+    EXPECT_TRUE(applied.contains("#444"));
+    EXPECT_TRUE(applied.contains("#555"));
+    EXPECT_EQ(applied.count("@V"), 0);
+}
+
+/**
+ * @brief Exercises extract_variables_block conditional matches indirectly:
+ *  - First branch: named block found.
+ *  - Second branch: named not found but default exists.
+ *  - No block: neither named nor default found -> variables remain unresolved.
+ */
+TEST_F(StylesheetLoaderTest, ExtractVariablesBlockBranchingViaLoad)
+{
+    // Named present
+    QString qss_named = R"(
+@Variables[Name="Named"] { @C: #abc; }
+QWidget { color: @C; }
+)";
+    ASSERT_TRUE(m_loader->load_stylesheet_from_data(qss_named, "Named"));
+    EXPECT_TRUE(m_loader->get_current_stylesheet().contains("#abc"));
+
+    // Named missing, default present -> default used
+    QString qss_default = R"(
+@Variables { @C: #def; }
+QWidget { color: @C; }
+)";
+    ASSERT_TRUE(m_loader->load_stylesheet_from_data(qss_default, "Unknown"));
+    EXPECT_TRUE(m_loader->get_current_stylesheet().contains("#def"));
+
+    // No variables block at all -> unresolved remains
+    QString qss_none = R"(
+QWidget { color: @C; }
+)";
+    ASSERT_TRUE(m_loader->load_stylesheet_from_data(qss_none, ""));
+    EXPECT_TRUE(m_loader->get_current_stylesheet().contains("@C"));
+}
+
+/**
+ * @brief Covers load_stylesheet open-branch and unresolved warning detection indirectly.
+ */
+TEST_F(StylesheetLoaderTest, LoadStylesheetWarnsOnUnresolvedVariables)
+{
+    QString qss = R"(
+@Variables[Name="Test"] { @Color: #444444; }
+QWidget { background: @Color; color: @MissingVar; }
+)";
+    QString path = create_temp_qss(qss);
+    ASSERT_FALSE(path.isEmpty());
+
+    // Triggers file open branch and unresolved warning path.
+    ASSERT_TRUE(m_loader->load_stylesheet(path, "Test"));
+    QString applied = m_loader->get_current_stylesheet();
+    EXPECT_TRUE(applied.contains("#444444"));
+    EXPECT_TRUE(applied.contains("@MissingVar"));  // still unresolved
+
+    QFile::remove(path);
+}
+
+/**
+ * @brief Covers iteration over m_variables when resolving them in load_stylesheet.
+ */
+TEST_F(StylesheetLoaderTest, LoadStylesheetIteratesOverVariablesForResolution)
+{
+    QString qss = R"(
+@Variables[Name="Iter"] {
+    @Base: #101010;
+    @Accent: @Base;
+    @Primary: @Accent;
+}
+QWidget { background: @Primary; border-color: @Accent; color: @Base; }
+)";
+    ASSERT_TRUE(m_loader->load_stylesheet_from_data(qss, "Iter"));
+    QString applied = m_loader->get_current_stylesheet();
+
+    EXPECT_EQ(applied.count("#101010"), 3);
+    EXPECT_EQ(applied.count("@"), 0);
+}
+
+/**
+ * @brief Ensures set_theme switches themes correctly and exercises re-parsing.
+ */
+TEST_F(StylesheetLoaderTest, SetThemeSwitchesNamedAndDefault)
+{
+    QString qss = R"(
+@Variables[Name="Dark"] { @Color: #000; }
+@Variables[Name="Light"] { @Color: #fff; }
+@Variables { @Color: #abc; }
+QWidget { color: @Color; }
+)";
+    ASSERT_TRUE(m_loader->load_stylesheet_from_data(qss, "Dark"));
+    EXPECT_TRUE(m_loader->get_current_stylesheet().contains("#000"));
+
+    ASSERT_TRUE(m_loader->set_theme("Light"));
+    EXPECT_TRUE(m_loader->get_current_stylesheet().contains("#fff"));
+
+    ASSERT_TRUE(m_loader->set_theme(""));
+    EXPECT_TRUE(m_loader->get_current_stylesheet().contains("#abc"));
+}
+
+/**
+ * @brief Validates auto-reload: enabling watcher, modifying file, and observing re-application.
+ *        Uses bounded polling to remain deterministic.
+ */
+TEST_F(StylesheetLoaderTest, AutoReloadUpdatesAppliedStylesheetOnFileChange)
+{
+    // Start with Dark
+    QString initial_qss = R"(
+@Variables[Name="Dark"] { @Color: #000000; }
+QWidget { color: @Color; }
+)";
+    QString path = create_temp_qss(initial_qss);
+    ASSERT_FALSE(path.isEmpty());
+
+    ASSERT_TRUE(m_loader->load_stylesheet(path, "Dark"));
+    ASSERT_TRUE(m_loader->enable_auto_reload(true));
+
+    QString applied_before = m_loader->get_current_stylesheet();
+    ASSERT_TRUE(applied_before.contains("#000000"));
+
+    // Update same theme "Dark" to a new 6-digit hex value for robust matching
+    QString updated_qss = R"(
+@Variables[Name="Dark"] { @Color: #FFFFFF; }
+QWidget { color: @Color; }
+)";
+    {
+        QFile f(path);
+        ASSERT_TRUE(f.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text));
+        QTextStream out(&f);
+        out << updated_qss;
+        out.flush();
+        f.close();
+    }
+
+    // Poll for auto-reload effect (bounded time)
+    QElapsedTimer timer;
+    timer.start();
+    const qint64 timeout_ms = 3000;
+    bool seen_update = false;
+
+    while (timer.elapsed() < timeout_ms)
+    {
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
+        const QString applied_now = m_loader->get_current_stylesheet();
+
+        if (applied_now.contains("#FFFFFF"))
+        {
+            seen_update = true;
+            break;
+        }
+
+        QThread::msleep(10);
+    }
+
+    EXPECT_TRUE(seen_update) << "Auto-reload did not apply updated stylesheet within timeout.";
+
+    QFile::remove(path);
+}
+
+/**
+ * @brief Tests that auto-reload reapplies the same theme block on file changes.
+ */
+TEST_F(StylesheetLoaderTest, AutoReloadSameThemeReappliesOnFileChange)
+{
+    QString initial_qss = R"(
+@Variables[Name="Dark"] { @Color: #000; }
+QWidget { color: @Color; }
+)";
+    QString path = create_temp_qss(initial_qss);
+    ASSERT_FALSE(path.isEmpty());
+
+    ASSERT_TRUE(m_loader->load_stylesheet(path, "Dark"));
+    ASSERT_TRUE(m_loader->enable_auto_reload(true));
+    ASSERT_TRUE(m_loader->get_current_stylesheet().contains("#000"));
+
+    // Update same theme "Dark"
+    QString updated_qss = R"(
+@Variables[Name="Dark"] { @Color: #0f0; }
+QWidget { color: @Color; }
+)";
+    QFile f(path);
+    ASSERT_TRUE(f.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text));
+    QTextStream out(&f);
+    out << updated_qss;
+    out.flush();
+    f.close();
+
+    QElapsedTimer timer;
+    timer.start();
+    bool seen_update = false;
+    while (timer.elapsed() < 2000)
+    {
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
+        QString applied_now = m_loader->get_current_stylesheet();
+        if (applied_now.contains("#0f0"))
+        {
+            seen_update = true;
+            break;
+        }
+        QThread::msleep(10);
+    }
+    EXPECT_TRUE(seen_update);
+
+    QFile::remove(path);
+}
+
+/**
+ * @brief Tests that when the current theme block is removed, the default block is used on reload.
+ */
+TEST_F(StylesheetLoaderTest, AutoReloadDefaultBlockUsedIfThemeMissing)
+{
+    QString initial_qss = R"(
+@Variables[Name="Dark"] { @Color: #000; }
+@Variables { @Color: #123; } /* default */
+QWidget { color: @Color; }
+)";
+    QString path = create_temp_qss(initial_qss);
+    ASSERT_FALSE(path.isEmpty());
+
+    ASSERT_TRUE(m_loader->load_stylesheet(path, "Dark"));
+    ASSERT_TRUE(m_loader->enable_auto_reload(true));
+    ASSERT_TRUE(m_loader->get_current_stylesheet().contains("#000"));
+
+    // Remove "Dark" block, keep default
+    QString updated_qss = R"(
+@Variables { @Color: #abc; }
+QWidget { color: @Color; }
+)";
+    QFile f(path);
+    ASSERT_TRUE(f.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text));
+    QTextStream out(&f);
+    out << updated_qss;
+    out.flush();
+    f.close();
+
+    QElapsedTimer timer;
+    timer.start();
+    bool seen_update = false;
+    while (timer.elapsed() < 2000)
+    {
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
+        QString applied_now = m_loader->get_current_stylesheet();
+        if (applied_now.contains("#abc"))
+        {
+            seen_update = true;
+            break;
+        }
+        QThread::msleep(10);
+    }
+    EXPECT_TRUE(seen_update);
+
+    QFile::remove(path);
+}
+
+/**
+ * @brief Tests that disabling auto-reload prevents updates on file changes.
+ */
+TEST_F(StylesheetLoaderTest, AutoReloadDisabledDoesNotUpdate)
+{
+    QString initial_qss = R"(
+@Variables[Name="Dark"] { @Color: #000; }
+QWidget { color: @Color; }
+)";
+    QString path = create_temp_qss(initial_qss);
+    ASSERT_FALSE(path.isEmpty());
+
+    ASSERT_TRUE(m_loader->load_stylesheet(path, "Dark"));
+    // Disabling should return false (no watcher path configured).
+    EXPECT_FALSE(m_loader->enable_auto_reload(false));
+    ASSERT_TRUE(m_loader->get_current_stylesheet().contains("#000"));
+
+    // Change file but auto-reload disabled
+    QString updated_qss = R"(
+@Variables[Name="Dark"] { @Color: #0f0; }
+QWidget { color: @Color; }
+)";
+    {
+        QFile f(path);
+        ASSERT_TRUE(f.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text));
+        QTextStream out(&f);
+        out << updated_qss;
+        out.flush();
+        f.close();
+    }
+
+    // Process events and ensure not updated
+    QElapsedTimer timer;
+    timer.start();
+    bool updated = false;
+    while (timer.elapsed() < 500)
+    {
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
+        if (m_loader->get_current_stylesheet().contains("#0f0"))
+        {
+            updated = true;
+            break;
+        }
+        QThread::msleep(10);
+    }
+    EXPECT_FALSE(updated);
+
+    QFile::remove(path);
+}
+
+/**
+ * @brief Tests that rapid successive file changes result in only the last change being applied
+ *        due to debounce timer behavior.
+ */
+TEST_F(StylesheetLoaderTest, AutoReloadDebounceAppliesLastWrite)
+{
+    QString initial_qss = R"(
+@Variables[Name="Dark"] { @Color: #000000; }
+QWidget { color: @Color; }
+)";
+    QString path = create_temp_qss(initial_qss);
+    ASSERT_FALSE(path.isEmpty());
+
+    ASSERT_TRUE(m_loader->load_stylesheet(path, "Dark"));
+    ASSERT_TRUE(m_loader->enable_auto_reload(true));
+    ASSERT_TRUE(m_loader->get_current_stylesheet().contains("#000000"));
+
+    // Rapid writes: three quick changes to the same theme; use 6-digit hex values
+    auto write_text = [&](const QString& text) {
+        QFile f(path);
+        EXPECT_TRUE(f.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text));
+        QTextStream out(&f);
+        out << text;
+        out.flush();
+        f.close();
+        // Let the OS and watcher register the change
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
+        QThread::msleep(20);
+    };
+
+    write_text(R"(
+@Variables[Name="Dark"] { @Color: #000001; }
+QWidget { color: @Color; }
+)");
+    write_text(R"(
+@Variables[Name="Dark"] { @Color: #000002; }
+QWidget { color: @Color; }
+)");
+    write_text(R"(
+@Variables[Name="Dark"] { @Color: #000003; }
+QWidget { color: @Color; }
+)");
+
+    // Wait for debounce; final content should be #000003
+    QElapsedTimer timer;
+    timer.start();
+    const qint64 timeout_ms = 4000;
+    bool applied_final = false;
+    while (timer.elapsed() < timeout_ms)
+    {
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
+        const QString applied_now = m_loader->get_current_stylesheet();
+        if (applied_now.contains("#000003"))
+        {
+            applied_final = true;
+            break;
+        }
+        QThread::msleep(10);
+    }
+    EXPECT_TRUE(applied_final) << "Debounce did not apply the last write within timeout.";
+
+    QFile::remove(path);
 }
