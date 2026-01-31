@@ -1,17 +1,41 @@
 #pragma once
 
+#include <QFileSystemWatcher>
 #include <QMap>
 #include <QObject>
+#include <QSet>
 #include <QString>
 #include <QStringList>
+#include <QTimer>
 
 /**
  * @class StylesheetLoader
  * @brief Loads, parses, and applies QSS stylesheets with variable support and runtime switching.
  *
- * Supports CSS-like variables (e.g. @ColorPrimary) at the top of the QSS file.
- * Variables are replaced throughout the stylesheet. Allows switching between multiple stylesheets
- * and changing variables at runtime.
+ * Supports CSS-like variables (e.g. @ColorPrimary) inside @Variables blocks:
+ *  - Default block: @Variables { @ColorPrimary: #123456; }
+ *  - Named theme:   @Variables[Name="Dark"] { @ColorPrimary: #000000; }
+ *
+ * Precedence:
+ *  - Default block is parsed first.
+ *  - Theme block (if provided) overrides default variables.
+ *  - Variables can reference others (e.g. @Accent: @ColorPrimary;), resolved recursively.
+ *
+ * Auto-reload:
+ *  - When __Enable Auto Reload__ is active, `QFileSystemWatcher` observes the loaded file.
+ *  - File change notifications start a single-shot debounce `QTimer` to avoid reentrancy and
+ *    to coalesce multiple quick write events before calling `reload_stylesheet()`.
+ *
+ * Reload semantics:
+ *  - `reload_stylesheet()` re-parses the last successfully loaded file using the current theme
+ * name.
+ *  - If the current theme is absent:
+ *      - If a default `@Variables {}` block exists, variables are taken from the default block.
+ *      - If no default block exists, variables stay unresolved and a warning is logged.
+ *    This class does not auto-switch themes on reload; callers can use `set_theme()` if desired.
+ *
+ * Warnings:
+ *  - If unresolved variables remain after substitution, a warning is logged.
  */
 class StylesheetLoader: public QObject
 {
@@ -19,7 +43,7 @@ class StylesheetLoader: public QObject
 
     public:
         /**
-         * @brief Constructs a StylesheetLoader.
+         * @brief Constructs a StylesheetLoader. Sets up file watcher and debounce timer.
          * @param parent The parent QObject, or nullptr.
          */
         explicit StylesheetLoader(QObject* parent = nullptr);
@@ -33,6 +57,29 @@ class StylesheetLoader: public QObject
          */
         auto load_stylesheet(const QString& file_path,
                              const QString& theme_name = QString()) -> bool;
+
+        /**
+         * @brief Loads a stylesheet from an in-memory buffer/string (e.g., external sources).
+         * @param stylesheet The raw QSS stylesheet text.
+         * @param theme_name The theme name to use, or empty for default.
+         * @return true if parsing and applying succeeded, false otherwise.
+         */
+        auto load_stylesheet_from_data(const QString& stylesheet,
+                                       const QString& theme_name = QString()) -> bool;
+
+        /**
+         * @brief Reloads the last successfully loaded stylesheet path with the current theme.
+         * @return true if reloading and applying succeeded, false otherwise.
+         * @note If no path was previously loaded, returns false.
+         */
+        auto reload_stylesheet() -> bool;
+
+        /**
+         * @brief Changes the current theme and reapplies the stylesheet.
+         * @param theme_name The theme to set. Empty uses the default @Variables block.
+         * @return true if the theme exists (or empty default) and was applied, false otherwise.
+         */
+        auto set_theme(const QString& theme_name) -> bool;
 
         /**
          * @brief Returns the current stylesheet as a QString (with variables substituted).
@@ -53,20 +100,51 @@ class StylesheetLoader: public QObject
         [[nodiscard]] auto get_current_theme_name() const -> QString;
 
         /**
+         * @brief Returns a copy of the current variables map after resolution.
+         * @return A QMap of variable name to resolved value.
+         */
+        [[nodiscard]] auto get_variables() const -> QMap<QString, QString>;
+
+        /**
+         * @brief Checks if a variable exists (after resolution).
+         * @param name The variable name (without '@').
+         * @return true if the variable exists, false otherwise.
+         */
+        [[nodiscard]] auto has_variable(const QString& name) const -> bool;
+
+        /**
+         * @brief Removes a variable and reapplies the stylesheet.
+         * @param name The variable name (without '@').
+         * @return true if the variable was removed, false otherwise.
+         */
+        auto remove_variable(const QString& name) -> bool;
+
+        /**
          * @brief Sets or overrides a variable and reapplies the stylesheet.
          * @param name The variable name (without '@').
          * @param value The value to set.
          */
         auto set_variable(const QString& name, const QString& value) -> void;
 
-    private:
         /**
-         * @brief Parses variables at the top of the stylesheet and removes their definitions.
-         *        Variables must be defined as "@Name: value;" at the top of the file.
-         * @param stylesheet The stylesheet string to parse and modify.
+         * @brief Enables automatic reloading when the loaded stylesheet file changes.
+         * @param enabled True to enable, false to disable.
+         * @return true if the watcher was configured, false otherwise (e.g., no file loaded).
          */
-        auto parse_variables(QString& stylesheet) -> void;
+        auto enable_auto_reload(bool enabled) -> bool;
 
+    private slots:
+        /**
+         * @brief Slot invoked when the watched stylesheet file changes.
+         *
+         * Starts a single-shot debounce timer; when it fires, the stylesheet is reloaded.
+         * This prevents reentrancy and coalesces multiple quick change notifications.
+         *
+         * @param changed_path The file path reported by `QFileSystemWatcher`.
+         */
+        void on_stylesheet_file_changed(const QString& changed_path);
+
+    private:
         /**
          * @brief Replaces all variable placeholders in the stylesheet with their values.
          * @param stylesheet The stylesheet string to process.
@@ -114,10 +192,7 @@ class StylesheetLoader: public QObject
 
         /**
          * @brief Recursively resolves a variable to its final value, following references to other
-         * variables.
-         *
-         * Prevents infinite recursion by tracking already visited variable names.
-         *
+         * variables. Prevents infinite recursion by tracking visited names.
          * @param name The variable name to resolve (without '@').
          * @param variables The map of all available variables.
          * @param seen A set of variable names already visited in this resolution chain (to prevent
@@ -135,4 +210,7 @@ class StylesheetLoader: public QObject
         QString m_current_stylesheet_path;
         QStringList m_available_themes;
         QString m_current_theme_name;
+        QFileSystemWatcher m_watcher;
+        bool m_auto_reload_enabled = false;
+        QTimer m_reload_timer;
 };
