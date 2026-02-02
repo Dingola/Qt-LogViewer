@@ -21,6 +21,8 @@
 
 #include "Qt-LogViewer/Models/LogModel.h"
 #include "Qt-LogViewer/Models/LogSortFilterProxyModel.h"
+#include "Qt-LogViewer/Models/RecentItemsModel.h"
+#include "Qt-LogViewer/Models/RecentListSchema.h"
 #include "Qt-LogViewer/Services/LogViewerSettings.h"
 #include "Qt-LogViewer/Services/SessionRepository.h"
 #include "Qt-LogViewer/Services/Translator.h"
@@ -83,23 +85,58 @@ MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
         central_stack->addWidget(old_central);
     }
 
-    // Initialize session manager and recent models
+    // Initialize session manager and recent models (unified, schema-driven)
     m_session_manager = new SessionManager(new SessionRepository(this), this);
     m_session_manager->initialize_from_storage();
 
-    m_recent_files_model = new RecentLogFilesModel(this);
-    m_recent_sessions_model = new RecentSessionsModel(this);
-    m_recent_files_model->set_items(m_session_manager->get_recent_log_files());
-    m_recent_sessions_model->set_items(m_session_manager->get_recent_sessions());
+    const RecentListSchema files_schema = RecentListSchemas::make_recent_files_schema();
+    const RecentListSchema sessions_schema = RecentListSchemas::make_recent_sessions_schema();
+
+    m_recent_files_model = new RecentItemsModel(files_schema, this);
+    m_recent_sessions_model = new RecentItemsModel(sessions_schema, this);
+
+    // Build rows from SessionManager data and set them on the generic model
+    {
+        QVector<QHash<int, QVariant>> file_rows;
+        const auto recent_files = m_session_manager->get_recent_log_files();
+        file_rows.reserve(recent_files.size());
+        for (const auto& rf: recent_files)
+        {
+            file_rows.push_back(RecentListSchemas::build_recent_file_row(rf));
+        }
+        m_recent_files_model->set_rows(std::move(file_rows));
+    }
+    {
+        QVector<QHash<int, QVariant>> session_rows;
+        const auto recent_sessions = m_session_manager->get_recent_sessions();
+        session_rows.reserve(recent_sessions.size());
+        for (const auto& rs: recent_sessions)
+        {
+            session_rows.push_back(RecentListSchemas::build_recent_session_row(rs));
+        }
+        m_recent_sessions_model->set_rows(std::move(session_rows));
+    }
 
     connect(m_session_manager, &SessionManager::recent_log_files_changed, this,
             [this](const QVector<RecentLogFileRecord>& items) {
-                m_recent_files_model->set_items(items);
+                QVector<QHash<int, QVariant>> rows;
+                rows.reserve(items.size());
+                for (const auto& rf: items)
+                {
+                    rows.push_back(RecentListSchemas::build_recent_file_row(rf));
+                }
+                m_recent_files_model->set_rows(std::move(rows));
                 rebuild_recent_menus();
             });
     connect(m_session_manager, &SessionManager::recent_sessions_changed, this,
             [this](const QVector<RecentSessionRecord>& items) {
-                m_recent_sessions_model->set_items(items);
+                QVector<QHash<int, QVariant>> rows;
+                rows.reserve(items.size());
+                for (const auto& rs: items)
+                {
+                    rows.push_back(RecentListSchemas::build_recent_session_row(rs));
+                }
+                m_recent_sessions_model->set_rows(std::move(rows));
                 rebuild_recent_menus();
             });
 
@@ -523,15 +560,16 @@ auto MainWindow::initialize_menu() -> void
  */
 auto MainWindow::rebuild_recent_menus() -> void
 {
-    if (m_recent_files_menu != nullptr)
+    if (m_recent_files_menu != nullptr && m_recent_files_model != nullptr)
     {
         m_recent_files_menu->clear();
         for (int row = 0; row < m_recent_files_model->rowCount(); ++row)
         {
-            const QModelIndex idx = m_recent_files_model->index(row, RecentLogFilesModel::FileName);
-            const QString title = m_recent_files_model->data(idx, Qt::DisplayRole).toString();
+            const QModelIndex idx = m_recent_files_model->index(row, 0);
+            const QString title =
+                m_recent_files_model->data(idx, to_role_id(RecentFileRole::FileName)).toString();
             const QString path =
-                m_recent_files_model->data(idx, RecentLogFilesModel::FilePathRole).toString();
+                m_recent_files_model->data(idx, to_role_id(RecentFileRole::FilePath)).toString();
             QAction* act = m_recent_files_menu->addAction(title);
             connect(act, &QAction::triggered, this,
                     [this, path]() { handle_open_recent_file(path); });
@@ -541,15 +579,16 @@ auto MainWindow::rebuild_recent_menus() -> void
         connect(clear_act, &QAction::triggered, this, [this]() { handle_clear_recent_files(); });
     }
 
-    if (m_recent_sessions_menu != nullptr)
+    if (m_recent_sessions_menu != nullptr && m_recent_sessions_model != nullptr)
     {
         m_recent_sessions_menu->clear();
         for (int row = 0; row < m_recent_sessions_model->rowCount(); ++row)
         {
-            const QModelIndex idx = m_recent_sessions_model->index(row, RecentSessionsModel::Name);
-            const QString title = m_recent_sessions_model->data(idx, Qt::DisplayRole).toString();
-            const int IdRole = Qt::UserRole + 3;
-            const QString id = m_recent_sessions_model->data(idx, IdRole).toString();
+            const QModelIndex idx = m_recent_sessions_model->index(row, 0);
+            const QString title =
+                m_recent_sessions_model->data(idx, to_role_id(RecentSessionRole::Name)).toString();
+            const QString id =
+                m_recent_sessions_model->data(idx, to_role_id(RecentSessionRole::Id)).toString();
             QAction* act = m_recent_sessions_menu->addAction(title);
             connect(act, &QAction::triggered, this, [this, id]() { handle_open_session(id); });
         }

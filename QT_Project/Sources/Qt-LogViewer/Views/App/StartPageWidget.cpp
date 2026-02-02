@@ -13,8 +13,7 @@
 #include <QPushButton>
 #include <QVariant>
 
-#include "Qt-LogViewer/Models/RecentLogFilesModel.h"
-#include "Qt-LogViewer/Models/RecentSessionsModel.h"
+#include "Qt-LogViewer/Models/RecentRoles.h"
 #include "Qt-LogViewer/Views/Shared/RecentItemDelegate.h"
 #include "ui_StartPageWidget.h"
 
@@ -48,9 +47,9 @@ auto StartPageWidget::set_recent_files_model(QAbstractItemModel* model) -> void
 
     if (auto* lv = qobject_cast<QListView*>(ui->recentFilesView); lv != nullptr)
     {
-        lv->setItemDelegate(new RecentItemDelegate(RecentLogFilesModel::FileNameRole,
-                                                   RecentLogFilesModel::FilePathRole,
-                                                   RecentLogFilesModel::LastOpenedRole, lv));
+        lv->setItemDelegate(new RecentItemDelegate(to_role_id(RecentFileRole::FileName),
+                                                   to_role_id(RecentFileRole::FilePath),
+                                                   to_role_id(RecentFileRole::LastOpened), lv));
         lv->setUniformItemSizes(true);
         lv->setSpacing(4);
     }
@@ -88,9 +87,9 @@ auto StartPageWidget::set_recent_sessions_model(QAbstractItemModel* model) -> vo
 
     if (auto* lv = qobject_cast<QListView*>(ui->recentSessionsView); lv != nullptr)
     {
-        lv->setItemDelegate(new RecentItemDelegate(RecentSessionsModel::NameRole,
-                                                   RecentSessionsModel::IdRole,
-                                                   RecentSessionsModel::LastOpenedRole, lv));
+        lv->setItemDelegate(new RecentItemDelegate(to_role_id(RecentSessionRole::Name),
+                                                   to_role_id(RecentSessionRole::Id),
+                                                   to_role_id(RecentSessionRole::LastOpened), lv));
         lv->setUniformItemSizes(true);
         lv->setSpacing(4);
     }
@@ -211,7 +210,7 @@ auto StartPageWidget::setup_connections() -> void
         if (index.isValid() && ui->recentFilesView->model() != nullptr)
         {
             const QVariant file_path_data =
-                ui->recentFilesView->model()->data(index, RecentLogFilesModel::FilePathRole);
+                ui->recentFilesView->model()->data(index, to_role_id(RecentFileRole::FilePath));
             const QString file_path = file_path_data.toString();
             if (!file_path.isEmpty())
             {
@@ -220,19 +219,19 @@ auto StartPageWidget::setup_connections() -> void
         }
     });
 
-    connect(ui->recentSessionsView, &QListView::doubleClicked, this,
-            [this](const QModelIndex& index) {
-                if (index.isValid() && ui->recentSessionsView->model() != nullptr)
+    connect(
+        ui->recentSessionsView, &QListView::doubleClicked, this, [this](const QModelIndex& index) {
+            if (index.isValid() && ui->recentSessionsView->model() != nullptr)
+            {
+                const QVariant session_id_data =
+                    ui->recentSessionsView->model()->data(index, to_role_id(RecentSessionRole::Id));
+                const QString session_id = session_id_data.toString();
+                if (!session_id.isEmpty())
                 {
-                    const QVariant session_id_data =
-                        ui->recentSessionsView->model()->data(index, RecentSessionsModel::IdRole);
-                    const QString session_id = session_id_data.toString();
-                    if (!session_id.isEmpty())
-                    {
-                        emit open_recent_session_requested(session_id);
-                    }
+                    emit open_recent_session_requested(session_id);
                 }
-            });
+            }
+        });
 }
 
 /**
@@ -252,7 +251,7 @@ auto StartPageWidget::get_selected_recent_file_path() const -> QString
             const QModelIndex index = files_selection_model->currentIndex();
             if (index.isValid() && view->model() != nullptr)
             {
-                const QVariant v = view->model()->data(index, Qt::UserRole + 1);
+                const QVariant v = view->model()->data(index, to_role_id(RecentFileRole::FilePath));
                 path = v.toString();
             }
         }
@@ -278,8 +277,7 @@ auto StartPageWidget::get_selected_recent_session_id() const -> QString
             const QModelIndex index = sel->currentIndex();
             if (index.isValid() && view->model() != nullptr)
             {
-                const int id_role = Qt::UserRole + 3;
-                const QVariant v = view->model()->data(index, id_role);
+                const QVariant v = view->model()->data(index, to_role_id(RecentSessionRole::Id));
                 id = v.toString();
             }
         }

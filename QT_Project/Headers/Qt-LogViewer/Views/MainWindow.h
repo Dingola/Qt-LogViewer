@@ -11,8 +11,8 @@
 #include "Qt-LogViewer/Controllers/SessionController.h"
 #include "Qt-LogViewer/Models/LogEntry.h"
 #include "Qt-LogViewer/Models/LogFileInfo.h"
-#include "Qt-LogViewer/Models/RecentLogFilesModel.h"
-#include "Qt-LogViewer/Models/RecentSessionsModel.h"
+#include "Qt-LogViewer/Models/RecentItemsModel.h"
+#include "Qt-LogViewer/Models/RecentListSchema.h"
 #include "Qt-LogViewer/Services/SessionManager.h"
 #include "Qt-LogViewer/Services/StylesheetLoader.h"
 #include "Qt-LogViewer/Views/App/LogFileExplorer.h"
@@ -359,8 +359,11 @@ class MainWindow: public BaseMainWindow
 
         // Session-related
         SessionManager* m_session_manager = nullptr;
-        RecentLogFilesModel* m_recent_files_model = nullptr;
-        RecentSessionsModel* m_recent_sessions_model = nullptr;
+
+        // Unified, schema-driven recent models
+        RecentItemsModel* m_recent_files_model = nullptr;
+        RecentItemsModel* m_recent_sessions_model = nullptr;
+
         SessionController* m_session_controller{nullptr};
 
         // File menu submenus
