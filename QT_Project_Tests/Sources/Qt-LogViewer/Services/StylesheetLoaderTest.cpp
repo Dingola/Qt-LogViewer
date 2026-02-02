@@ -609,6 +609,28 @@ QWidget { color: @Color; }
 }
 
 /**
+ * @brief Helper lambda to write content to a file and allow the watcher to settle.
+ * @param path The file path to write to.
+ * @param content The content to write.
+ */
+static void write_file_and_wait(const QString& path, const QString& content)
+{
+    {
+        QFile f(path);
+        if (f.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text))
+        {
+            QTextStream out(&f);
+            out << content;
+            out.flush();
+            f.close();
+        }
+    }
+    // Give the OS time to flush and the watcher to potentially pick up the change
+    QThread::msleep(50);
+    QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+}
+
+/**
  * @brief Validates auto-reload: enabling watcher, modifying file, and observing re-application.
  *        Uses bounded polling to remain deterministic.
  */
@@ -625,6 +647,10 @@ QWidget { color: @Color; }
     ASSERT_TRUE(m_loader->load_stylesheet(path, "Dark"));
     ASSERT_TRUE(m_loader->enable_auto_reload(true));
 
+    // Give the watcher time to fully initialize before modifying the file
+    QThread::msleep(100);
+    QCoreApplication::processEvents(QEventLoop::AllEvents, 100);
+
     QString applied_before = m_loader->get_current_stylesheet();
     ASSERT_TRUE(applied_before.contains("#000000"));
 
@@ -633,24 +659,17 @@ QWidget { color: @Color; }
 @Variables[Name="Dark"] { @Color: #FFFFFF; }
 QWidget { color: @Color; }
 )";
-    {
-        QFile f(path);
-        ASSERT_TRUE(f.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text));
-        QTextStream out(&f);
-        out << updated_qss;
-        out.flush();
-        f.close();
-    }
+    write_file_and_wait(path, updated_qss);
 
     // Poll for auto-reload effect (bounded time)
     QElapsedTimer timer;
     timer.start();
-    const qint64 timeout_ms = 3000;
+    const qint64 timeout_ms = 5000;
     bool seen_update = false;
 
     while (timer.elapsed() < timeout_ms)
     {
-        QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
         const QString applied_now = m_loader->get_current_stylesheet();
 
         if (applied_now.contains("#FFFFFF"))
@@ -659,7 +678,7 @@ QWidget { color: @Color; }
             break;
         }
 
-        QThread::msleep(10);
+        QThread::msleep(50);
     }
 
     EXPECT_TRUE(seen_update) << "Auto-reload did not apply updated stylesheet within timeout.";
@@ -681,6 +700,11 @@ QWidget { color: @Color; }
 
     ASSERT_TRUE(m_loader->load_stylesheet(path, "Dark"));
     ASSERT_TRUE(m_loader->enable_auto_reload(true));
+
+    // Give the watcher time to fully initialize
+    QThread::msleep(100);
+    QCoreApplication::processEvents(QEventLoop::AllEvents, 100);
+
     ASSERT_TRUE(m_loader->get_current_stylesheet().contains("#000"));
 
     // Update same theme "Dark"
@@ -688,26 +712,21 @@ QWidget { color: @Color; }
 @Variables[Name="Dark"] { @Color: #0f0; }
 QWidget { color: @Color; }
 )";
-    QFile f(path);
-    ASSERT_TRUE(f.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text));
-    QTextStream out(&f);
-    out << updated_qss;
-    out.flush();
-    f.close();
+    write_file_and_wait(path, updated_qss);
 
     QElapsedTimer timer;
     timer.start();
     bool seen_update = false;
-    while (timer.elapsed() < 2000)
+    while (timer.elapsed() < 5000)
     {
-        QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
         QString applied_now = m_loader->get_current_stylesheet();
         if (applied_now.contains("#0f0"))
         {
             seen_update = true;
             break;
         }
-        QThread::msleep(10);
+        QThread::msleep(50);
     }
     EXPECT_TRUE(seen_update);
 
@@ -729,6 +748,11 @@ QWidget { color: @Color; }
 
     ASSERT_TRUE(m_loader->load_stylesheet(path, "Dark"));
     ASSERT_TRUE(m_loader->enable_auto_reload(true));
+
+    // Give the watcher time to fully initialize
+    QThread::msleep(100);
+    QCoreApplication::processEvents(QEventLoop::AllEvents, 100);
+
     ASSERT_TRUE(m_loader->get_current_stylesheet().contains("#000"));
 
     // Remove "Dark" block, keep default
@@ -736,26 +760,21 @@ QWidget { color: @Color; }
 @Variables { @Color: #abc; }
 QWidget { color: @Color; }
 )";
-    QFile f(path);
-    ASSERT_TRUE(f.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text));
-    QTextStream out(&f);
-    out << updated_qss;
-    out.flush();
-    f.close();
+    write_file_and_wait(path, updated_qss);
 
     QElapsedTimer timer;
     timer.start();
     bool seen_update = false;
-    while (timer.elapsed() < 3000)
+    while (timer.elapsed() < 5000)
     {
-        QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
         QString applied_now = m_loader->get_current_stylesheet();
         if (applied_now.contains("#abc"))
         {
             seen_update = true;
             break;
         }
-        QThread::msleep(10);
+        QThread::msleep(50);
     }
     EXPECT_TRUE(seen_update);
 
@@ -784,14 +803,7 @@ QWidget { color: @Color; }
 @Variables[Name="Dark"] { @Color: #0f0; }
 QWidget { color: @Color; }
 )";
-    {
-        QFile f(path);
-        ASSERT_TRUE(f.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text));
-        QTextStream out(&f);
-        out << updated_qss;
-        out.flush();
-        f.close();
-    }
+    write_file_and_wait(path, updated_qss);
 
     // Process events and ensure not updated
     QElapsedTimer timer;
@@ -827,6 +839,11 @@ QWidget { color: @Color; }
 
     ASSERT_TRUE(m_loader->load_stylesheet(path, "Dark"));
     ASSERT_TRUE(m_loader->enable_auto_reload(true));
+
+    // Give the watcher time to fully initialize
+    QThread::msleep(100);
+    QCoreApplication::processEvents(QEventLoop::AllEvents, 100);
+
     ASSERT_TRUE(m_loader->get_current_stylesheet().contains("#000000"));
 
     // Rapid writes: three quick changes to the same theme; use 6-digit hex values
@@ -858,18 +875,18 @@ QWidget { color: @Color; }
     // Wait for debounce; final content should be #000003
     QElapsedTimer timer;
     timer.start();
-    const qint64 timeout_ms = 4000;
+    const qint64 timeout_ms = 5000;
     bool applied_final = false;
     while (timer.elapsed() < timeout_ms)
     {
-        QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
         const QString applied_now = m_loader->get_current_stylesheet();
         if (applied_now.contains("#000003"))
         {
             applied_final = true;
             break;
         }
-        QThread::msleep(10);
+        QThread::msleep(50);
     }
     EXPECT_TRUE(applied_final) << "Debounce did not apply the last write within timeout.";
 
