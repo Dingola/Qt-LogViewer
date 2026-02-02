@@ -746,7 +746,7 @@ QWidget { color: @Color; }
     QElapsedTimer timer;
     timer.start();
     bool seen_update = false;
-    while (timer.elapsed() < 2000)
+    while (timer.elapsed() < 3000)
     {
         QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
         QString applied_now = m_loader->get_current_stylesheet();
