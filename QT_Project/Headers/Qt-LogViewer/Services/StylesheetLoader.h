@@ -146,6 +146,23 @@ class StylesheetLoader: public QObject
 
     private:
         /**
+         * @brief Common parsing/apply routine used by both file and in-memory loading.
+         *
+         * Parses available themes and variables, resolves recursively, removes @Variables blocks,
+         * substitutes variables, applies the stylesheet, and updates internal state.
+         *
+         * @param raw_stylesheet The raw QSS input.
+         * @param theme_name The requested theme (empty means default block only).
+         * @param source_path The file path if coming from a file, empty when from data.
+         * @param configure_watcher If true, updates watcher paths for file-based loads. For data,
+         *                          paths are cleared.
+         * @return true if parsing + applying succeeded, false otherwise.
+         */
+        auto process_and_apply_stylesheet(const QString& raw_stylesheet, const QString& theme_name,
+                                          const QString& source_path,
+                                          bool configure_watcher) -> bool;
+
+        /**
          * @brief Replaces all variable placeholders in the stylesheet with their values.
          * @param stylesheet The stylesheet string to process.
          * @return The stylesheet with variables substituted.

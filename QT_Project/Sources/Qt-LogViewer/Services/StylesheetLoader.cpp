@@ -29,26 +29,29 @@ StylesheetLoader::StylesheetLoader(QObject* parent): QObject(parent)
 }
 
 /**
- * @brief Loads a stylesheet file, parses variables (default and theme), resolves them recursively,
- * and applies it to the application. Logs success or failure.
+ * @brief Common parsing/apply routine used by both file and in-memory loading.
  *
- * Reload semantics:
- *  - Applies variables from the default block first (if present).
- *  - Overrides with requested theme (if provided and present).
+ * Parses available themes and variables, resolves recursively, removes @Variables blocks,
+ * substitutes variables, applies the stylesheet, and updates internal state.
  *
- * @param file_path The path to the QSS file.
- * @param theme_name The theme name to use, or empty for default.
- * @return true if loading and applying succeeded, false otherwise.
+ * @param raw_stylesheet The raw QSS input.
+ * @param theme_name The requested theme (empty means default block only).
+ * @param source_path The file path if coming from a file, empty when from data.
+ * @param configure_watcher If true, updates watcher paths for file-based loads. For data,
+ *                          paths are cleared.
+ * @return true if parsing + applying succeeded, false otherwise.
  */
-auto StylesheetLoader::load_stylesheet(const QString& file_path, const QString& theme_name) -> bool
+auto StylesheetLoader::process_and_apply_stylesheet(const QString& raw_stylesheet,
+                                                    const QString& theme_name,
+                                                    const QString& source_path,
+                                                    bool configure_watcher) -> bool
 {
     bool success = false;
-    QFile style_file(file_path);
 
-    if (style_file.open(QFile::ReadOnly | QFile::Text))
+    if (!raw_stylesheet.isEmpty())
     {
-        m_raw_stylesheet = QString::fromUtf8(style_file.readAll());
-        m_current_stylesheet_path = file_path;
+        m_raw_stylesheet = raw_stylesheet;
+        m_current_stylesheet_path = source_path;
         m_variables.clear();
 
         // Parse and store available themes
@@ -106,14 +109,53 @@ auto StylesheetLoader::load_stylesheet(const QString& file_path, const QString& 
             m_watcher.removePaths(watched);
         }
 
-        if (m_auto_reload_enabled && !m_current_stylesheet_path.isEmpty())
+        if (configure_watcher && m_auto_reload_enabled && !m_current_stylesheet_path.isEmpty())
         {
             m_watcher.addPath(m_current_stylesheet_path);
         }
 
-        qDebug() << "[StylesheetLoader] Loaded stylesheet from" << file_path
-                 << "with theme:" << theme_name;
+        // Log source
+        if (!m_current_stylesheet_path.isEmpty())
+        {
+            qDebug() << "[StylesheetLoader] Loaded stylesheet from" << m_current_stylesheet_path
+                     << "with theme:" << theme_name;
+        }
+        else
+        {
+            qDebug() << "[StylesheetLoader] Loaded stylesheet from data with theme:" << theme_name;
+        }
+
         success = true;
+    }
+    else
+    {
+        qWarning() << "[StylesheetLoader] Provided stylesheet data is empty.";
+    }
+
+    return success;
+}
+
+/**
+ * @brief Loads a stylesheet file, parses variables (default and theme), resolves them recursively,
+ * and applies it to the application. Logs success or failure.
+ *
+ * Reload semantics:
+ *  - Applies variables from the default block first (if present).
+ *  - Overrides with requested theme (if provided and present).
+ *
+ * @param file_path The path to the QSS file.
+ * @param theme_name The theme name to use, or empty for default.
+ * @return true if loading and applying succeeded, false otherwise.
+ */
+auto StylesheetLoader::load_stylesheet(const QString& file_path, const QString& theme_name) -> bool
+{
+    bool success = false;
+    QFile style_file(file_path);
+
+    if (style_file.open(QFile::ReadOnly | QFile::Text))
+    {
+        const QString raw = QString::fromUtf8(style_file.readAll());
+        success = process_and_apply_stylesheet(raw, theme_name, file_path, true);
     }
     else
     {
@@ -137,67 +179,7 @@ auto StylesheetLoader::load_stylesheet(const QString& file_path, const QString& 
 auto StylesheetLoader::load_stylesheet_from_data(const QString& stylesheet,
                                                  const QString& theme_name) -> bool
 {
-    bool success = false;
-
-    if (!stylesheet.isEmpty())
-    {
-        m_raw_stylesheet = stylesheet;
-        m_current_stylesheet_path.clear();
-        m_variables.clear();
-
-        m_available_themes = parse_available_themes(m_raw_stylesheet);
-
-        QString default_block = extract_variables_block(m_raw_stylesheet, QString());
-        if (!default_block.isEmpty())
-        {
-            parse_variables_block(default_block, m_variables);
-        }
-
-        if (!theme_name.isEmpty())
-        {
-            QString theme_block = extract_variables_block(m_raw_stylesheet, theme_name);
-            if (!theme_block.isEmpty())
-            {
-                parse_variables_block(theme_block, m_variables);
-            }
-        }
-
-        QMap<QString, QString> resolved_variables;
-        for (auto it = m_variables.begin(); it != m_variables.end(); ++it)
-        {
-            QSet<QString> seen;
-            resolved_variables[it.key()] = resolve_variable(it.key(), m_variables, seen);
-        }
-        m_variables = resolved_variables;
-
-        QString base_stylesheet = remove_variables_blocks(m_raw_stylesheet);
-        QString final_stylesheet = substitute_variables(base_stylesheet);
-
-        if (final_stylesheet.contains(QRegularExpression(R"(@[A-Za-z0-9_\-]+)")))
-        {
-            qWarning()
-                << "[StylesheetLoader] Warning: Unresolved variable(s) remain in stylesheet!";
-        }
-
-        apply_stylesheet(final_stylesheet);
-        m_current_theme_name = theme_name;
-
-        // in-memory data cannot be auto-reloaded through QFileSystemWatcher
-        QStringList watched = m_watcher.files();
-        if (!watched.isEmpty())
-        {
-            m_watcher.removePaths(watched);
-        }
-
-        qDebug() << "[StylesheetLoader] Loaded stylesheet from data with theme:" << theme_name;
-        success = true;
-    }
-    else
-    {
-        qWarning() << "[StylesheetLoader] Provided stylesheet data is empty.";
-    }
-
-    return success;
+    return process_and_apply_stylesheet(stylesheet, theme_name, QString(), false);
 }
 
 /**

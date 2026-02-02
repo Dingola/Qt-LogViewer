@@ -875,3 +875,123 @@ QWidget { color: @Color; }
 
     QFile::remove(path);
 }
+
+/**
+ * @brief get_variables returns a copy of the resolved variables map (values are fully resolved).
+ */
+TEST_F(StylesheetLoaderTest, GetVariablesReturnsResolvedValues)
+{
+    const QString qss = R"(
+@Variables[Name="Test"] {
+    @Base: #112233;
+    @Accent: @Base;
+}
+QWidget { color: @Accent; }
+)";
+    ASSERT_TRUE(m_loader->load_stylesheet_from_data(qss, "Test"));
+
+    const auto vars = m_loader->get_variables();
+    ASSERT_TRUE(vars.contains("Base"));
+    ASSERT_TRUE(vars.contains("Accent"));
+    EXPECT_EQ(vars.value("Base"), "#112233");
+    EXPECT_EQ(vars.value("Accent"), "#112233");  // resolved via recursion
+}
+
+/**
+ * @brief has_variable reflects current state after load, set_variable and remove_variable.
+ */
+TEST_F(StylesheetLoaderTest, HasVariableReflectsAddAndRemove)
+{
+    const QString qss = R"(
+@Variables[Name="Test"] {
+    @Color: #abcdef;
+}
+QWidget { color: @Color; }
+)";
+    ASSERT_TRUE(m_loader->load_stylesheet_from_data(qss, "Test"));
+    EXPECT_TRUE(m_loader->has_variable("Color"));
+    EXPECT_FALSE(m_loader->has_variable("Missing"));
+
+    // add/override
+    m_loader->set_variable("NewVar", "#010101");
+    EXPECT_TRUE(m_loader->has_variable("NewVar"));
+
+    // remove again
+    EXPECT_TRUE(m_loader->remove_variable("NewVar"));
+    EXPECT_FALSE(m_loader->has_variable("NewVar"));
+}
+
+/**
+ * @brief remove_variable removes the entry and reapplies the stylesheet (placeholder remains).
+ */
+TEST_F(StylesheetLoaderTest, RemoveVariableRemovesAndTriggersReapply)
+{
+    const QString qss = R"(
+@Variables[Name="Test"] {
+    @Accent: #445566;
+}
+QWidget { color: @Accent; }
+)";
+    ASSERT_TRUE(m_loader->load_stylesheet_from_data(qss, "Test"));
+
+    // Sanity: value applied
+    QString applied_before = m_loader->get_current_stylesheet();
+    ASSERT_TRUE(applied_before.contains("#445566"));
+
+    // Remove and verify
+    EXPECT_TRUE(m_loader->remove_variable("Accent"));
+    EXPECT_FALSE(m_loader->has_variable("Accent"));
+
+    // After removal, unresolved placeholder should remain and previous color must be gone
+    QString applied_after = m_loader->get_current_stylesheet();
+    EXPECT_TRUE(applied_after.contains("@Accent"));
+    EXPECT_FALSE(applied_after.contains("#445566"));
+
+    // Removing again returns false (already removed)
+    EXPECT_FALSE(m_loader->remove_variable("Accent"));
+}
+
+/**
+ * @brief remove_variable on a non-existing variable returns false and leaves stylesheet unchanged.
+ */
+TEST_F(StylesheetLoaderTest, RemoveVariableNonExistingReturnsFalseAndNoChange)
+{
+    const QString qss = R"(
+@Variables[Name="Test"] {
+    @Color: #778899;
+}
+QWidget { color: @Color; }
+)";
+    ASSERT_TRUE(m_loader->load_stylesheet_from_data(qss, "Test"));
+    const QString applied_before = m_loader->get_current_stylesheet();
+
+    EXPECT_FALSE(m_loader->remove_variable("DoesNotExist"));
+    const QString applied_after = m_loader->get_current_stylesheet();
+
+    EXPECT_EQ(applied_before, applied_after);
+}
+
+/**
+ * @brief get_variables returns a copy; mutating the returned map must not affect internal state.
+ */
+TEST_F(StylesheetLoaderTest, GetVariablesReturnsCopyNotReference)
+{
+    const QString qss = R"(
+@Variables[Name="Test"] {
+    @Color: #aabbcc;
+}
+QWidget { color: @Color; }
+)";
+    ASSERT_TRUE(m_loader->load_stylesheet_from_data(qss, "Test"));
+
+    auto vars_copy = m_loader->get_variables();
+    vars_copy.insert("Injected", "should-not-appear");
+
+    // Internal state unchanged
+    EXPECT_FALSE(m_loader->has_variable("Injected"));
+
+    // Stylesheet still uses only the real variables
+    const QString applied = m_loader->get_current_stylesheet();
+    EXPECT_TRUE(applied.contains("#aabbcc"));
+    EXPECT_FALSE(applied.contains("should-not-appear"));
+}
