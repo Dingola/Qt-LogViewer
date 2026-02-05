@@ -1,5 +1,10 @@
 @PACKAGE_INIT@
 
+include(CMakeFindDependencyMacro)
+
+set(SimpleQtLogger_DIR "@SIMPLEQTLOGGER_DIR@")
+find_dependency(SimpleQtLogger REQUIRED)
+
 include(${CMAKE_CURRENT_LIST_DIR}/@PROJECT_NAME@.cmake)
 
 check_required_components(@PROJECT_NAME@)
