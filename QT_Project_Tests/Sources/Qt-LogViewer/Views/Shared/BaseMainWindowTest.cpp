@@ -6,7 +6,7 @@
 #include <QTest>
 #include <QWidget>
 
-#include "Qt-LogViewer/Services/StylesheetLoader.h"
+#include "QtWidgetsCommonLib/Utils/StylesheetLoader.h"
 
 /**
  * @brief Creates a temporary QSS file with the given content.

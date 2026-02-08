@@ -28,6 +28,7 @@
 #include "Qt-LogViewer/Services/Translator.h"
 #include "Qt-LogViewer/Views/App/Dialogs/SettingsDialog.h"
 #include "Qt-LogViewer/Views/App/StartPageWidget.h"
+#include "QtWidgetsCommonLib/Utils/StylesheetLoader.h"
 #include "ui_MainWindow.h"
 
 namespace

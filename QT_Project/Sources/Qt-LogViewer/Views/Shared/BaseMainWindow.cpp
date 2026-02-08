@@ -2,8 +2,10 @@
 
 #include "Qt-LogViewer/Services/AppPreferencesInterface.h"
 #include "Qt-LogViewer/Services/Settings.h"
-#include "Qt-LogViewer/Services/StylesheetLoader.h"
 #include "Qt-LogViewer/Services/Translator.h"
+#include "QtWidgetsCommonLib/Utils/StylesheetLoader.h"
+
+using QtWidgetsCommonLib::StylesheetLoader;
 
 /**
  * @brief Constructs a BaseMainWindow object.
@@ -183,7 +185,8 @@ void BaseMainWindow::showEvent(QShowEvent* event)
         if (!m_theme_applied)
         {
             const QString theme = m_preferences->get_theme();
-            m_stylesheet_loader->load_stylesheet(":/Resources/style.qss", theme);
+            m_stylesheet_loader->load_stylesheet(
+                "D:/Projects/VS_Projects/Qt-LogViewer/QT_Project/Resources/style.qss", theme);
             m_theme_applied = true;
             qInfo() << "[BaseMainWindow] Loaded theme from preferences (showEvent):" << theme;
         }

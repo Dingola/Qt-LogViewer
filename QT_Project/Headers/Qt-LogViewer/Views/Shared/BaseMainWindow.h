@@ -3,8 +3,12 @@
 #include <QMainWindow>
 
 class AppPreferencesInterface;
-class StylesheetLoader;
 class Translator;
+
+namespace QtWidgetsCommonLib
+{
+class StylesheetLoader;
+}
 
 /**
  * @class BaseMainWindow
@@ -44,7 +48,7 @@ class BaseMainWindow: public QMainWindow
          *
          * @return Pointer to the StylesheetLoader object.
          */
-        [[nodiscard]] auto get_stylesheet_loader() const -> StylesheetLoader*;
+        [[nodiscard]] auto get_stylesheet_loader() const -> QtWidgetsCommonLib::StylesheetLoader*;
 
         /**
          * @brief Gets the translator object.
@@ -124,7 +128,7 @@ class BaseMainWindow: public QMainWindow
         /**
          * @brief Pointer to the StylesheetLoader object used for managing application stylesheets.
          */
-        StylesheetLoader* m_stylesheet_loader;
+        QtWidgetsCommonLib::StylesheetLoader* m_stylesheet_loader;
 
         /**
          * @brief Indicates whether the theme has been applied.

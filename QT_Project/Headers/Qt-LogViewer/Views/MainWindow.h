@@ -14,7 +14,6 @@
 #include "Qt-LogViewer/Models/RecentItemsModel.h"
 #include "Qt-LogViewer/Models/RecentListSchema.h"
 #include "Qt-LogViewer/Services/SessionManager.h"
-#include "Qt-LogViewer/Services/StylesheetLoader.h"
 #include "Qt-LogViewer/Views/App/LogFileExplorer.h"
 #include "Qt-LogViewer/Views/App/LogLevelPieChartWidget.h"
 #include "Qt-LogViewer/Views/App/LogViewWidget.h"
