@@ -212,6 +212,7 @@ endif()
 target_link_libraries(${PROJECT_NAME} PRIVATE Qt6::Widgets Qt6::Svg)
 include(${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/Doxygen.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/SimpleQtLogger.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/QtWidgetsCommonLib.cmake)
 
 if (WIN32)
     if (MSVC OR (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC"))
