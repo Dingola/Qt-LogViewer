@@ -11,6 +11,7 @@ configure_file(Config.h.in Config.h)
 # Include CMake helper scripts
 include(${CMAKE_SOURCE_DIR}/CMake/SourceGroups.cmake)
 include(${CMAKE_SOURCE_DIR}/CMake/BuildThirdPartyProject.cmake)
+include(${CMAKE_SOURCE_DIR}/CMake/IncludeThirdParty.cmake)
 include(${CMAKE_SOURCE_DIR}/CMake/SanitizerConfig.cmake)
 
 ############################################

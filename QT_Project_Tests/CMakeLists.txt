@@ -10,6 +10,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Include CMake helper scripts
 include(${CMAKE_SOURCE_DIR}/CMake/SourceGroups.cmake)
 include(${CMAKE_SOURCE_DIR}/CMake/BuildThirdPartyProject.cmake)
+include(${CMAKE_SOURCE_DIR}/CMake/IncludeThirdParty.cmake)
 
 ############################################
 ### Global Properties                    ###
