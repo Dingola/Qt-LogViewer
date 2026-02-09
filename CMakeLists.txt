@@ -36,6 +36,9 @@ set_property(CACHE ${MAIN_PROJECT_NAME}_BUILD_TARGET_TYPE PROPERTY STRINGS execu
 # Option to build the test project
 option(${MAIN_PROJECT_NAME}_BUILD_TEST_PROJECT "Build test project" OFF)
 
+# Option to include third-party libraries source code into the solution
+option(${MAIN_PROJECT_NAME}_INCLUDE_THIRD_LIBS_INTO_SOLUTION "Force third-party libraries to be included in the solution via add_subdirectory" OFF)
+
 # Option to use clang-format
 option(USE_CLANG_FORMAT "Use clang-format for code formatting" OFF)
 
@@ -76,7 +79,7 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 # Set the build type if not set
 if(NOT CMAKE_BUILD_TYPE)
-	set(CMAKE_BUILD_TYPE "${CMAKE_CONFIGURATION_TYPES}" CACHE STRING "Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel.")
+	set(CMAKE_BUILD_TYPE "Debug" CACHE STRING "Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel.")
 endif()
 
 ############################################

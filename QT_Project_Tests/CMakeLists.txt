@@ -64,7 +64,7 @@ if(USE_CLANG_FORMAT)
     find_program(CLANG_FORMAT "clang-format" HINTS ${CLANG_TOOLS_PATH})
     if(CLANG_FORMAT)
         # Define a custom target for formatting code
-        add_custom_target(_run_clang_format_tests
+        add_custom_target(${PROJECT_NAME}_run_clang_format_tests
             COMMAND ${CLANG_FORMAT}
             -style=file:${CMAKE_SOURCE_DIR}/Configs/.clang-format
             -i
@@ -73,6 +73,7 @@ if(USE_CLANG_FORMAT)
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
             COMMENT "Formatting code with clang-format"
         )
+        set_target_properties(${PROJECT_NAME}_run_clang_format_tests PROPERTIES FOLDER "_Tasks")
     else()
         message(WARNING "clang-format not found. Please ensure clang-format is installed and the path is set correctly.")
     endif()
@@ -86,7 +87,7 @@ if(USE_CLANG_TIDY)
     find_program(CLANG_TIDY "clang-tidy" HINTS ${CLANG_TOOLS_PATH})
     if(CLANG_TIDY)
         # Define a custom target for running clang-tidy
-        add_custom_target(_run_clang_tidy_tests
+        add_custom_target(${PROJECT_NAME}_run_clang_tidy_tests
             COMMAND ${CLANG_TIDY}
 			--config-file=${CMAKE_SOURCE_DIR}/Configs/.clang-tidy
             -p=${CMAKE_BINARY_DIR}
@@ -95,6 +96,7 @@ if(USE_CLANG_TIDY)
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
             COMMENT "Running clang-tidy for static analysis"
         )
+        set_target_properties(${PROJECT_NAME}_run_clang_tidy_tests PROPERTIES FOLDER "_Tasks")
     else()
         message(WARNING "clang-tidy not found. Please ensure clang-tidy is installed and the path is set correctly.")
     endif()
