@@ -1,32 +1,46 @@
 #pragma once
 
-#include <QAction>
-#include <QDockWidget>
+#include <QByteArray>
+#include <QJsonObject>
 #include <QMainWindow>
+#include <QMap>
 #include <QModelIndex>
-#include <QPlainTextEdit>
+#include <QSet>
+#include <QString>
+#include <QUuid>
 #include <QVector>
 
-#include "Qt-LogViewer/Controllers/LogViewerController.h"
-#include "Qt-LogViewer/Controllers/SessionController.h"
-#include "Qt-LogViewer/Models/LogEntry.h"
-#include "Qt-LogViewer/Models/LogFileInfo.h"
-#include "Qt-LogViewer/Models/RecentItemsModel.h"
-#include "Qt-LogViewer/Models/RecentListSchema.h"
-#include "Qt-LogViewer/Services/SessionManager.h"
-#include "Qt-LogViewer/Views/App/LogFileExplorer.h"
-#include "Qt-LogViewer/Views/App/LogLevelPieChartWidget.h"
-#include "Qt-LogViewer/Views/App/LogViewWidget.h"
-#include "Qt-LogViewer/Views/App/StartPageWidget.h"
 #include "Qt-LogViewer/Views/Shared/BaseMainWindow.h"
-#include "Qt-LogViewer/Views/Shared/DockWidget.h"
 
+// Forward declarations for Qt types used as pointers/references
+class QAction;
+class QDockWidget;
+class QPlainTextEdit;
+class QMenu;
+class QResizeEvent;
+class QDragEnterEvent;
+class QDropEvent;
+class QCloseEvent;
+class QEvent;
+
+// Forward declarations for project types used as pointers/references
 namespace Ui
 {
 class MainWindow;
 }
 
 class LogViewerSettings;
+class LogViewerController;
+class SessionController;
+class LogFileInfo;
+class RecentItemsModel;
+class SessionManager;
+class LogFileExplorer;
+class LogLevelPieChartWidget;
+class LogViewWidget;
+class StartPageWidget;
+class DockWidget;
+struct SessionViewState;
 
 /**
  * @class MainWindow

@@ -5,6 +5,7 @@
 
 #include <QApplication>
 
+#include "Qt-LogViewer/Models/LogFileInfo.h"
 #include "Qt-LogViewer/Services/LogViewerSettings.h"
 #include "Qt-LogViewer/Views/MainWindow.h"
 #include "Qt-LogViewer/Views/Shared/AppWindow.h"
