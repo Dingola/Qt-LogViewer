@@ -5,7 +5,10 @@
 
 #include "Qt-LogViewer/Controllers/FileCatalogController.h"
 
+#include "Qt-LogViewer/Controllers/LogIngestController.h"
 #include "Qt-LogViewer/Models/LogEntry.h"
+#include "Qt-LogViewer/Models/LogFileInfo.h"
+#include "Qt-LogViewer/Models/LogFileTreeModel.h"
 #include "Qt-LogViewer/Services/LogLoader.h"
 
 /**

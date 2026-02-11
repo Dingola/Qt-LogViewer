@@ -8,7 +8,11 @@
 #include <QDebug>
 #include <algorithm>
 
+// Concrete includes for forward-declared and used types
 #include "Qt-LogViewer/Controllers/FilterCoordinator.h"
+#include "Qt-LogViewer/Controllers/LogViewContext.h"
+#include "Qt-LogViewer/Models/LogSortFilterProxyModel.h"
+#include "Qt-LogViewer/Models/PagingProxyModel.h"
 
 /**
  * @brief Construct a new ViewRegistry.

@@ -1,16 +1,17 @@
 #pragma once
 
-#include <QJsonArray>
 #include <QJsonObject>
 #include <QObject>
 #include <QString>
 #include <QUuid>
 
+// Value types used by value in API
 #include "Qt-LogViewer/Models/LogFileInfo.h"
-#include "Qt-LogViewer/Models/LogFileTreeModel.h"
-#include "Qt-LogViewer/Services/SessionManager.h"
 
+// Forward declarations (pointers only)
 class LogViewerController;
+class SessionManager;
+class LogFileTreeModel;
 
 /**
  * @file SessionController.h

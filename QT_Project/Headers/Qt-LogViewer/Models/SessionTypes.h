@@ -9,7 +9,6 @@
 #include <QVector>
 #include <Qt>
 
-#include "Qt-LogViewer/Controllers/FilterCoordinator.h"
 #include "Qt-LogViewer/Models/LogFileInfo.h"
 
 /**

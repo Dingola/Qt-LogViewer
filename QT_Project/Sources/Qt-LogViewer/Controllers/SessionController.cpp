@@ -5,10 +5,14 @@
 
 #include "Qt-LogViewer/Controllers/SessionController.h"
 
+#include <QJsonArray>
 #include <QUuid>
 
+// Concrete includes for forward-declared types and value usage
 #include "Qt-LogViewer/Controllers/LogViewerController.h"
+#include "Qt-LogViewer/Models/LogFileTreeModel.h"
 #include "Qt-LogViewer/Models/SessionTypes.h"
+#include "Qt-LogViewer/Services/SessionManager.h"
 
 /**
  * @brief Constructs a SessionController.

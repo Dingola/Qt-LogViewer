@@ -9,6 +9,19 @@
 #include <QDebug>
 #include <algorithm>
 
+// Concrete includes for forward-declared types used in implementation
+#include "Qt-LogViewer/Controllers/FileCatalogController.h"
+#include "Qt-LogViewer/Controllers/FilterCoordinator.h"
+#include "Qt-LogViewer/Controllers/LogIngestController.h"
+#include "Qt-LogViewer/Controllers/LogViewContext.h"
+#include "Qt-LogViewer/Controllers/ViewRegistry.h"
+#include "Qt-LogViewer/Models/LogFileTreeModel.h"
+#include "Qt-LogViewer/Models/LogModel.h"
+#include "Qt-LogViewer/Models/LogSortFilterProxyModel.h"
+#include "Qt-LogViewer/Models/PagingProxyModel.h"
+#include "Qt-LogViewer/Services/LogLoader.h"
+#include "Qt-LogViewer/Services/LogLoadingService.h"
+
 /**
  * @brief Constructs a LogViewerController.
  * @param log_format The log format string for parsing.

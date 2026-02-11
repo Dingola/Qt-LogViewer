@@ -5,12 +5,13 @@
 #include <QString>
 #include <QUuid>
 
+// Forward declaration (owned/used by pointer in API)
+class LogLoadingService;
+
 /**
  * @file LogViewLoadQueue.h
  * @brief Declares the LogViewLoadQueue which coordinates per-view async log streaming.
  */
-
-class LogLoadingService;
 
 /**
  * @class LogViewLoadQueue

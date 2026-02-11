@@ -12,7 +12,10 @@
 
 #include <algorithm>
 
+#include "Qt-LogViewer/Controllers/LogViewContext.h"
 #include "Qt-LogViewer/Controllers/ViewRegistry.h"
+#include "Qt-LogViewer/Models/LogEntry.h"
+#include "Qt-LogViewer/Models/LogSortFilterProxyModel.h"
 
 /**
  * @brief Construct a new FilterCoordinator.

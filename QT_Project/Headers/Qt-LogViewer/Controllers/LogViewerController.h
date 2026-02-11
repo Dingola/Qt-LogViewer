@@ -8,18 +8,21 @@
 #include <QUuid>
 #include <QVector>
 
-#include "Qt-LogViewer/Controllers/FileCatalogController.h"
-#include "Qt-LogViewer/Controllers/FilterCoordinator.h"
-#include "Qt-LogViewer/Controllers/LogIngestController.h"
-#include "Qt-LogViewer/Controllers/LogViewContext.h"
-#include "Qt-LogViewer/Controllers/LogViewLoadQueue.h"
-#include "Qt-LogViewer/Controllers/ViewRegistry.h"
+// Value types used by value in API
+#include "Qt-LogViewer/Models/LogEntry.h"
 #include "Qt-LogViewer/Models/LogFileInfo.h"
-#include "Qt-LogViewer/Models/LogFileTreeModel.h"
-#include "Qt-LogViewer/Models/LogModel.h"
-#include "Qt-LogViewer/Models/LogSortFilterProxyModel.h"
-#include "Qt-LogViewer/Models/PagingProxyModel.h"
-#include "Qt-LogViewer/Services/LogLoadingService.h"
+#include "Qt-LogViewer/Models/SessionTypes.h"
+
+// Forward declarations (pointers only)
+class FileCatalogController;
+class FilterCoordinator;
+class LogIngestController;
+class LogViewContext;
+class ViewRegistry;
+class LogModel;
+class LogSortFilterProxyModel;
+class PagingProxyModel;
+class LogFileTreeModel;
 
 /**
  * @file LogViewerController.h

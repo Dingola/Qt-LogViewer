@@ -8,8 +8,9 @@
 #include <QVector>
 
 class FilterCoordinator;
+class LogViewContext;
 
-#include "Qt-LogViewer/Controllers/LogViewContext.h"
+// Value types used by value in API
 #include "Qt-LogViewer/Models/LogEntry.h"
 #include "Qt-LogViewer/Models/LogFileInfo.h"
 #include "Qt-LogViewer/Models/SessionTypes.h"

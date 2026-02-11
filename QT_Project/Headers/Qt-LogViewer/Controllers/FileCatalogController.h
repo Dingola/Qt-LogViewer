@@ -4,9 +4,10 @@
 #include <QString>
 #include <QVector>
 
-#include "Qt-LogViewer/Controllers/LogIngestController.h"
-#include "Qt-LogViewer/Models/LogFileInfo.h"
-#include "Qt-LogViewer/Models/LogFileTreeModel.h"
+// Forward declarations to reduce header dependencies
+class LogIngestController;
+class LogFileTreeModel;
+class LogFileInfo;
 
 /**
  * @file FileCatalogController.h

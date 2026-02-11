@@ -7,12 +7,11 @@
 #include <QUuid>
 #include <QVector>
 
-struct FilterState;
+// Forward declarations (pointers/references only)
 class ViewRegistry;
 class LogSortFilterProxyModel;
 
-#include "Qt-LogViewer/Models/LogEntry.h"
-#include "Qt-LogViewer/Models/LogSortFilterProxyModel.h"
+// Kept because FilterState is used/returned by value
 #include "Qt-LogViewer/Models/SessionTypes.h"
 
 /**

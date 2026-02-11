@@ -10,6 +10,11 @@
 
 #include "Qt-LogViewer/Controllers/LogViewContext.h"
 
+// Concrete includes for forward-declared types
+#include "Qt-LogViewer/Models/LogModel.h"
+#include "Qt-LogViewer/Models/LogSortFilterProxyModel.h"
+#include "Qt-LogViewer/Models/PagingProxyModel.h"
+
 /**
  * @brief Constructs a LogViewContext and wires the model/proxy chain.
  *

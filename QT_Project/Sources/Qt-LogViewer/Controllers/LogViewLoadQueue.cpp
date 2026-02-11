@@ -10,6 +10,7 @@
 #include <QDebug>
 #include <QList>
 
+// Concrete include for forward-declared type
 #include "Qt-LogViewer/Services/LogLoadingService.h"
 
 /**

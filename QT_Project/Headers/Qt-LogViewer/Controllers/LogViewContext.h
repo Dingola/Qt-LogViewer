@@ -3,13 +3,16 @@
 #include <QList>
 #include <QObject>
 #include <QString>
-#include <QUuid>
 #include <QVector>
 
+// Value types used in API - need full definitions
+#include "Qt-LogViewer/Models/LogEntry.h"
 #include "Qt-LogViewer/Models/LogFileInfo.h"
-#include "Qt-LogViewer/Models/LogModel.h"
-#include "Qt-LogViewer/Models/LogSortFilterProxyModel.h"
-#include "Qt-LogViewer/Models/PagingProxyModel.h"
+
+// Forward declarations (pointer members only)
+class LogModel;
+class LogSortFilterProxyModel;
+class PagingProxyModel;
 
 /**
  * @file LogViewContext.h
