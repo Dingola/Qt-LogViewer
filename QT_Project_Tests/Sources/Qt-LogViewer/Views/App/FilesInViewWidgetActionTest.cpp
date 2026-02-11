@@ -1,7 +1,10 @@
 #include "Qt-LogViewer/Views/App/FilesInViewWidgetActionTest.h"
 
 #include <QApplication>
+#include <QColor>
 #include <QMenu>
+#include <QSignalSpy>
+#include <QWidgetAction>
 
 struct HostedRow {
         QMenu* menu = nullptr;

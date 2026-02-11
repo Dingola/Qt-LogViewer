@@ -10,8 +10,6 @@
 #include <QPushButton>
 #include <QSignalSpy>
 
-#include "Qt-LogViewer/Views/Shared/DialogHeaderWidget.h"
-
 void DialogHeaderWidgetTest::SetUp()
 {
     m_header = new DialogHeaderWidget(QStringLiteral("Initial Title"));

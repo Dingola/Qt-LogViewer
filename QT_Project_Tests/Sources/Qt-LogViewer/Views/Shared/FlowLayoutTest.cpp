@@ -1,7 +1,6 @@
 #include "Qt-LogViewer/Views/Shared/FlowLayoutTest.h"
 
 #include <QLabel>
-#include <QWidget>
 
 /**
  * @brief Sets up the test fixture for each test.

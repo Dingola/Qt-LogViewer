@@ -7,6 +7,7 @@
 #include <QTemporaryFile>
 #include <QTextStream>
 #include <QUuid>
+#include <QVector>
 
 /**
  * @brief Constructs the test fixture.

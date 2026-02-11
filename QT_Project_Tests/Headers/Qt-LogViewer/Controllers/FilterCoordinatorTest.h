@@ -2,14 +2,11 @@
 
 #include <gtest/gtest.h>
 
-#include <QDir>
-#include <QSet>
 #include <QString>
 #include <QUuid>
 
 #include "Qt-LogViewer/Controllers/FilterCoordinator.h"
 #include "Qt-LogViewer/Controllers/ViewRegistry.h"
-#include "Qt-LogViewer/Models/LogEntry.h"
 #include "Qt-LogViewer/Models/LogSortFilterProxyModel.h"
 
 /**

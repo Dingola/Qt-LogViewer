@@ -3,6 +3,7 @@
 #include <QComboBox>
 #include <QCoreApplication>
 #include <QLineEdit>
+#include <QSignalSpy>
 #include <QTest>
 #include <QToolButton>
 

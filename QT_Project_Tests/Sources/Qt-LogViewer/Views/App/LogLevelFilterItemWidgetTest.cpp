@@ -3,8 +3,6 @@
 #include <QSignalSpy>
 #include <QTest>
 
-#include "Qt-LogViewer/Views/App/LogLevelFilterItemWidget.h"
-
 /**
  * @brief Sets up the test fixture for each test.
  */

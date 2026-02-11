@@ -2,11 +2,8 @@
 
 #include <gtest/gtest.h>
 
-#include <QColor>
 #include <QEvent>
 #include <QLabel>
-#include <QSignalSpy>
-#include <QTemporaryFile>
 #include <QToolButton>
 #include <QWidget>
 

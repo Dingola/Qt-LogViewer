@@ -15,11 +15,6 @@
 #include <QPixmap>
 #include <QPushButton>
 #include <QSignalSpy>
-#include <QSize>
-#include <QTimer>
-#include <QWindow>
-
-#include "Qt-LogViewer/Views/Shared/WindowTitleBar.h"
 
 void WindowTitleBarTest::SetUp()
 {

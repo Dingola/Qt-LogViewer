@@ -5,7 +5,6 @@
 #include <QCheckBox>
 #include <QLabel>
 #include <QString>
-#include <QWidget>
 
 #include "Qt-LogViewer/Views/App/LogLevelFilterItemWidget.h"
 

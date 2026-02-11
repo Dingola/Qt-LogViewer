@@ -1,6 +1,13 @@
 #include "Qt-LogViewer/Controllers/ViewRegistryTest.h"
 
 #include <QDateTime>
+#include <QList>
+#include <QSignalSpy>
+#include <QUuid>
+#include <QVector>
+
+#include "Qt-LogViewer/Models/LogEntry.h"
+#include "Qt-LogViewer/Models/LogFileInfo.h"
 
 /**
  * @brief Constructs the test fixture.

@@ -2,8 +2,6 @@
 
 #include <gtest/gtest.h>
 
-#include <QDialog>
-
 #include "Qt-LogViewer/Views/Shared/Dialog.h"
 
 /**

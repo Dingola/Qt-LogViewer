@@ -1,8 +1,10 @@
 #include "Qt-LogViewer/Views/Shared/PieChartTest.h"
 
-#include <QApplication>
+#include <QColor>
 #include <QImage>
+#include <QMap>
 #include <QPixmap>
+#include <QString>
 
 /**
  * @brief Sets up the test fixture for each test.

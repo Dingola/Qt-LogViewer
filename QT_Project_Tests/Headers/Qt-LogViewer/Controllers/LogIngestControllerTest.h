@@ -2,12 +2,7 @@
 
 #include <gtest/gtest.h>
 
-#include <QSignalSpy>
-#include <QTemporaryFile>
-#include <QUuid>
-
 #include "Qt-LogViewer/Controllers/LogIngestController.h"
-#include "Qt-LogViewer/Models/LogEntry.h"
 
 /**
  * @file LogIngestControllerTest.h

@@ -2,8 +2,6 @@
 
 #include <gtest/gtest.h>
 
-#include "Qt-LogViewer/Models/LogFileTreeItem.h"
-
 /**
  * @file LogFileTreeItemTest.h
  * @brief Test fixture for LogFileTreeItem.

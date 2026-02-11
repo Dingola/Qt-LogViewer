@@ -2,7 +2,6 @@
 
 #include <gtest/gtest.h>
 
-#include <QLabel>
 #include <QWidget>
 
 #include "Qt-LogViewer/Views/Shared/FlowLayout.h"

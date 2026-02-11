@@ -2,11 +2,7 @@
 
 #include <gtest/gtest.h>
 
-#include <QDir>
-#include <QFile>
-#include <QPair>
 #include <QString>
-#include <QTemporaryFile>
 #include <QUuid>
 
 #include "Qt-LogViewer/Controllers/LogViewLoadQueue.h"

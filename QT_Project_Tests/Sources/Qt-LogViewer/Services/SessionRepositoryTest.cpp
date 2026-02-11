@@ -1,5 +1,12 @@
 #include "Qt-LogViewer/Services/SessionRepositoryTest.h"
 
+#include <QDir>
+#include <QFile>
+#include <QJsonArray>
+#include <QJsonObject>
+#include <QStandardPaths>
+#include <QUuid>
+
 /**
  * @brief Sets up a fresh, isolated repository under a unique AppConfig subdirectory.
  */

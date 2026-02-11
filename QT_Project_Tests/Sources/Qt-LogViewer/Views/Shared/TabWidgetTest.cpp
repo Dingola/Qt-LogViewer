@@ -12,7 +12,6 @@
 
 #include "Qt-LogViewer/Views/Shared/TabWidgetTest.h"
 
-#include <QAbstractButton>
 #include <QAction>
 #include <QApplication>
 #include <QMenu>
@@ -21,7 +20,6 @@
 #include <QWidget>
 
 #include "Qt-LogViewer/Views/Shared/TabBar.h"
-#include "Qt-LogViewer/Views/Shared/TabWidget.h"
 
 void TabWidgetTest::SetUp()
 {

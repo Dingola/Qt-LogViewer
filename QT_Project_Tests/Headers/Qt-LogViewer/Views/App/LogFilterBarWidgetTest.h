@@ -2,11 +2,7 @@
 
 #include <gtest/gtest.h>
 
-#include <QSet>
 #include <QString>
-#include <QStringList>
-#include <QVector>
-#include <QWidget>
 
 #include "Qt-LogViewer/Views/App/LogFilterBarWidget.h"
 #include "Qt-LogViewer/Views/App/LogLevelFilterItemWidget.h"

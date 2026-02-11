@@ -2,6 +2,10 @@
 
 #include <QDateTime>
 
+#include "Qt-LogViewer/Models/LogModel.h"
+#include "Qt-LogViewer/Models/LogSortFilterProxyModel.h"
+#include "Qt-LogViewer/Models/PagingProxyModel.h"
+
 /**
  * @brief Constructs the test fixture.
  */

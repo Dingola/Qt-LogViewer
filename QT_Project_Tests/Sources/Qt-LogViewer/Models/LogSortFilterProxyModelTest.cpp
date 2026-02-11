@@ -1,7 +1,9 @@
 #include "Qt-LogViewer/Models/LogSortFilterProxyModelTest.h"
 
 #include <QDateTime>
+#include <QSet>
 #include <QSignalSpy>
+#include <QString>
 #include <QVector>
 
 /**

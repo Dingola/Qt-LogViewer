@@ -2,8 +2,6 @@
 
 #include <gtest/gtest.h>
 
-#include "Qt-LogViewer/Models/LogEntry.h"
-
 /**
  * @file LogEntryTest.h
  * @brief Test fixture for LogEntry.

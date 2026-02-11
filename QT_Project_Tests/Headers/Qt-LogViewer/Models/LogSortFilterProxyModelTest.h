@@ -2,9 +2,6 @@
 
 #include <gtest/gtest.h>
 
-#include <QSet>
-#include <QString>
-
 #include "Qt-LogViewer/Models/LogModel.h"
 #include "Qt-LogViewer/Models/LogSortFilterProxyModel.h"
 

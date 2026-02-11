@@ -1,7 +1,5 @@
 #include "Qt-LogViewer/Services/LogViewerSettingsTest.h"
 
-#include <QCoreApplication>
-#include <QFile>
 #include <QString>
 
 /**

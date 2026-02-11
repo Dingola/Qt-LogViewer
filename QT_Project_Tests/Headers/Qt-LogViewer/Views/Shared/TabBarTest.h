@@ -2,8 +2,6 @@
 
 #include <gtest/gtest.h>
 
-#include <QTabBar>
-
 #include "Qt-LogViewer/Views/Shared/TabBar.h"
 
 /**

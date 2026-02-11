@@ -1,7 +1,6 @@
 #include "Qt-LogViewer/Models/LogModelTest.h"
 
 #include <QDateTime>
-#include <QString>
 
 /**
  * @brief Sets up the test fixture for each test.

@@ -2,8 +2,6 @@
 
 #include <gtest/gtest.h>
 
-#include "Qt-LogViewer/Models/LogFileInfo.h"
-
 /**
  * @file LogFileInfoTest.h
  * @brief Test fixture for LogFileInfo.

@@ -2,14 +2,8 @@
 
 #include <gtest/gtest.h>
 
-#include <QDir>
-#include <QModelIndex>
-#include <QTemporaryFile>
-#include <QTextStream>
-
 #include "Qt-LogViewer/Controllers/FileCatalogController.h"
 #include "Qt-LogViewer/Controllers/LogIngestController.h"
-#include "Qt-LogViewer/Models/LogFileInfo.h"
 #include "Qt-LogViewer/Models/LogFileTreeModel.h"
 
 /**

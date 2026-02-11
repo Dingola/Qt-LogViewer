@@ -5,6 +5,7 @@
 #include <QMenu>
 #include <QSignalSpy>
 #include <QStandardItemModel>
+#include <QTemporaryFile>
 #include <QToolButton>
 
 #include "Qt-LogViewer/Views/App/LogFilterWidget.h"

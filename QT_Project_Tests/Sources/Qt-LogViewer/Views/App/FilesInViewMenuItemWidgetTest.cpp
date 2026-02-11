@@ -1,8 +1,9 @@
 #include "Qt-LogViewer/Views/App/FilesInViewMenuItemWidgetTest.h"
 
+#include <QColor>
 #include <QFileInfo>
-#include <QFontMetrics>
-#include <QHBoxLayout>
+#include <QSignalSpy>
+#include <QTemporaryFile>
 #include <QTextStream>
 #include <QToolButton>
 

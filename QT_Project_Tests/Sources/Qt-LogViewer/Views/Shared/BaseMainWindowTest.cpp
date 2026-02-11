@@ -1,10 +1,7 @@
 #include "Qt-LogViewer/Views/Shared/BaseMainWindowTest.h"
 
-#include <QByteArray>
 #include <QFile>
-#include <QMainWindow>
-#include <QTest>
-#include <QWidget>
+#include <QTemporaryFile>
 
 #include "QtWidgetsCommonLib/Utils/StylesheetLoader.h"
 

@@ -2,12 +2,7 @@
 
 #include <gtest/gtest.h>
 
-#include <QColor>
-#include <QImage>
-#include <QPixmap>
 #include <QTemporaryFile>
-
-#include "Qt-LogViewer/Services/UiUtils.h"
 
 /**
  * @file UiUtilsTest.h

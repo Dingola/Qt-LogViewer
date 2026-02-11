@@ -2,9 +2,7 @@
 
 #include <gtest/gtest.h>
 
-#include <QColor>
 #include <QLabel>
-#include <QMap>
 #include <QWidget>
 
 #include "Qt-LogViewer/Views/App/LogLevelPieChartWidget.h"

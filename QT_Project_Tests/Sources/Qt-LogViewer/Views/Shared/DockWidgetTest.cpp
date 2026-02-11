@@ -1,8 +1,8 @@
 #include "Qt-LogViewer/Views/Shared/DockWidgetTest.h"
 
 #include <QApplication>
-#include <QEvent>
-#include <QMainWindow>
+#include <QColor>
+#include <QSignalSpy>
 #include <QTest>
 #include <QToolButton>
 

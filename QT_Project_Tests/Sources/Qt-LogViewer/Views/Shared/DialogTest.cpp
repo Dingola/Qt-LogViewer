@@ -6,12 +6,11 @@
 #include "Qt-LogViewer/Views/Shared/DialogTest.h"
 
 #include <QApplication>
+#include <QDialog>
 #include <QMouseEvent>
 #include <QRegion>
 #include <QSignalSpy>
-#include <QWidget>
 
-#include "Qt-LogViewer/Views/Shared/Dialog.h"
 #include "Qt-LogViewer/Views/Shared/DialogHeaderWidget.h"
 
 void DialogTest::SetUp()

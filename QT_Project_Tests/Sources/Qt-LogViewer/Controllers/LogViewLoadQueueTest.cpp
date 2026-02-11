@@ -2,7 +2,6 @@
 
 #include <QDir>
 #include <QFile>
-#include <QTextStream>
 #include <QUuid>
 
 /**

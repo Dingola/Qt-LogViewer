@@ -5,6 +5,11 @@
 #include <QSignalSpy>
 #include <QTextStream>
 
+#include "Qt-LogViewer/Models/LogFileTreeModel.h"
+#include "Qt-LogViewer/Models/LogModel.h"
+#include "Qt-LogViewer/Models/LogSortFilterProxyModel.h"
+#include "Qt-LogViewer/Models/PagingProxyModel.h"
+
 /**
  * @brief Constructs the test fixture.
  */

@@ -9,7 +9,6 @@
 #include <QMouseEvent>
 #include <QSignalSpy>
 #include <QStandardItemModel>
-#include <QWidget>
 
 #include "Qt-LogViewer/Views/Shared/TableView.h"
 

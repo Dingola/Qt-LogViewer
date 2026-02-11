@@ -3,6 +3,8 @@
 #include <QDateTime>
 #include <QString>
 
+#include "Qt-LogViewer/Models/LogEntry.h"
+
 /**
  * @brief Sets up the test fixture for each test.
  *

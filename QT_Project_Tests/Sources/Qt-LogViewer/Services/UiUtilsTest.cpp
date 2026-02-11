@@ -5,12 +5,10 @@
 
 #include "Qt-LogViewer/Services/UiUtilsTest.h"
 
-#include <QApplication>
+#include <QColor>
 #include <QDir>
 #include <QImage>
-#include <QPainter>
 #include <QPixmap>
-#include <QTemporaryFile>
 
 #include "Qt-LogViewer/Services/UiUtils.h"
 

@@ -1,7 +1,5 @@
 #include "Qt-LogViewer/Services/SettingsTest.h"
 
-#include <QCoreApplication>
-#include <QDir>
 #include <QFile>
 #include <QTemporaryFile>
 #include <QTextStream>

@@ -3,7 +3,6 @@
 #include <gtest/gtest.h>
 
 #include <QMenu>
-#include <QTemporaryFile>
 #include <QVector>
 
 #include "Qt-LogViewer/Views/App/FilesInViewMenuItemWidget.h"

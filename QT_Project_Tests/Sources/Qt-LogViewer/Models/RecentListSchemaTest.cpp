@@ -1,6 +1,10 @@
 #include "Qt-LogViewer/Models/RecentListSchemaTest.h"
 
+#include <QDateTime>
 #include <QFileInfo>
+#include <QString>
+
+#include "Qt-LogViewer/Models/RecentListSchema.h"
 
 /**
  * @brief Verifies recent files schema role names and columns.

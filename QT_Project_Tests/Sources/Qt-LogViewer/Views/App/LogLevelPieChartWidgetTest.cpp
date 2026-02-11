@@ -1,8 +1,7 @@
 #include "Qt-LogViewer/Views/App/LogLevelPieChartWidgetTest.h"
 
-#include <QHBoxLayout>
-#include <QTest>
-#include <QVBoxLayout>
+#include <QColor>
+#include <QMap>
 
 /**
  * @brief Sets up the test fixture for each test.

@@ -2,14 +2,7 @@
 
 #include <gtest/gtest.h>
 
-#include <QDir>
-#include <QFile>
-#include <QJsonArray>
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QStandardPaths>
 #include <QString>
-#include <QUuid>
 
 #include "Qt-LogViewer/Services/SessionRepository.h"
 

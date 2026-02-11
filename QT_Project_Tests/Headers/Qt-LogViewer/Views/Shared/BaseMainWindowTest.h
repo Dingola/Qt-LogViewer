@@ -4,7 +4,6 @@
 #include <gtest/gtest.h>
 
 #include <QString>
-#include <QTemporaryFile>
 
 #include "Qt-LogViewer/Services/AppPreferencesInterface.h"
 #include "Qt-LogViewer/Views/Shared/BaseMainWindow.h"

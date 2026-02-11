@@ -1,5 +1,12 @@
 #include "Qt-LogViewer/Controllers/FileCatalogControllerTest.h"
 
+#include <QDir>
+#include <QModelIndex>
+#include <QTemporaryFile>
+#include <QTextStream>
+
+#include "Qt-LogViewer/Models/LogFileInfo.h"
+
 FileCatalogControllerTest::FileCatalogControllerTest()
     : m_ctrl(nullptr), m_ingest(nullptr), m_temp1(), m_temp2()
 {}

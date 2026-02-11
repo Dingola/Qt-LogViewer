@@ -2,8 +2,6 @@
 
 #include <gtest/gtest.h>
 
-#include <QString>
-
 #include "Qt-LogViewer/Services/LogViewerSettings.h"
 
 /**

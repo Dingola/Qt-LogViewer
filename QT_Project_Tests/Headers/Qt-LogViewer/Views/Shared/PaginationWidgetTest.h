@@ -2,8 +2,6 @@
 
 #include <gtest/gtest.h>
 
-#include <QSignalSpy>
-
 #include "Qt-LogViewer/Views/Shared/PaginationWidget.h"
 
 /**

@@ -1,7 +1,10 @@
 #include "Qt-LogViewer/Views/App/LogFilterWidgetTest.h"
 
 #include <QLabel>
+#include <QMap>
+#include <QSet>
 #include <QTest>
+#include <QVector>
 
 /**
  * @brief Sets up the test fixture for each test.

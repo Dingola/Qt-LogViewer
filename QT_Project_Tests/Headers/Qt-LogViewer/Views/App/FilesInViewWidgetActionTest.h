@@ -2,12 +2,8 @@
 
 #include <gtest/gtest.h>
 
-#include <QColor>
 #include <QLabel>
-#include <QMenu>
-#include <QSignalSpy>
 #include <QToolButton>
-#include <QWidgetAction>
 
 #include "Qt-LogViewer/Views/App/FilesInViewMenuItemWidget.h"
 #include "Qt-LogViewer/Views/App/FilesInViewWidgetAction.h"

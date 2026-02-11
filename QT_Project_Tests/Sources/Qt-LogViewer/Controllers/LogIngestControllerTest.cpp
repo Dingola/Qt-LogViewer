@@ -2,12 +2,15 @@
 
 #include <QApplication>
 #include <QDir>
-#include <QEventLoop>
 #include <QFile>
+#include <QSignalSpy>
+#include <QTemporaryFile>
 #include <QTest>
 #include <QTextStream>
-#include <QTimer>
+#include <QUuid>
 #include <atomic>
+
+#include "Qt-LogViewer/Models/LogEntry.h"
 
 /**
  * @brief Constructs the test fixture.

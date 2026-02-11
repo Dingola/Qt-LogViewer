@@ -2,10 +2,7 @@
 
 #include <gtest/gtest.h>
 
-#include <QColor>
 #include <QDockWidget>
-#include <QMenu>
-#include <QSignalSpy>
 #include <QToolButton>
 #include <QWidget>
 

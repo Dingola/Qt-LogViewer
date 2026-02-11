@@ -2,16 +2,10 @@
 
 #include <gtest/gtest.h>
 
-#include <QList>
-#include <QSignalSpy>
 #include <QString>
-#include <QUuid>
-#include <QVector>
 
 #include "Qt-LogViewer/Controllers/LogViewContext.h"
 #include "Qt-LogViewer/Controllers/ViewRegistry.h"
-#include "Qt-LogViewer/Models/LogEntry.h"
-#include "Qt-LogViewer/Models/LogFileInfo.h"
 
 /**
  * @file ViewRegistryTest.h

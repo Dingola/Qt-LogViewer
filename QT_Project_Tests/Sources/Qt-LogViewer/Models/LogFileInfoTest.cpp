@@ -1,5 +1,7 @@
 #include "Qt-LogViewer/Models/LogFileInfoTest.h"
 
+#include "Qt-LogViewer/Models/LogFileInfo.h"
+
 /**
  * @brief Sets up the test fixture for each test.
  */

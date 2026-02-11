@@ -3,7 +3,6 @@
 #include <gtest/gtest.h>
 
 #include <QStandardItemModel>
-#include <QVector>
 
 /**
  * @file TableViewTest.h

@@ -1,9 +1,13 @@
 #include "Qt-LogViewer/Controllers/FilterCoordinatorTest.h"
 
+#include <QDir>
 #include <QList>
 #include <QMap>
-#include <QTextStream>
+#include <QSet>
 #include <QVector>
+
+#include "Qt-LogViewer/Controllers/LogViewContext.h"
+#include "Qt-LogViewer/Models/LogEntry.h"
 
 /**
  * @brief Constructs the test fixture.

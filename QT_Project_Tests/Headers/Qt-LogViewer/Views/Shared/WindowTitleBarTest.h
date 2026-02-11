@@ -2,9 +2,6 @@
 
 #include <gtest/gtest.h>
 
-#include <QIcon>
-#include <QMenuBar>
-
 #include "Qt-LogViewer/Views/Shared/WindowTitleBar.h"
 
 /**

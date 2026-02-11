@@ -1,7 +1,9 @@
 #include "Qt-LogViewer/Models/LogFileTreeModelTest.h"
 
 #include <QIcon>
-#include <QSignalSpy>
+
+#include "Qt-LogViewer/Models/LogFileInfo.h"
+#include "Qt-LogViewer/Models/LogFileTreeItem.h"
 
 /**
  * @brief Sets up the test fixture for each test.

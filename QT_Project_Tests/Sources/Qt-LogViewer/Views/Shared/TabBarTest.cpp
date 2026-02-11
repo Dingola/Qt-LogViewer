@@ -12,9 +12,7 @@
 #include <QMenu>
 #include <QMouseEvent>
 #include <QSignalSpy>
-#include <QToolButton>
-
-#include "Qt-LogViewer/Views/Shared/TabBar.h"
+#include <QTabBar>
 
 void TabBarTest::SetUp()
 {

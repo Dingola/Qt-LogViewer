@@ -4,10 +4,8 @@
 
 #include <QEventLoop>
 #include <QObject>
-#include <QSignalSpy>
 #include <QString>
 #include <QTimer>
-#include <QVector>
 
 #include "Qt-LogViewer/Services/LogLoadingService.h"
 
