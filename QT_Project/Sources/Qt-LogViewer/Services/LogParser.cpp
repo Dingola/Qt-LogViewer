@@ -167,7 +167,7 @@ auto LogParser::format_string_to_regex(const QString& format)
         if (field == "timestamp")
         {
             // Constrained, multi-format timestamp (matches the formats parse_timestamp supports).
-            // - ISO: yyyy-MM-dd[ T]HH:mm:ss(.sss)?(Z|±HH:MM)?
+            // - ISO: yyyy-MM-dd[ T]HH:mm:ss(.sss)?(Z|+/-HH:MM)?
             // - Dotted: dd.MM.yyyy HH:mm:ss(.sss)?
             // - Slash (MDY): MM/dd/yyyy HH:mm:ss(.sss)?
             // - Slash (YMD): yyyy/MM/dd HH:mm:ss(.sss)?

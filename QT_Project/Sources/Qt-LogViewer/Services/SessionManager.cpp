@@ -1,8 +1,11 @@
 #include "Qt-LogViewer/Services/SessionManager.h"
 
+#include <QDateTime>
 #include <QFileInfo>
 #include <QJsonArray>
-#include <QJsonDocument>
+
+// Concrete include for forward-declared repository type
+#include "Qt-LogViewer/Services/SessionRepository.h"
 
 namespace
 {

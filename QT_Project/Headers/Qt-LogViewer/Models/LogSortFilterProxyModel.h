@@ -5,7 +5,6 @@
  * @brief This file contains the definition of the LogSortFilterProxyModel class.
  */
 
-#include <QAbstractItemModel>
 #include <QCollator>
 #include <QHash>
 #include <QMap>

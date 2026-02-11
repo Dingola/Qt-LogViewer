@@ -176,25 +176,25 @@ auto LogFileExplorer::init_context_menu() -> void
     auto* open_action = new QAction(tr("Open in New View"), m_file_context_menu);
     m_file_context_menu->addAction(open_action);
     connect(open_action, &QAction::triggered, this, [this]() {
-        dispatch_current_if_type(LogFileTreeItem::Type::File, [this](const LogFileInfo& info) {
-            emit open_file_requested(info);
-        });
+        [[maybe_unused]] const bool dispatched = dispatch_current_if_type(
+            LogFileTreeItem::Type::File,
+            [this](const LogFileInfo& info) { emit open_file_requested(info); });
     });
 
     auto* add_to_view_action = new QAction(tr("Add to Current View"), m_file_context_menu);
     m_file_context_menu->addAction(add_to_view_action);
     connect(add_to_view_action, &QAction::triggered, this, [this]() {
-        dispatch_current_if_type(LogFileTreeItem::Type::File, [this](const LogFileInfo& info) {
-            emit add_to_current_view_requested(info);
-        });
+        [[maybe_unused]] const bool dispatched = dispatch_current_if_type(
+            LogFileTreeItem::Type::File,
+            [this](const LogFileInfo& info) { emit add_to_current_view_requested(info); });
     });
 
     auto* remove_file_action = new QAction(tr("Remove"), m_file_context_menu);
     m_file_context_menu->addAction(remove_file_action);
     connect(remove_file_action, &QAction::triggered, this, [this]() {
-        dispatch_current_if_type(LogFileTreeItem::Type::File, [this](const LogFileInfo& info) {
-            emit remove_file_requested(info);
-        });
+        [[maybe_unused]] const bool dispatched = dispatch_current_if_type(
+            LogFileTreeItem::Type::File,
+            [this](const LogFileInfo& info) { emit remove_file_requested(info); });
     });
 
     // Session context menu

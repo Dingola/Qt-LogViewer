@@ -1,13 +1,14 @@
 #pragma once
 
-#include <QDateTime>
 #include <QJsonObject>
 #include <QObject>
 #include <QVector>
 
 #include "Qt-LogViewer/Models/LogFileInfo.h"
 #include "Qt-LogViewer/Models/SessionTypes.h"
-#include "Qt-LogViewer/Services/SessionRepository.h"
+
+// Forward declarations for types used as pointers/references
+class SessionRepository;
 
 /**
  * @file SessionManager.h
