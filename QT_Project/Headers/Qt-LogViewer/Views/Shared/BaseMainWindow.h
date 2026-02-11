@@ -3,12 +3,12 @@
 #include <QMainWindow>
 
 class AppPreferencesInterface;
-class Translator;
 
 namespace QtWidgetsCommonLib
 {
 class StylesheetLoader;
-}
+class Translator;
+}  // namespace QtWidgetsCommonLib
 
 /**
  * @class BaseMainWindow
@@ -58,7 +58,7 @@ class BaseMainWindow: public QMainWindow
          *
          * @return Pointer to the Translator object.
          */
-        [[nodiscard]] auto get_translator() const -> Translator*;
+        [[nodiscard]] auto get_translator() const -> QtWidgetsCommonLib::Translator*;
 
     protected:
         /**
@@ -143,7 +143,7 @@ class BaseMainWindow: public QMainWindow
         /**
          * @brief Pointer to the Translator object used for managing translations.
          */
-        Translator* m_translator = nullptr;
+        QtWidgetsCommonLib::Translator* m_translator = nullptr;
 
         /**
          * @brief Indicates whether the language has been applied.

@@ -25,9 +25,9 @@
 #include "Qt-LogViewer/Models/RecentListSchema.h"
 #include "Qt-LogViewer/Services/LogViewerSettings.h"
 #include "Qt-LogViewer/Services/SessionRepository.h"
-#include "Qt-LogViewer/Services/Translator.h"
 #include "Qt-LogViewer/Views/App/Dialogs/SettingsDialog.h"
 #include "Qt-LogViewer/Views/App/StartPageWidget.h"
+#include "QtWidgetsCommonLib/Services/Translator.h"
 #include "QtWidgetsCommonLib/Utils/StylesheetLoader.h"
 #include "ui_MainWindow.h"
 

@@ -2,10 +2,11 @@
 
 #include "Qt-LogViewer/Services/AppPreferencesInterface.h"
 #include "Qt-LogViewer/Services/Settings.h"
-#include "Qt-LogViewer/Services/Translator.h"
+#include "QtWidgetsCommonLib/Services/Translator.h"
 #include "QtWidgetsCommonLib/Utils/StylesheetLoader.h"
 
 using QtWidgetsCommonLib::StylesheetLoader;
+using QtWidgetsCommonLib::Translator;
 
 /**
  * @brief Constructs a BaseMainWindow object.
