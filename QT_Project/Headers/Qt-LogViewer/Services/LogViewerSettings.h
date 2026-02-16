@@ -2,8 +2,8 @@
 
 #include <QString>
 
-#include "Qt-LogViewer/Services/Preferences/IUiPreferences.h"
 #include "Qt-LogViewer/Services/Settings.h"
+#include "QtWidgetsCommonLib/Services/Preferences/IUiPreferences.h"
 
 /**
  * @class LogViewerSettings
@@ -12,10 +12,10 @@
  * Provides convenience methods for common application settings such as theme and language.
  * Inherits from Settings and can be extended for further application-specific settings.
  */
-class LogViewerSettings: public Settings, public IUiPreferences
+class LogViewerSettings: public Settings, public QtWidgetsCommonLib::IUiPreferences
 {
         Q_OBJECT
-        Q_INTERFACES(IUiPreferences)
+        Q_INTERFACES(QtWidgetsCommonLib::IUiPreferences)
 
     public:
         using Settings::Settings;

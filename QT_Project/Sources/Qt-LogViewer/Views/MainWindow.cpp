@@ -62,6 +62,8 @@ constexpr auto k_show_log_details_text = QT_TRANSLATE_NOOP("MainWindow", "Show L
 constexpr auto k_untitled_session_text = QT_TRANSLATE_NOOP("MainWindow", "Untitled Session");
 }  // namespace
 
+using QtWidgetsCommonLib::AppMainWindow;
+
 /**
  * @brief Constructs a MainWindow object.
  *

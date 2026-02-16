@@ -10,7 +10,7 @@
 #include <QUuid>
 #include <QVector>
 
-#include "Qt-LogViewer/Views/Shared/AppMainWindow.h"
+#include "QtWidgetsCommonLib/Widgets/AppMainWindow.h"
 
 // Forward declarations for Qt types used as pointers/references
 class QAction;
@@ -49,7 +49,7 @@ struct SessionViewState;
  * This class represents the main window of the application, providing
  * the central user interface and handling main window events.
  */
-class MainWindow: public AppMainWindow
+class MainWindow: public QtWidgetsCommonLib::AppMainWindow
 {
         Q_OBJECT
 
