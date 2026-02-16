@@ -5,16 +5,16 @@
 
 #include <QString>
 
-#include "Qt-LogViewer/Services/AppPreferencesInterface.h"
-#include "Qt-LogViewer/Views/Shared/BaseMainWindow.h"
+#include "Qt-LogViewer/Services/Preferences/IUiPreferences.h"
+#include "Qt-LogViewer/Views/Shared/AppMainWindow.h"
 
 /**
  * @brief Google Mock for AppPreferencesInterface.
  */
-class MockPreferences: public QObject, public AppPreferencesInterface
+class MockPreferences: public QObject, public IUiPreferences
 {
         Q_OBJECT
-        Q_INTERFACES(AppPreferencesInterface)
+        Q_INTERFACES(IUiPreferences)
 
     public:
         MOCK_METHOD(QString, get_theme, (), (override));
@@ -39,25 +39,25 @@ class MockPreferences: public QObject, public AppPreferencesInterface
 /**
  * @brief Test subclass to expose protected methods for testing.
  */
-class TestableBaseMainWindow: public BaseMainWindow
+class TestableBaseMainWindow: public AppMainWindow
 {
         Q_OBJECT
 
     public:
-        using BaseMainWindow::BaseMainWindow;
-        using BaseMainWindow::restore_window_settings;
-        using BaseMainWindow::save_window_settings;
+        using AppMainWindow::AppMainWindow;
+        using AppMainWindow::restore_window_settings;
+        using AppMainWindow::save_window_settings;
 };
 
 /**
- * @file BaseMainWindowTest.h
+ * @file AppMainWindowTest.h
  * @brief Test fixture for BaseMainWindow.
  */
-class BaseMainWindowTest: public ::testing::Test
+class AppMainWindowTest: public ::testing::Test
 {
     protected:
-        BaseMainWindowTest() = default;
-        ~BaseMainWindowTest() override = default;
+        AppMainWindowTest() = default;
+        ~AppMainWindowTest() override = default;
 
         void SetUp() override;
         void TearDown() override;

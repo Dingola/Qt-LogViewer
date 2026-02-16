@@ -1,4 +1,4 @@
-#include "Qt-LogViewer/Views/Shared/BaseMainWindowTest.h"
+#include "Qt-LogViewer/Views/Shared/AppMainWindowTest.h"
 
 #include <QFile>
 #include <QTemporaryFile>
@@ -10,7 +10,7 @@
  * @param content The QSS content to write to the file.
  * @return The path to the temporary QSS file.
  */
-QString BaseMainWindowTest::create_temp_qss(const QString& content)
+QString AppMainWindowTest::create_temp_qss(const QString& content)
 {
     QTemporaryFile temp_file;
     temp_file.setAutoRemove(false);
@@ -29,7 +29,7 @@ QString BaseMainWindowTest::create_temp_qss(const QString& content)
 /**
  * @brief Sets up the test fixture before each test.
  */
-void BaseMainWindowTest::SetUp()
+void AppMainWindowTest::SetUp()
 {
     m_mock_prefs = new MockPreferences();
     m_window = new TestableBaseMainWindow(m_mock_prefs);
@@ -39,7 +39,7 @@ void BaseMainWindowTest::SetUp()
 /**
  * @brief Tears down the test fixture after each test.
  */
-void BaseMainWindowTest::TearDown()
+void AppMainWindowTest::TearDown()
 {
     delete m_window;
     m_window = nullptr;
@@ -55,9 +55,9 @@ void BaseMainWindowTest::TearDown()
 }
 
 /**
- * @brief Tests the construction of the BaseMainWindow and its stylesheet loader.
+ * @brief Tests the construction of the AppMainWindow and its stylesheet loader.
  */
-TEST_F(BaseMainWindowTest, ConstructionAndStylesheetLoader)
+TEST_F(AppMainWindowTest, ConstructionAndStylesheetLoader)
 {
     EXPECT_NE(m_window, nullptr);
     EXPECT_NE(m_window->get_stylesheet_loader(), nullptr);
@@ -66,7 +66,7 @@ TEST_F(BaseMainWindowTest, ConstructionAndStylesheetLoader)
 /**
  * @brief Tests that saving window settings calls the preferences methods.
  */
-TEST_F(BaseMainWindowTest, SaveWindowSettingsCallsPreferences)
+TEST_F(AppMainWindowTest, SaveWindowSettingsCallsPreferences)
 {
     EXPECT_CALL(*m_mock_prefs, set_mainwindow_geometry(testing::_)).Times(1);
     EXPECT_CALL(*m_mock_prefs, set_mainwindow_state(testing::_)).Times(1);
@@ -78,7 +78,7 @@ TEST_F(BaseMainWindowTest, SaveWindowSettingsCallsPreferences)
 /**
  * @brief Tests that restoring window settings calls the preferences methods.
  */
-TEST_F(BaseMainWindowTest, RestoreWindowSettingsCallsPreferences)
+TEST_F(AppMainWindowTest, RestoreWindowSettingsCallsPreferences)
 {
     EXPECT_CALL(*m_mock_prefs, get_mainwindow_geometry()).Times(1);
     EXPECT_CALL(*m_mock_prefs, get_mainwindow_state()).Times(1);
@@ -90,7 +90,7 @@ TEST_F(BaseMainWindowTest, RestoreWindowSettingsCallsPreferences)
 /**
  * @brief Tests that the main window can be shown and closed without exceptions.
  */
-TEST_F(BaseMainWindowTest, ShowAndCloseWindow)
+TEST_F(AppMainWindowTest, ShowAndCloseWindow)
 {
     EXPECT_NO_THROW(m_window->show());
     EXPECT_NO_THROW(m_window->close());
@@ -98,10 +98,10 @@ TEST_F(BaseMainWindowTest, ShowAndCloseWindow)
 
 /**
  * @brief Tests that emitting the themeChanged signal on preferences
- *        causes BaseMainWindow to load and apply the correct stylesheet
+ *        causes AppMainWindow to load and apply the correct stylesheet
  *        for the given theme, including variable substitution.
  */
-TEST_F(BaseMainWindowTest, ThemeChangeSignalLoadsStylesheet)
+TEST_F(AppMainWindowTest, ThemeChangeSignalLoadsStylesheet)
 {
     auto* loader = m_window->get_stylesheet_loader();
     ASSERT_NE(loader, nullptr);

@@ -72,7 +72,7 @@ constexpr auto k_untitled_session_text = QT_TRANSLATE_NOOP("MainWindow", "Untitl
  * @param parent The parent widget, or nullptr if this is a top-level window.
  */
 MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
-    : BaseMainWindow(settings, parent),
+    : AppMainWindow(settings, parent),
       m_log_viewer_settings(settings),
       m_controller(new LogViewerController("{timestamp} {level} {message} {app_name}", this)),
       m_log_level_pie_chart_widget(new LogLevelPieChartWidget(this)),
@@ -844,7 +844,7 @@ auto MainWindow::changeEvent(QEvent* event) -> void
         update_pagination_widget();
     }
 
-    BaseMainWindow::changeEvent(event);
+    AppMainWindow::changeEvent(event);
 }
 
 /**
@@ -853,7 +853,7 @@ auto MainWindow::changeEvent(QEvent* event) -> void
  */
 void MainWindow::showEvent(QShowEvent* event)
 {
-    BaseMainWindow::showEvent(event);
+    AppMainWindow::showEvent(event);
     show_start_page_if_needed();
 }
 
@@ -870,7 +870,7 @@ auto MainWindow::closeEvent(QCloseEvent* event) -> void
     else
     {
         // If we are on StartPage, restore the last-session dock state just before saving window
-        // settings, so BaseMainWindow persists the session layout instead of the StartPage-off
+        // settings, so AppMainWindow persists the session layout instead of the StartPage-off
         // layout.
         if (!m_last_session_dock_state.isEmpty())
         {
@@ -878,7 +878,7 @@ auto MainWindow::closeEvent(QCloseEvent* event) -> void
         }
     }
 
-    BaseMainWindow::closeEvent(event);
+    AppMainWindow::closeEvent(event);
 }
 
 /**
@@ -958,9 +958,9 @@ void MainWindow::handle_show_settings_dialog_requested()
     SettingsDialog dialog(m_log_viewer_settings, this);
     dialog.setWindowTitle("SettingsDialog");
     dialog.resize(440, 300);
-    dialog.set_available_themes(BaseMainWindow::get_stylesheet_loader()->get_available_themes());
+    dialog.set_available_themes(AppMainWindow::get_stylesheet_loader()->get_available_themes());
     dialog.set_available_language_names(
-        BaseMainWindow::get_translator()->get_available_language_names());
+        AppMainWindow::get_translator()->get_available_language_names());
 
     dialog.exec();
 }

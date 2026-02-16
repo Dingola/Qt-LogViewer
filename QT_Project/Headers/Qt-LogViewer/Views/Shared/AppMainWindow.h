@@ -2,7 +2,7 @@
 
 #include <QMainWindow>
 
-class AppPreferencesInterface;
+class IUiPreferences;
 
 namespace QtWidgetsCommonLib
 {
@@ -11,18 +11,18 @@ class Translator;
 }  // namespace QtWidgetsCommonLib
 
 /**
- * @class BaseMainWindow
+ * @class AppMainWindow
  * @brief Base class for main windows in the application.
  *
  * This class provides basic functionality for managing application settings and stylesheets.
  */
-class BaseMainWindow: public QMainWindow
+class AppMainWindow: public QMainWindow
 {
         Q_OBJECT
 
     public:
         /**
-         * @brief Constructs a BaseMainWindow object.
+         * @brief Constructs a AppMainWindow object.
          *
          * Initializes the main window, settings, and stylesheet loader.
          *
@@ -30,15 +30,14 @@ class BaseMainWindow: public QMainWindow
          * is created.
          * @param parent The parent widget, or nullptr if this is a top-level window.
          */
-        explicit BaseMainWindow(AppPreferencesInterface* preferences = nullptr,
-                                QWidget* parent = nullptr);
+        explicit AppMainWindow(IUiPreferences* ui_preferences = nullptr, QWidget* parent = nullptr);
 
         /**
-         * @brief Destroys the BaseMainWindow object.
+         * @brief Destroys the AppMainWindow object.
          *
          * Cleans up any resources used by the main window.
          */
-        ~BaseMainWindow() override;
+        ~AppMainWindow() override;
 
         /**
          * @brief Gets the stylesheet loader object.
@@ -123,7 +122,7 @@ class BaseMainWindow: public QMainWindow
         /**
          * @brief Pointer to the Settings object used for managing application settings.
          */
-        AppPreferencesInterface* m_preferences;
+        IUiPreferences* m_ui_preferences;
 
         /**
          * @brief Pointer to the StylesheetLoader object used for managing application stylesheets.
