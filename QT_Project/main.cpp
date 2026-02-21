@@ -8,7 +8,7 @@
 #include "Qt-LogViewer/Models/LogFileInfo.h"
 #include "Qt-LogViewer/Services/LogViewerSettings.h"
 #include "Qt-LogViewer/Views/MainWindow.h"
-#include "Qt-LogViewer/Views/Shared/AppWindow.h"
+#include "QtWidgetsCommonLib/Widgets/AppWindow.h"
 #include "SimpleQtLogger/QtLoggerAdapter.h"
 
 /**
@@ -39,11 +39,11 @@ auto main(int argc, char* argv[]) -> int
     auto settings = LogViewerSettings(Settings::default_settings_file_path(), QSettings::IniFormat);
 
     auto* main_window = new MainWindow(&settings);
-    AppWindow app_window(nullptr, main_window);
+    QtWidgetsCommonLib::AppWindow app_window(nullptr, main_window);
     app_window.resize(1120, 800);
     app_window.set_app_title("Qt-LogViewer");
     app_window.set_app_icon(QIcon(":/Resources/Icons/App/AppIcon.svg"));
-    app_window.set_adopt_menubar(true, WindowTitleBar::RowPosition::Top);
+    app_window.set_adopt_menubar(true, QtWidgetsCommonLib::WindowTitleBar::RowPosition::Top);
     app_window.show();
 
     return app.exec();
