@@ -8,6 +8,10 @@
 #include <QHBoxLayout>
 #include <QLabel>
 
+#include "QtWidgetsCommonLib/Layouts/FlowLayout.h"
+
+using QtWidgetsCommonLib::FlowLayout;
+
 /**
  * @brief Constructs the log level pie chart widget.
  *

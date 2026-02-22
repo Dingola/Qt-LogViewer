@@ -9,8 +9,12 @@
 #include <QMap>
 #include <QWidget>
 
-#include "Qt-LogViewer/Views/Shared/FlowLayout.h"
 #include "Qt-LogViewer/Views/Shared/PieChart.h"
+
+namespace QtWidgetsCommonLib
+{
+class FlowLayout;
+}
 
 /**
  * @class LogLevelPieChartWidget
@@ -107,7 +111,7 @@ class LogLevelPieChartWidget: public QWidget
         QColor m_warning_color;
         QColor m_error_color;
         QColor m_fatal_color;
-        QWidget* m_levels_widget;                     ///< Container for log level rows
-        FlowLayout* m_levels_layout;                  ///< Layout for stacking log level rows
-        QMap<QString, QWidget*> m_level_row_widgets;  ///< Map log level to row widget
+        QWidget* m_levels_widget;                         ///< Container for log level rows
+        QtWidgetsCommonLib::FlowLayout* m_levels_layout;  ///< Layout for stacking log level rows
+        QMap<QString, QWidget*> m_level_row_widgets;      ///< Map log level to row widget
 };
