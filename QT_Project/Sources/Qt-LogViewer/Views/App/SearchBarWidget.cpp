@@ -9,8 +9,10 @@
 #include <QStyleOptionFrame>
 #include <QToolButton>
 
-#include "Qt-LogViewer/Services/UiUtils.h"
+#include "QtWidgetsCommonLib/Utils/UiUtils.h"
 #include "ui_SearchBarWidget.h"
+
+using QtWidgetsCommonLib::UiUtils;
 
 namespace
 {

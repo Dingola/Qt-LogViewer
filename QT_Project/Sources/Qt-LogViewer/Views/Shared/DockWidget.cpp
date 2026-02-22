@@ -8,7 +8,9 @@
 #include <QStyle>
 #include <QToolButton>
 
-#include "Qt-LogViewer/Services/UiUtils.h"
+#include "QtWidgetsCommonLib/Utils/UiUtils.h"
+
+using QtWidgetsCommonLib::UiUtils;
 
 /**
  * @file DockWidget.cpp

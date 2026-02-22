@@ -4,7 +4,9 @@
 #include <QStyle>
 #include <QStyleOption>
 
-#include "Qt-LogViewer/Services/UiUtils.h"
+#include "QtWidgetsCommonLib/Utils/UiUtils.h"
+
+using QtWidgetsCommonLib::UiUtils;
 
 /**
  * @file TreeView.cpp

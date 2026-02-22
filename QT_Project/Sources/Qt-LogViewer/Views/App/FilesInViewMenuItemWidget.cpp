@@ -5,7 +5,9 @@
 #include <QFontMetrics>
 #include <QStyle>
 
-#include "Qt-LogViewer/Services/UiUtils.h"
+#include "QtWidgetsCommonLib/Utils/UiUtils.h"
+
+using QtWidgetsCommonLib::UiUtils;
 
 /**
  * @file FilesInViewMenuItemWidget.cpp

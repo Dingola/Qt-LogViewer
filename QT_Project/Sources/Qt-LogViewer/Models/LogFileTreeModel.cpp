@@ -4,7 +4,9 @@
 
 #include "Qt-LogViewer/Models/LogFileInfo.h"
 #include "Qt-LogViewer/Models/LogFileTreeItem.h"
-#include "Qt-LogViewer/Services/UiUtils.h"
+#include "QtWidgetsCommonLib/Utils/UiUtils.h"
+
+using QtWidgetsCommonLib::UiUtils;
 
 /**
  * @brief Constructs a LogFileTreeModel object.

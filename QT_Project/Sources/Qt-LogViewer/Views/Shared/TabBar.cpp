@@ -15,7 +15,9 @@
 #include <QShowEvent>
 #include <QToolButton>
 
-#include "Qt-LogViewer/Services/UiUtils.h"
+#include "QtWidgetsCommonLib/Utils/UiUtils.h"
+
+using QtWidgetsCommonLib::UiUtils;
 
 /**
  * @brief Constructs the tab bar.

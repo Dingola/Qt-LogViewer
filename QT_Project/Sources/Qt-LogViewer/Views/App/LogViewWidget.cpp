@@ -7,12 +7,14 @@
 #include <QToolButton>
 
 #include "Qt-LogViewer/Models/LogSortFilterProxyModel.h"
-#include "Qt-LogViewer/Services/UiUtils.h"
 #include "Qt-LogViewer/Views/App/FilesInViewMenuItemWidget.h"
 #include "Qt-LogViewer/Views/App/FilesInViewWidgetAction.h"
 #include "Qt-LogViewer/Views/App/LogFilterWidget.h"
 #include "Qt-LogViewer/Views/App/LogTableView.h"
+#include "QtWidgetsCommonLib/Utils/UiUtils.h"
 #include "ui_LogViewWidget.h"
+
+using QtWidgetsCommonLib::UiUtils;
 
 /**
  * @brief Constructs a LogViewWidget object.
