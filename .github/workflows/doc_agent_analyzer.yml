@@ -244,6 +244,11 @@ jobs:
           fi
           echo "json extraction ok"
 
+          echo "----- RAW MODEL OUTPUT START -----"
+          cat "$json_output_file"
+          echo
+          echo "----- RAW MODEL OUTPUT END -----"
+
           jq -e '
             has("home_md") and
             has("build_and_run_md") and
