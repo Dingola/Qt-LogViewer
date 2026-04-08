@@ -133,8 +133,8 @@ jobs:
           CHANGED_FILES: ${{ steps.doc_agent_detect.outputs.changed_files }}
         run: |
           output_file="${RUNNER_TEMP}/doc_agent_input.md"
-          max_total_chars=120000
-          max_file_chars=6000
+          max_total_chars=1000000
+          max_file_chars=50000
           total_chars=0
 
           is_monitored() {
@@ -244,11 +244,34 @@ jobs:
           fi
           echo "json extraction ok"
 
-          jq -e 'has("home_md") and has("documentation_review_md")' "$json_output_file" > /dev/null
+          jq -e '
+            has("home_md") and
+            has("build_and_run_md") and
+            has("project_structure_md") and
+            has("architecture_md") and
+            has("testing_md") and
+            has("configuration_md") and
+            has("documentation_review_md")
+          ' "$json_output_file" > /dev/null
           echo "json validation ok"
 
           jq -r '.home_md' "$json_output_file" > "${{ env.WIKI_STAGING_DIR }}/Home.md"
           printf '\n' >> "${{ env.WIKI_STAGING_DIR }}/Home.md"
+
+          jq -r '.build_and_run_md' "$json_output_file" > "${{ env.WIKI_STAGING_DIR }}/Build-and-Run.md"
+          printf '\n' >> "${{ env.WIKI_STAGING_DIR }}/Build-and-Run.md"
+
+          jq -r '.project_structure_md' "$json_output_file" > "${{ env.WIKI_STAGING_DIR }}/Project-Structure.md"
+          printf '\n' >> "${{ env.WIKI_STAGING_DIR }}/Project-Structure.md"
+
+          jq -r '.architecture_md' "$json_output_file" > "${{ env.WIKI_STAGING_DIR }}/Architecture.md"
+          printf '\n' >> "${{ env.WIKI_STAGING_DIR }}/Architecture.md"
+
+          jq -r '.testing_md' "$json_output_file" > "${{ env.WIKI_STAGING_DIR }}/Testing.md"
+          printf '\n' >> "${{ env.WIKI_STAGING_DIR }}/Testing.md"
+
+          jq -r '.configuration_md' "$json_output_file" > "${{ env.WIKI_STAGING_DIR }}/Configuration.md"
+          printf '\n' >> "${{ env.WIKI_STAGING_DIR }}/Configuration.md"
 
           jq -r '.documentation_review_md' "$json_output_file" > "${{ env.WIKI_STAGING_DIR }}/Documentation-Review.md"
           printf '\n' >> "${{ env.WIKI_STAGING_DIR }}/Documentation-Review.md"
@@ -259,11 +282,21 @@ jobs:
           # Wiki
 
           - [[Home]]
+          - [[Build-and-Run]]
+          - [[Project-Structure]]
+          - [[Architecture]]
+          - [[Testing]]
+          - [[Configuration]]
           - [[Documentation-Review]]
           EOF
 
           cat > "${{ env.WIKI_STAGING_DIR }}/${{ env.WIKI_MANIFEST_FILE }}" <<'EOF'
           Home.md
+          Build-and-Run.md
+          Project-Structure.md
+          Architecture.md
+          Testing.md
+          Configuration.md
           Documentation-Review.md
           _Sidebar.md
           EOF
@@ -276,6 +309,11 @@ jobs:
         run: |
           required_files=(
             "${{ env.WIKI_STAGING_DIR }}/Home.md"
+            "${{ env.WIKI_STAGING_DIR }}/Build-and-Run.md"
+            "${{ env.WIKI_STAGING_DIR }}/Project-Structure.md"
+            "${{ env.WIKI_STAGING_DIR }}/Architecture.md"
+            "${{ env.WIKI_STAGING_DIR }}/Testing.md"
+            "${{ env.WIKI_STAGING_DIR }}/Configuration.md"
             "${{ env.WIKI_STAGING_DIR }}/Documentation-Review.md"
             "${{ env.WIKI_STAGING_DIR }}/_Sidebar.md"
             "${{ env.WIKI_STAGING_DIR }}/${{ env.WIKI_MANIFEST_FILE }}"
@@ -288,7 +326,7 @@ jobs:
             fi
           done
 
-          expected_manifest=$'Home.md\nDocumentation-Review.md\n_Sidebar.md'
+          expected_manifest=$'Home.md\nBuild-and-Run.md\nProject-Structure.md\nArchitecture.md\nTesting.md\nConfiguration.md\nDocumentation-Review.md\n_Sidebar.md'
           actual_manifest="$(cat "${{ env.WIKI_STAGING_DIR }}/${{ env.WIKI_MANIFEST_FILE }}")"
 
           if [[ "$actual_manifest" != "$expected_manifest" ]]; then
