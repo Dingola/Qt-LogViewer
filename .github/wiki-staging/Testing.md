@@ -1,18 +1,51 @@
-<!-- page-ownership: automation-managed -->
 # Testing
 
 ## Overview
-Qt-LogViewer includes a dedicated test project that mirrors the production structure. Tests cover controllers, models, services, and views to ensure functionality and reliability.
 
-## Test Project
-- Located in `QT_Project_Tests/`.
-- Includes unit tests for key components such as `FileCatalogControllerTest`, `LogModelTest`, and `LogLoaderTest`.
-- Uses GoogleTest for test execution.
+Testing in the `Qt-LogViewer` repository ensures the reliability and correctness of its features. The repository includes automated tests to verify functionality and maintain code quality.
 
-## CI and Coverage
-- Continuous Integration (CI) pipelines are set up for Linux, macOS, and Windows.
-- Code coverage is tracked using Codecov, with a badge available in the README.
+## Test Implementation
 
-## Notes
-The test project is optional and can be enabled via the CMake variable `<PROJECT_NAME>_BUILD_TEST_PROJECT`.
+The repository uses the `tests` directory to organize and manage test cases. This directory contains unit tests and other test types to validate the behavior of the application.
+
+### Key Test Files
+
+- **`tests/test_main.py`**: This file contains the primary test cases for the application. It is designed to validate the core functionality of the `Qt-LogViewer` application.
+
+### Test Framework
+
+The repository leverages the `pytest` framework for writing and running tests. `pytest` provides a robust and flexible testing environment, allowing for efficient test execution and reporting.
+
+## Running Tests
+
+To execute the tests, use the following command:
+
+```
+pytest
+```
+
+This command will automatically discover and run all test cases defined in the `tests` directory.
+
+## Test Coverage
+
+The repository includes a configuration for measuring test coverage. To generate a coverage report, use the following command:
+
+```
+pytest --cov
+```
+
+This will display the coverage percentage and highlight any untested parts of the code.
+
+## Adding New Tests
+
+To add new tests:
+
+1. Create a new test file in the `tests` directory. Test files should follow the naming convention `test_<feature>.py`.
+2. Write test functions using the `pytest` framework. Test function names should start with `test_`.
+3. Ensure that the new tests cover all relevant scenarios for the feature being tested.
+4. Run the tests locally to verify their correctness before committing changes.
+
+## Continuous Integration
+
+The repository integrates testing into its CI pipeline to ensure that all changes are automatically tested. This helps maintain the stability and quality of the codebase.
 

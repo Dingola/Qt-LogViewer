@@ -1,22 +1,43 @@
-<!-- page-ownership: automation-managed -->
 # Architecture
 
-## Overview
-Qt-LogViewer employs a modular architecture with distinct responsibilities for controllers, models, services, and views. This design ensures scalability and maintainability while providing a responsive user experience.
+The `Qt-LogViewer` application is designed to provide an efficient and user-friendly interface for viewing and analyzing log files. Its architecture is structured to ensure modularity, maintainability, and scalability. Below is an overview of the key architectural components and their responsibilities.
 
-## Main Responsibilities
-- **Controllers**: Manage application logic and coordinate between models and views. Examples include `FileCatalogController`, `LogViewerController`, and `SessionController`.
-- **Models**: Represent data structures such as logs (`LogModel`, `LogEntry`) and support filtering and pagination (`LogSortFilterProxyModel`, `PagingProxyModel`).
-- **Services**: Handle background tasks like log loading (`LogLoader`, `LogLoadingService`), parsing (`LogParser`), and session management (`SessionManager`).
-- **Views**: Provide the user interface, including widgets like `LogViewWidget`, `LogFilterBarWidget`, and `MainWindow`.
+## Core Components
 
-## Data and Interaction Flow
-1. **File Selection and Cataloging**: `FileCatalogController` manages file selection and organizes logs into a catalog.
-2. **Log Ingestion and Parsing**: `LogIngestController` and `LogParser` process log files and populate models.
-3. **Loading into Models**: Logs are loaded into `LogModel` and filtered using `LogSortFilterProxyModel`.
-4. **UI Coordination**: Views like `LogViewWidget` and `LogFilterWidget` display data and interact with controllers for updates.
-5. **Session Persistence**: `SessionManager` saves and restores user sessions, including active views and filters.
+### 1. User Interface (UI)
+The UI layer is implemented using Qt Widgets and provides an interactive interface for users to load, view, and filter log files. Key UI elements include:
+- **MainWindow**: The central window of the application, which hosts the primary log viewing and filtering functionalities.
+- **Dialogs and Forms**: Custom dialogs and forms for user interactions, such as file selection and filter configuration.
 
-## Notes
-The architecture leverages asynchronous loading to maintain UI responsiveness and supports advanced features like regex-based search and per-view filtering.
+### 2. Data Management
+The data management layer handles the loading, parsing, and representation of log files. It includes:
+- **Log File Parser**: Responsible for reading and interpreting log file contents into a structured format.
+- **Data Models**: Manage the structured data and provide it to the UI for display.
+
+### 3. Filtering and Search
+This component enables users to filter and search through log entries based on specific criteria. It includes:
+- **Filter Logic**: Implements the rules and conditions for filtering log entries.
+- **Search Functionality**: Allows users to locate specific log entries quickly.
+
+### 4. Configuration Management
+The application supports user preferences and settings, which are managed through:
+- **Settings Storage**: Handles saving and loading of user configurations, such as default directories and filter presets.
+
+## Interaction Flow
+1. **Log File Loading**: Users load a log file through the UI, which is then parsed by the Log File Parser into a structured format.
+2. **Data Display**: The parsed data is passed to the Data Models, which provide it to the UI for rendering in a table or list view.
+3. **Filtering and Search**: Users can apply filters or search terms via the UI. The Filter Logic processes these inputs and updates the displayed data accordingly.
+4. **Configuration Persistence**: User preferences are saved and loaded automatically to enhance the user experience across sessions.
+
+## Repository Structure
+The repository is organized into directories and files that reflect the application's modular design. Key directories include:
+- **src/**: Contains the source code for the application, including UI components, data models, and logic.
+- **forms/**: Includes UI form definitions for dialogs and other interface elements.
+- **tests/**: Houses unit tests and integration tests to ensure application reliability.
+
+## Extensibility
+The modular design of `Qt-LogViewer` allows for easy extension of its functionality. Developers can add new features, such as additional filter types or support for new log file formats, by extending the relevant components in the `src/` directory.
+
+## Conclusion
+The architecture of `Qt-LogViewer` emphasizes a clear separation of concerns, making it easier to maintain and extend. By leveraging Qt's robust framework and adhering to modular design principles, the application provides a reliable and user-friendly tool for log file analysis.
 
