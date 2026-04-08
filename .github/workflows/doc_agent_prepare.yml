@@ -132,43 +132,43 @@ jobs:
             cp README.md "${{ env.WIKI_STAGING_DIR }}/Home.md"
           else
             cat > "${{ env.WIKI_STAGING_DIR }}/Home.md" <<'EOF'
-# Qt-LogViewer Wiki
+          # Qt-LogViewer Wiki
 
-The repository `README.md` was not found during the Doc-Agent run.
-EOF
+          The repository `README.md` was not found during the Doc-Agent run.
+          EOF
           fi
 
           cat > "${{ env.WIKI_STAGING_DIR }}/Documentation-Review.md" <<EOF
-# Documentation Review
+          # Documentation Review
 
-## Summary
+          ## Summary
 
-The Doc-Agent reviewed the repository documentation inputs and prepared the wiki staging content for review.
+          The Doc-Agent reviewed the repository documentation inputs and prepared the wiki staging content for review.
 
-- Full scan requested: ${FULL_SCAN_REQUESTED}
-- README changed: ${README_CHANGED}
-- QT_Project changed: ${QT_PROJECT_CHANGED}
-- QT_Project_Tests changed: ${QT_PROJECT_TESTS_CHANGED}
-- Configs changed: ${CONFIGS_CHANGED}
+          - Full scan requested: ${FULL_SCAN_REQUESTED}
+          - README changed: ${README_CHANGED}
+          - QT_Project changed: ${QT_PROJECT_CHANGED}
+          - QT_Project_Tests changed: ${QT_PROJECT_TESTS_CHANGED}
+          - Configs changed: ${CONFIGS_CHANGED}
 
-## Reviewed Inputs
+          ## Reviewed Inputs
 
-- \`README.md\`
-- \`QT_Project/**\`
-- \`QT_Project_Tests/**\`
-- \`Configs/**\`
+          - \`README.md\`
+          - \`QT_Project/**\`
+          - \`QT_Project_Tests/**\`
+          - \`Configs/**\`
 
-## Source Commit
+          ## Source Commit
 
-- Commit: \`${{ github.sha }}\`
+          - Commit: \`${{ github.sha }}\`
 
-## Review Requirement
+          ## Review Requirement
 
-This staging content must be reviewed and approved in the main repository before the Wiki-Agent publishes it to the GitHub Wiki.
+          This staging content must be reviewed and approved in the main repository before the Wiki-Agent publishes it to the GitHub Wiki.
 
-## Changed Files
+          ## Changed Files
 
-EOF
+          EOF
 
           if [[ -n "$CHANGED_FILES" ]]; then
             while IFS= read -r file; do
@@ -181,17 +181,17 @@ EOF
           fi
 
           cat > "${{ env.WIKI_STAGING_DIR }}/_Sidebar.md" <<'EOF'
-# Wiki
+          # Wiki
 
-- [[Home]]
-- [[Documentation-Review]]
-EOF
+          - [[Home]]
+          - [[Documentation-Review]]
+          EOF
 
           cat > "${{ env.WIKI_STAGING_DIR }}/${{ env.WIKI_MANIFEST_FILE }}" <<'EOF'
-Home.md
-Documentation-Review.md
-_Sidebar.md
-EOF
+          Home.md
+          Documentation-Review.md
+          _Sidebar.md
+          EOF
 
       - name: Doc-Agent - Create or update staging pull request
         if: steps.doc_agent_detect.outputs.relevant_change_detected == 'true'

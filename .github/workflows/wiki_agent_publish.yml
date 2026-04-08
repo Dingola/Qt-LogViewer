@@ -43,19 +43,28 @@ jobs:
       #------------------------------------------------
       # Wiki-Agent
       #------------------------------------------------
-      - name: Wiki-Agent - Validate approved staging content
+      - name: Wiki-Agent - Detect approved staging content
+        id: wiki_agent_detect
         shell: bash
         run: |
+          staging_ready=true
+
           if [[ ! -d "${{ env.WIKI_STAGING_DIR }}" ]]; then
-            echo "Missing staging directory: ${{ env.WIKI_STAGING_DIR }}"
-            exit 1
+            echo "Staging directory not found. Wiki publish will be skipped."
+            staging_ready=false
           fi
 
-          if [[ ! -f "${{ env.WIKI_STAGING_DIR }}/${{ env.WIKI_MANIFEST_FILE }}" ]]; then
-            echo "Missing staging manifest: ${{ env.WIKI_STAGING_DIR }}/${{ env.WIKI_MANIFEST_FILE }}"
-            exit 1
+          if [[ "$staging_ready" == "true" && ! -f "${{ env.WIKI_STAGING_DIR }}/${{ env.WIKI_MANIFEST_FILE }}" ]]; then
+            echo "Staging manifest not found. Wiki publish will be skipped."
+            staging_ready=false
           fi
 
+          echo "staging_ready=$staging_ready" >> "$GITHUB_OUTPUT"
+
+      - name: Wiki-Agent - Validate approved staging content
+        if: steps.wiki_agent_detect.outputs.staging_ready == 'true'
+        shell: bash
+        run: |
           missing_file_detected=false
 
           while IFS= read -r managed_file; do
@@ -70,6 +79,7 @@ jobs:
           fi
 
       - name: Wiki-Agent - Clone wiki repository
+        if: steps.wiki_agent_detect.outputs.staging_ready == 'true'
         shell: bash
         run: |
           rm -rf "${{ env.WIKI_CLONE_DIR }}"
@@ -85,6 +95,7 @@ jobs:
           fi
 
       - name: Wiki-Agent - Sync approved managed pages only
+        if: steps.wiki_agent_detect.outputs.staging_ready == 'true'
         shell: bash
         run: |
           previous_manifest_path="${{ env.WIKI_CLONE_DIR }}/${{ env.WIKI_MANIFEST_FILE }}"
@@ -108,6 +119,7 @@ jobs:
           cp "$current_manifest_path" "$previous_manifest_path"
 
       - name: Wiki-Agent - Commit and push wiki changes
+        if: steps.wiki_agent_detect.outputs.staging_ready == 'true'
         shell: bash
         run: |
           cd "${{ env.WIKI_CLONE_DIR }}"
