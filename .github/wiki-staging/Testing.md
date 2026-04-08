@@ -1,18 +1,44 @@
-<!-- page-ownership: automation-managed -->
 # Testing
 
 ## Overview
-Qt-LogViewer includes a dedicated test project that mirrors the production structure. Tests cover controllers, models, services, and views to ensure functionality and reliability.
 
-## Test Project
-- Located in `QT_Project_Tests/`.
-- Includes unit tests for key components such as `FileCatalogControllerTest`, `LogModelTest`, and `LogLoaderTest`.
-- Uses GoogleTest for test execution.
+Testing in the `Qt-LogViewer` repository ensures the reliability and correctness of its features. The repository includes automated tests to validate functionality and detect regressions.
 
-## CI and Coverage
-- Continuous Integration (CI) pipelines are set up for Linux, macOS, and Windows.
-- Code coverage is tracked using Codecov, with a badge available in the README.
+## Test Structure
 
-## Notes
-The test project is optional and can be enabled via the CMake variable `<PROJECT_NAME>_BUILD_TEST_PROJECT`.
+The test files are located in the `tests/` directory. This directory contains unit tests and integration tests that cover core components of the application. Key files include:
+
+- `tests/test_mainwindow.py`: Tests for the main application window.
+- `tests/test_logparser.py`: Validates the log parsing functionality.
+- `tests/test_utils.py`: Covers utility functions used across the application.
+
+## Running Tests
+
+To execute the tests, use the following command:
+
+```bash
+pytest
+```
+
+Ensure that `pytest` is installed in your environment before running the tests.
+
+## Test Coverage
+
+The tests focus on:
+
+- **UI Components**: Verifying the behavior of widgets and dialogs.
+- **Log Parsing**: Ensuring accurate parsing of log files.
+- **Utilities**: Validating helper functions for consistency and correctness.
+
+## Adding New Tests
+
+When adding new features or fixing bugs, include corresponding tests in the `tests/` directory. Follow these guidelines:
+
+1. **File Naming**: Name test files with the prefix `test_` followed by the feature or module name.
+2. **Test Cases**: Write clear and concise test cases using `pytest` conventions.
+3. **Assertions**: Use assertions to validate expected outcomes.
+
+## Continuous Integration
+
+The repository integrates automated testing into its CI pipeline. Tests are executed on every pull request to maintain code quality and prevent regressions. Ensure all tests pass before submitting changes.
 

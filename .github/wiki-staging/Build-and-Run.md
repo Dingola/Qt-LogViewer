@@ -1,37 +1,61 @@
-<!-- page-ownership: automation-managed -->
 # Build and Run
 
-## Overview
-Qt-LogViewer provides a streamlined process for building and running the application across multiple platforms, including Linux, macOS, and Windows. The project uses CMake for configuration and supports Docker for deployment.
-
 ## Prerequisites
-- CMake
-- Qt framework
-- Compiler supporting C++17 or later
-- Git
 
-## Configure and Build
-1. Clone the repository:
-   ```
-git clone https://github.com/Dingola/Qt-LogViewer.git
+Before building and running the Qt-LogViewer application, ensure the following dependencies are installed:
+
+- **Qt Framework**: Version 5.15 or later.
+- **CMake**: Version 3.15 or later.
+- **Compiler**: A C++ compiler compatible with Qt and CMake (e.g., GCC, Clang, or MSVC).
+- **Git**: For cloning the repository.
+
+## Clone the Repository
+
+To obtain the source code, clone the Qt-LogViewer repository:
+
+```bash
+git clone https://github.com/<username>/Qt-LogViewer.git
 cd Qt-LogViewer
-   ```
-2. Create a build directory and navigate to it:
-   ```
-mkdir build && cd build
-   ```
-3. Configure the project using CMake:
-   ```
-cmake ..
-   ```
-4. Build the project:
-   ```
-cmake --build .
+```
+
+Replace `<username>` with the appropriate repository owner.
+
+## Build Instructions
+
+1. **Create a Build Directory**  
+   It is recommended to use a separate directory for building the project to keep the source directory clean:
+   ```bash
+   mkdir build
+   cd build
    ```
 
-## Run
-After building, execute the application binary located in the build directory.
+2. **Run CMake**  
+   Configure the project using CMake:
+   ```bash
+   cmake ..
+   ```
+   Ensure that the correct Qt installation path is detected. If necessary, specify the path manually:
+   ```bash
+   cmake .. -DCMAKE_PREFIX_PATH=/path/to/Qt
+   ```
 
-## Deployment and Docker Notes
-The project supports Docker for deployment. Refer to the provided Docker configuration files for setup and usage instructions.
+3. **Build the Project**  
+   Compile the application:
+   ```bash
+   cmake --build .
+   ```
+
+## Run the Application
+
+After a successful build, the executable file will be available in the `build` directory. Run the application using the following command:
+
+```bash
+./Qt-LogViewer
+```
+
+## Notes
+
+- Ensure all required dependencies are installed and accessible in your system's PATH.
+- For troubleshooting build issues, refer to the CMake output for missing dependencies or configuration errors.
+- The application is designed to work on platforms supported by the Qt framework. Compatibility details are not specified in the repository documentation.
 

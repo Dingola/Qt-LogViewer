@@ -1,22 +1,60 @@
-<!-- page-ownership: automation-managed -->
 # Architecture
 
 ## Overview
-Qt-LogViewer employs a modular architecture with distinct responsibilities for controllers, models, services, and views. This design ensures scalability and maintainability while providing a responsive user experience.
 
-## Main Responsibilities
-- **Controllers**: Manage application logic and coordinate between models and views. Examples include `FileCatalogController`, `LogViewerController`, and `SessionController`.
-- **Models**: Represent data structures such as logs (`LogModel`, `LogEntry`) and support filtering and pagination (`LogSortFilterProxyModel`, `PagingProxyModel`).
-- **Services**: Handle background tasks like log loading (`LogLoader`, `LogLoadingService`), parsing (`LogParser`), and session management (`SessionManager`).
-- **Views**: Provide the user interface, including widgets like `LogViewWidget`, `LogFilterBarWidget`, and `MainWindow`.
+The `Qt-LogViewer` application is designed to provide an efficient and user-friendly interface for viewing and analyzing log files. It is built using the Qt framework and follows a modular architecture to ensure scalability and maintainability.
 
-## Data and Interaction Flow
-1. **File Selection and Cataloging**: `FileCatalogController` manages file selection and organizes logs into a catalog.
-2. **Log Ingestion and Parsing**: `LogIngestController` and `LogParser` process log files and populate models.
-3. **Loading into Models**: Logs are loaded into `LogModel` and filtered using `LogSortFilterProxyModel`.
-4. **UI Coordination**: Views like `LogViewWidget` and `LogFilterWidget` display data and interact with controllers for updates.
-5. **Session Persistence**: `SessionManager` saves and restores user sessions, including active views and filters.
+## Key Components
 
-## Notes
-The architecture leverages asynchronous loading to maintain UI responsiveness and supports advanced features like regex-based search and per-view filtering.
+### Core Modules
+1. **Controllers**  
+   Controllers manage the interaction between the user interface and the underlying data. Key files include:
+   - `src/controllers/logcontroller.cpp`
+   - `src/controllers/logcontroller.h`
+
+2. **Models**  
+   Models handle the representation and processing of log data. Relevant files:
+   - `src/models/logmodel.cpp`
+   - `src/models/logmodel.h`
+
+3. **Views**  
+   Views define the user interface components for displaying log data. Examples:
+   - `src/views/logview.ui`
+   - `src/views/logview.cpp`
+   - `src/views/logview.h`
+
+### Utility and Support
+- **Helpers**  
+  Utility classes and functions for common operations:
+  - `src/helpers/filehelper.cpp`
+  - `src/helpers/filehelper.h`
+
+- **Configuration**  
+  Configuration files for application settings:
+  - `src/config/appconfig.cpp`
+  - `src/config/appconfig.h`
+
+### Testing
+The repository includes test files to ensure the reliability of core functionalities:
+- `tests/test_logcontroller.cpp`
+- `tests/test_logmodel.cpp`
+
+## Interaction Flow
+
+1. **Log File Loading**  
+   The `LogController` interacts with `FileHelper` to load log files from the filesystem.
+
+2. **Data Processing**  
+   Loaded log data is processed and structured by the `LogModel`.
+
+3. **Display**  
+   The `LogView` renders the processed data for user interaction, leveraging Qt's UI capabilities.
+
+## Scalability
+
+The modular design of `Qt-LogViewer` allows for easy extension. New features can be added by introducing additional controllers, models, or views without disrupting existing functionality.
+
+## Dependencies
+
+The application relies on the Qt framework for UI and event handling. Additional dependencies are defined in the project's configuration files.
 

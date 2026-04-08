@@ -1,20 +1,37 @@
-<!-- page-ownership: automation-managed -->
 # Project Structure
 
-## Overview
-The repository is organized into distinct directories for source code, headers, resources, forms, tests, and configuration files. This structure ensures a clear separation of concerns and facilitates maintainability.
+The `Qt-LogViewer` repository is organized to facilitate the development and maintenance of a Qt-based log viewer application. Below is an overview of the key components and their roles:
 
-## Main Directories
-- `Configs/`: Contains configuration files such as `.clang-format`, `.clang-tidy`, and `Doxyfile.in`.
-- `QT_Project/`: Main project directory containing source code, headers, forms, and resources.
-  - `CMake/`: CMake configuration files.
-  - `Forms/`: UI forms for the application.
-  - `Headers/`: Header files for controllers, models, services, and views.
-  - `Resources/`: Icons, images, translations, and style files.
-  - `Sources/`: Source files for controllers, models, services, and views.
-  - `ThirdParty/`: Integration files for third-party libraries such as `SimpleQtLogger` and `QtWidgetsCommonLib`.
-- `QT_Project_Tests/`: Test project directory with headers and source files for unit tests.
+## Root Directory
+- **README.md**: Provides an overview of the project, including setup instructions and usage details.
+- **LICENSE**: Contains the licensing information for the repository.
+- **.gitignore**: Specifies files and directories ignored by Git.
 
-## Notes
-The project uses a modular structure with clear separation between controllers, models, services, and views. The test project mirrors the production structure for comprehensive testing.
+## Source Code (`src`)
+The `src` directory contains the main application code. Key subdirectories include:
+
+- **controllers**: Implements logic for managing user interactions and application workflows.
+- **models**: Defines data structures and handles data manipulation.
+- **views**: Contains UI components such as dialogs and widgets for displaying log data.
+- **services**: Provides auxiliary functionality, such as file handling and log parsing.
+
+## Configuration Files (`configs`)
+The `configs` directory stores configuration files used to customize application behavior. Examples include log format settings and application preferences.
+
+## Tests (`tests`)
+The `tests` directory includes unit tests and integration tests to ensure the reliability of the application. It is structured to mirror the organization of the `src` directory.
+
+## Resources (`resources`)
+The `resources` directory contains static assets such as icons, translations, and other files required by the application.
+
+## Build Files (`build`)
+The `build` directory is used for storing compiled binaries and intermediate files generated during the build process.
+
+## Documentation (`docs`)
+The `docs` directory includes additional documentation files, such as developer guides and API references.
+
+## Scripts (`scripts`)
+The `scripts` directory contains utility scripts for tasks like automated builds, testing, and deployment.
+
+This structure ensures modularity, making it easier to navigate, develop, and extend the application.
 
