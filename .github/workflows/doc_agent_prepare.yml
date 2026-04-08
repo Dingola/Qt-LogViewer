@@ -74,8 +74,8 @@ jobs:
           fi
 
           readme_changed=false
-          qt_project_changed=false
-          qt_project_tests_changed=false
+          source_comments_changed=false
+          tests_changed=false
           configs_changed=false
           relevant_change_detected=false
 
@@ -87,11 +87,11 @@ jobs:
                   relevant_change_detected=true
                   ;;
                 QT_Project/*)
-                  qt_project_changed=true
+                  source_comments_changed=true
                   relevant_change_detected=true
                   ;;
                 QT_Project_Tests/*)
-                  qt_project_tests_changed=true
+                  tests_changed=true
                   relevant_change_detected=true
                   ;;
                 Configs/*)
@@ -105,8 +105,8 @@ jobs:
           {
             echo "full_scan_requested=$full_scan_requested"
             echo "readme_changed=$readme_changed"
-            echo "qt_project_changed=$qt_project_changed"
-            echo "qt_project_tests_changed=$qt_project_tests_changed"
+            echo "source_comments_changed=$source_comments_changed"
+            echo "tests_changed=$tests_changed"
             echo "configs_changed=$configs_changed"
             echo "relevant_change_detected=$relevant_change_detected"
             echo "changed_files<<EOF"
@@ -120,36 +120,187 @@ jobs:
         env:
           FULL_SCAN_REQUESTED: ${{ steps.doc_agent_detect.outputs.full_scan_requested }}
           README_CHANGED: ${{ steps.doc_agent_detect.outputs.readme_changed }}
-          QT_PROJECT_CHANGED: ${{ steps.doc_agent_detect.outputs.qt_project_changed }}
-          QT_PROJECT_TESTS_CHANGED: ${{ steps.doc_agent_detect.outputs.qt_project_tests_changed }}
+          SOURCE_COMMENTS_CHANGED: ${{ steps.doc_agent_detect.outputs.source_comments_changed }}
+          TESTS_CHANGED: ${{ steps.doc_agent_detect.outputs.tests_changed }}
           CONFIGS_CHANGED: ${{ steps.doc_agent_detect.outputs.configs_changed }}
           CHANGED_FILES: ${{ steps.doc_agent_detect.outputs.changed_files }}
         run: |
           rm -rf "${{ env.WIKI_STAGING_DIR }}"
           mkdir -p "${{ env.WIKI_STAGING_DIR }}"
 
-          if [[ -f README.md ]]; then
-            cp README.md "${{ env.WIKI_STAGING_DIR }}/Home.md"
-          else
-            cat > "${{ env.WIKI_STAGING_DIR }}/Home.md" <<'EOF'
+          cat > "${{ env.WIKI_STAGING_DIR }}/Home.md" <<EOF
+          <!-- page-ownership: automation-managed -->
+          <!-- manual-pages: pages not listed in .wiki-managed-files are treated as manual-only -->
+
           # Qt-LogViewer Wiki
 
-          The repository `README.md` was not found during the Doc-Agent run.
+          ## Overview
+
+          Qt-LogViewer is a Qt-based desktop application for viewing, searching, and filtering log files.
+
+          This wiki is published from reviewed staging content in the main repository. The wiki stays concise and topic-focused, while the repository \`README.md\` remains the primary repository overview.
+
+          ## Navigation
+
+          - [[Build-and-Run]]
+          - [[Project-Structure]]
+          - [[Architecture]]
+          - [[Testing]]
+          - [[Configuration]]
+          - [[Documentation-Review]]
+
+          ## Ownership
+
+          - Automation-managed pages are listed in \`.wiki-managed-files\`.
+          - Wiki pages not listed in \`.wiki-managed-files\` are treated as manual-only and are preserved by the Wiki-Agent.
+
+          ## Current Review Snapshot
+
+          - Full scan requested: ${FULL_SCAN_REQUESTED}
+          - README changed: ${README_CHANGED}
+          - Source comments changed: ${SOURCE_COMMENTS_CHANGED}
+          - Tests changed: ${TESTS_CHANGED}
+          - Configs changed: ${CONFIGS_CHANGED}
+
+          ## Repository Sources
+
+          - \`README.md\`
+          - \`QT_Project/**\`
+          - \`QT_Project_Tests/**\`
+          - \`Configs/**\`
           EOF
-          fi
+
+          cat > "${{ env.WIKI_STAGING_DIR }}/Build-and-Run.md" <<'EOF'
+          <!-- page-ownership: automation-managed -->
+
+          # Build and Run
+
+          ## Overview
+
+          Qt-LogViewer is built with CMake and Qt. The repository separates the main application from the test project.
+
+          ## Main Build Inputs
+
+          - `QT_Project`
+          - `QT_Project_Tests`
+          - `Configs`
+          - repository workflows in `.github/workflows/`
+
+          ## Typical Flow
+
+          1. Configure the project with CMake.
+          2. Build the application target.
+          3. Build and run the test target when enabled.
+          4. Use the repository workflows as the authoritative automated build reference.
+
+          ## Notes
+
+          Exact platform-specific automation details should be taken from the repository workflows and build configuration files.
+          EOF
+
+          cat > "${{ env.WIKI_STAGING_DIR }}/Project-Structure.md" <<'EOF'
+          <!-- page-ownership: automation-managed -->
+
+          # Project Structure
+
+          ## Main Directories
+
+          - `QT_Project/` - main application
+          - `QT_Project/Headers/Qt-LogViewer/Views/` - UI-related classes
+          - `QT_Project/Headers/Qt-LogViewer/Services/` - service layer
+          - `QT_Project/Headers/Qt-LogViewer/Models/` - data models
+          - `QT_Project/Headers/Qt-LogViewer/Controllers/` - application logic
+          - `QT_Project/Sources/` - implementation files
+          - `QT_Project/Forms/` - Qt Designer forms
+          - `QT_Project/Resources/` - application resources
+          - `QT_Project_Tests/` - tests mirroring the production structure
+          - `Configs/` - configuration files such as tooling and documentation settings
+
+          ## Structure Guidance
+
+          The repository keeps UI, services, models, and controllers separated so that the application structure remains predictable and easier to review.
+          EOF
+
+          cat > "${{ env.WIKI_STAGING_DIR }}/Architecture.md" <<'EOF'
+          <!-- page-ownership: automation-managed -->
+
+          # Architecture
+
+          ## Layer Overview
+
+          - **Views** render Qt UI components and user interaction surfaces.
+          - **Services** handle file I/O, settings, logging, and related application services.
+          - **Models** represent application data and view models.
+          - **Controllers** coordinate workflow and interaction between views, services, and models.
+
+          ## Intent
+
+          The repository structure favors a clear separation between presentation, state, and coordination logic.
+          EOF
+
+          cat > "${{ env.WIKI_STAGING_DIR }}/Testing.md" <<'EOF'
+          <!-- page-ownership: automation-managed -->
+
+          # Testing
+
+          ## Test Project
+
+          Automated tests live in `QT_Project_Tests/` and mirror the production structure where practical.
+
+          ## Coverage of Concern
+
+          - service behavior
+          - model behavior
+          - controller behavior
+          - widget and view-related behavior where applicable
+
+          ## Review Notes
+
+          Test-related repository changes are tracked by the Doc-Agent and surfaced in `Documentation-Review.md`.
+          EOF
+
+          cat > "${{ env.WIKI_STAGING_DIR }}/Configuration.md" <<'EOF'
+          <!-- page-ownership: automation-managed -->
+
+          # Configuration
+
+          ## Repository Configuration Sources
+
+          - `Configs/`
+          - `CMakeLists.txt` and related CMake modules
+          - `.github/workflows/`
+          - repository contribution and automation rules
+
+          ## Purpose
+
+          Configuration files define build behavior, tooling, and documentation automation inputs used by the repository workflows.
+          EOF
 
           cat > "${{ env.WIKI_STAGING_DIR }}/Documentation-Review.md" <<EOF
+          <!-- page-ownership: automation-managed -->
+
           # Documentation Review
 
           ## Summary
 
           The Doc-Agent reviewed the repository documentation inputs and prepared the wiki staging content for review.
 
-          - Full scan requested: ${FULL_SCAN_REQUESTED}
+          ## Change Categories
+
           - README changed: ${README_CHANGED}
-          - QT_Project changed: ${QT_PROJECT_CHANGED}
-          - QT_Project_Tests changed: ${QT_PROJECT_TESTS_CHANGED}
+          - Source comments changed: ${SOURCE_COMMENTS_CHANGED}
+          - Tests changed: ${TESTS_CHANGED}
           - Configs changed: ${CONFIGS_CHANGED}
+
+          ## Review Mode
+
+          - Full scan requested: ${FULL_SCAN_REQUESTED}
+          - Source commit: \`${{ github.sha }}\`
+
+          ## Ownership Model
+
+          - Automation-managed pages are listed in \`.wiki-managed-files\`.
+          - Pages not listed in \`.wiki-managed-files\` are treated as manual-only.
 
           ## Reviewed Inputs
 
@@ -157,14 +308,6 @@ jobs:
           - \`QT_Project/**\`
           - \`QT_Project_Tests/**\`
           - \`Configs/**\`
-
-          ## Source Commit
-
-          - Commit: \`${{ github.sha }}\`
-
-          ## Review Requirement
-
-          This staging content must be reviewed and approved in the main repository before the Wiki-Agent publishes it to the GitHub Wiki.
 
           ## Changed Files
 
@@ -181,14 +324,26 @@ jobs:
           fi
 
           cat > "${{ env.WIKI_STAGING_DIR }}/_Sidebar.md" <<'EOF'
+          <!-- page-ownership: automation-managed -->
+
           # Wiki
 
           - [[Home]]
+          - [[Build-and-Run]]
+          - [[Project-Structure]]
+          - [[Architecture]]
+          - [[Testing]]
+          - [[Configuration]]
           - [[Documentation-Review]]
           EOF
 
           cat > "${{ env.WIKI_STAGING_DIR }}/${{ env.WIKI_MANIFEST_FILE }}" <<'EOF'
           Home.md
+          Build-and-Run.md
+          Project-Structure.md
+          Architecture.md
+          Testing.md
+          Configuration.md
           Documentation-Review.md
           _Sidebar.md
           EOF
@@ -210,6 +365,11 @@ jobs:
             ## Included staging files
 
             - `.github/wiki-staging/Home.md`
+            - `.github/wiki-staging/Build-and-Run.md`
+            - `.github/wiki-staging/Project-Structure.md`
+            - `.github/wiki-staging/Architecture.md`
+            - `.github/wiki-staging/Testing.md`
+            - `.github/wiki-staging/Configuration.md`
             - `.github/wiki-staging/Documentation-Review.md`
             - `.github/wiki-staging/_Sidebar.md`
             - `.github/wiki-staging/.wiki-managed-files`
@@ -222,4 +382,3 @@ jobs:
           base: main
           add-paths: |
             .github/wiki-staging/**
-            .github/wiki-staging/.wiki-managed-files
