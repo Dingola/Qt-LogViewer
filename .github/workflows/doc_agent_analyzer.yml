@@ -133,14 +133,25 @@ jobs:
           CHANGED_FILES: ${{ steps.doc_agent_detect.outputs.changed_files }}
         run: |
           output_file="${RUNNER_TEMP}/doc_agent_input.md"
-          max_total_chars=120000
-          max_file_chars=5000
+          max_total_chars=24000
+          max_file_chars=2500
           total_chars=0
 
           is_monitored() {
             case "$1" in
               README.md|QT_Project/*|QT_Project_Tests/*|Configs/*) return 0 ;;
               *) return 1 ;;
+            esac
+          }
+
+          is_text_analysis_file() {
+            case "$1" in
+              README.md|CMakeLists.txt|*.md|*.txt|*.cmake|*.yml|*.yaml|*.json|*.xml|*.ui|*.h|*.hpp|*.cpp|*.cxx|*.in)
+                return 0
+                ;;
+              *)
+                return 1
+                ;;
             esac
           }
 
@@ -161,6 +172,10 @@ jobs:
             local file_path="$1"
 
             if ! is_monitored "$file_path"; then
+              return
+            fi
+
+            if ! is_text_analysis_file "$file_path"; then
               return
             fi
 
