@@ -33,7 +33,7 @@ permissions:
 env:
   WIKI_STAGING_DIR: .github/wiki-staging
   WIKI_MANIFEST_FILE: .wiki-managed-files
-  DOC_AGENT_MODEL: openai/gpt-4.1
+  DOC_AGENT_MODEL: openai/gpt-4.1-mini
 
 #------------------------------------------------
 # Workflow jobs
@@ -232,6 +232,7 @@ jobs:
           import json
           import os
           import pathlib
+          import urllib.error
           import urllib.request
 
           input_path = pathlib.Path(os.environ["RUNNER_TEMP"]) / "doc_agent_input.md"
@@ -279,15 +280,12 @@ jobs:
             - concise AI analysis notes based only on the provided input
           """
 
-          user_prompt = prompt_input
-
           request_body = {
               "model": os.environ["DOC_AGENT_MODEL"],
               "messages": [
                   {"role": "system", "content": system_prompt},
-                  {"role": "user", "content": user_prompt},
+                  {"role": "user", "content": prompt_input},
               ],
-              "temperature": 0.2,
           }
 
           request = urllib.request.Request(
@@ -300,8 +298,14 @@ jobs:
               method="POST",
           )
 
-          with urllib.request.urlopen(request) as response:
-              response_payload = json.loads(response.read().decode("utf-8"))
+          try:
+              with urllib.request.urlopen(request) as response:
+                  response_payload = json.loads(response.read().decode("utf-8"))
+          except urllib.error.HTTPError as error:
+              error_body = error.read().decode("utf-8", errors="replace")
+              print(f"GitHub Models request failed: HTTP {error.code}")
+              print(error_body)
+              raise
 
           content = response_payload["choices"][0]["message"]["content"]
 
