@@ -207,13 +207,16 @@ jobs:
         run: |
           output_file="${RUNNER_TEMP}/doc_agent_input.md"
           inventory_dir="${RUNNER_TEMP}/doc_agent_inventory"
-          max_total_chars=24000
-          max_file_chars=2500
-          max_inventory_items_per_group=20
+          appended_files_manifest="${RUNNER_TEMP}/doc_agent_appended_files.txt"
+          max_total_chars=120000
+          max_readme_chars=10000
+          max_file_chars=5000
+          max_inventory_items_per_group=30
           total_chars=0
 
           rm -rf "$inventory_dir"
           mkdir -p "$inventory_dir"
+          : > "$appended_files_manifest"
 
           is_monitored() {
             case "$1" in
@@ -246,28 +249,9 @@ jobs:
             total_chars=$((total_chars + text_len))
           }
 
-          normalize_inventory_entry() {
-            local entry_name="$1"
-
-            entry_name="${entry_name%.hpp}"
-            entry_name="${entry_name%.h}"
-            entry_name="${entry_name%.cpp}"
-            entry_name="${entry_name%.cxx}"
-            entry_name="${entry_name%.ui}"
-            entry_name="${entry_name%.cmake}"
-            entry_name="${entry_name%.yml}"
-            entry_name="${entry_name%.yaml}"
-            entry_name="${entry_name%.json}"
-            entry_name="${entry_name%.xml}"
-            entry_name="${entry_name%.in}"
-
-            printf "%s" "$entry_name"
-          }
-
           add_inventory_entry() {
             local file_path="$1"
             local category=""
-            local entry_name=""
 
             case "$file_path" in
               QT_Project/Headers/Qt-LogViewer/Controllers/*|QT_Project/Sources/Qt-LogViewer/Controllers/*)
@@ -303,12 +287,7 @@ jobs:
             esac
 
             if [[ -n "$category" ]]; then
-              entry_name="$(basename "$file_path")"
-              entry_name="$(normalize_inventory_entry "$entry_name")"
-
-              if [[ -n "$entry_name" ]]; then
-                printf "%s\n" "$entry_name" >> "${inventory_dir}/${category}.txt"
-              fi
+              printf "%s\n" "$file_path" >> "${inventory_dir}/${category}.txt"
             fi
           }
 
@@ -336,8 +315,9 @@ jobs:
             fi
           }
 
-          append_file_section() {
+          append_file_section_once() {
             local file_path="$1"
+            local char_limit="$2"
 
             if ! is_monitored "$file_path"; then
               return
@@ -351,10 +331,115 @@ jobs:
               return
             fi
 
+            if grep -Fxq "$file_path" "$appended_files_manifest"; then
+              return
+            fi
+
             local excerpt
-            excerpt="$(head -c "$max_file_chars" "$file_path")"
+            excerpt="$(head -c "$char_limit" "$file_path")"
 
             append_text "$(printf '\n## File: %s\n\n```text\n%s\n```\n' "$file_path" "$excerpt")"
+            printf "%s\n" "$file_path" >> "$appended_files_manifest"
+          }
+
+          append_known_directory_map() {
+            append_text "## Repository Structure Snapshot"$'\n'$'\n'
+
+            if [[ -f "README.md" ]]; then
+              append_text "- \`README.md\`"$'\n'
+            fi
+
+            for directory_path in \
+              "QT_Project/" \
+              "QT_Project/Headers/" \
+              "QT_Project/Headers/Qt-LogViewer/" \
+              "QT_Project/Headers/Qt-LogViewer/Controllers/" \
+              "QT_Project/Headers/Qt-LogViewer/Models/" \
+              "QT_Project/Headers/Qt-LogViewer/Services/" \
+              "QT_Project/Headers/Qt-LogViewer/Views/" \
+              "QT_Project/Sources/" \
+              "QT_Project/Sources/Qt-LogViewer/" \
+              "QT_Project/Sources/Qt-LogViewer/Controllers/" \
+              "QT_Project/Sources/Qt-LogViewer/Models/" \
+              "QT_Project/Sources/Qt-LogViewer/Services/" \
+              "QT_Project/Sources/Qt-LogViewer/Views/" \
+              "QT_Project/Forms/" \
+              "QT_Project/Resources/" \
+              "QT_Project/CMake/" \
+              "QT_Project_Tests/" \
+              "QT_Project_Tests/Headers/" \
+              "QT_Project_Tests/Headers/Qt-LogViewer/" \
+              "QT_Project_Tests/Sources/" \
+              "QT_Project_Tests/Sources/Qt-LogViewer/" \
+              "Configs/"
+            do
+              if [[ -d "$directory_path" ]]; then
+                append_text "- \`${directory_path}\`"$'\n'
+              fi
+            done
+
+            append_text $'\n'
+          }
+
+          append_focus_files() {
+            append_text "## Focused Repository Files"$'\n'$'\n'
+
+            while IFS= read -r focus_file; do
+              if [[ -n "$focus_file" ]]; then
+                append_text "- \`${focus_file}\`"$'\n'
+              fi
+            done <<'EOF'
+          QT_Project/main.cpp
+          QT_Project/Headers/Qt-LogViewer/Controllers/FileCatalogController.h
+          QT_Project/Headers/Qt-LogViewer/Controllers/LogIngestController.h
+          QT_Project/Headers/Qt-LogViewer/Controllers/LogViewerController.h
+          QT_Project/Headers/Qt-LogViewer/Controllers/SessionController.h
+          QT_Project/Headers/Qt-LogViewer/Models/LogModel.h
+          QT_Project/Headers/Qt-LogViewer/Models/LogSortFilterProxyModel.h
+          QT_Project/Headers/Qt-LogViewer/Models/PagingProxyModel.h
+          QT_Project/Headers/Qt-LogViewer/Services/LogLoader.h
+          QT_Project/Headers/Qt-LogViewer/Services/LogLoadingService.h
+          QT_Project/Headers/Qt-LogViewer/Services/SessionManager.h
+          QT_Project/Headers/Qt-LogViewer/Services/SessionRepository.h
+          QT_Project/Headers/Qt-LogViewer/Views/MainWindow.h
+          QT_Project/Headers/Qt-LogViewer/Views/App/LogViewWidget.h
+          QT_Project/Headers/Qt-LogViewer/Views/App/LogFileExplorer.h
+          QT_Project/Headers/Qt-LogViewer/Views/App/LogFilterBarWidget.h
+          QT_Project/Headers/Qt-LogViewer/Views/App/SearchBarWidget.h
+          QT_Project/Headers/Qt-LogViewer/Views/App/StartPageWidget.h
+          QT_Project_Tests/Headers/Qt-LogViewer/Controllers/LogViewLoadQueueTest.h
+          QT_Project_Tests/Headers/Qt-LogViewer/Models/LogSortFilterProxyModelTest.h
+          QT_Project_Tests/Headers/Qt-LogViewer/Services/LogLoaderTest.h
+          QT_Project_Tests/Headers/Qt-LogViewer/Services/LogLoadingServiceTest.h
+          QT_Project_Tests/Headers/Qt-LogViewer/Views/App/LogViewWidgetTest.h
+          EOF
+
+            append_text $'\n'
+
+            append_file_section_once "README.md" "$max_readme_chars"
+            append_file_section_once "QT_Project/main.cpp" "$max_file_chars"
+            append_file_section_once "QT_Project/Headers/Qt-LogViewer/Controllers/FileCatalogController.h" "$max_file_chars"
+            append_file_section_once "QT_Project/Headers/Qt-LogViewer/Controllers/LogIngestController.h" "$max_file_chars"
+            append_file_section_once "QT_Project/Headers/Qt-LogViewer/Controllers/LogViewerController.h" "$max_file_chars"
+            append_file_section_once "QT_Project/Headers/Qt-LogViewer/Controllers/SessionController.h" "$max_file_chars"
+            append_file_section_once "QT_Project/Headers/Qt-LogViewer/Models/LogModel.h" "$max_file_chars"
+            append_file_section_once "QT_Project/Headers/Qt-LogViewer/Models/LogSortFilterProxyModel.h" "$max_file_chars"
+            append_file_section_once "QT_Project/Headers/Qt-LogViewer/Models/PagingProxyModel.h" "$max_file_chars"
+            append_file_section_once "QT_Project/Headers/Qt-LogViewer/Services/LogLoader.h" "$max_file_chars"
+            append_file_section_once "QT_Project/Headers/Qt-LogViewer/Services/LogLoadingService.h" "$max_file_chars"
+            append_file_section_once "QT_Project/Headers/Qt-LogViewer/Services/SessionManager.h" "$max_file_chars"
+            append_file_section_once "QT_Project/Headers/Qt-LogViewer/Services/SessionRepository.h" "$max_file_chars"
+            append_file_section_once "QT_Project/Headers/Qt-LogViewer/Views/MainWindow.h" "$max_file_chars"
+            append_file_section_once "QT_Project/Headers/Qt-LogViewer/Views/App/LogViewWidget.h" "$max_file_chars"
+            append_file_section_once "QT_Project/Headers/Qt-LogViewer/Views/App/LogFileExplorer.h" "$max_file_chars"
+            append_file_section_once "QT_Project/Headers/Qt-LogViewer/Views/App/LogFilterBarWidget.h" "$max_file_chars"
+            append_file_section_once "QT_Project/Headers/Qt-LogViewer/Views/App/SearchBarWidget.h" "$max_file_chars"
+            append_file_section_once "QT_Project/Headers/Qt-LogViewer/Views/App/StartPageWidget.h" "$max_file_chars"
+            append_file_section_once "QT_Project_Tests/Headers/Qt-LogViewer/Controllers/LogViewLoadQueueTest.h" "$max_file_chars"
+            append_file_section_once "QT_Project_Tests/Headers/Qt-LogViewer/Models/LogSortFilterProxyModelTest.h" "$max_file_chars"
+            append_file_section_once "QT_Project_Tests/Headers/Qt-LogViewer/Services/LogLoaderTest.h" "$max_file_chars"
+            append_file_section_once "QT_Project_Tests/Headers/Qt-LogViewer/Services/LogLoadingServiceTest.h" "$max_file_chars"
+            append_file_section_once "QT_Project_Tests/Headers/Qt-LogViewer/Views/App/LogViewWidgetTest.h" "$max_file_chars"
           }
 
           : > "$output_file"
@@ -388,8 +473,9 @@ jobs:
           fi
 
           append_text $'\n'
-          append_text "## Repository Inventory"$'\n'$'\n'
+          append_known_directory_map
 
+          append_text "## Repository Inventory"$'\n'$'\n'
           append_inventory_group "Controllers"
           append_inventory_group "Models"
           append_inventory_group "Services"
@@ -401,11 +487,12 @@ jobs:
           append_inventory_group "Test Views"
           append_inventory_group "Build and Config"
 
-          append_file_section "README.md"
+          append_focus_files
 
+          append_text "## Changed File Excerpts"$'\n'
           while IFS= read -r changed_file; do
             if [[ -n "$changed_file" ]]; then
-              append_file_section "$changed_file"
+              append_file_section_once "$changed_file" "$max_file_chars"
             fi
           done <<< "$CHANGED_FILES"
 
@@ -583,7 +670,17 @@ jobs:
             printf '\n' >> "$page_input_file"
             cat "$requirements_file" >> "$page_input_file"
 
-            if [[ -f "${{ env.WIKI_STAGING_DIR }}/$target_file" ]]; then
+            if [[ "$page_key" == "architecture_md" ]]; then
+              cat >> "$page_input_file" <<'EOF'
+
+          ## Page-Specific Guidance
+          - Prefer the repository structure snapshot, repository inventory, focused repository files, and file excerpts.
+          - Replace unsupported or generic architecture wording instead of preserving it.
+          - Keep architecture descriptions tied to concrete repository elements present in the input.
+          EOF
+            fi
+
+            if [[ "$page_key" != "architecture_md" && -f "${{ env.WIKI_STAGING_DIR }}/$target_file" ]]; then
               cat >> "$page_input_file" <<EOF
 
           ## Existing Staged Page
