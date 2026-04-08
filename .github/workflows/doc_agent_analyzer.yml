@@ -14,9 +14,14 @@ on:
   workflow_dispatch:
     inputs:
       full_scan:
-        description: Analyze repository documentation inputs with AI and refresh wiki staging
+        description: Analyze repository documentation inputs and refresh wiki staging
         required: false
         default: true
+        type: boolean
+      rebuild_all_pages:
+        description: Force regeneration of all wiki pages
+        required: false
+        default: false
         type: boolean
 
 #------------------------------------------------
@@ -65,6 +70,7 @@ jobs:
           after_sha="${{ github.sha }}"
           zero_sha="0000000000000000000000000000000000000000"
           full_scan_requested=false
+          rebuild_all_pages=false
           changed_files=""
 
           if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.full_scan }}" == "true" ]]; then
@@ -78,11 +84,23 @@ jobs:
             fi
           fi
 
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.rebuild_all_pages }}" == "true" ]]; then
+            rebuild_all_pages=true
+          fi
+
           readme_changed=false
           source_comments_changed=false
           tests_changed=false
           configs_changed=false
           relevant_change_detected=false
+
+          update_home=false
+          update_build_and_run=false
+          update_project_structure=false
+          update_architecture=false
+          update_testing=false
+          update_configuration=false
+          update_documentation_review=false
 
           while IFS= read -r file; do
             if [[ -n "$file" ]]; then
@@ -90,30 +108,85 @@ jobs:
                 README.md)
                   readme_changed=true
                   relevant_change_detected=true
+                  update_home=true
+                  update_build_and_run=true
+                  update_project_structure=true
+                  update_testing=true
+                  update_configuration=true
+                  ;;
+                QT_Project/Headers/Qt-LogViewer/Controllers/*|QT_Project/Sources/Qt-LogViewer/Controllers/*|QT_Project/Headers/Qt-LogViewer/Models/*|QT_Project/Sources/Qt-LogViewer/Models/*|QT_Project/Headers/Qt-LogViewer/Services/*|QT_Project/Sources/Qt-LogViewer/Services/*|QT_Project/Headers/Qt-LogViewer/Views/*|QT_Project/Sources/Qt-LogViewer/Views/*|QT_Project/Forms/*)
+                  source_comments_changed=true
+                  relevant_change_detected=true
+                  update_home=true
+                  update_project_structure=true
+                  update_architecture=true
+                  ;;
+                QT_Project/CMake/*|QT_Project/CMakeLists.txt|QT_Project/Config.h.in|QT_Project/ThirdParty/*|QT_Project/main.cpp|QT_Project/resources.qrc)
+                  source_comments_changed=true
+                  relevant_change_detected=true
+                  update_home=true
+                  update_build_and_run=true
+                  update_project_structure=true
+                  update_configuration=true
+                  ;;
+                QT_Project/Resources/*)
+                  source_comments_changed=true
+                  relevant_change_detected=true
+                  update_home=true
+                  update_project_structure=true
                   ;;
                 QT_Project/*)
                   source_comments_changed=true
                   relevant_change_detected=true
+                  update_home=true
+                  update_project_structure=true
                   ;;
                 QT_Project_Tests/*)
                   tests_changed=true
                   relevant_change_detected=true
+                  update_home=true
+                  update_testing=true
+                  update_project_structure=true
                   ;;
                 Configs/*)
                   configs_changed=true
                   relevant_change_detected=true
+                  update_home=true
+                  update_build_and_run=true
+                  update_configuration=true
                   ;;
               esac
             fi
           done <<< "$changed_files"
 
+          if [[ "$rebuild_all_pages" == "true" ]]; then
+            update_home=true
+            update_build_and_run=true
+            update_project_structure=true
+            update_architecture=true
+            update_testing=true
+            update_configuration=true
+          fi
+
+          if [[ "$relevant_change_detected" == "true" ]]; then
+            update_documentation_review=true
+          fi
+
           {
             echo "full_scan_requested=$full_scan_requested"
+            echo "rebuild_all_pages=$rebuild_all_pages"
             echo "readme_changed=$readme_changed"
             echo "source_comments_changed=$source_comments_changed"
             echo "tests_changed=$tests_changed"
             echo "configs_changed=$configs_changed"
             echo "relevant_change_detected=$relevant_change_detected"
+            echo "update_home=$update_home"
+            echo "update_build_and_run=$update_build_and_run"
+            echo "update_project_structure=$update_project_structure"
+            echo "update_architecture=$update_architecture"
+            echo "update_testing=$update_testing"
+            echo "update_configuration=$update_configuration"
+            echo "update_documentation_review=$update_documentation_review"
             echo "changed_files<<EOF"
             echo "$changed_files"
             echo "EOF"
@@ -337,88 +410,234 @@ jobs:
           done <<< "$CHANGED_FILES"
 
           test -s "$output_file"
-          echo "AI input size:"
-          wc -c "$output_file"
-          echo "----- RAW MODEL INPUT START -----"
-          head -n 80 "$output_file"
-          echo "----- RAW MODEL INPUT END -----"
-
           echo "AI input written to $output_file"
 
-      - name: Doc-Agent - Generate reviewable wiki staging with GitHub Models
+      - name: Doc-Agent - Generate targeted wiki staging with GitHub Models
         if: steps.doc_agent_detect.outputs.relevant_change_detected == 'true'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          UPDATE_HOME: ${{ steps.doc_agent_detect.outputs.update_home }}
+          UPDATE_BUILD_AND_RUN: ${{ steps.doc_agent_detect.outputs.update_build_and_run }}
+          UPDATE_PROJECT_STRUCTURE: ${{ steps.doc_agent_detect.outputs.update_project_structure }}
+          UPDATE_ARCHITECTURE: ${{ steps.doc_agent_detect.outputs.update_architecture }}
+          UPDATE_TESTING: ${{ steps.doc_agent_detect.outputs.update_testing }}
+          UPDATE_CONFIGURATION: ${{ steps.doc_agent_detect.outputs.update_configuration }}
+          UPDATE_DOCUMENTATION_REVIEW: ${{ steps.doc_agent_detect.outputs.update_documentation_review }}
         run: |
-          set -x
-          rm -rf "${{ env.WIKI_STAGING_DIR }}"
-          echo "rm ok"
-
           mkdir -p "${{ env.WIKI_STAGING_DIR }}"
-          echo "mkdir ok"
 
-          raw_output_file="${RUNNER_TEMP}/doc_agent_output.raw"
-          json_output_file="${RUNNER_TEMP}/doc_agent_output.json"
+          should_generate_page() {
+            local update_flag="$1"
+            local target_file="$2"
 
-          test -f "${{ env.DOC_AGENT_PROMPT_FILE }}"
-          echo "prompt file ok"
+            if [[ "$update_flag" == "true" || ! -f "${{ env.WIKI_STAGING_DIR }}/$target_file" ]]; then
+              echo "true"
+            else
+              echo "false"
+            fi
+          }
 
-          test -s "${RUNNER_TEMP}/doc_agent_input.md"
-          echo "input file ok"
+          write_page_requirements() {
+            local page_key="$1"
+            local requirements_file="$2"
 
-          echo "input size:"
-          wc -c "${RUNNER_TEMP}/doc_agent_input.md"
+            case "$page_key" in
+              home_md)
+                cat > "$requirements_file" <<'EOF'
+            ## Target Page Requirements
+            - Page key: `home_md`
+            - Output file: `Home.md`
+            - Must begin with exactly:
+              <!-- page-ownership: automation-managed -->
+              <!-- manual-pages: pages not listed in .wiki-managed-files are treated as manual-only -->
+            - Include:
+              - `# Qt-LogViewer Wiki`
+              - `## Overview`
+              - a concise project-specific overview grounded in the input
+              - `## Navigation`
+              - links for `[[Build-and-Run]]`, `[[Project-Structure]]`, `[[Architecture]]`, `[[Testing]]`, `[[Configuration]]`, and `[[Documentation-Review]]`
+              - `## Ownership`
+              - `## Current Review Snapshot`
+              - `## Repository Sources`
+            EOF
+                            ;;
+                          build_and_run_md)
+                            cat > "$requirements_file" <<'EOF'
+            ## Target Page Requirements
+            - Page key: `build_and_run_md`
+            - Output file: `Build-and-Run.md`
+            - Must begin with:
+              <!-- page-ownership: automation-managed -->
+            - Include:
+              - `# Build and Run`
+              - `## Overview`
+              - `## Prerequisites`
+              - `## Configure and Build`
+              - `## Run`
+              - `## Deployment and Docker Notes`
+            - Use only build and run details supported by the input.
+            EOF
+                            ;;
+                          project_structure_md)
+                            cat > "$requirements_file" <<'EOF'
+            ## Target Page Requirements
+            - Page key: `project_structure_md`
+            - Output file: `Project-Structure.md`
+            - Must begin with:
+              <!-- page-ownership: automation-managed -->
+            - Include:
+              - `# Project Structure`
+              - `## Overview`
+              - `## Main Directories`
+              - `## Notes`
+            - Use actual repository folders and concrete directory paths from the input.
+            EOF
+                            ;;
+                          architecture_md)
+                            cat > "$requirements_file" <<'EOF'
+            ## Target Page Requirements
+            - Page key: `architecture_md`
+            - Output file: `Architecture.md`
+            - Must begin with:
+              <!-- page-ownership: automation-managed -->
+            - Include:
+              - `# Architecture`
+              - `## Overview`
+              - `## Main Responsibilities`
+              - `## Data and Interaction Flow`
+              - `## Notes`
+            - Tie architecture descriptions to concrete classes, files, directories, and repository inventory entries from the input.
+            - Explain interaction flow in grounded terms such as file selection, ingestion, parsing, loading, filtering, paging, UI coordination, and session persistence only when supported by the input.
+            EOF
+                            ;;
+                          testing_md)
+                            cat > "$requirements_file" <<'EOF'
+            ## Target Page Requirements
+            - Page key: `testing_md`
+            - Output file: `Testing.md`
+            - Must begin with:
+              <!-- page-ownership: automation-managed -->
+            - Include:
+              - `# Testing`
+              - `## Overview`
+              - `## Test Project`
+              - `## CI and Coverage`
+              - `## Notes`
+            - Use only information supported by the input.
+            EOF
+                            ;;
+                          configuration_md)
+                            cat > "$requirements_file" <<'EOF'
+            ## Target Page Requirements
+            - Page key: `configuration_md`
+            - Output file: `Configuration.md`
+            - Must begin with:
+              <!-- page-ownership: automation-managed -->
+            - Include:
+              - `# Configuration`
+              - `## CMake Options`
+              - `## Environment Variables`
+              - `## Tooling`
+            - Use only options, variables, and tooling supported by the input.
+            EOF
+                            ;;
+                          documentation_review_md)
+                            cat > "$requirements_file" <<'EOF'
+            ## Target Page Requirements
+            - Page key: `documentation_review_md`
+            - Output file: `Documentation-Review.md`
+            - Must begin with exactly:
+              <!-- page-ownership: automation-managed -->
+            - Include:
+              - `# Documentation Review`
+              - `## Summary`
+              - `## Change Categories`
+              - `## Review Mode`
+              - `## Ownership Model`
+              - `## Reviewed Inputs`
+              - `## Changed Files`
+              - `## AI Analysis Notes`
+            - `Reviewed Inputs` must summarize actual reviewed scope honestly.
+            - `Changed Files` must use exact file paths from the input.
+            - If many changed files are present, group them under repository-specific subsections when supported by the file paths.
+            - `AI Analysis Notes` must contain 3 to 6 concise repository-specific bullet points and avoid filler text.
+            EOF
+                            ;;
+            esac
+          }
 
-          cat "${RUNNER_TEMP}/doc_agent_input.md" | gh models run --file "${{ env.DOC_AGENT_PROMPT_FILE }}" > "$raw_output_file"
-          echo "gh models run ok"
+          generate_page() {
+            local page_key="$1"
+            local page_title="$2"
+            local target_file="$3"
 
-          if head -n 1 "$raw_output_file" | grep -q '^```'; then
-            sed '1d;$d' "$raw_output_file" > "$json_output_file"
-          else
-            cp "$raw_output_file" "$json_output_file"
-          fi
-          echo "json extraction ok"
+            local requirements_file="${RUNNER_TEMP}/${page_key}_requirements.md"
+            local page_input_file="${RUNNER_TEMP}/${page_key}_input.md"
+            local raw_output_file="${RUNNER_TEMP}/${page_key}.raw"
+            local final_output_file="${RUNNER_TEMP}/${page_key}.md"
 
-          echo "----- RAW MODEL OUTPUT START -----"
-          cat "$json_output_file"
-          echo
-          echo "----- RAW MODEL OUTPUT END -----"
+            write_page_requirements "$page_key" "$requirements_file"
 
-          jq -e '
-            has("home_md") and
-            has("build_and_run_md") and
-            has("project_structure_md") and
-            has("architecture_md") and
-            has("testing_md") and
-            has("configuration_md") and
-            has("documentation_review_md")
-          ' "$json_output_file" > /dev/null
-          echo "json validation ok"
+            cat "${RUNNER_TEMP}/doc_agent_input.md" > "$page_input_file"
+            printf '\n' >> "$page_input_file"
+            cat "$requirements_file" >> "$page_input_file"
 
-          jq -r '.home_md' "$json_output_file" > "${{ env.WIKI_STAGING_DIR }}/Home.md"
-          printf '\n' >> "${{ env.WIKI_STAGING_DIR }}/Home.md"
+            if [[ -f "${{ env.WIKI_STAGING_DIR }}/$target_file" ]]; then
+              cat >> "$page_input_file" <<EOF
 
-          jq -r '.build_and_run_md' "$json_output_file" > "${{ env.WIKI_STAGING_DIR }}/Build-and-Run.md"
-          printf '\n' >> "${{ env.WIKI_STAGING_DIR }}/Build-and-Run.md"
+            ## Existing Staged Page
+            Use the existing staged page as baseline context. Preserve correct grounded content and revise minimally. Do not rewrite unaffected sections only for style.
 
-          jq -r '.project_structure_md' "$json_output_file" > "${{ env.WIKI_STAGING_DIR }}/Project-Structure.md"
-          printf '\n' >> "${{ env.WIKI_STAGING_DIR }}/Project-Structure.md"
+            \`\`\`markdown
+            $(cat "${{ env.WIKI_STAGING_DIR }}/$target_file")
+            \`\`\`
+            EOF
+                        fi
 
-          jq -r '.architecture_md' "$json_output_file" > "${{ env.WIKI_STAGING_DIR }}/Architecture.md"
-          printf '\n' >> "${{ env.WIKI_STAGING_DIR }}/Architecture.md"
+                        cat "$page_input_file" | gh models run --file "${{ env.DOC_AGENT_PROMPT_FILE }}" --var page_key="$page_key" --var page_title="$page_title" > "$raw_output_file"
 
-          jq -r '.testing_md' "$json_output_file" > "${{ env.WIKI_STAGING_DIR }}/Testing.md"
-          printf '\n' >> "${{ env.WIKI_STAGING_DIR }}/Testing.md"
+                        if head -n 1 "$raw_output_file" | grep -q '^```'; then
+                          sed '1d;$d' "$raw_output_file" > "$final_output_file"
+                        else
+                          cp "$raw_output_file" "$final_output_file"
+                        fi
 
-          jq -r '.configuration_md' "$json_output_file" > "${{ env.WIKI_STAGING_DIR }}/Configuration.md"
-          printf '\n' >> "${{ env.WIKI_STAGING_DIR }}/Configuration.md"
+                        test -s "$final_output_file"
+                        cp "$final_output_file" "${{ env.WIKI_STAGING_DIR }}/$target_file"
+                        printf '\n' >> "${{ env.WIKI_STAGING_DIR }}/$target_file"
+                      }
 
-          jq -r '.documentation_review_md' "$json_output_file" > "${{ env.WIKI_STAGING_DIR }}/Documentation-Review.md"
-          printf '\n' >> "${{ env.WIKI_STAGING_DIR }}/Documentation-Review.md"
+                      if [[ "$(should_generate_page "$UPDATE_HOME" "Home.md")" == "true" ]]; then
+                        generate_page "home_md" "Home" "Home.md"
+                      fi
 
-          cat > "${{ env.WIKI_STAGING_DIR }}/_Sidebar.md" <<'EOF'
-          <!-- page-ownership: automation-managed -->
+                      if [[ "$(should_generate_page "$UPDATE_BUILD_AND_RUN" "Build-and-Run.md")" == "true" ]]; then
+                        generate_page "build_and_run_md" "Build and Run" "Build-and-Run.md"
+                      fi
+
+                      if [[ "$(should_generate_page "$UPDATE_PROJECT_STRUCTURE" "Project Structure")" == "true" ]]; then
+                        generate_page "project_structure_md" "Project Structure" "Project-Structure.md"
+                      fi
+
+                      if [[ "$(should_generate_page "$UPDATE_ARCHITECTURE" "Architecture.md")" == "true" ]]; then
+                        generate_page "architecture_md" "Architecture" "Architecture.md"
+                      fi
+
+                      if [[ "$(should_generate_page "$UPDATE_TESTING" "Testing.md")" == "true" ]]; then
+                        generate_page "testing_md" "Testing" "Testing.md"
+                      fi
+
+                      if [[ "$(should_generate_page "$UPDATE_CONFIGURATION" "Configuration.md")" == "true" ]]; then
+                        generate_page "configuration_md" "Configuration" "Configuration.md"
+                      fi
+
+                      if [[ "$(should_generate_page "$UPDATE_DOCUMENTATION_REVIEW" "Documentation-Review.md")" == "true" ]]; then
+                        generate_page "documentation_review_md" "Documentation Review" "Documentation-Review.md"
+                      fi
+
+                      cat > "${{ env.WIKI_STAGING_DIR }}/_Sidebar.md" <<'EOF'
+                      <!-- page-ownership: automation-managed -->
 
           # Wiki
 
@@ -441,8 +660,6 @@ jobs:
           Documentation-Review.md
           _Sidebar.md
           EOF
-
-          echo "staging write ok"
 
       - name: Doc-Agent - Validate staged wiki content
         if: steps.doc_agent_detect.outputs.relevant_change_detected == 'true'
@@ -492,6 +709,11 @@ jobs:
             ## Included staging files
 
             - `.github/wiki-staging/Home.md`
+            - `.github/wiki-staging/Build-and-Run.md`
+            - `.github/wiki-staging/Project-Structure.md`
+            - `.github/wiki-staging/Architecture.md`
+            - `.github/wiki-staging/Testing.md`
+            - `.github/wiki-staging/Configuration.md`
             - `.github/wiki-staging/Documentation-Review.md`
             - `.github/wiki-staging/_Sidebar.md`
             - `.github/wiki-staging/.wiki-managed-files`
