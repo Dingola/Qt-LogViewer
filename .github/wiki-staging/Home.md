@@ -1,21 +1,29 @@
 <!-- page-ownership: automation-managed -->
 <!-- manual-pages: pages not listed in .wiki-managed-files are treated as manual-only -->
-
-# Home
+# Qt-LogViewer Wiki
 
 ## Overview
-This repository provides tools and resources for streamlined project management and automation. It focuses on enhancing workflows with customizable integrations and efficient processes.
+Qt-LogViewer is a Qt-based desktop application designed for efficiently opening, viewing, searching, and filtering large log files. It supports multiple views (tabs), per-view filters (application name, log levels, search with optional regex), pagination for large datasets, and a session system for saving and restoring workspaces. The application includes a file explorer for grouping logs by application and sessions, and uses asynchronous loading to ensure a responsive user interface.
 
 ## Navigation
-- [Home](#home)
-- [Documentation Review](#documentation-review-md)
+- [[Build-and-Run]]
+- [[Project-Structure]]
+- [[Architecture]]
+- [[Testing]]
+- [[Configuration]]
+- [[Documentation-Review]]
 
-## Page Ownership
-This page is maintained by automation processes. Manual edits should adhere to repository guidelines.
+## Ownership
+This wiki is managed by automation. Manual edits should be limited to pages not listed in `.wiki-managed-files`.
 
 ## Current Review Snapshot
-The documentation is up-to-date as per the latest repository inputs provided for review.
+- Commit: 88af7d765af89dc7e2af0163b717f2c80b064c3a
+- README changed: true
+- Source comments changed: true
+- Tests changed: true
+- Configs changed: true
 
 ## Repository Sources
-Source files and documentation inputs drive the wiki content. Ensure changes are reflected in the main repository for accurate synchronization.
+- Repository: Dingola/Qt-LogViewer
+
 
