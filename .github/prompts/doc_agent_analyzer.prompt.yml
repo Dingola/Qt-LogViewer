@@ -27,11 +27,16 @@ messages:
       Grounding rules:
       - Use the repository name `Qt-LogViewer` when supported by the input.
       - Prefer facts from `README.md` over generic wording.
-      - If the input contains changed-file entries, list those exact files in `Documentation-Review.md`.
-      - If the input contains review flags such as README changed / tests changed / configs changed, reflect them exactly in the output.
+      - If the input contains changed-file entries, use those exact paths.
+      - If the input contains review flags such as README changed, tests changed, or configs changed, reflect them exactly.
       - If some detail is not available in the input, say so briefly instead of guessing.
-      - Do not output placeholders such as "repository-provided inputs" or "current repository state" when the actual input contains concrete details.
+      - Do not output placeholders such as "repository-provided inputs" or "current repository state" when the input contains concrete details.
       - Do not use vague phrases such as "tools and resources for streamlined project management" unless that wording appears in the input.
+      - Do not use generic layer descriptions unless they are tied to concrete classes, files, or folders from the input.
+      - If class, file, widget, dialog, or directory names are mentioned, use their real names from the input.
+      - If the input contains a `## Repository Inventory` section, treat it as a concise repository map derived from actual file paths.
+      - Prefer the repository inventory for naming concrete controllers, models, services, views, forms, and test components.
+      - Do not infer behavior from names alone; combine inventory names with README facts and file excerpts when describing responsibilities or interaction flow.
 
       Required structure for "home_md":
       - Must begin with exactly:
@@ -40,7 +45,7 @@ messages:
       - Include:
         - `# Qt-LogViewer Wiki`
         - `## Overview`
-        - project-specific summary grounded in the input
+        - a short project-specific summary grounded in the input
         - `## Navigation`
         - links for `[[Build-and-Run]]`, `[[Project-Structure]]`, `[[Architecture]]`, `[[Testing]]`, `[[Configuration]]`, and `[[Documentation-Review]]`
         - `## Ownership`
@@ -57,7 +62,7 @@ messages:
         - `## Configure and Build`
         - `## Run`
         - `## Deployment and Docker Notes`
-      - Use only build/run details supported by the input.
+      - Use only build and run details supported by the input.
 
       Required structure for "project_structure_md":
       - Must begin with:
@@ -68,6 +73,7 @@ messages:
         - `## Main Directories`
         - `## Notes`
       - Use the actual repository folders from the input.
+      - Prefer concrete directory paths over generic descriptions.
 
       Required structure for "architecture_md":
       - Must begin with:
@@ -76,8 +82,18 @@ messages:
         - `# Architecture`
         - `## Overview`
         - `## Main Responsibilities`
+        - `## Data and Interaction Flow`
         - `## Notes`
-      - Describe architecture only to the extent supported by the input, such as views, services, models, controllers, sessions, async loading, filtering, or file explorer behavior.
+      - Describe architecture only to the extent supported by the input.
+      - Prefer concrete repository elements found in the input, such as controllers, models, services, views, widgets, dialogs, repositories, loaders, parsers, proxy models, and related files.
+      - Explain interaction flow in repository-specific terms when supported by the input, for example:
+        - file selection and cataloging
+        - log ingestion and parsing
+        - loading into models
+        - filtering and paging
+        - UI coordination and session persistence
+      - Do not merely say controllers, models, services, and views have separate responsibilities; tie each section to concrete classes, files, or directories from the input.
+      - If a responsibility cannot be grounded, omit it.
 
       Required structure for "testing_md":
       - Must begin with:
@@ -89,6 +105,7 @@ messages:
         - `## CI and Coverage`
         - `## Notes`
       - Use only information supported by the input.
+      - Mention mirrored production and test structure when supported by the input.
 
       Required structure for "configuration_md":
       - Must begin with:
@@ -112,14 +129,25 @@ messages:
         - `## Reviewed Inputs`
         - `## Changed Files`
         - `## AI Analysis Notes`
-      - `Changed Files` must be a bullet list of the exact file paths from the input when available.
-      - `AI Analysis Notes` must be concise and repository-specific, not generic.
+      - `Reviewed Inputs` must not pretend that only a tiny subset was reviewed when the input covers a broader scope.
+      - If the input represents a broad or full-scope scan, summarize the reviewed scope first and optionally list representative files.
+      - `Changed Files` must use the exact file paths from the input.
+      - If many changed files are present, group them under short repository-specific subsections such as `Controllers`, `Models`, `Services`, `Views`, `Forms`, `Resources`, `Tests`, `Configs`, and `Build Files` when supported by the file paths.
+      - `AI Analysis Notes` must contain 3 to 6 concise repository-specific bullet points.
+      - `AI Analysis Notes` must mention concrete observations from the input, such as:
+        - cross-cutting changes across controllers, models, services, views, tests, forms, or resources
+        - strong README coverage for build and run documentation
+        - separation between production and test projects
+        - use of paging, filtering, async loading, sessions, or file explorer behavior when supported by the input
+      - Do not use filler such as "aligned with the provided repository details."
 
       Output quality rules:
       - Prefer explicit booleans and exact facts from the input.
       - Avoid marketing language.
       - Avoid repetition.
       - Avoid generic documentation filler text.
+      - Be specific when the input is specific.
+      - When many concrete file paths are available, use them to improve precision rather than summarizing vaguely.
   - role: user
     content: |-
       Analyze the following repository documentation input and return strict JSON only.

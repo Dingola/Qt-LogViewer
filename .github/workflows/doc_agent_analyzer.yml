@@ -133,9 +133,14 @@ jobs:
           CHANGED_FILES: ${{ steps.doc_agent_detect.outputs.changed_files }}
         run: |
           output_file="${RUNNER_TEMP}/doc_agent_input.md"
+          inventory_dir="${RUNNER_TEMP}/doc_agent_inventory"
           max_total_chars=24000
           max_file_chars=2500
+          max_inventory_items_per_group=20
           total_chars=0
+
+          rm -rf "$inventory_dir"
+          mkdir -p "$inventory_dir"
 
           is_monitored() {
             case "$1" in
@@ -166,6 +171,96 @@ jobs:
 
             printf "%s" "$text" >> "$output_file"
             total_chars=$((total_chars + text_len))
+          }
+
+          normalize_inventory_entry() {
+            local entry_name="$1"
+
+            entry_name="${entry_name%.hpp}"
+            entry_name="${entry_name%.h}"
+            entry_name="${entry_name%.cpp}"
+            entry_name="${entry_name%.cxx}"
+            entry_name="${entry_name%.ui}"
+            entry_name="${entry_name%.cmake}"
+            entry_name="${entry_name%.yml}"
+            entry_name="${entry_name%.yaml}"
+            entry_name="${entry_name%.json}"
+            entry_name="${entry_name%.xml}"
+            entry_name="${entry_name%.in}"
+
+            printf "%s" "$entry_name"
+          }
+
+          add_inventory_entry() {
+            local file_path="$1"
+            local category=""
+            local entry_name=""
+
+            case "$file_path" in
+              QT_Project/Headers/Qt-LogViewer/Controllers/*|QT_Project/Sources/Qt-LogViewer/Controllers/*)
+                category="Controllers"
+                ;;
+              QT_Project/Headers/Qt-LogViewer/Models/*|QT_Project/Sources/Qt-LogViewer/Models/*)
+                category="Models"
+                ;;
+              QT_Project/Headers/Qt-LogViewer/Services/*|QT_Project/Sources/Qt-LogViewer/Services/*)
+                category="Services"
+                ;;
+              QT_Project/Headers/Qt-LogViewer/Views/*|QT_Project/Sources/Qt-LogViewer/Views/*)
+                category="Views"
+                ;;
+              QT_Project/Forms/*)
+                category="Forms"
+                ;;
+              QT_Project_Tests/Headers/Qt-LogViewer/Controllers/*|QT_Project_Tests/Sources/Qt-LogViewer/Controllers/*)
+                category="Test Controllers"
+                ;;
+              QT_Project_Tests/Headers/Qt-LogViewer/Models/*|QT_Project_Tests/Sources/Qt-LogViewer/Models/*)
+                category="Test Models"
+                ;;
+              QT_Project_Tests/Headers/Qt-LogViewer/Services/*|QT_Project_Tests/Sources/Qt-LogViewer/Services/*)
+                category="Test Services"
+                ;;
+              QT_Project_Tests/Headers/Qt-LogViewer/Views/*|QT_Project_Tests/Sources/Qt-LogViewer/Views/*)
+                category="Test Views"
+                ;;
+              Configs/*|QT_Project/CMake/*|QT_Project_Tests/CMakeLists.txt|QT_Project/CMakeLists.txt|QT_Project/ThirdParty/*|QT_Project_Tests/ThirdParty/*)
+                category="Build and Config"
+                ;;
+            esac
+
+            if [[ -n "$category" ]]; then
+              entry_name="$(basename "$file_path")"
+              entry_name="$(normalize_inventory_entry "$entry_name")"
+
+              if [[ -n "$entry_name" ]]; then
+                printf "%s\n" "$entry_name" >> "${inventory_dir}/${category}.txt"
+              fi
+            fi
+          }
+
+          append_inventory_group() {
+            local category="$1"
+            local category_file="${inventory_dir}/${category}.txt"
+            local item_count=0
+
+            if [[ -s "$category_file" ]]; then
+              append_text "### ${category}"$'\n'
+
+              while IFS= read -r inventory_entry; do
+                if [[ -n "$inventory_entry" ]]; then
+                  append_text "- \`${inventory_entry}\`"$'\n'
+                  item_count=$((item_count + 1))
+
+                  if (( item_count >= max_inventory_items_per_group )); then
+                    append_text "- Additional entries omitted for brevity."$'\n'
+                    break
+                  fi
+                fi
+              done < <(sort -u "$category_file")
+
+              append_text $'\n'
+            fi
           }
 
           append_file_section() {
@@ -212,11 +307,26 @@ jobs:
             while IFS= read -r file; do
               if [[ -n "$file" ]]; then
                 append_text "- \`$file\`"$'\n'
+                add_inventory_entry "$file"
               fi
             done <<< "$CHANGED_FILES"
           else
             append_text "- None"$'\n'
           fi
+
+          append_text $'\n'
+          append_text "## Repository Inventory"$'\n'$'\n'
+
+          append_inventory_group "Controllers"
+          append_inventory_group "Models"
+          append_inventory_group "Services"
+          append_inventory_group "Views"
+          append_inventory_group "Forms"
+          append_inventory_group "Test Controllers"
+          append_inventory_group "Test Models"
+          append_inventory_group "Test Services"
+          append_inventory_group "Test Views"
+          append_inventory_group "Build and Config"
 
           append_file_section "README.md"
 
