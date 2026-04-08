@@ -1,0 +1,215 @@
+name: Docs Agent Chain
+
+#------------------------------------------------
+# Workflow Triggers
+#------------------------------------------------
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'README.md'
+      - 'QT_Project/**'
+      - 'QT_Project_Tests/**'
+      - 'Configs/**'
+  workflow_dispatch:
+
+#------------------------------------------------
+# Permissions
+#------------------------------------------------
+permissions:
+  contents: write
+
+#------------------------------------------------
+# Environment Variables
+#------------------------------------------------
+env:
+  WIKI_STAGING_DIR: ${{ github.workspace }}/wiki-staging
+  WIKI_CLONE_DIR: ${{ github.workspace }}/wiki-repo
+  WIKI_REPO_URL: https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.wiki.git
+
+#------------------------------------------------
+# Workflow jobs
+#------------------------------------------------
+jobs:
+  docs_agent_chain:
+    name: Doc-Agent -> Wiki-Agent
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout the repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      #------------------------------------------------
+      # Doc-Agent
+      #------------------------------------------------
+      - name: Doc-Agent - Detect changed documentation inputs
+        id: doc_agent_detect
+        shell: bash
+        run: |
+          before_sha="${{ github.event.before }}"
+          after_sha="${{ github.sha }}"
+          zero_sha="0000000000000000000000000000000000000000"
+          changed_files=""
+
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            changed_files="$(git ls-files README.md QT_Project QT_Project_Tests Configs 2>/dev/null || true)"
+          else
+            if [[ -n "$before_sha" && "$before_sha" != "$zero_sha" ]]; then
+              changed_files="$(git diff --name-only "$before_sha" "$after_sha")"
+            else
+              changed_files="$(git ls-files README.md QT_Project QT_Project_Tests Configs 2>/dev/null || true)"
+            fi
+          fi
+
+          readme_changed=false
+          qt_project_changed=false
+          qt_project_tests_changed=false
+          configs_changed=false
+          relevant_change_detected=false
+
+          while IFS= read -r file; do
+            if [[ -n "$file" ]]; then
+              case "$file" in
+                README.md)
+                  readme_changed=true
+                  relevant_change_detected=true
+                  ;;
+                QT_Project/*)
+                  qt_project_changed=true
+                  relevant_change_detected=true
+                  ;;
+                QT_Project_Tests/*)
+                  qt_project_tests_changed=true
+                  relevant_change_detected=true
+                  ;;
+                Configs/*)
+                  configs_changed=true
+                  relevant_change_detected=true
+                  ;;
+              esac
+            fi
+          done <<< "$changed_files"
+
+          {
+            echo "readme_changed=$readme_changed"
+            echo "qt_project_changed=$qt_project_changed"
+            echo "qt_project_tests_changed=$qt_project_tests_changed"
+            echo "configs_changed=$configs_changed"
+            echo "relevant_change_detected=$relevant_change_detected"
+            echo "changed_files<<EOF"
+            echo "$changed_files"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Doc-Agent - Prepare wiki staging
+        if: steps.doc_agent_detect.outputs.relevant_change_detected == 'true'
+        shell: bash
+        env:
+          README_CHANGED: ${{ steps.doc_agent_detect.outputs.readme_changed }}
+          QT_PROJECT_CHANGED: ${{ steps.doc_agent_detect.outputs.qt_project_changed }}
+          QT_PROJECT_TESTS_CHANGED: ${{ steps.doc_agent_detect.outputs.qt_project_tests_changed }}
+          CONFIGS_CHANGED: ${{ steps.doc_agent_detect.outputs.configs_changed }}
+          CHANGED_FILES: ${{ steps.doc_agent_detect.outputs.changed_files }}
+        run: |
+          rm -rf "${{ env.WIKI_STAGING_DIR }}"
+          mkdir -p "${{ env.WIKI_STAGING_DIR }}"
+
+          if [[ -f README.md ]]; then
+            cp README.md "${{ env.WIKI_STAGING_DIR }}/Home.md"
+          else
+            cat > "${{ env.WIKI_STAGING_DIR }}/Home.md" <<'EOF'
+          # Qt-LogViewer Wiki
+
+          The repository README was not found during the workflow run.
+          EOF
+          fi
+
+          cat > "${{ env.WIKI_STAGING_DIR }}/Documentation-Review.md" <<EOF
+          # Documentation Review
+
+          ## Summary
+
+          The Doc-Agent reviewed the pushed or changed documentation inputs for this repository.
+
+          - README changed: ${README_CHANGED}
+          - QT_Project changed: ${QT_PROJECT_CHANGED}
+          - QT_Project_Tests changed: ${QT_PROJECT_TESTS_CHANGED}
+          - Configs changed: ${CONFIGS_CHANGED}
+
+          ## Reviewed Inputs
+
+          - \`README.md\`
+          - \`QT_Project/**\`
+          - \`QT_Project_Tests/**\`
+          - \`Configs/**\`
+
+          ## Reviewed Commit
+
+          - Commit: \`${{ github.sha }}\`
+
+          ## Changed Files
+
+          EOF
+
+          if [[ -n "$CHANGED_FILES" ]]; then
+            while IFS= read -r file; do
+              if [[ -n "$file" ]]; then
+                echo "- \`$file\`" >> "${{ env.WIKI_STAGING_DIR }}/Documentation-Review.md"
+              fi
+            done <<< "$CHANGED_FILES"
+          else
+            echo "- No changed files were detected." >> "${{ env.WIKI_STAGING_DIR }}/Documentation-Review.md"
+          fi
+
+          cat > "${{ env.WIKI_STAGING_DIR }}/_Sidebar.md" <<'EOF'
+          # Wiki
+
+          - [[Home]]
+          - [[Documentation-Review]]
+          EOF
+
+      #------------------------------------------------
+      # Wiki-Agent
+      #------------------------------------------------
+      - name: Wiki-Agent - Clone wiki repository
+        if: steps.doc_agent_detect.outputs.relevant_change_detected == 'true'
+        shell: bash
+        run: |
+          rm -rf "${{ env.WIKI_CLONE_DIR }}"
+
+          if git clone "${{ env.WIKI_REPO_URL }}" "${{ env.WIKI_CLONE_DIR }}"; then
+            echo "Wiki repository cloned successfully."
+          else
+            mkdir -p "${{ env.WIKI_CLONE_DIR }}"
+            cd "${{ env.WIKI_CLONE_DIR }}"
+            git init
+            git checkout -b master
+            git remote add origin "${{ env.WIKI_REPO_URL }}"
+          fi
+
+      - name: Wiki-Agent - Sync wiki content
+        if: steps.doc_agent_detect.outputs.relevant_change_detected == 'true'
+        shell: bash
+        run: |
+          find "${{ env.WIKI_CLONE_DIR }}" -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} +
+          cp -R "${{ env.WIKI_STAGING_DIR }}/." "${{ env.WIKI_CLONE_DIR }}/"
+
+      - name: Wiki-Agent - Commit and push wiki changes
+        if: steps.doc_agent_detect.outputs.relevant_change_detected == 'true'
+        shell: bash
+        run: |
+          cd "${{ env.WIKI_CLONE_DIR }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if [[ -n "$(git status --porcelain)" ]]; then
+            git add .
+            git commit -m "Update wiki from documentation inputs"
+            git push origin HEAD:master
+          else
+            echo "No wiki changes detected."
+          fi
