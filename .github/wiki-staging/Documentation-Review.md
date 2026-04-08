@@ -1,14 +1,27 @@
+<!-- page-ownership: automation-managed -->
+
 # Documentation Review
 
 ## Summary
 
 The Doc-Agent reviewed the repository documentation inputs and prepared the wiki staging content for review.
 
-- Full scan requested: true
+## Change Categories
+
 - README changed: true
-- QT_Project changed: true
-- QT_Project_Tests changed: true
+- Source comments changed: true
+- Tests changed: true
 - Configs changed: true
+
+## Review Mode
+
+- Full scan requested: true
+- Source commit: `78a4abfd87b2a84e46d22a56b90385c092a8ef53`
+
+## Ownership Model
+
+- Automation-managed pages are listed in `.wiki-managed-files`.
+- Pages not listed in `.wiki-managed-files` are treated as manual-only.
 
 ## Reviewed Inputs
 
@@ -16,14 +29,6 @@ The Doc-Agent reviewed the repository documentation inputs and prepared the wiki
 - `QT_Project/**`
 - `QT_Project_Tests/**`
 - `Configs/**`
-
-## Source Commit
-
-- Commit: `bdbcab7fe672f4ada52f1b3b358d17ebda179f43`
-
-## Review Requirement
-
-This staging content must be reviewed and approved in the main repository before the Wiki-Agent publishes it to the GitHub Wiki.
 
 ## Changed Files
 
