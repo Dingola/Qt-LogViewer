@@ -208,9 +208,9 @@ jobs:
           output_file="${RUNNER_TEMP}/doc_agent_input.md"
           inventory_dir="${RUNNER_TEMP}/doc_agent_inventory"
           appended_files_manifest="${RUNNER_TEMP}/doc_agent_appended_files.txt"
-          max_total_chars=120000
-          max_readme_chars=10000
-          max_file_chars=5000
+          max_total_chars=48000
+          max_readme_chars=5000
+          max_file_chars=1800
           max_inventory_items_per_group=30
           total_chars=0
 
