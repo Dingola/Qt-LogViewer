@@ -1,0 +1,123 @@
+name: Wiki Agent Publish
+
+#------------------------------------------------
+# Workflow Triggers
+#------------------------------------------------
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/wiki-staging/**'
+  workflow_dispatch:
+
+#------------------------------------------------
+# Permissions
+#------------------------------------------------
+permissions:
+  contents: write
+
+#------------------------------------------------
+# Environment Variables
+#------------------------------------------------
+env:
+  WIKI_STAGING_DIR: .github/wiki-staging
+  WIKI_MANIFEST_FILE: .wiki-managed-files
+  WIKI_CLONE_DIR: ${{ github.workspace }}/wiki-repo
+  WIKI_REPO_URL: https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.wiki.git
+
+#------------------------------------------------
+# Workflow jobs
+#------------------------------------------------
+jobs:
+  wiki_agent_publish:
+    name: Wiki-Agent Publish Approved Staging
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout the repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      #------------------------------------------------
+      # Wiki-Agent
+      #------------------------------------------------
+      - name: Wiki-Agent - Validate approved staging content
+        shell: bash
+        run: |
+          if [[ ! -d "${{ env.WIKI_STAGING_DIR }}" ]]; then
+            echo "Missing staging directory: ${{ env.WIKI_STAGING_DIR }}"
+            exit 1
+          fi
+
+          if [[ ! -f "${{ env.WIKI_STAGING_DIR }}/${{ env.WIKI_MANIFEST_FILE }}" ]]; then
+            echo "Missing staging manifest: ${{ env.WIKI_STAGING_DIR }}/${{ env.WIKI_MANIFEST_FILE }}"
+            exit 1
+          fi
+
+          missing_file_detected=false
+
+          while IFS= read -r managed_file; do
+            if [[ -n "$managed_file" && ! -f "${{ env.WIKI_STAGING_DIR }}/$managed_file" ]]; then
+              echo "Missing managed staging file: $managed_file"
+              missing_file_detected=true
+            fi
+          done < "${{ env.WIKI_STAGING_DIR }}/${{ env.WIKI_MANIFEST_FILE }}"
+
+          if [[ "$missing_file_detected" == "true" ]]; then
+            exit 1
+          fi
+
+      - name: Wiki-Agent - Clone wiki repository
+        shell: bash
+        run: |
+          rm -rf "${{ env.WIKI_CLONE_DIR }}"
+
+          if git clone "${{ env.WIKI_REPO_URL }}" "${{ env.WIKI_CLONE_DIR }}"; then
+            echo "Wiki repository cloned successfully."
+          else
+            mkdir -p "${{ env.WIKI_CLONE_DIR }}"
+            cd "${{ env.WIKI_CLONE_DIR }}"
+            git init
+            git checkout -b master
+            git remote add origin "${{ env.WIKI_REPO_URL }}"
+          fi
+
+      - name: Wiki-Agent - Sync approved managed pages only
+        shell: bash
+        run: |
+          previous_manifest_path="${{ env.WIKI_CLONE_DIR }}/${{ env.WIKI_MANIFEST_FILE }}"
+          current_manifest_path="${{ env.WIKI_STAGING_DIR }}/${{ env.WIKI_MANIFEST_FILE }}"
+
+          if [[ -f "$previous_manifest_path" ]]; then
+            while IFS= read -r managed_file; do
+              if [[ -n "$managed_file" ]]; then
+                rm -f "${{ env.WIKI_CLONE_DIR }}/$managed_file"
+              fi
+            done < "$previous_manifest_path"
+          fi
+
+          while IFS= read -r managed_file; do
+            if [[ -n "$managed_file" ]]; then
+              mkdir -p "$(dirname "${{ env.WIKI_CLONE_DIR }}/$managed_file")"
+              cp "${{ env.WIKI_STAGING_DIR }}/$managed_file" "${{ env.WIKI_CLONE_DIR }}/$managed_file"
+            fi
+          done < "$current_manifest_path"
+
+          cp "$current_manifest_path" "$previous_manifest_path"
+
+      - name: Wiki-Agent - Commit and push wiki changes
+        shell: bash
+        run: |
+          cd "${{ env.WIKI_CLONE_DIR }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if [[ -n "$(git status --porcelain)" ]]; then
+            git add .
+            git commit -m "Publish approved wiki staging content"
+            git push origin HEAD:master
+          else
+            echo "No wiki changes detected."
+          fi
