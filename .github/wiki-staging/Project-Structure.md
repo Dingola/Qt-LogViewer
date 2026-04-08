@@ -1,20 +1,21 @@
 <!-- page-ownership: automation-managed -->
+
 # Project Structure
 
 ## Overview
-The repository is organized into distinct directories for source code, headers, resources, forms, tests, and configuration files. This structure ensures a clear separation of concerns and facilitates maintainability.
+The Qt-LogViewer repository is organized into distinct modules, including controllers, models, services, views, forms, and tests. This modular structure ensures separation of concerns and maintainability.
 
 ## Main Directories
-- `Configs/`: Contains configuration files such as `.clang-format`, `.clang-tidy`, and `Doxyfile.in`.
-- `QT_Project/`: Main project directory containing source code, headers, forms, and resources.
-  - `CMake/`: CMake configuration files.
-  - `Forms/`: UI forms for the application.
-  - `Headers/`: Header files for controllers, models, services, and views.
-  - `Resources/`: Icons, images, translations, and style files.
-  - `Sources/`: Source files for controllers, models, services, and views.
-  - `ThirdParty/`: Integration files for third-party libraries such as `SimpleQtLogger` and `QtWidgetsCommonLib`.
-- `QT_Project_Tests/`: Test project directory with headers and source files for unit tests.
+- `Configs`: Configuration files, including `.clang-format`, `.clang-tidy`, and `Doxyfile.in`.
+- `QT_Project`: Main project source files, headers, forms, and resources.
+  - `CMake`: CMake configuration files.
+  - `Forms`: UI forms for various widgets and dialogs.
+  - `Headers`: Header files for controllers, models, services, and views.
+  - `Sources`: Implementation files for controllers, models, services, and views.
+  - `Resources`: Icons, images, translations, and stylesheets.
+  - `ThirdParty`: External dependencies like `QtWidgetsCommonLib` and `SimpleQtLogger`.
+- `QT_Project_Tests`: Test project files, including headers and sources for unit tests.
 
 ## Notes
-The project uses a modular structure with clear separation between controllers, models, services, and views. The test project mirrors the production structure for comprehensive testing.
+The repository includes a test project that mirrors the structure of the main project, ensuring comprehensive test coverage. The modular design facilitates easy navigation and development.
 

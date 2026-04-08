@@ -1,22 +1,25 @@
 <!-- page-ownership: automation-managed -->
+
 # Architecture
 
 ## Overview
-Qt-LogViewer employs a modular architecture with distinct responsibilities for controllers, models, services, and views. This design ensures scalability and maintainability while providing a responsive user experience.
+The architecture of Qt-LogViewer is modular, with distinct components for controllers, models, services, views, and forms. This design ensures separation of concerns and supports scalability and maintainability.
 
 ## Main Responsibilities
-- **Controllers**: Manage application logic and coordinate between models and views. Examples include `FileCatalogController`, `LogViewerController`, and `SessionController`.
-- **Models**: Represent data structures such as logs (`LogModel`, `LogEntry`) and support filtering and pagination (`LogSortFilterProxyModel`, `PagingProxyModel`).
-- **Services**: Handle background tasks like log loading (`LogLoader`, `LogLoadingService`), parsing (`LogParser`), and session management (`SessionManager`).
-- **Views**: Provide the user interface, including widgets like `LogViewWidget`, `LogFilterBarWidget`, and `MainWindow`.
+- **Controllers**: Manage application logic and coordinate interactions between models and views. Key controllers include `FileCatalogController`, `LogIngestController`, and `SessionController`.
+- **Models**: Represent the data structure and provide data manipulation logic. Examples include `LogModel`, `LogFileTreeModel`, and `PagingProxyModel`.
+- **Services**: Handle background tasks such as log loading, parsing, and session management. Key services include `LogLoader`, `LogParser`, and `SessionManager`.
+- **Views**: Define the user interface components, such as `LogViewWidget`, `LogFilterBarWidget`, and `MainWindow`.
+- **Forms**: Contain the UI definitions for widgets and dialogs, such as `SettingsDialog.ui` and `PaginationWidget.ui`.
 
 ## Data and Interaction Flow
-1. **File Selection and Cataloging**: `FileCatalogController` manages file selection and organizes logs into a catalog.
-2. **Log Ingestion and Parsing**: `LogIngestController` and `LogParser` process log files and populate models.
-3. **Loading into Models**: Logs are loaded into `LogModel` and filtered using `LogSortFilterProxyModel`.
-4. **UI Coordination**: Views like `LogViewWidget` and `LogFilterWidget` display data and interact with controllers for updates.
-5. **Session Persistence**: `SessionManager` saves and restores user sessions, including active views and filters.
+1. **File Selection and Cataloging**: The `FileCatalogController` manages the file explorer, grouping logs by application and session.
+2. **Log Ingestion and Parsing**: The `LogIngestController` and `LogParser` handle loading and parsing log files asynchronously.
+3. **Data Management**: Parsed logs are stored in models like `LogModel` and `LogFileTreeModel`.
+4. **Filtering and Paging**: Filters are applied using `LogSortFilterProxyModel`, and large datasets are paginated using `PagingProxyModel`.
+5. **UI Coordination**: Views such as `LogViewWidget` and `MainWindow` display the data and interact with controllers for user actions.
+6. **Session Persistence**: The `SessionManager` and `SessionRepository` save and restore user workspaces.
 
 ## Notes
-The architecture leverages asynchronous loading to maintain UI responsiveness and supports advanced features like regex-based search and per-view filtering.
+The architecture leverages Qt's signal-slot mechanism for communication between components, ensuring a responsive and modular design.
 
