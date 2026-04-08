@@ -445,125 +445,125 @@ jobs:
             case "$page_key" in
               home_md)
                 cat > "$requirements_file" <<'EOF'
-            ## Target Page Requirements
-            - Page key: `home_md`
-            - Output file: `Home.md`
-            - Must begin with exactly:
-              <!-- page-ownership: automation-managed -->
-              <!-- manual-pages: pages not listed in .wiki-managed-files are treated as manual-only -->
-            - Include:
-              - `# Qt-LogViewer Wiki`
-              - `## Overview`
-              - a concise project-specific overview grounded in the input
-              - `## Navigation`
-              - links for `[[Build-and-Run]]`, `[[Project-Structure]]`, `[[Architecture]]`, `[[Testing]]`, `[[Configuration]]`, and `[[Documentation-Review]]`
-              - `## Ownership`
-              - `## Current Review Snapshot`
-              - `## Repository Sources`
-            EOF
-                            ;;
-                          build_and_run_md)
-                            cat > "$requirements_file" <<'EOF'
-            ## Target Page Requirements
-            - Page key: `build_and_run_md`
-            - Output file: `Build-and-Run.md`
-            - Must begin with:
-              <!-- page-ownership: automation-managed -->
-            - Include:
-              - `# Build and Run`
-              - `## Overview`
-              - `## Prerequisites`
-              - `## Configure and Build`
-              - `## Run`
-              - `## Deployment and Docker Notes`
-            - Use only build and run details supported by the input.
-            EOF
-                            ;;
-                          project_structure_md)
-                            cat > "$requirements_file" <<'EOF'
-            ## Target Page Requirements
-            - Page key: `project_structure_md`
-            - Output file: `Project-Structure.md`
-            - Must begin with:
-              <!-- page-ownership: automation-managed -->
-            - Include:
-              - `# Project Structure`
-              - `## Overview`
-              - `## Main Directories`
-              - `## Notes`
-            - Use actual repository folders and concrete directory paths from the input.
-            EOF
-                            ;;
-                          architecture_md)
-                            cat > "$requirements_file" <<'EOF'
-            ## Target Page Requirements
-            - Page key: `architecture_md`
-            - Output file: `Architecture.md`
-            - Must begin with:
-              <!-- page-ownership: automation-managed -->
-            - Include:
-              - `# Architecture`
-              - `## Overview`
-              - `## Main Responsibilities`
-              - `## Data and Interaction Flow`
-              - `## Notes`
-            - Tie architecture descriptions to concrete classes, files, directories, and repository inventory entries from the input.
-            - Explain interaction flow in grounded terms such as file selection, ingestion, parsing, loading, filtering, paging, UI coordination, and session persistence only when supported by the input.
-            EOF
-                            ;;
-                          testing_md)
-                            cat > "$requirements_file" <<'EOF'
-            ## Target Page Requirements
-            - Page key: `testing_md`
-            - Output file: `Testing.md`
-            - Must begin with:
-              <!-- page-ownership: automation-managed -->
-            - Include:
-              - `# Testing`
-              - `## Overview`
-              - `## Test Project`
-              - `## CI and Coverage`
-              - `## Notes`
-            - Use only information supported by the input.
-            EOF
-                            ;;
-                          configuration_md)
-                            cat > "$requirements_file" <<'EOF'
-            ## Target Page Requirements
-            - Page key: `configuration_md`
-            - Output file: `Configuration.md`
-            - Must begin with:
-              <!-- page-ownership: automation-managed -->
-            - Include:
-              - `# Configuration`
-              - `## CMake Options`
-              - `## Environment Variables`
-              - `## Tooling`
-            - Use only options, variables, and tooling supported by the input.
-            EOF
-                            ;;
-                          documentation_review_md)
-                            cat > "$requirements_file" <<'EOF'
-            ## Target Page Requirements
-            - Page key: `documentation_review_md`
-            - Output file: `Documentation-Review.md`
-            - Must begin with exactly:
-              <!-- page-ownership: automation-managed -->
-            - Include:
-              - `# Documentation Review`
-              - `## Summary`
-              - `## Change Categories`
-              - `## Review Mode`
-              - `## Ownership Model`
-              - `## Reviewed Inputs`
-              - `## Changed Files`
-              - `## AI Analysis Notes`
-            - `Reviewed Inputs` must summarize actual reviewed scope honestly.
-            - `Changed Files` must use exact file paths from the input.
-            - If many changed files are present, group them under repository-specific subsections when supported by the file paths.
-            - `AI Analysis Notes` must contain 3 to 6 concise repository-specific bullet points and avoid filler text.
-            EOF
-                            ;;
+          ## Target Page Requirements
+          - Page key: `home_md`
+          - Output file: `Home.md`
+          - Must begin with exactly:
+            <!-- page-ownership: automation-managed -->
+            <!-- manual-pages: pages not listed in .wiki-managed-files are treated as manual-only -->
+          - Include:
+            - `# Qt-LogViewer Wiki`
+            - `## Overview`
+            - a concise project-specific overview grounded in the input
+            - `## Navigation`
+            - links for `[[Build-and-Run]]`, `[[Project-Structure]]`, `[[Architecture]]`, `[[Testing]]`, `[[Configuration]]`, and `[[Documentation-Review]]`
+            - `## Ownership`
+            - `## Current Review Snapshot`
+            - `## Repository Sources`
+          EOF
+                ;;
+              build_and_run_md)
+                cat > "$requirements_file" <<'EOF'
+          ## Target Page Requirements
+          - Page key: `build_and_run_md`
+          - Output file: `Build-and-Run.md`
+          - Must begin with:
+            <!-- page-ownership: automation-managed -->
+          - Include:
+            - `# Build and Run`
+            - `## Overview`
+            - `## Prerequisites`
+            - `## Configure and Build`
+            - `## Run`
+            - `## Deployment and Docker Notes`
+          - Use only build and run details supported by the input.
+          EOF
+                ;;
+              project_structure_md)
+                cat > "$requirements_file" <<'EOF'
+          ## Target Page Requirements
+          - Page key: `project_structure_md`
+          - Output file: `Project-Structure.md`
+          - Must begin with:
+            <!-- page-ownership: automation-managed -->
+          - Include:
+            - `# Project Structure`
+            - `## Overview`
+            - `## Main Directories`
+            - `## Notes`
+          - Use actual repository folders and concrete directory paths from the input.
+          EOF
+                ;;
+              architecture_md)
+                cat > "$requirements_file" <<'EOF'
+          ## Target Page Requirements
+          - Page key: `architecture_md`
+          - Output file: `Architecture.md`
+          - Must begin with:
+            <!-- page-ownership: automation-managed -->
+          - Include:
+            - `# Architecture`
+            - `## Overview`
+            - `## Main Responsibilities`
+            - `## Data and Interaction Flow`
+            - `## Notes`
+          - Tie architecture descriptions to concrete classes, files, directories, and repository inventory entries from the input.
+          - Explain interaction flow in grounded terms such as file selection, ingestion, parsing, loading, filtering, paging, UI coordination, and session persistence only when supported by the input.
+          EOF
+                ;;
+              testing_md)
+                cat > "$requirements_file" <<'EOF'
+          ## Target Page Requirements
+          - Page key: `testing_md`
+          - Output file: `Testing.md`
+          - Must begin with:
+            <!-- page-ownership: automation-managed -->
+          - Include:
+            - `# Testing`
+            - `## Overview`
+            - `## Test Project`
+            - `## CI and Coverage`
+            - `## Notes`
+          - Use only information supported by the input.
+          EOF
+                ;;
+              configuration_md)
+                cat > "$requirements_file" <<'EOF'
+          ## Target Page Requirements
+          - Page key: `configuration_md`
+          - Output file: `Configuration.md`
+          - Must begin with:
+            <!-- page-ownership: automation-managed -->
+          - Include:
+            - `# Configuration`
+            - `## CMake Options`
+            - `## Environment Variables`
+            - `## Tooling`
+          - Use only options, variables, and tooling supported by the input.
+          EOF
+                ;;
+              documentation_review_md)
+                cat > "$requirements_file" <<'EOF'
+          ## Target Page Requirements
+          - Page key: `documentation_review_md`
+          - Output file: `Documentation-Review.md`
+          - Must begin with exactly:
+            <!-- page-ownership: automation-managed -->
+          - Include:
+            - `# Documentation Review`
+            - `## Summary`
+            - `## Change Categories`
+            - `## Review Mode`
+            - `## Ownership Model`
+            - `## Reviewed Inputs`
+            - `## Changed Files`
+            - `## AI Analysis Notes`
+          - `Reviewed Inputs` must summarize actual reviewed scope honestly.
+          - `Changed Files` must use exact file paths from the input.
+          - If many changed files are present, group them under repository-specific subsections when supported by the file paths.
+          - `AI Analysis Notes` must contain 3 to 6 concise repository-specific bullet points and avoid filler text.
+          EOF
+                ;;
             esac
           }
 
@@ -586,58 +586,58 @@ jobs:
             if [[ -f "${{ env.WIKI_STAGING_DIR }}/$target_file" ]]; then
               cat >> "$page_input_file" <<EOF
 
-            ## Existing Staged Page
-            Use the existing staged page as baseline context. Preserve correct grounded content and revise minimally. Do not rewrite unaffected sections only for style.
+          ## Existing Staged Page
+          Use the existing staged page as baseline context. Preserve correct grounded content and revise minimally. Do not rewrite unaffected sections only for style.
 
-            \`\`\`markdown
-            $(cat "${{ env.WIKI_STAGING_DIR }}/$target_file")
-            \`\`\`
-            EOF
-                        fi
+          \`\`\`markdown
+          $(cat "${{ env.WIKI_STAGING_DIR }}/$target_file")
+          \`\`\`
+          EOF
+            fi
 
-                        cat "$page_input_file" | gh models run --file "${{ env.DOC_AGENT_PROMPT_FILE }}" --var page_key="$page_key" --var page_title="$page_title" > "$raw_output_file"
+            gh models run --file "${{ env.DOC_AGENT_PROMPT_FILE }}" --var page_key="$page_key" --var page_title="$page_title" < "$page_input_file" > "$raw_output_file"
 
-                        if head -n 1 "$raw_output_file" | grep -q '^```'; then
-                          sed '1d;$d' "$raw_output_file" > "$final_output_file"
-                        else
-                          cp "$raw_output_file" "$final_output_file"
-                        fi
+            if head -n 1 "$raw_output_file" | grep -q '^```'; then
+              sed '1d;$d' "$raw_output_file" > "$final_output_file"
+            else
+              cp "$raw_output_file" "$final_output_file"
+            fi
 
-                        test -s "$final_output_file"
-                        cp "$final_output_file" "${{ env.WIKI_STAGING_DIR }}/$target_file"
-                        printf '\n' >> "${{ env.WIKI_STAGING_DIR }}/$target_file"
-                      }
+            test -s "$final_output_file"
+            cp "$final_output_file" "${{ env.WIKI_STAGING_DIR }}/$target_file"
+            printf '\n' >> "${{ env.WIKI_STAGING_DIR }}/$target_file"
+          }
 
-                      if [[ "$(should_generate_page "$UPDATE_HOME" "Home.md")" == "true" ]]; then
-                        generate_page "home_md" "Home" "Home.md"
-                      fi
+          if [[ "$(should_generate_page "$UPDATE_HOME" "Home.md")" == "true" ]]; then
+            generate_page "home_md" "Home" "Home.md"
+          fi
 
-                      if [[ "$(should_generate_page "$UPDATE_BUILD_AND_RUN" "Build-and-Run.md")" == "true" ]]; then
-                        generate_page "build_and_run_md" "Build and Run" "Build-and-Run.md"
-                      fi
+          if [[ "$(should_generate_page "$UPDATE_BUILD_AND_RUN" "Build-and-Run.md")" == "true" ]]; then
+            generate_page "build_and_run_md" "Build and Run" "Build-and-Run.md"
+          fi
 
-                      if [[ "$(should_generate_page "$UPDATE_PROJECT_STRUCTURE" "Project Structure")" == "true" ]]; then
-                        generate_page "project_structure_md" "Project Structure" "Project-Structure.md"
-                      fi
+          if [[ "$(should_generate_page "$UPDATE_PROJECT_STRUCTURE" "Project-Structure.md")" == "true" ]]; then
+            generate_page "project_structure_md" "Project Structure" "Project-Structure.md"
+          fi
 
-                      if [[ "$(should_generate_page "$UPDATE_ARCHITECTURE" "Architecture.md")" == "true" ]]; then
-                        generate_page "architecture_md" "Architecture" "Architecture.md"
-                      fi
+          if [[ "$(should_generate_page "$UPDATE_ARCHITECTURE" "Architecture.md")" == "true" ]]; then
+            generate_page "architecture_md" "Architecture" "Architecture.md"
+          fi
 
-                      if [[ "$(should_generate_page "$UPDATE_TESTING" "Testing.md")" == "true" ]]; then
-                        generate_page "testing_md" "Testing" "Testing.md"
-                      fi
+          if [[ "$(should_generate_page "$UPDATE_TESTING" "Testing.md")" == "true" ]]; then
+            generate_page "testing_md" "Testing" "Testing.md"
+          fi
 
-                      if [[ "$(should_generate_page "$UPDATE_CONFIGURATION" "Configuration.md")" == "true" ]]; then
-                        generate_page "configuration_md" "Configuration" "Configuration.md"
-                      fi
+          if [[ "$(should_generate_page "$UPDATE_CONFIGURATION" "Configuration.md")" == "true" ]]; then
+            generate_page "configuration_md" "Configuration" "Configuration.md"
+          fi
 
-                      if [[ "$(should_generate_page "$UPDATE_DOCUMENTATION_REVIEW" "Documentation-Review.md")" == "true" ]]; then
-                        generate_page "documentation_review_md" "Documentation Review" "Documentation-Review.md"
-                      fi
+          if [[ "$(should_generate_page "$UPDATE_DOCUMENTATION_REVIEW" "Documentation-Review.md")" == "true" ]]; then
+            generate_page "documentation_review_md" "Documentation Review" "Documentation-Review.md"
+          fi
 
-                      cat > "${{ env.WIKI_STAGING_DIR }}/_Sidebar.md" <<'EOF'
-                      <!-- page-ownership: automation-managed -->
+          cat > "${{ env.WIKI_STAGING_DIR }}/_Sidebar.md" <<'EOF'
+          <!-- page-ownership: automation-managed -->
 
           # Wiki
 
