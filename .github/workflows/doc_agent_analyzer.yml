@@ -133,8 +133,8 @@ jobs:
           CHANGED_FILES: ${{ steps.doc_agent_detect.outputs.changed_files }}
         run: |
           output_file="${RUNNER_TEMP}/doc_agent_input.md"
-          max_total_chars=1000000
-          max_file_chars=50000
+          max_total_chars=120000
+          max_file_chars=5000
           total_chars=0
 
           is_monitored() {
@@ -211,7 +211,15 @@ jobs:
             fi
           done <<< "$CHANGED_FILES"
 
+          test -s "$output_file"
+          echo "AI input size:"
+          wc -c "$output_file"
+          echo "----- RAW MODEL INPUT START -----"
+          head -n 80 "$output_file"
+          echo "----- RAW MODEL INPUT END -----"
+
           echo "AI input written to $output_file"
+
       - name: Doc-Agent - Generate reviewable wiki staging with GitHub Models
         if: steps.doc_agent_detect.outputs.relevant_change_detected == 'true'
         shell: bash
@@ -231,10 +239,13 @@ jobs:
           test -f "${{ env.DOC_AGENT_PROMPT_FILE }}"
           echo "prompt file ok"
 
-          test -f "${RUNNER_TEMP}/doc_agent_input.md"
+          test -s "${RUNNER_TEMP}/doc_agent_input.md"
           echo "input file ok"
 
-          gh models run --file "${{ env.DOC_AGENT_PROMPT_FILE }}" < "${RUNNER_TEMP}/doc_agent_input.md" > "$raw_output_file"
+          echo "input size:"
+          wc -c "${RUNNER_TEMP}/doc_agent_input.md"
+
+          cat "${RUNNER_TEMP}/doc_agent_input.md" | gh models run --file "${{ env.DOC_AGENT_PROMPT_FILE }}" > "$raw_output_file"
           echo "gh models run ok"
 
           if head -n 1 "$raw_output_file" | grep -q '^```'; then
