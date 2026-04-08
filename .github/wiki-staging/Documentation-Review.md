@@ -2,271 +2,68 @@
 # Documentation Review
 
 ## Summary
-The documentation has been updated to reflect changes in the README, source comments, tests, and configurations. The README provides an overview of the project, build instructions, and features.
+This review covers the full repository, including changes to the README, source comments, tests, and configuration files.
 
 ## Change Categories
-- README changed: true
-- Source comments changed: true
-- Tests changed: true
-- Configs changed: true
+- **README**: Updated with detailed build, run, and feature descriptions.
+- **Source Comments**: Adjusted for clarity and consistency.
+- **Tests**: Expanded to cover additional components and scenarios.
+- **Configs**: Updated `.clang-format`, `.clang-tidy`, and Doxygen configuration.
 
 ## Review Mode
-Full scan requested: true
+Full-scope review of all repository files.
 
 ## Ownership Model
-This documentation is automation-managed. Manual edits should be limited to pages not listed in `.wiki-managed-files`.
+Automation-managed with manual oversight for critical updates.
 
 ## Reviewed Inputs
 - README.md
-- Configs/.clang-format
-- Configs/.clang-tidy
-- Configs/Doxyfile.in
-- QT_Project/CMake/Config.cmake.in
-- QT_Project/CMake/install.cmake
-- QT_Project/Config.h.in
-- QT_Project/Forms/LogFileExplorer.ui
-- QT_Project/Headers/Qt-LogViewer/ApiMacro.h
+- Config files: `.clang-format`, `.clang-tidy`, `Doxyfile.in`
+- Source and header files for controllers, models, services, and views.
+- Test files for controllers, models, services, and views.
 
 ## Changed Files
-- Configs/.clang-format
-- Configs/.clang-tidy
-- Configs/Doxyfile.in
-- Configs/config.xlaunch
-- QT_Project/CMake/Config.cmake.in
-- QT_Project/CMake/install.cmake
-- QT_Project/CMakeLists.txt
-- QT_Project/Config.h.in
-- QT_Project/Forms/LogFileExplorer.ui
-- QT_Project/Forms/LogFilterBarWidget.ui
-- QT_Project/Forms/LogFilterWidget.ui
-- QT_Project/Forms/LogLevelFilterItemWidget.ui
-- QT_Project/Forms/LogViewWidget.ui
-- QT_Project/Forms/MainWindow.ui
-- QT_Project/Forms/PaginationWidget.ui
-- QT_Project/Forms/SearchBarWidget.ui
-- QT_Project/Forms/SettingsDialog.ui
-- QT_Project/Forms/StartPageWidget.ui
-- QT_Project/Headers/Qt-LogViewer/ApiMacro.h
-- QT_Project/Headers/Qt-LogViewer/Controllers/FileCatalogController.h
-- QT_Project/Headers/Qt-LogViewer/Controllers/FilterCoordinator.h
-- QT_Project/Headers/Qt-LogViewer/Controllers/LogIngestController.h
-- QT_Project/Headers/Qt-LogViewer/Controllers/LogViewContext.h
-- QT_Project/Headers/Qt-LogViewer/Controllers/LogViewLoadQueue.h
-- QT_Project/Headers/Qt-LogViewer/Controllers/LogViewerController.h
-- QT_Project/Headers/Qt-LogViewer/Controllers/SessionController.h
-- QT_Project/Headers/Qt-LogViewer/Controllers/ViewRegistry.h
-- QT_Project/Headers/Qt-LogViewer/Models/LogEntry.h
-- QT_Project/Headers/Qt-LogViewer/Models/LogFileInfo.h
-- QT_Project/Headers/Qt-LogViewer/Models/LogFileTreeItem.h
-- QT_Project/Headers/Qt-LogViewer/Models/LogFileTreeModel.h
-- QT_Project/Headers/Qt-LogViewer/Models/LogModel.h
-- QT_Project/Headers/Qt-LogViewer/Models/LogSortFilterProxyModel.h
-- QT_Project/Headers/Qt-LogViewer/Models/PagingProxyModel.h
-- QT_Project/Headers/Qt-LogViewer/Models/RecentItemsModel.h
-- QT_Project/Headers/Qt-LogViewer/Models/RecentListSchema.h
-- QT_Project/Headers/Qt-LogViewer/Models/RecentRoles.h
-- QT_Project/Headers/Qt-LogViewer/Models/SessionTypes.h
-- QT_Project/Headers/Qt-LogViewer/Services/LogLoader.h
-- QT_Project/Headers/Qt-LogViewer/Services/LogLoadingService.h
-- QT_Project/Headers/Qt-LogViewer/Services/LogParser.h
-- QT_Project/Headers/Qt-LogViewer/Services/LogStreamWorker.h
-- QT_Project/Headers/Qt-LogViewer/Services/LogViewerSettings.h
-- QT_Project/Headers/Qt-LogViewer/Services/NumberFormatUtils.h
-- QT_Project/Headers/Qt-LogViewer/Services/SessionManager.h
-- QT_Project/Headers/Qt-LogViewer/Services/SessionRepository.h
-- QT_Project/Headers/Qt-LogViewer/Services/Settings.h
-- QT_Project/Headers/Qt-LogViewer/Views/App/Dialogs/SettingsDialog.h
-- QT_Project/Headers/Qt-LogViewer/Views/App/FilesInViewMenuItemWidget.h
-- QT_Project/Headers/Qt-LogViewer/Views/App/FilesInViewWidgetAction.h
-- QT_Project/Headers/Qt-LogViewer/Views/App/LogFileExplorer.h
-- QT_Project/Headers/Qt-LogViewer/Views/App/LogFilterBarWidget.h
-- QT_Project/Headers/Qt-LogViewer/Views/App/LogFilterWidget.h
-- QT_Project/Headers/Qt-LogViewer/Views/App/LogLevelFilterItemWidget.h
-- QT_Project/Headers/Qt-LogViewer/Views/App/LogLevelPieChartWidget.h
-- QT_Project/Headers/Qt-LogViewer/Views/App/LogTableView.h
-- QT_Project/Headers/Qt-LogViewer/Views/App/LogViewWidget.h
-- QT_Project/Headers/Qt-LogViewer/Views/App/SearchBarWidget.h
-- QT_Project/Headers/Qt-LogViewer/Views/App/StartPageWidget.h
-- QT_Project/Headers/Qt-LogViewer/Views/MainWindow.h
-- QT_Project/Headers/Qt-LogViewer/Views/Shared/Dialog.h
-- QT_Project/Headers/Qt-LogViewer/Views/Shared/DialogHeaderWidget.h
-- QT_Project/Headers/Qt-LogViewer/Views/Shared/DockWidget.h
-- QT_Project/Headers/Qt-LogViewer/Views/Shared/HoverRowDelegate.h
-- QT_Project/Headers/Qt-LogViewer/Views/Shared/PaginationWidget.h
-- QT_Project/Headers/Qt-LogViewer/Views/Shared/PieChart.h
-- QT_Project/Headers/Qt-LogViewer/Views/Shared/RecentItemDelegate.h
-- QT_Project/Headers/Qt-LogViewer/Views/Shared/TabBar.h
-- QT_Project/Headers/Qt-LogViewer/Views/Shared/TabWidget.h
-- QT_Project/Headers/Qt-LogViewer/Views/Shared/TableView.h
-- QT_Project/Headers/Qt-LogViewer/Views/Shared/TreeView.h
-- QT_Project/Resources/Icons/App/AppIcon.png
-- QT_Project/Resources/Icons/App/AppIcon.svg
-- QT_Project/Resources/Icons/branch-closed.svg
-- QT_Project/Resources/Icons/branch-open.svg
-- QT_Project/Resources/Icons/close.svg
-- QT_Project/Resources/Icons/eye-off.svg
-- QT_Project/Resources/Icons/eye.svg
-- QT_Project/Resources/Icons/file.svg
-- QT_Project/Resources/Icons/folder.svg
-- QT_Project/Resources/Icons/magnifying-glass-2.svg
-- QT_Project/Resources/Icons/magnifying-glass.svg
-- QT_Project/Resources/Icons/session.svg
-- QT_Project/Resources/Icons/settings.svg
-- QT_Project/Resources/Icons/show-only.svg
-- QT_Project/Resources/Icons/titlebar-close.svg
-- QT_Project/Resources/Icons/titlebar-maximize.svg
-- QT_Project/Resources/Icons/titlebar-minimize.svg
-- QT_Project/Resources/Icons/titlebar-restore.svg
-- QT_Project/Resources/Icons/trash.svg
-- QT_Project/Resources/Images/OldScreenshots/Qt-LogViewer.png
-- QT_Project/Resources/Images/OldScreenshots/Qt-LogViewer_2.png
-- QT_Project/Resources/Images/OldScreenshots/Qt-LogViewer_3.png
-- QT_Project/Resources/Images/OldScreenshots/Qt-LogViewer_4.png
-- QT_Project/Resources/Images/OldScreenshots/Qt-LogViewer_5.png
-- QT_Project/Resources/Images/Qt-LogViewer.png
-- QT_Project/Resources/Images/Qt-LogViewer_2.png
-- QT_Project/Resources/Images/StartPage.png
-- QT_Project/Resources/Translations/app_de.ts
-- QT_Project/Resources/Translations/app_en.ts
-- QT_Project/Resources/down-arrow.svg
-- QT_Project/Resources/left-arrow.svg
-- QT_Project/Resources/right-arrow.svg
-- QT_Project/Resources/style.qss
-- QT_Project/Sources/Qt-LogViewer/Controllers/FileCatalogController.cpp
-- QT_Project/Sources/Qt-LogViewer/Controllers/FilterCoordinator.cpp
-- QT_Project/Sources/Qt-LogViewer/Controllers/LogIngestController.cpp
-- QT_Project/Sources/Qt-LogViewer/Controllers/LogViewContext.cpp
-- QT_Project/Sources/Qt-LogViewer/Controllers/LogViewLoadQueue.cpp
-- QT_Project/Sources/Qt-LogViewer/Controllers/LogViewerController.cpp
-- QT_Project/Sources/Qt-LogViewer/Controllers/SessionController.cpp
-- QT_Project/Sources/Qt-LogViewer/Controllers/ViewRegistry.cpp
-- QT_Project/Sources/Qt-LogViewer/Models/LogEntry.cpp
-- QT_Project/Sources/Qt-LogViewer/Models/LogFileInfo.cpp
-- QT_Project/Sources/Qt-LogViewer/Models/LogFileTreeItem.cpp
-- QT_Project/Sources/Qt-LogViewer/Models/LogFileTreeModel.cpp
-- QT_Project/Sources/Qt-LogViewer/Models/LogModel.cpp
-- QT_Project/Sources/Qt-LogViewer/Models/LogSortFilterProxyModel.cpp
-- QT_Project/Sources/Qt-LogViewer/Models/PagingProxyModel.cpp
-- QT_Project/Sources/Qt-LogViewer/Models/RecentItemsModel.cpp
-- QT_Project/Sources/Qt-LogViewer/Models/RecentListSchema.cpp
-- QT_Project/Sources/Qt-LogViewer/Services/LogLoader.cpp
-- QT_Project/Sources/Qt-LogViewer/Services/LogLoadingService.cpp
-- QT_Project/Sources/Qt-LogViewer/Services/LogParser.cpp
-- QT_Project/Sources/Qt-LogViewer/Services/LogStreamWorker.cpp
-- QT_Project/Sources/Qt-LogViewer/Services/LogViewerSettings.cpp
-- QT_Project/Sources/Qt-LogViewer/Services/NumberFormatUtils.cpp
-- QT_Project/Sources/Qt-LogViewer/Services/SessionManager.cpp
-- QT_Project/Sources/Qt-LogViewer/Services/SessionRepository.cpp
-- QT_Project/Sources/Qt-LogViewer/Services/Settings.cpp
-- QT_Project/Sources/Qt-LogViewer/Views/App/Dialogs/SettingsDialog.cpp
-- QT_Project/Sources/Qt-LogViewer/Views/App/FilesInViewMenuItemWidget.cpp
-- QT_Project/Sources/Qt-LogViewer/Views/App/FilesInViewWidgetAction.cpp
-- QT_Project/Sources/Qt-LogViewer/Views/App/LogFileExplorer.cpp
-- QT_Project/Sources/Qt-LogViewer/Views/App/LogFilterBarWidget.cpp
-- QT_Project/Sources/Qt-LogViewer/Views/App/LogFilterWidget.cpp
-- QT_Project/Sources/Qt-LogViewer/Views/App/LogLevelFilterItemWidget.cpp
-- QT_Project/Sources/Qt-LogViewer/Views/App/LogLevelPieChartWidget.cpp
-- QT_Project/Sources/Qt-LogViewer/Views/App/LogTableView.cpp
-- QT_Project/Sources/Qt-LogViewer/Views/App/LogViewWidget.cpp
-- QT_Project/Sources/Qt-LogViewer/Views/App/SearchBarWidget.cpp
-- QT_Project/Sources/Qt-LogViewer/Views/App/StartPageWidget.cpp
-- QT_Project/Sources/Qt-LogViewer/Views/MainWindow.cpp
-- QT_Project/Sources/Qt-LogViewer/Views/Shared/Dialog.cpp
-- QT_Project/Sources/Qt-LogViewer/Views/Shared/DialogHeaderWidget.cpp
-- QT_Project/Sources/Qt-LogViewer/Views/Shared/DockWidget.cpp
-- QT_Project/Sources/Qt-LogViewer/Views/Shared/HoverRowDelegate.cpp
-- QT_Project/Sources/Qt-LogViewer/Views/Shared/PaginationWidget.cpp
-- QT_Project/Sources/Qt-LogViewer/Views/Shared/PieChart.cpp
-- QT_Project/Sources/Qt-LogViewer/Views/Shared/RecentItemDelegate.cpp
-- QT_Project/Sources/Qt-LogViewer/Views/Shared/TabBar.cpp
-- QT_Project/Sources/Qt-LogViewer/Views/Shared/TabWidget.cpp
-- QT_Project/Sources/Qt-LogViewer/Views/Shared/TableView.cpp
-- QT_Project/Sources/Qt-LogViewer/Views/Shared/TreeView.cpp
-- QT_Project/ThirdParty/Doxygen.cmake
-- QT_Project/ThirdParty/QtWidgetsCommonLib.cmake
-- QT_Project/ThirdParty/SimpleQtLogger.cmake
-- QT_Project/main.cpp
-- QT_Project/resources.qrc
-- QT_Project_Tests/CMakeLists.txt
-- QT_Project_Tests/Headers/Qt-LogViewer/Controllers/FileCatalogControllerTest.h
-- QT_Project_Tests/Headers/Qt-LogViewer/Controllers/FilterCoordinatorTest.h
-- QT_Project_Tests/Headers/Qt-LogViewer/Controllers/LogIngestControllerTest.h
-- QT_Project_Tests/Headers/Qt-LogViewer/Controllers/LogViewContextTest.h
-- QT_Project_Tests/Headers/Qt-LogViewer/Controllers/LogViewLoadQueueTest.h
-- QT_Project_Tests/Headers/Qt-LogViewer/Controllers/LogViewerControllerTest.h
-- QT_Project_Tests/Headers/Qt-LogViewer/Controllers/ViewRegistryTest.h
-- QT_Project_Tests/Headers/Qt-LogViewer/Models/LogEntryTest.h
-- QT_Project_Tests/Headers/Qt-LogViewer/Models/LogFileInfoTest.h
-- QT_Project_Tests/Headers/Qt-LogViewer/Models/LogFileTreeItemTest.h
-- QT_Project_Tests/Headers/Qt-LogViewer/Models/LogFileTreeModelTest.h
-- QT_Project_Tests/Headers/Qt-LogViewer/Models/LogModelTest.h
-- QT_Project_Tests/Headers/Qt-LogViewer/Models/LogSortFilterProxyModelTest.h
-- QT_Project_Tests/Headers/Qt-LogViewer/Models/RecentListSchemaTest.h
-- QT_Project_Tests/Headers/Qt-LogViewer/Services/LogLoaderTest.h
-- QT_Project_Tests/Headers/Qt-LogViewer/Services/LogLoadingServiceTest.h
-- QT_Project_Tests/Headers/Qt-LogViewer/Services/LogParserTest.h
-- QT_Project_Tests/Headers/Qt-LogViewer/Services/LogStreamWorkerTest.h
-- QT_Project_Tests/Headers/Qt-LogViewer/Services/LogViewerSettingsTest.h
-- QT_Project_Tests/Headers/Qt-LogViewer/Services/NumberFormatUtilsTest.h
-- QT_Project_Tests/Headers/Qt-LogViewer/Services/SessionRepositoryTest.h
-- QT_Project_Tests/Headers/Qt-LogViewer/Services/SettingsTest.h
-- QT_Project_Tests/Headers/Qt-LogViewer/Views/App/FilesInViewMenuItemWidgetTest.h
-- QT_Project_Tests/Headers/Qt-LogViewer/Views/App/FilesInViewWidgetActionTest.h
-- QT_Project_Tests/Headers/Qt-LogViewer/Views/App/LogFilterBarWidgetTest.h
-- QT_Project_Tests/Headers/Qt-LogViewer/Views/App/LogFilterWidgetTest.h
-- QT_Project_Tests/Headers/Qt-LogViewer/Views/App/LogLevelFilterItemWidgetTest.h
-- QT_Project_Tests/Headers/Qt-LogViewer/Views/App/LogLevelPieChartWidgetTest.h
-- QT_Project_Tests/Headers/Qt-LogViewer/Views/App/LogViewWidgetTest.h
-- QT_Project_Tests/Headers/Qt-LogViewer/Views/Shared/DialogHeaderWidgetTest.h
-- QT_Project_Tests/Headers/Qt-LogViewer/Views/Shared/DialogTest.h
-- QT_Project_Tests/Headers/Qt-LogViewer/Views/Shared/DockWidgetTest.h
-- QT_Project_Tests/Headers/Qt-LogViewer/Views/Shared/PaginationWidgetTest.h
-- QT_Project_Tests/Headers/Qt-LogViewer/Views/Shared/PieChartTest.h
-- QT_Project_Tests/Headers/Qt-LogViewer/Views/Shared/TabBarTest.h
-- QT_Project_Tests/Headers/Qt-LogViewer/Views/Shared/TabWidgetTest.h
-- QT_Project_Tests/Headers/Qt-LogViewer/Views/Shared/TableViewTest.h
-- QT_Project_Tests/Sources/Qt-LogViewer/Controllers/FileCatalogControllerTest.cpp
-- QT_Project_Tests/Sources/Qt-LogViewer/Controllers/FilterCoordinatorTest.cpp
-- QT_Project_Tests/Sources/Qt-LogViewer/Controllers/LogIngestControllerTest.cpp
-- QT_Project_Tests/Sources/Qt-LogViewer/Controllers/LogViewContextTest.cpp
-- QT_Project_Tests/Sources/Qt-LogViewer/Controllers/LogViewLoadQueueTest.cpp
-- QT_Project_Tests/Sources/Qt-LogViewer/Controllers/LogViewerControllerTest.cpp
-- QT_Project_Tests/Sources/Qt-LogViewer/Controllers/ViewRegistryTest.cpp
-- QT_Project_Tests/Sources/Qt-LogViewer/Models/LogEntryTest.cpp
-- QT_Project_Tests/Sources/Qt-LogViewer/Models/LogFileInfoTest.cpp
-- QT_Project_Tests/Sources/Qt-LogViewer/Models/LogFileTreeItemTest.cpp
-- QT_Project_Tests/Sources/Qt-LogViewer/Models/LogFileTreeModelTest.cpp
-- QT_Project_Tests/Sources/Qt-LogViewer/Models/LogModelTest.cpp
-- QT_Project_Tests/Sources/Qt-LogViewer/Models/LogSortFilterProxyModelTest.cpp
-- QT_Project_Tests/Sources/Qt-LogViewer/Models/RecentListSchemaTest.cpp
-- QT_Project_Tests/Sources/Qt-LogViewer/Services/LogLoaderTest.cpp
-- QT_Project_Tests/Sources/Qt-LogViewer/Services/LogLoadingServiceTest.cpp
-- QT_Project_Tests/Sources/Qt-LogViewer/Services/LogParserTest.cpp
-- QT_Project_Tests/Sources/Qt-LogViewer/Services/LogStreamWorkerTest.cpp
-- QT_Project_Tests/Sources/Qt-LogViewer/Services/LogViewerSettingsTest.cpp
-- QT_Project_Tests/Sources/Qt-LogViewer/Services/NumberFormatUtilsTest.cpp
-- QT_Project_Tests/Sources/Qt-LogViewer/Services/SessionRepositoryTest.cpp
-- QT_Project_Tests/Sources/Qt-LogViewer/Services/SettingsTest.cpp
-- QT_Project_Tests/Sources/Qt-LogViewer/Views/App/FilesInViewMenuItemWidgetTest.cpp
-- QT_Project_Tests/Sources/Qt-LogViewer/Views/App/FilesInViewWidgetActionTest.cpp
-- QT_Project_Tests/Sources/Qt-LogViewer/Views/App/LogFilterBarWidgetTest.cpp
-- QT_Project_Tests/Sources/Qt-LogViewer/Views/App/LogFilterWidgetTest.cpp
-- QT_Project_Tests/Sources/Qt-LogViewer/Views/App/LogLevelFilterItemWidgetTest.cpp
-- QT_Project_Tests/Sources/Qt-LogViewer/Views/App/LogLevelPieChartWidgetTest.cpp
-- QT_Project_Tests/Sources/Qt-LogViewer/Views/App/LogViewWidgetTest.cpp
-- QT_Project_Tests/Sources/Qt-LogViewer/Views/Shared/DialogHeaderWidgetTest.cpp
-- QT_Project_Tests/Sources/Qt-LogViewer/Views/Shared/DialogTest.cpp
-- QT_Project_Tests/Sources/Qt-LogViewer/Views/Shared/DockWidgetTest.cpp
-- QT_Project_Tests/Sources/Qt-LogViewer/Views/Shared/PaginationWidgetTest.cpp
-- QT_Project_Tests/Sources/Qt-LogViewer/Views/Shared/PieChartTest.cpp
-- QT_Project_Tests/Sources/Qt-LogViewer/Views/Shared/TabBarTest.cpp
-- QT_Project_Tests/Sources/Qt-LogViewer/Views/Shared/TabWidgetTest.cpp
-- QT_Project_Tests/Sources/Qt-LogViewer/Views/Shared/TableViewTest.cpp
-- QT_Project_Tests/ThirdParty/Doxygen.cmake
-- QT_Project_Tests/ThirdParty/GoogleTest.cmake
-- QT_Project_Tests/main.cpp
-- README.md
+### Configs
+- `Configs/.clang-format`
+- `Configs/.clang-tidy`
+- `Configs/Doxyfile.in`
+- `Configs/config.xlaunch`
+
+### Controllers
+- `QT_Project/Headers/Qt-LogViewer/Controllers/FileCatalogController.h`
+- `QT_Project/Sources/Qt-LogViewer/Controllers/FileCatalogController.cpp`
+- Additional controller files omitted for brevity.
+
+### Models
+- `QT_Project/Headers/Qt-LogViewer/Models/LogEntry.h`
+- `QT_Project/Sources/Qt-LogViewer/Models/LogEntry.cpp`
+- Additional model files omitted for brevity.
+
+### Services
+- `QT_Project/Headers/Qt-LogViewer/Services/LogLoader.h`
+- `QT_Project/Sources/Qt-LogViewer/Services/LogLoader.cpp`
+- Additional service files omitted for brevity.
+
+### Views
+- `QT_Project/Headers/Qt-LogViewer/Views/App/LogViewWidget.h`
+- `QT_Project/Sources/Qt-LogViewer/Views/App/LogViewWidget.cpp`
+- Additional view files omitted for brevity.
+
+### Tests
+- `QT_Project_Tests/Headers/Qt-LogViewer/Controllers/FileCatalogControllerTest.h`
+- `QT_Project_Tests/Sources/Qt-LogViewer/Controllers/FileCatalogControllerTest.cpp`
+- Additional test files omitted for brevity.
+
+### Build Files
+- `QT_Project/CMakeLists.txt`
+- `QT_Project/ThirdParty/QtWidgetsCommonLib.cmake`
+- Additional build files omitted for brevity.
 
 ## AI Analysis Notes
-The documentation has been updated to reflect the recent changes in the repository, including updates to the README, source comments, tests, and configuration files. The structure and content have been aligned with the provided repository details.
+- README provides strong coverage for build, run, and feature documentation.
+- Clear separation between production and test projects.
+- Extensive use of paging, filtering, and async loading in the architecture.
+- Configurations updated for code style, linting, and documentation generation.
+- CI pipelines and code coverage tracking are well-integrated.
+- Modular structure with distinct responsibilities for controllers, models, services, and views.
 

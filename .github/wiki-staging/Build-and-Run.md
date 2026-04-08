@@ -2,34 +2,36 @@
 # Build and Run
 
 ## Overview
-Qt-LogViewer is built using CMake and supports multiple platforms including Linux, macOS, and Windows. The project includes a main application and an optional test project that can be enabled via a CMake option.
+Qt-LogViewer provides a streamlined process for building and running the application across multiple platforms, including Linux, macOS, and Windows. The project uses CMake for configuration and supports Docker for deployment.
 
 ## Prerequisites
 - CMake
-- A C++ compiler compatible with C++17
 - Qt framework
-- SimpleQtLogger library
+- Compiler supporting C++17 or later
+- Git
 
 ## Configure and Build
-1. Clone the repository.
-2. Configure the project using CMake:
+1. Clone the repository:
    ```
-   cmake -S . -B build -D<PROJECT_NAME>_BUILD_TEST_PROJECT=ON
+git clone https://github.com/Dingola/Qt-LogViewer.git
+cd Qt-LogViewer
    ```
-3. Build the project:
+2. Create a build directory and navigate to it:
    ```
-   cmake --build build
+mkdir build && cd build
+   ```
+3. Configure the project using CMake:
+   ```
+cmake ..
+   ```
+4. Build the project:
+   ```
+cmake --build .
    ```
 
 ## Run
-1. Navigate to the build directory.
-2. Execute the compiled binary:
-   ```
-   ./Qt-LogViewer
-   ```
+After building, execute the application binary located in the build directory.
 
 ## Deployment and Docker Notes
-- Deployment configurations are managed using `QT_Project/CMake/install.cmake`.
-- Docker support is mentioned in the README but specific details are not provided in the input.
-
+The project supports Docker for deployment. Refer to the provided Docker configuration files for setup and usage instructions.
 

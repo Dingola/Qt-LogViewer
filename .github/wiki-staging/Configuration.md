@@ -2,13 +2,13 @@
 # Configuration
 
 ## CMake Options
-- `<PROJECT_NAME>_BUILD_TEST_PROJECT`: Boolean variable to enable or disable the test project build.
+- `<PROJECT_NAME>_BUILD_TEST_PROJECT`: Boolean variable to enable or disable the test project.
 
 ## Environment Variables
-- No specific environment variables are mentioned in the input.
+- Not explicitly documented in the provided input.
 
 ## Tooling
-- `.clang-format` and `.clang-tidy` configurations are provided in the `Configs/` directory.
-- Doxygen configuration is available in `Configs/Doxyfile.in`.
-
+- `.clang-format` and `.clang-tidy` for code style and linting.
+- Doxygen for documentation generation, configured via `Doxyfile.in`.
+- Integration with third-party libraries like `SimpleQtLogger` and `QtWidgetsCommonLib`.
 
