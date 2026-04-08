@@ -1,18 +1,23 @@
 <!-- page-ownership: automation-managed -->
+
 # Testing
 
 ## Overview
-Qt-LogViewer includes a dedicated test project that mirrors the production structure. Tests cover controllers, models, services, and views to ensure functionality and reliability.
+Qt-LogViewer includes a dedicated test project to ensure the reliability and correctness of its components. The test project mirrors the structure of the main project, providing comprehensive coverage for controllers, models, services, and views.
 
 ## Test Project
-- Located in `QT_Project_Tests/`.
-- Includes unit tests for key components such as `FileCatalogControllerTest`, `LogModelTest`, and `LogLoaderTest`.
-- Uses GoogleTest for test execution.
+- Located in the `QT_Project_Tests` directory.
+- Includes unit tests for controllers, models, services, and views.
+- Examples of test files:
+  - `FileCatalogControllerTest.cpp`
+  - `LogModelTest.cpp`
+  - `LogParserTest.cpp`
+  - `SettingsTest.cpp`
 
 ## CI and Coverage
-- Continuous Integration (CI) pipelines are set up for Linux, macOS, and Windows.
-- Code coverage is tracked using Codecov, with a badge available in the README.
+- Continuous integration is set up for Linux, macOS, and Windows using GitHub Actions.
+- Code coverage is tracked via Codecov and displayed with a badge in the README.
 
 ## Notes
-The test project is optional and can be enabled via the CMake variable `<PROJECT_NAME>_BUILD_TEST_PROJECT`.
+The test project is optional and can be enabled using the CMake option `<PROJECT_NAME>_BUILD_TEST_PROJECT`. This ensures that tests are only built when explicitly required.
 
