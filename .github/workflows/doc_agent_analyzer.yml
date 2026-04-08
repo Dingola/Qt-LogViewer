@@ -33,7 +33,7 @@ permissions:
 env:
   WIKI_STAGING_DIR: .github/wiki-staging
   WIKI_MANIFEST_FILE: .wiki-managed-files
-  DOC_AGENT_MODEL: openai/gpt-4.1-mini
+  DOC_AGENT_PROMPT_FILE: .github/prompts/doc_agent_analyzer.prompt.yml
 
 #------------------------------------------------
 # Workflow jobs
@@ -44,16 +44,19 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Checkout the repository
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           submodules: recursive
 
-      #------------------------------------------------
-      # Doc-Agent
-      #------------------------------------------------
+      - name: Install GitHub Models extension
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh extension install https://github.com/github/gh-models || gh extension upgrade gh-models
+
       - name: Doc-Agent - Detect documentation inputs to analyze
         id: doc_agent_detect
         shell: bash
@@ -120,6 +123,8 @@ jobs:
         if: steps.doc_agent_detect.outputs.relevant_change_detected == 'true'
         shell: bash
         env:
+          REPOSITORY_NAME: ${{ github.repository }}
+          COMMIT_SHA: ${{ github.sha }}
           FULL_SCAN_REQUESTED: ${{ steps.doc_agent_detect.outputs.full_scan_requested }}
           README_CHANGED: ${{ steps.doc_agent_detect.outputs.readme_changed }}
           SOURCE_COMMENTS_CHANGED: ${{ steps.doc_agent_detect.outputs.source_comments_changed }}
@@ -127,213 +132,113 @@ jobs:
           CONFIGS_CHANGED: ${{ steps.doc_agent_detect.outputs.configs_changed }}
           CHANGED_FILES: ${{ steps.doc_agent_detect.outputs.changed_files }}
         run: |
-          python - <<'PY'
-          import os
-          import pathlib
+          output_file="${RUNNER_TEMP}/doc_agent_input.md"
+          max_total_chars=120000
+          max_file_chars=6000
+          total_chars=0
 
-          root = pathlib.Path(".")
-          output_path = pathlib.Path(os.environ["RUNNER_TEMP"]) / "doc_agent_input.md"
+          is_monitored() {
+            case "$1" in
+              README.md|QT_Project/*|QT_Project_Tests/*|Configs/*) return 0 ;;
+              *) return 1 ;;
+            esac
+          }
 
-          changed_files = [
-              line.strip()
-              for line in os.environ.get("CHANGED_FILES", "").splitlines()
-              if line.strip()
-          ]
+          append_text() {
+            local text="$1"
+            local text_len
+            text_len=$(printf "%s" "$text" | wc -c)
 
-          max_total_chars = 120000
-          max_file_chars = 6000
+            if (( total_chars + text_len > max_total_chars )); then
+              return
+            fi
 
-          total_chars = 0
-          sections = []
-          included_files = set()
+            printf "%s" "$text" >> "$output_file"
+            total_chars=$((total_chars + text_len))
+          }
 
-          metadata = [
-              "# Doc-Agent Analysis Input",
-              "",
-              f"- Repository: {os.environ.get('GITHUB_REPOSITORY', '')}",
-              f"- Commit: {os.environ.get('GITHUB_SHA', '')}",
-              f"- Full scan requested: {os.environ.get('FULL_SCAN_REQUESTED', 'false')}",
-              f"- README changed: {os.environ.get('README_CHANGED', 'false')}",
-              f"- Source comments changed: {os.environ.get('SOURCE_COMMENTS_CHANGED', 'false')}",
-              f"- Tests changed: {os.environ.get('TESTS_CHANGED', 'false')}",
-              f"- Configs changed: {os.environ.get('CONFIGS_CHANGED', 'false')}",
-              "",
-              "## Changed Files",
-          ]
+          append_file_section() {
+            local file_path="$1"
 
-          if changed_files:
-              metadata.extend(f"- `{file_path}`" for file_path in changed_files)
-          else:
-              metadata.append("- None")
+            if ! is_monitored "$file_path"; then
+              return
+            fi
 
-          sections.append("\n".join(metadata))
-          total_chars += len(sections[0])
+            if [[ ! -f "$file_path" ]]; then
+              return
+            fi
 
-          def is_monitored(file_path: str) -> bool:
-              return file_path == "README.md" or file_path.startswith(("QT_Project/", "QT_Project_Tests/", "Configs/"))
+            local excerpt
+            excerpt="$(head -c "$max_file_chars" "$file_path")"
 
-          def add_file(file_path: str) -> None:
-              global total_chars
-              if file_path in included_files or not is_monitored(file_path):
-                  return
+            append_text "$(printf '\n## File: %s\n\n```text\n%s\n```\n' "$file_path" "$excerpt")"
+          }
 
-              path = root / file_path
-              if not path.is_file():
-                  return
+          : > "$output_file"
 
-              text = path.read_text(encoding="utf-8", errors="replace")
-              excerpt = text[:max_file_chars].rstrip()
+          cat > "${RUNNER_TEMP}/doc_agent_header.md" <<EOF
+          # Doc-Agent Analysis Input
 
-              section = "\n".join(
-                  [
-                      "",
-                      f"## File: {file_path}",
-                      "",
-                      "```text",
-                      excerpt,
-                      "```",
-                  ]
-              )
+          - Repository: ${REPOSITORY_NAME}
+          - Commit: ${COMMIT_SHA}
+          - Full scan requested: ${FULL_SCAN_REQUESTED}
+          - README changed: ${README_CHANGED}
+          - Source comments changed: ${SOURCE_COMMENTS_CHANGED}
+          - Tests changed: ${TESTS_CHANGED}
+          - Configs changed: ${CONFIGS_CHANGED}
 
-              projected_total = total_chars + len(section)
-              if projected_total > max_total_chars:
-                  return
+          ## Changed Files
+          EOF
 
-              sections.append(section)
-              included_files.add(file_path)
-              total_chars = projected_total
+          append_text "$(cat "${RUNNER_TEMP}/doc_agent_header.md")"
+          append_text $'\n'
 
-          add_file("README.md")
+          if [[ -n "$CHANGED_FILES" ]]; then
+            while IFS= read -r file; do
+              if [[ -n "$file" ]]; then
+                append_text "- \`$file\`"$'\n'
+              fi
+            done <<< "$CHANGED_FILES"
+          else
+            append_text "- None"$'\n'
+          fi
 
-          for changed_file in changed_files:
-              add_file(changed_file)
+          append_file_section "README.md"
 
-          output_path.write_text("\n".join(sections).rstrip() + "\n", encoding="utf-8")
-          print(f"AI input written to {output_path}")
-          print(f"Included files: {len(included_files)}")
-          PY
+          while IFS= read -r changed_file; do
+            if [[ -n "$changed_file" ]]; then
+              append_file_section "$changed_file"
+            fi
+          done <<< "$CHANGED_FILES"
 
-      - name: Doc-Agent - Generate reviewable wiki staging with GitHub AI
+          echo "AI input written to $output_file"
+      - name: Doc-Agent - Generate reviewable wiki staging with GitHub Models
         if: steps.doc_agent_detect.outputs.relevant_change_detected == 'true'
         shell: bash
         env:
-          GITHUB_TOKEN: ${{ github.token }}
-          FULL_SCAN_REQUESTED: ${{ steps.doc_agent_detect.outputs.full_scan_requested }}
-          README_CHANGED: ${{ steps.doc_agent_detect.outputs.readme_changed }}
-          SOURCE_COMMENTS_CHANGED: ${{ steps.doc_agent_detect.outputs.source_comments_changed }}
-          TESTS_CHANGED: ${{ steps.doc_agent_detect.outputs.tests_changed }}
-          CONFIGS_CHANGED: ${{ steps.doc_agent_detect.outputs.configs_changed }}
-          CHANGED_FILES: ${{ steps.doc_agent_detect.outputs.changed_files }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           rm -rf "${{ env.WIKI_STAGING_DIR }}"
           mkdir -p "${{ env.WIKI_STAGING_DIR }}"
 
-          python - <<'PY'
-          import json
-          import os
-          import pathlib
-          import urllib.error
-          import urllib.request
+          raw_output_file="${RUNNER_TEMP}/doc_agent_output.raw"
+          json_output_file="${RUNNER_TEMP}/doc_agent_output.json"
 
-          input_path = pathlib.Path(os.environ["RUNNER_TEMP"]) / "doc_agent_input.md"
-          prompt_input = input_path.read_text(encoding="utf-8")
+          gh models run --file "${{ env.DOC_AGENT_PROMPT_FILE }}" < "${RUNNER_TEMP}/doc_agent_input.md" > "$raw_output_file"
 
-          system_prompt = """
-          You are the repository Doc-Agent Analyzer.
+          if head -n 1 "$raw_output_file" | grep -q '^```'; then
+            sed '1d;$d' "$raw_output_file" > "$json_output_file"
+          else
+            cp "$raw_output_file" "$json_output_file"
+          fi
 
-          Your job is to analyze repository documentation inputs and produce concise, reviewable wiki staging content.
+          jq -e 'has("home_md") and has("documentation_review_md")' "$json_output_file" > /dev/null
 
-          Output rules:
-          - Return strict JSON only.
-          - Do not use Markdown code fences.
-          - Use exactly these keys:
-            - "home_md"
-            - "documentation_review_md"
-          - Write all documentation in English.
-          - Keep content focused, minimal, and reviewable.
-          - Do not invent build details that are not grounded in the input.
-          - Do not mention GitHub Pages.
-          - The wiki is published only from reviewed staging content in the main repository.
-          - The Doc-Agent Analyzer may analyze, correct, and adapt content, but must not publish directly.
-          - The Wiki-Agent is publish-only.
+          jq -r '.home_md' "$json_output_file" > "${{ env.WIKI_STAGING_DIR }}/Home.md"
+          printf '\n' >> "${{ env.WIKI_STAGING_DIR }}/Home.md"
 
-          Content rules:
-          - "home_md" must start with:
-            <!-- page-ownership: automation-managed -->
-            <!-- manual-pages: pages not listed in .wiki-managed-files are treated as manual-only -->
-          - "documentation_review_md" must start with:
-            <!-- page-ownership: automation-managed -->
-          - "home_md" must contain:
-            - title
-            - short overview based on repository inputs
-            - navigation with Home and Documentation-Review only
-            - ownership section
-            - current review snapshot
-            - repository sources
-          - "documentation_review_md" must contain:
-            - summary
-            - change categories
-            - review mode
-            - ownership model
-            - reviewed inputs
-            - changed files
-            - concise AI analysis notes based only on the provided input
-          """
-
-          request_body = {
-              "model": os.environ["DOC_AGENT_MODEL"],
-              "messages": [
-                  {"role": "system", "content": system_prompt},
-                  {"role": "user", "content": prompt_input},
-              ],
-          }
-
-          request = urllib.request.Request(
-              url="https://models.inference.ai.azure.com/chat/completions",
-              data=json.dumps(request_body).encode("utf-8"),
-              headers={
-                  "Content-Type": "application/json",
-                  "Authorization": f"Bearer {os.environ['GITHUB_TOKEN']}",
-              },
-              method="POST",
-          )
-
-          try:
-              with urllib.request.urlopen(request) as response:
-                  response_payload = json.loads(response.read().decode("utf-8"))
-          except urllib.error.HTTPError as error:
-              error_body = error.read().decode("utf-8", errors="replace")
-              print(f"GitHub Models request failed: HTTP {error.code}")
-              print(error_body)
-              raise
-
-          content = response_payload["choices"][0]["message"]["content"]
-
-          if isinstance(content, list):
-              content = "".join(
-                  item.get("text", "")
-                  for item in content
-                  if isinstance(item, dict)
-              )
-
-          content = content.strip()
-
-          if content.startswith("```"):
-              lines = content.splitlines()
-              if len(lines) >= 3:
-                  content = "\n".join(lines[1:-1]).strip()
-
-          generated = json.loads(content)
-
-          home_md = generated["home_md"].rstrip() + "\n"
-          documentation_review_md = generated["documentation_review_md"].rstrip() + "\n"
-
-          staging_dir = pathlib.Path(os.environ["WIKI_STAGING_DIR"])
-          staging_dir.mkdir(parents=True, exist_ok=True)
-
-          (staging_dir / "Home.md").write_text(home_md, encoding="utf-8")
-          (staging_dir / "Documentation-Review.md").write_text(documentation_review_md, encoding="utf-8")
-          PY
+          jq -r '.documentation_review_md' "$json_output_file" > "${{ env.WIKI_STAGING_DIR }}/Documentation-Review.md"
+          printf '\n' >> "${{ env.WIKI_STAGING_DIR }}/Documentation-Review.md"
 
           cat > "${{ env.WIKI_STAGING_DIR }}/_Sidebar.md" <<'EOF'
           <!-- page-ownership: automation-managed -->
