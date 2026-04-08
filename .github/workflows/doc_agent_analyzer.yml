@@ -1,0 +1,403 @@
+name: Doc Agent Analyzer
+
+#------------------------------------------------
+# Workflow Triggers
+#------------------------------------------------
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'README.md'
+      - 'QT_Project/**'
+      - 'QT_Project_Tests/**'
+      - 'Configs/**'
+  workflow_dispatch:
+    inputs:
+      full_scan:
+        description: Analyze repository documentation inputs with AI and refresh wiki staging
+        required: false
+        default: true
+        type: boolean
+
+#------------------------------------------------
+# Permissions
+#------------------------------------------------
+permissions:
+  contents: write
+  pull-requests: write
+  models: read
+
+#------------------------------------------------
+# Environment Variables
+#------------------------------------------------
+env:
+  WIKI_STAGING_DIR: .github/wiki-staging
+  WIKI_MANIFEST_FILE: .wiki-managed-files
+  DOC_AGENT_MODEL: openai/gpt-4.1
+
+#------------------------------------------------
+# Workflow jobs
+#------------------------------------------------
+jobs:
+  doc_agent_analyzer:
+    name: Doc-Agent Analyze and Stage Wiki Content
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout the repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      #------------------------------------------------
+      # Doc-Agent
+      #------------------------------------------------
+      - name: Doc-Agent - Detect documentation inputs to analyze
+        id: doc_agent_detect
+        shell: bash
+        run: |
+          before_sha="${{ github.event.before }}"
+          after_sha="${{ github.sha }}"
+          zero_sha="0000000000000000000000000000000000000000"
+          full_scan_requested=false
+          changed_files=""
+
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.full_scan }}" == "true" ]]; then
+            full_scan_requested=true
+            changed_files="$(git ls-files README.md QT_Project QT_Project_Tests Configs 2>/dev/null || true)"
+          else
+            if [[ -n "$before_sha" && "$before_sha" != "$zero_sha" ]]; then
+              changed_files="$(git diff --name-only "$before_sha" "$after_sha")"
+            else
+              changed_files="$(git ls-files README.md QT_Project QT_Project_Tests Configs 2>/dev/null || true)"
+            fi
+          fi
+
+          readme_changed=false
+          source_comments_changed=false
+          tests_changed=false
+          configs_changed=false
+          relevant_change_detected=false
+
+          while IFS= read -r file; do
+            if [[ -n "$file" ]]; then
+              case "$file" in
+                README.md)
+                  readme_changed=true
+                  relevant_change_detected=true
+                  ;;
+                QT_Project/*)
+                  source_comments_changed=true
+                  relevant_change_detected=true
+                  ;;
+                QT_Project_Tests/*)
+                  tests_changed=true
+                  relevant_change_detected=true
+                  ;;
+                Configs/*)
+                  configs_changed=true
+                  relevant_change_detected=true
+                  ;;
+              esac
+            fi
+          done <<< "$changed_files"
+
+          {
+            echo "full_scan_requested=$full_scan_requested"
+            echo "readme_changed=$readme_changed"
+            echo "source_comments_changed=$source_comments_changed"
+            echo "tests_changed=$tests_changed"
+            echo "configs_changed=$configs_changed"
+            echo "relevant_change_detected=$relevant_change_detected"
+            echo "changed_files<<EOF"
+            echo "$changed_files"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Doc-Agent - Build AI analysis input
+        if: steps.doc_agent_detect.outputs.relevant_change_detected == 'true'
+        shell: bash
+        env:
+          FULL_SCAN_REQUESTED: ${{ steps.doc_agent_detect.outputs.full_scan_requested }}
+          README_CHANGED: ${{ steps.doc_agent_detect.outputs.readme_changed }}
+          SOURCE_COMMENTS_CHANGED: ${{ steps.doc_agent_detect.outputs.source_comments_changed }}
+          TESTS_CHANGED: ${{ steps.doc_agent_detect.outputs.tests_changed }}
+          CONFIGS_CHANGED: ${{ steps.doc_agent_detect.outputs.configs_changed }}
+          CHANGED_FILES: ${{ steps.doc_agent_detect.outputs.changed_files }}
+        run: |
+          python - <<'PY'
+          import os
+          import pathlib
+
+          root = pathlib.Path(".")
+          output_path = pathlib.Path(os.environ["RUNNER_TEMP"]) / "doc_agent_input.md"
+
+          changed_files = [
+              line.strip()
+              for line in os.environ.get("CHANGED_FILES", "").splitlines()
+              if line.strip()
+          ]
+
+          max_total_chars = 120000
+          max_file_chars = 6000
+
+          total_chars = 0
+          sections = []
+          included_files = set()
+
+          metadata = [
+              "# Doc-Agent Analysis Input",
+              "",
+              f"- Repository: {os.environ.get('GITHUB_REPOSITORY', '')}",
+              f"- Commit: {os.environ.get('GITHUB_SHA', '')}",
+              f"- Full scan requested: {os.environ.get('FULL_SCAN_REQUESTED', 'false')}",
+              f"- README changed: {os.environ.get('README_CHANGED', 'false')}",
+              f"- Source comments changed: {os.environ.get('SOURCE_COMMENTS_CHANGED', 'false')}",
+              f"- Tests changed: {os.environ.get('TESTS_CHANGED', 'false')}",
+              f"- Configs changed: {os.environ.get('CONFIGS_CHANGED', 'false')}",
+              "",
+              "## Changed Files",
+          ]
+
+          if changed_files:
+              metadata.extend(f"- `{file_path}`" for file_path in changed_files)
+          else:
+              metadata.append("- None")
+
+          sections.append("\n".join(metadata))
+          total_chars += len(sections[0])
+
+          def is_monitored(file_path: str) -> bool:
+              return file_path == "README.md" or file_path.startswith(("QT_Project/", "QT_Project_Tests/", "Configs/"))
+
+          def add_file(file_path: str) -> None:
+              global total_chars
+              if file_path in included_files or not is_monitored(file_path):
+                  return
+
+              path = root / file_path
+              if not path.is_file():
+                  return
+
+              text = path.read_text(encoding="utf-8", errors="replace")
+              excerpt = text[:max_file_chars].rstrip()
+
+              section = "\n".join(
+                  [
+                      "",
+                      f"## File: {file_path}",
+                      "",
+                      "```text",
+                      excerpt,
+                      "```",
+                  ]
+              )
+
+              projected_total = total_chars + len(section)
+              if projected_total > max_total_chars:
+                  return
+
+              sections.append(section)
+              included_files.add(file_path)
+              total_chars = projected_total
+
+          add_file("README.md")
+
+          for changed_file in changed_files:
+              add_file(changed_file)
+
+          output_path.write_text("\n".join(sections).rstrip() + "\n", encoding="utf-8")
+          print(f"AI input written to {output_path}")
+          print(f"Included files: {len(included_files)}")
+          PY
+
+      - name: Doc-Agent - Generate reviewable wiki staging with GitHub AI
+        if: steps.doc_agent_detect.outputs.relevant_change_detected == 'true'
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          FULL_SCAN_REQUESTED: ${{ steps.doc_agent_detect.outputs.full_scan_requested }}
+          README_CHANGED: ${{ steps.doc_agent_detect.outputs.readme_changed }}
+          SOURCE_COMMENTS_CHANGED: ${{ steps.doc_agent_detect.outputs.source_comments_changed }}
+          TESTS_CHANGED: ${{ steps.doc_agent_detect.outputs.tests_changed }}
+          CONFIGS_CHANGED: ${{ steps.doc_agent_detect.outputs.configs_changed }}
+          CHANGED_FILES: ${{ steps.doc_agent_detect.outputs.changed_files }}
+        run: |
+          rm -rf "${{ env.WIKI_STAGING_DIR }}"
+          mkdir -p "${{ env.WIKI_STAGING_DIR }}"
+
+          python - <<'PY'
+          import json
+          import os
+          import pathlib
+          import urllib.request
+
+          input_path = pathlib.Path(os.environ["RUNNER_TEMP"]) / "doc_agent_input.md"
+          prompt_input = input_path.read_text(encoding="utf-8")
+
+          system_prompt = """
+          You are the repository Doc-Agent Analyzer.
+
+          Your job is to analyze repository documentation inputs and produce concise, reviewable wiki staging content.
+
+          Output rules:
+          - Return strict JSON only.
+          - Do not use Markdown code fences.
+          - Use exactly these keys:
+            - "home_md"
+            - "documentation_review_md"
+          - Write all documentation in English.
+          - Keep content focused, minimal, and reviewable.
+          - Do not invent build details that are not grounded in the input.
+          - Do not mention GitHub Pages.
+          - The wiki is published only from reviewed staging content in the main repository.
+          - The Doc-Agent Analyzer may analyze, correct, and adapt content, but must not publish directly.
+          - The Wiki-Agent is publish-only.
+
+          Content rules:
+          - "home_md" must start with:
+            <!-- page-ownership: automation-managed -->
+            <!-- manual-pages: pages not listed in .wiki-managed-files are treated as manual-only -->
+          - "documentation_review_md" must start with:
+            <!-- page-ownership: automation-managed -->
+          - "home_md" must contain:
+            - title
+            - short overview based on repository inputs
+            - navigation with Home and Documentation-Review only
+            - ownership section
+            - current review snapshot
+            - repository sources
+          - "documentation_review_md" must contain:
+            - summary
+            - change categories
+            - review mode
+            - ownership model
+            - reviewed inputs
+            - changed files
+            - concise AI analysis notes based only on the provided input
+          """
+
+          user_prompt = prompt_input
+
+          request_body = {
+              "model": os.environ["DOC_AGENT_MODEL"],
+              "messages": [
+                  {"role": "system", "content": system_prompt},
+                  {"role": "user", "content": user_prompt},
+              ],
+              "temperature": 0.2,
+          }
+
+          request = urllib.request.Request(
+              url="https://models.inference.ai.azure.com/chat/completions",
+              data=json.dumps(request_body).encode("utf-8"),
+              headers={
+                  "Content-Type": "application/json",
+                  "Authorization": f"Bearer {os.environ['GITHUB_TOKEN']}",
+              },
+              method="POST",
+          )
+
+          with urllib.request.urlopen(request) as response:
+              response_payload = json.loads(response.read().decode("utf-8"))
+
+          content = response_payload["choices"][0]["message"]["content"]
+
+          if isinstance(content, list):
+              content = "".join(
+                  item.get("text", "")
+                  for item in content
+                  if isinstance(item, dict)
+              )
+
+          content = content.strip()
+
+          if content.startswith("```"):
+              lines = content.splitlines()
+              if len(lines) >= 3:
+                  content = "\n".join(lines[1:-1]).strip()
+
+          generated = json.loads(content)
+
+          home_md = generated["home_md"].rstrip() + "\n"
+          documentation_review_md = generated["documentation_review_md"].rstrip() + "\n"
+
+          staging_dir = pathlib.Path(os.environ["WIKI_STAGING_DIR"])
+          staging_dir.mkdir(parents=True, exist_ok=True)
+
+          (staging_dir / "Home.md").write_text(home_md, encoding="utf-8")
+          (staging_dir / "Documentation-Review.md").write_text(documentation_review_md, encoding="utf-8")
+          PY
+
+          cat > "${{ env.WIKI_STAGING_DIR }}/_Sidebar.md" <<'EOF'
+          <!-- page-ownership: automation-managed -->
+
+          # Wiki
+
+          - [[Home]]
+          - [[Documentation-Review]]
+          EOF
+
+          cat > "${{ env.WIKI_STAGING_DIR }}/${{ env.WIKI_MANIFEST_FILE }}" <<'EOF'
+          Home.md
+          Documentation-Review.md
+          _Sidebar.md
+          EOF
+
+      - name: Doc-Agent - Validate staged wiki content
+        if: steps.doc_agent_detect.outputs.relevant_change_detected == 'true'
+        shell: bash
+        run: |
+          required_files=(
+            "${{ env.WIKI_STAGING_DIR }}/Home.md"
+            "${{ env.WIKI_STAGING_DIR }}/Documentation-Review.md"
+            "${{ env.WIKI_STAGING_DIR }}/_Sidebar.md"
+            "${{ env.WIKI_STAGING_DIR }}/${{ env.WIKI_MANIFEST_FILE }}"
+          )
+
+          for file in "${required_files[@]}"; do
+            if [[ ! -s "$file" ]]; then
+              echo "Required staging file is missing or empty: $file"
+              exit 1
+            fi
+          done
+
+          expected_manifest=$'Home.md\nDocumentation-Review.md\n_Sidebar.md'
+          actual_manifest="$(cat "${{ env.WIKI_STAGING_DIR }}/${{ env.WIKI_MANIFEST_FILE }}")"
+
+          if [[ "$actual_manifest" != "$expected_manifest" ]]; then
+            echo "Unexpected manifest content."
+            exit 1
+          fi
+
+      - name: Doc-Agent - Create or update staging pull request
+        if: steps.doc_agent_detect.outputs.relevant_change_detected == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ github.token }}
+          commit-message: "docs(wiki-staging): refresh AI-analyzed wiki content"
+          branch: automation/wiki-staging
+          delete-branch: true
+          title: "docs(wiki-staging): refresh AI-analyzed wiki content"
+          body: |
+            ## Summary
+
+            This pull request contains Doc-Agent AI-analyzed wiki staging content for review.
+
+            ## Included staging files
+
+            - `.github/wiki-staging/Home.md`
+            - `.github/wiki-staging/Documentation-Review.md`
+            - `.github/wiki-staging/_Sidebar.md`
+            - `.github/wiki-staging/.wiki-managed-files`
+
+            ## Review notes
+
+            - Review the staged wiki content in this pull request.
+            - Merge only if the prepared content is suitable for wiki publication.
+            - After merge, the Wiki-Agent will publish the approved staging content to the GitHub Wiki.
+          base: main
+          add-paths: |
+            .github/wiki-staging/**
