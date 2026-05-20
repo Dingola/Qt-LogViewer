@@ -1,7 +1,9 @@
 #include "Qt-LogViewer/Views/App/LogLevelFilterItemWidget.h"
 
-#include "Qt-LogViewer/Services/NumberFormatUtils.h"
+#include "QtWidgetsCommonLib/Utils/NumberFormatUtils.h"
 #include "ui_LogLevelFilterItemWidget.h"
+
+using QtWidgetsCommonLib::NumberFormatUtils;
 
 /**
  * @brief Constructs a LogLevelFilterItemWidget object.
