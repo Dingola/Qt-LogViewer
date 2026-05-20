@@ -1,19 +1,13 @@
 <!-- page-ownership: automation-managed -->
-
 # Configuration
 
 ## CMake Options
-- `<PROJECT_NAME>_BUILD_TEST_PROJECT`: Boolean option to enable or disable building the test project.
+- `<PROJECT_NAME>_BUILD_TEST_PROJECT`: Boolean variable to enable or disable the test project during the build process.
 
 ## Environment Variables
-- `PROJECT_NAME`: Specifies the main project name.
-- `PROJECT_VER`, `PROJECT_VER_MAJOR`, `PROJECT_VER_MINOR`, `PROJECT_VER_PATCH`: Define the project version and its components.
+No specific environment variables are mentioned in the provided input.
 
 ## Tooling
-- **Code Style and Linting**:
-  - `.clang-format` and `.clang-tidy` for code style and static analysis.
-- **Documentation**:
-  - `Doxyfile.in` for generating documentation using Doxygen.
-- **Third-Party Libraries**:
-  - `SimpleQtLogger` and `QtWidgetsCommonLib` are integrated via CMake scripts.
+- CMake is used for project configuration and build management.
+- The project relies on the Qt framework for UI and application logic.
 
