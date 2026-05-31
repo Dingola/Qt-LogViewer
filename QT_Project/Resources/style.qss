@@ -905,20 +905,19 @@ DockWidget QToolButton#dock_title_bar_close_button:pressed {
 
 /* === Dialogs === */
 #Dialog {
-    background: @Neutral-1;
-    border: 1px solid @ColorBorder;
-    qproperty-border_radius: 16;
-    border-radius: 16px;
+    qproperty-background_color: @Neutral-1;
+    qproperty-border_color: @ColorBorder;
+    qproperty-border_width: 2;
+    qproperty-border_radius: 6;
 }
 
 #DialogHeaderWidget {
-    background: @ColorDockHeader;
-    border-top-left-radius: 16px;
-    border-top-right-radius: 16px;
+    background-color: transparent;
+    border-top-left-radius: 0px;
+    border-top-right-radius: 0px;
     border-bottom-left-radius: 0px;
     border-bottom-right-radius: 0px;
     border-bottom: 1px solid @ColorBorder;
-    padding: 8px 16px;
 }
 
 #DialogHeaderWidget QLabel {
@@ -940,6 +939,10 @@ DockWidget QToolButton#dock_title_bar_close_button:pressed {
 
 #DialogHeaderCloseButton:hover {
     background: @ColorButtonBackgroundHover;
+}
+
+#DialogContent {
+    background: transparent;
 }
 
 /* === Pie Chart === */

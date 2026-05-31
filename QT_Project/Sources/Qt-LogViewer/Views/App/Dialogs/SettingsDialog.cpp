@@ -7,18 +7,15 @@
 
 /**
  * @brief Constructs a SettingsDialog and initializes the UI.
+ * @param settings The settings object for managing application preferences.
  * @param parent The parent widget, or nullptr.
  */
 SettingsDialog::SettingsDialog(LogViewerSettings* settings, QWidget* parent)
-    : Dialog(tr("Settings"), parent), ui(new Ui::SettingsDialog), m_settings(settings)
+    : Dialog(tr("Settings"), parent, Dialog::LayoutMode::External),
+      ui(new Ui::SettingsDialog),
+      m_settings(settings)
 {
     ui->setupUi(this);
-
-    auto* vlayout = qobject_cast<QVBoxLayout*>(layout());
-    if (vlayout)
-    {
-        vlayout->insertWidget(0, header_widget());
-    }
 
     connect(ui->pushButtonApply, &QPushButton::clicked, this, &SettingsDialog::onApply);
     connect(ui->pushButtonOk, &QPushButton::clicked, this, &SettingsDialog::onOk);

@@ -26,6 +26,12 @@ class DialogHeaderWidget: public QWidget
         explicit DialogHeaderWidget(const QString& title, QWidget* parent = nullptr);
 
         /**
+         * @brief Returns the current title.
+         * @return The current title text.
+         */
+        [[nodiscard]] auto get_title() const -> QString;
+
+        /**
          * @brief Sets the title of the header.
          * @param title The new title to display.
          */

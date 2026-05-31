@@ -18,6 +18,8 @@ DialogHeaderWidget::DialogHeaderWidget(const QString& title, QWidget* parent)
       m_close_button(new QPushButton(this)),
       m_layout(new QHBoxLayout(this))
 {
+    setAttribute(Qt::WA_StyledBackground, true);
+
     m_layout->addWidget(m_title_label);
     m_layout->addStretch();
     m_layout->addWidget(m_close_button);
@@ -30,6 +32,15 @@ DialogHeaderWidget::DialogHeaderWidget(const QString& title, QWidget* parent)
     m_close_button->setIcon(style()->standardIcon(QStyle::SP_TitleBarCloseButton, nullptr, this));
 
     connect(m_close_button, &QPushButton::clicked, this, &DialogHeaderWidget::close_requested);
+}
+
+/**
+ * @brief Returns the current title.
+ * @return The current title text.
+ */
+auto DialogHeaderWidget::get_title() const -> QString
+{
+    return m_title_label->text();
 }
 
 /**
