@@ -180,28 +180,9 @@ jobs:
             total_chars=$((total_chars + text_len))
           }
 
-          normalize_inventory_entry() {
-            local entry_name="$1"
-
-            entry_name="${entry_name%.hpp}"
-            entry_name="${entry_name%.h}"
-            entry_name="${entry_name%.cpp}"
-            entry_name="${entry_name%.cxx}"
-            entry_name="${entry_name%.ui}"
-            entry_name="${entry_name%.cmake}"
-            entry_name="${entry_name%.yml}"
-            entry_name="${entry_name%.yaml}"
-            entry_name="${entry_name%.json}"
-            entry_name="${entry_name%.xml}"
-            entry_name="${entry_name%.in}"
-
-            printf "%s" "$entry_name"
-          }
-
           add_inventory_entry() {
             local file_path="$1"
             local category=""
-            local entry_name=""
 
             case "$file_path" in
               QT_Project/Headers/Qt-LogViewer/Controllers/*|QT_Project/Sources/Qt-LogViewer/Controllers/*)
@@ -237,12 +218,7 @@ jobs:
             esac
 
             if [[ -n "$category" ]]; then
-              entry_name="$(basename "$file_path")"
-              entry_name="$(normalize_inventory_entry "$entry_name")"
-
-              if [[ -n "$entry_name" ]]; then
-                printf "%s\n" "$entry_name" >> "${inventory_dir}/${category}.txt"
-              fi
+              printf "%s\n" "$file_path" >> "${inventory_dir}/${category}.txt"
             fi
           }
 
@@ -499,6 +475,11 @@ jobs:
             ## Included staging files
 
             - `.github/wiki-staging/Home.md`
+            - `.github/wiki-staging/Build-and-Run.md`
+            - `.github/wiki-staging/Project-Structure.md`
+            - `.github/wiki-staging/Architecture.md`
+            - `.github/wiki-staging/Testing.md`
+            - `.github/wiki-staging/Configuration.md`
             - `.github/wiki-staging/Documentation-Review.md`
             - `.github/wiki-staging/_Sidebar.md`
             - `.github/wiki-staging/.wiki-managed-files`
