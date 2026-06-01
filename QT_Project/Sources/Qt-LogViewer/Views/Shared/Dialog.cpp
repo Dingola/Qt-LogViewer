@@ -10,6 +10,7 @@
 #include "Qt-LogViewer/Views/Shared/Dialog.h"
 
 #include <QDebug>
+#include <QHoverEvent>
 #include <QPainter>
 #include <QPainterPath>
 #include <QPen>
@@ -26,7 +27,9 @@ Dialog::Dialog(const QString& title, QWidget* parent, LayoutMode mode)
 {
     setWindowFlags(Qt::FramelessWindowHint | Qt::Dialog);
     setAttribute(Qt::WA_TranslucentBackground, true);
+    setAttribute(Qt::WA_Hover, true);
     setObjectName("Dialog");
+    setMouseTracking(true);
 
     connect(m_header_widget, &DialogHeaderWidget::close_requested, this, &QDialog::reject);
 
@@ -135,6 +138,28 @@ auto Dialog::set_border_width(int width) -> void
 }
 
 /**
+ * @brief Returns whether the dialog is resizable.
+ * @return true if resizable, false otherwise.
+ */
+auto Dialog::is_resizable() const -> bool
+{
+    return m_resizable;
+}
+
+/**
+ * @brief Sets whether the dialog is resizable.
+ * @param resizable true to enable resizing, false to disable.
+ */
+auto Dialog::set_resizable(bool resizable) -> void
+{
+    m_resizable = resizable;
+    if (!m_resizable)
+    {
+        setCursor(Qt::ArrowCursor);
+    }
+}
+
+/**
  * @brief Returns the title of the dialog header.
  * @return The current title text.
  */
@@ -228,44 +253,94 @@ void Dialog::showEvent(QShowEvent* event)
 }
 
 /**
- * @brief Handles mouse press events for drag-move.
+ * @brief Handles mouse press events for drag-move and resize.
  * @param event The mouse event.
  */
 void Dialog::mousePressEvent(QMouseEvent* event)
 {
-    if (event->button() == Qt::LeftButton && m_header_widget->isVisible() &&
-        m_header_widget->rect().contains(m_header_widget->mapFromParent(event->pos())))
+    if (event->button() == Qt::LeftButton)
     {
-        m_dragging = true;
-        m_drag_position = event->globalPosition().toPoint() - frameGeometry().topLeft();
-        event->accept();
-    }
+        m_resize_edges = get_resize_edge(event->pos());
 
-    QDialog::mousePressEvent(event);
+        if (m_resizable && m_resize_edges != Qt::Edges())
+        {
+            m_resizing = true;
+            m_resize_start_pos = event->globalPosition().toPoint();
+            m_resize_start_geometry = geometry();
+            event->accept();
+        }
+        else if (is_in_draggable_header_area(event->pos()))
+        {
+            m_dragging = true;
+            m_drag_position = event->globalPosition().toPoint() - frameGeometry().topLeft();
+            event->accept();
+        }
+        else
+        {
+            QDialog::mousePressEvent(event);
+        }
+    }
+    else
+    {
+        QDialog::mousePressEvent(event);
+    }
 }
 
 /**
- * @brief Handles mouse move events for drag-move.
+ * @brief Handles mouse move events for drag-move and resize.
  * @param event The mouse event.
  */
 void Dialog::mouseMoveEvent(QMouseEvent* event)
 {
-    if (m_dragging && (event->buttons() & Qt::LeftButton))
+    if (m_resizing && (event->buttons() & Qt::LeftButton))
+    {
+        QPoint delta = event->globalPosition().toPoint() - m_resize_start_pos;
+        QRect new_geometry = m_resize_start_geometry;
+
+        if (m_resize_edges & Qt::LeftEdge)
+        {
+            new_geometry.setLeft(m_resize_start_geometry.left() + delta.x());
+        }
+        if (m_resize_edges & Qt::RightEdge)
+        {
+            new_geometry.setRight(m_resize_start_geometry.right() + delta.x());
+        }
+        if (m_resize_edges & Qt::TopEdge)
+        {
+            new_geometry.setTop(m_resize_start_geometry.top() + delta.y());
+        }
+        if (m_resize_edges & Qt::BottomEdge)
+        {
+            new_geometry.setBottom(m_resize_start_geometry.bottom() + delta.y());
+        }
+
+        if (new_geometry.width() >= minimumWidth() && new_geometry.height() >= minimumHeight())
+        {
+            setGeometry(new_geometry);
+        }
+
+        event->accept();
+    }
+    else if (m_dragging && (event->buttons() & Qt::LeftButton))
     {
         move(event->globalPosition().toPoint() - m_drag_position);
         event->accept();
     }
-
-    QDialog::mouseMoveEvent(event);
+    else
+    {
+        QDialog::mouseMoveEvent(event);
+    }
 }
 
 /**
- * @brief Handles mouse release events for drag-move.
+ * @brief Handles mouse release events for drag-move and resize.
  * @param event The mouse event.
  */
 void Dialog::mouseReleaseEvent(QMouseEvent* event)
 {
     m_dragging = false;
+    m_resizing = false;
+    m_resize_edges = Qt::Edges();
     QDialog::mouseReleaseEvent(event);
 }
 
@@ -277,6 +352,32 @@ void Dialog::resizeEvent(QResizeEvent* event)
 {
     QDialog::resizeEvent(event);
     update();
+}
+
+/**
+ * @brief Handles hover events to update cursor for resize.
+ * @param event The hover event.
+ */
+bool Dialog::event(QEvent* event)
+{
+    if (event->type() == QEvent::HoverMove)
+    {
+        auto* hover_event = static_cast<QHoverEvent*>(event);
+        if (m_resizable && !m_dragging && !m_resizing)
+        {
+            Qt::Edges edges = get_resize_edge(hover_event->position().toPoint());
+            update_cursor_shape(edges);
+        }
+    }
+    else if (event->type() == QEvent::Leave)
+    {
+        if (m_resizable && !m_dragging && !m_resizing)
+        {
+            setCursor(Qt::ArrowCursor);
+        }
+    }
+
+    return QDialog::event(event);
 }
 
 /**
@@ -333,4 +434,85 @@ auto Dialog::initialize_header_for_existing_layout() -> void
     {
         qWarning() << "Dialog: No QVBoxLayout found. Header cannot be added.";
     }
+}
+
+/**
+ * @brief Determines the resize edge from cursor position.
+ * @param pos The cursor position relative to the dialog.
+ * @return Qt::Edges flags indicating which edges are being resized.
+ */
+auto Dialog::get_resize_edge(const QPoint& pos) const -> Qt::Edges
+{
+    if (!m_resizable)
+    {
+        return Qt::Edges();
+    }
+
+    Qt::Edges edges;
+    const QRect rect_area = rect();
+
+    if (pos.x() <= RESIZE_MARGIN)
+    {
+        edges |= Qt::LeftEdge;
+    }
+    if (pos.x() >= rect_area.width() - RESIZE_MARGIN)
+    {
+        edges |= Qt::RightEdge;
+    }
+    if (pos.y() <= RESIZE_MARGIN)
+    {
+        edges |= Qt::TopEdge;
+    }
+    if (pos.y() >= rect_area.height() - RESIZE_MARGIN)
+    {
+        edges |= Qt::BottomEdge;
+    }
+
+    return edges;
+}
+
+/**
+ * @brief Updates the cursor shape based on resize edge.
+ * @param edges The resize edges.
+ */
+auto Dialog::update_cursor_shape(Qt::Edges edges) -> void
+{
+    if (m_resizable)
+    {
+        if (edges == (Qt::LeftEdge | Qt::TopEdge) || edges == (Qt::RightEdge | Qt::BottomEdge))
+        {
+            setCursor(Qt::SizeFDiagCursor);
+        }
+        else if (edges == (Qt::RightEdge | Qt::TopEdge) || edges == (Qt::LeftEdge | Qt::BottomEdge))
+        {
+            setCursor(Qt::SizeBDiagCursor);
+        }
+        else if (edges & (Qt::LeftEdge | Qt::RightEdge))
+        {
+            setCursor(Qt::SizeHorCursor);
+        }
+        else if (edges & (Qt::TopEdge | Qt::BottomEdge))
+        {
+            setCursor(Qt::SizeVerCursor);
+        }
+        else
+        {
+            setCursor(Qt::ArrowCursor);
+        }
+    }
+    else
+    {
+        setCursor(Qt::ArrowCursor);
+    }
+}
+
+/**
+ * @brief Checks if a point is within the header area for drag detection.
+ * @param pos The position to check (dialog coordinates).
+ * @return true if the point is in a draggable header area, false otherwise.
+ */
+auto Dialog::is_in_draggable_header_area(const QPoint& pos) const -> bool
+{
+    return m_header_widget->isVisible() &&
+           m_header_widget->rect().contains(m_header_widget->mapFromParent(pos));
 }

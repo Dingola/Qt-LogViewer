@@ -14,7 +14,7 @@
  *
  * Inherit from this class for all dialogs that require a custom header (with close button)
  * and frameless window style. The header is styled via QSS and emits a signal when closed.
- * The dialog can be moved by dragging the header.
+ * The dialog can be moved by dragging the header and resized from edges/corners.
  *
  * This class provides two usage modes:
  * 1. **Managed Layout Mode**: Dialog manages the layout and header automatically.
@@ -59,6 +59,7 @@ class Dialog: public QDialog
         Q_PROPERTY(QColor background_color READ get_background_color WRITE set_background_color)
         Q_PROPERTY(QColor border_color READ get_border_color WRITE set_border_color)
         Q_PROPERTY(int border_width READ get_border_width WRITE set_border_width)
+        Q_PROPERTY(bool resizable READ is_resizable WRITE set_resizable)
 
     public:
         /**
@@ -146,6 +147,18 @@ class Dialog: public QDialog
         auto set_border_width(int width) -> void;
 
         /**
+         * @brief Returns whether the dialog is resizable.
+         * @return true if resizable, false otherwise.
+         */
+        [[nodiscard]] auto is_resizable() const -> bool;
+
+        /**
+         * @brief Sets whether the dialog is resizable.
+         * @param resizable true to enable resizing, false to disable.
+         */
+        auto set_resizable(bool resizable) -> void;
+
+        /**
          * @brief Returns the title of the dialog header.
          * @return The current title text.
          */
@@ -177,19 +190,19 @@ class Dialog: public QDialog
         void showEvent(QShowEvent* event) override;
 
         /**
-         * @brief Handles mouse press events for drag-move.
+         * @brief Handles mouse press events for drag-move and resize.
          * @param event The mouse event.
          */
         void mousePressEvent(QMouseEvent* event) override;
 
         /**
-         * @brief Handles mouse move events for drag-move.
+         * @brief Handles mouse move events for drag-move and resize.
          * @param event The mouse event.
          */
         void mouseMoveEvent(QMouseEvent* event) override;
 
         /**
-         * @brief Handles mouse release events for drag-move.
+         * @brief Handles mouse release events for drag-move and resize.
          * @param event The mouse event.
          */
         void mouseReleaseEvent(QMouseEvent* event) override;
@@ -199,6 +212,12 @@ class Dialog: public QDialog
          * @param event The resize event.
          */
         void resizeEvent(QResizeEvent* event) override;
+
+        /**
+         * @brief Handles hover events to update cursor for resize.
+         * @param event The hover event.
+         */
+        bool event(QEvent* event) override;
 
         /**
          * @brief Returns the header widget.
@@ -217,9 +236,30 @@ class Dialog: public QDialog
          */
         auto initialize_header_for_existing_layout() -> void;
 
+        /**
+         * @brief Determines the resize edge from cursor position.
+         * @param pos The cursor position relative to the dialog.
+         * @return Qt::Edges flags indicating which edges are being resized.
+         */
+        [[nodiscard]] auto get_resize_edge(const QPoint& pos) const -> Qt::Edges;
+
+        /**
+         * @brief Updates the cursor shape based on resize edge.
+         * @param edges The resize edges.
+         */
+        auto update_cursor_shape(Qt::Edges edges) -> void;
+
+        /**
+         * @brief Checks if a point is within the header area for drag detection.
+         * @param pos The position to check (dialog coordinates).
+         * @return true if the point is in a draggable header area, false otherwise.
+         */
+        [[nodiscard]] auto is_in_draggable_header_area(const QPoint& pos) const -> bool;
+
     private:
         static constexpr int DEFAULT_BORDER_RADIUS = 0;  ///< Default border radius in pixels.
         static constexpr int DEFAULT_BORDER_WIDTH = 2;   ///< Default border width in pixels.
+        static constexpr int RESIZE_MARGIN = 8;          ///< Margin for resize detection in pixels.
 
         LayoutMode m_layout_mode = LayoutMode::Managed;  ///< Layout management mode.
         int m_border_radius = DEFAULT_BORDER_RADIUS;     ///< Border radius for rounded corners.
@@ -231,5 +271,10 @@ class Dialog: public QDialog
         QVBoxLayout* m_content_layout = nullptr;         ///< Content layout (Managed mode only).
         QPoint m_drag_position;                          ///< Position for drag-move.
         bool m_dragging = false;                         ///< Dragging state.
+        bool m_resizing = false;                         ///< Resizing state.
+        bool m_resizable = true;                         ///< Whether dialog is resizable.
+        Qt::Edges m_resize_edges = Qt::Edges();          ///< Current resize edges.
+        QPoint m_resize_start_pos;                       ///< Start position for resize.
+        QRect m_resize_start_geometry;                   ///< Start geometry for resize.
         bool m_header_initialized = false;               ///< Whether header has been initialized.
 };
