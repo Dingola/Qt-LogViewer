@@ -77,6 +77,11 @@ class SettingsDialog: public Dialog
 
     private:
         /**
+         * @brief Initializes the category list with items.
+         */
+        auto setup_categories() -> void;
+
+        /**
          * @brief Populates the language combo box.
          */
         auto load_available_languages() -> void;
@@ -120,6 +125,7 @@ class SettingsDialog: public Dialog
         auto onApply() -> void;
         auto onOk() -> void;
         auto onCancel() -> void;
+        auto onCategoryChanged(int index) -> void;
 
     private:
         Ui::SettingsDialog* ui =

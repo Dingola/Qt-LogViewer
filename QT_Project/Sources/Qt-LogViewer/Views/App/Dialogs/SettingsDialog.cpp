@@ -17,6 +17,10 @@ SettingsDialog::SettingsDialog(LogViewerSettings* settings, QWidget* parent)
 {
     ui->setupUi(this);
 
+    setup_categories();
+
+    connect(ui->listWidgetCategories, &QListWidget::currentRowChanged, this,
+            &SettingsDialog::onCategoryChanged);
     connect(ui->pushButtonApply, &QPushButton::clicked, this, &SettingsDialog::onApply);
     connect(ui->pushButtonOk, &QPushButton::clicked, this, &SettingsDialog::onOk);
     connect(ui->pushButtonCancel, &QPushButton::clicked, this, &SettingsDialog::onCancel);
@@ -39,6 +43,9 @@ SettingsDialog::SettingsDialog(LogViewerSettings* settings, QWidget* parent)
 
     m_applied_language = selected_language();
     m_applied_theme = selected_theme();
+
+    // Set initial category
+    ui->listWidgetCategories->setCurrentRow(0);
 }
 
 /**
@@ -47,6 +54,16 @@ SettingsDialog::SettingsDialog(LogViewerSettings* settings, QWidget* parent)
 SettingsDialog::~SettingsDialog()
 {
     delete ui;
+}
+
+/**
+ * @brief Initializes the category list with items.
+ */
+auto SettingsDialog::setup_categories() -> void
+{
+    ui->listWidgetCategories->clear();
+    ui->listWidgetCategories->addItem(tr("General"));
+    ui->listWidgetCategories->addItem(tr("Appearance"));
 }
 
 /**
@@ -195,6 +212,15 @@ auto SettingsDialog::onCancel() -> void
 }
 
 /**
+ * @brief Slot: Handles category selection change.
+ * @param index The index of the selected category.
+ */
+auto SettingsDialog::onCategoryChanged(int index) -> void
+{
+    ui->stackedWidgetContent->setCurrentIndex(index);
+}
+
+/**
  * @brief Applies the changes and emits signals if needed.
  */
 auto SettingsDialog::apply_changes() -> void
@@ -244,6 +270,7 @@ auto SettingsDialog::changeEvent(QEvent* event) -> void
     if (event != nullptr && event->type() == QEvent::LanguageChange)
     {
         ui->retranslateUi(this);
+        setup_categories();
         load_available_languages();
         load_available_themes();
     }

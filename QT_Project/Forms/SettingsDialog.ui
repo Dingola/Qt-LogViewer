@@ -6,90 +6,82 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>303</width>
-    <height>172</height>
+    <width>469</width>
+    <height>420</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>Dialog</string>
   </property>
-  <layout class="QVBoxLayout" name="verticalLayout">
-   <property name="spacing">
-    <number>12</number>
-   </property>
+  <layout class="QVBoxLayout" name="verticalLayout_3">
    <item>
-    <widget class="QTabWidget" name="tabWidget">
-     <property name="currentIndex">
-      <number>0</number>
-     </property>
-     <widget class="QWidget" name="tabGeneral">
-      <attribute name="title">
-       <string>General</string>
-      </attribute>
-      <layout class="QGridLayout" name="gridLayout">
-       <item row="0" column="1">
-        <widget class="QComboBox" name="comboBoxLang"/>
-       </item>
-       <item row="0" column="0">
-        <widget class="QLabel" name="labelLang">
-         <property name="text">
-          <string>Language</string>
-         </property>
-        </widget>
-       </item>
-       <item row="1" column="0">
-        <spacer name="verticalSpacer">
-         <property name="orientation">
-          <enum>Qt::Vertical</enum>
-         </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>20</width>
-           <height>40</height>
-          </size>
-         </property>
-        </spacer>
-       </item>
-      </layout>
-     </widget>
-     <widget class="QWidget" name="tabAppearance">
-      <attribute name="title">
-       <string>Appearance</string>
-      </attribute>
-      <layout class="QGridLayout" name="gridLayout_2">
-       <item row="0" column="1">
-        <widget class="QComboBox" name="comboBoxTheme"/>
-       </item>
-       <item row="0" column="0">
-        <widget class="QLabel" name="labelTheme">
-         <property name="text">
-          <string>Theme</string>
-         </property>
-        </widget>
-       </item>
-       <item row="1" column="0">
-        <spacer name="verticalSpacer_2">
-         <property name="orientation">
-          <enum>Qt::Vertical</enum>
-         </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>20</width>
-           <height>40</height>
-          </size>
-         </property>
-        </spacer>
-       </item>
-      </layout>
-     </widget>
-    </widget>
+    <layout class="QHBoxLayout" name="horizontalLayout" stretch="1,3">
+     <item>
+      <widget class="QListWidget" name="listWidgetCategories"/>
+     </item>
+     <item>
+      <widget class="QStackedWidget" name="stackedWidgetContent">
+       <property name="currentIndex">
+        <number>0</number>
+       </property>
+       <widget class="QWidget" name="pageGeneral">
+        <layout class="QVBoxLayout" name="verticalLayout">
+         <item>
+          <layout class="QFormLayout" name="formLayoutGeneral">
+           <property name="fieldGrowthPolicy">
+            <enum>QFormLayout::FieldGrowthPolicy::ExpandingFieldsGrow</enum>
+           </property>
+           <item row="0" column="0">
+            <widget class="QLabel" name="labelLang">
+             <property name="text">
+              <string>Language</string>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="1">
+            <widget class="QComboBox" name="comboBoxLang"/>
+           </item>
+          </layout>
+         </item>
+        </layout>
+       </widget>
+       <widget class="QWidget" name="pageAppearance">
+        <layout class="QVBoxLayout" name="verticalLayout_2">
+         <item>
+          <layout class="QFormLayout" name="formLayoutAppearance">
+           <property name="sizeConstraint">
+            <enum>QLayout::SizeConstraint::SetDefaultConstraint</enum>
+           </property>
+           <property name="fieldGrowthPolicy">
+            <enum>QFormLayout::FieldGrowthPolicy::ExpandingFieldsGrow</enum>
+           </property>
+           <property name="rowWrapPolicy">
+            <enum>QFormLayout::RowWrapPolicy::DontWrapRows</enum>
+           </property>
+           <item row="0" column="1">
+            <widget class="QComboBox" name="comboBoxTheme"/>
+           </item>
+           <item row="0" column="0">
+            <widget class="QLabel" name="labelTheme">
+             <property name="text">
+              <string>Theme</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+        </layout>
+       </widget>
+      </widget>
+     </item>
+    </layout>
    </item>
    <item>
     <layout class="QHBoxLayout" name="horizontalLayoutButtons">
      <item>
       <spacer name="horizontalSpacer">
        <property name="orientation">
-        <enum>Qt::Horizontal</enum>
+        <enum>Qt::Orientation::Horizontal</enum>
        </property>
        <property name="sizeHint" stdset="0">
         <size>
