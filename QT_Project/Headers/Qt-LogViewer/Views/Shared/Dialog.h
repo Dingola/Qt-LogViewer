@@ -4,6 +4,7 @@
 #include <QDialog>
 #include <QMouseEvent>
 #include <QShowEvent>
+#include <QSize>
 #include <QVBoxLayout>
 
 #include "Qt-LogViewer/Views/Shared/DialogHeaderWidget.h"
@@ -277,4 +278,6 @@ class Dialog: public QDialog
         QPoint m_resize_start_pos;                       ///< Start position for resize.
         QRect m_resize_start_geometry;                   ///< Start geometry for resize.
         bool m_header_initialized = false;               ///< Whether header has been initialized.
+        QSize m_resize_minimum_size;                     ///< Cached minimum size during resize.
+        QSize m_resize_maximum_size;                     ///< Cached maximum size during resize.
 };

@@ -907,22 +907,23 @@ DockWidget QToolButton#dock_title_bar_close_button:pressed {
 #Dialog {
     qproperty-background_color: @Neutral-1;
     qproperty-border_color: @ColorBorder;
-    qproperty-border_width: 2;
+    qproperty-border_width: 0;
     qproperty-border_radius: 6;
 }
 
 #DialogHeaderWidget {
-    background-color: transparent;
+    background: transparent;
+    padding-left: 12px;
+    margin: 10px;
     border-top-left-radius: 0px;
     border-top-right-radius: 0px;
     border-bottom-left-radius: 0px;
     border-bottom-right-radius: 0px;
-    border-bottom: 1px solid @ColorBorder;
 }
 
 #DialogHeaderWidget QLabel {
     color: @ColorDockHeaderText;
-    font-size: 15pt;
+    font-size: 12pt;
     font-weight: bold;
     letter-spacing: 0.5px;
 }
@@ -943,6 +944,9 @@ DockWidget QToolButton#dock_title_bar_close_button:pressed {
 
 #DialogContent {
     background: transparent;
+    margin-top: 6px;
+    margin-bottom: 6px;
+    margin: 8px;
 }
 
 /* === Pie Chart === */
@@ -1308,4 +1312,72 @@ StartPageWidget QListView::item:!selected:focus {
     background: transparent;
     color: @StartPageItemTextColor;
     border: 1px solid transparent;
+}
+
+/* === SettingsDialog === */
+SettingsDialog {
+    min-height: 400px;
+    min-width: 600px;
+}
+
+SettingsDialog QListView {
+    background: transparent;
+    border: none;
+    margin: 4px;
+}
+
+SettingsDialog QStackedWidget,
+SettingsDialog QStackedWidget > QWidget {
+    background: transparent;
+    border-radius: 0px;
+}
+
+SettingsDialog QStackedWidget {
+    padding-left: 8px;
+    border-left: 1px solid @Brand-Accent-500;
+}
+
+SettingsDialog QStackedWidget > QWidget QLabel {
+    font-size: 12pt;
+    font-weight: bold;
+}
+
+SettingsDialog QListView {
+    min-width: 150px;
+    max-width: 220px;
+    background: transparent;
+    border: none;
+    outline: none;
+    padding: 0px;
+    margin-left: 10px;
+    margin-right: 15px;
+}
+
+SettingsDialog QListView#listWidgetCategories::item {
+    background: transparent;
+    border: 1px solid transparent;
+    border: 1px solid @ColorBackground;
+    border-radius: 7px;
+    color: @ColorText;
+    padding: 6px;
+    margin-left: 4px;
+    margin-bottom: 4px;
+    font-size: 12;
+    font-weight: 500;
+}
+
+SettingsDialog QListView#listWidgetCategories::item:hover {
+    background: @Neutral-5;
+}
+
+SettingsDialog QListView#listWidgetCategories::item:selected {
+    background: @ColorBackground;
+}
+
+SettingsDialog QGroupBox {
+    padding-left: 12px;
+    margin-top: 10px;
+    border: none;
+    border-radius: 8px;
+    background: @Neutral-3;
 }

@@ -11,6 +11,7 @@
 
 #include <QDebug>
 #include <QHoverEvent>
+#include <QLayout>
 #include <QPainter>
 #include <QPainterPath>
 #include <QPen>
@@ -267,6 +268,10 @@ void Dialog::mousePressEvent(QMouseEvent* event)
             m_resizing = true;
             m_resize_start_pos = event->globalPosition().toPoint();
             m_resize_start_geometry = geometry();
+
+            m_resize_minimum_size = minimumSizeHint().expandedTo(minimumSize());
+            m_resize_maximum_size = maximumSize();
+
             event->accept();
         }
         else if (is_in_draggable_header_area(event->pos()))
@@ -294,7 +299,7 @@ void Dialog::mouseMoveEvent(QMouseEvent* event)
 {
     if (m_resizing && (event->buttons() & Qt::LeftButton))
     {
-        QPoint delta = event->globalPosition().toPoint() - m_resize_start_pos;
+        const QPoint delta = event->globalPosition().toPoint() - m_resize_start_pos;
         QRect new_geometry = m_resize_start_geometry;
 
         if (m_resize_edges & Qt::LeftEdge)
@@ -314,7 +319,27 @@ void Dialog::mouseMoveEvent(QMouseEvent* event)
             new_geometry.setBottom(m_resize_start_geometry.bottom() + delta.y());
         }
 
-        if (new_geometry.width() >= minimumWidth() && new_geometry.height() >= minimumHeight())
+        const QSize accepted_size = QLayout::closestAcceptableSize(this, new_geometry.size());
+
+        if (m_resize_edges & Qt::LeftEdge)
+        {
+            new_geometry.setLeft(new_geometry.right() - accepted_size.width() + 1);
+        }
+        else if (m_resize_edges & Qt::RightEdge)
+        {
+            new_geometry.setRight(new_geometry.left() + accepted_size.width() - 1);
+        }
+
+        if (m_resize_edges & Qt::TopEdge)
+        {
+            new_geometry.setTop(new_geometry.bottom() - accepted_size.height() + 1);
+        }
+        else if (m_resize_edges & Qt::BottomEdge)
+        {
+            new_geometry.setBottom(new_geometry.top() + accepted_size.height() - 1);
+        }
+
+        if (new_geometry != geometry())
         {
             setGeometry(new_geometry);
         }
@@ -415,7 +440,8 @@ auto Dialog::initialize_header_for_existing_layout() -> void
     auto* existing_layout = qobject_cast<QVBoxLayout*>(layout());
     if (existing_layout != nullptr)
     {
-        auto* content_wrapper = new QWidget(this);
+        auto* content_wrapper = new QFrame(this);
+        content_wrapper->setAttribute(Qt::WA_StyledBackground, true);
         content_wrapper->setObjectName("DialogContent");
         content_wrapper->setLayout(existing_layout);
 

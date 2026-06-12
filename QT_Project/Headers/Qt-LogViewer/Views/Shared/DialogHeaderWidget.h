@@ -1,9 +1,9 @@
 #pragma once
 
+#include <QFrame>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPushButton>
-#include <QWidget>
 
 /**
  * @class DialogHeaderWidget
@@ -13,7 +13,7 @@
  * and a close button. The appearance should be styled via QSS. Emits a signal when
  * the close button is pressed.
  */
-class DialogHeaderWidget: public QWidget
+class DialogHeaderWidget: public QFrame
 {
         Q_OBJECT
 

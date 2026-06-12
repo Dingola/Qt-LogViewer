@@ -46,6 +46,7 @@ SettingsDialog::SettingsDialog(LogViewerSettings* settings, QWidget* parent)
 
     // Set initial category
     ui->listWidgetCategories->setCurrentRow(0);
+    ui->listWidgetCategories->setFocusPolicy(Qt::NoFocus);
 }
 
 /**

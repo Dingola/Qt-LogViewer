@@ -13,7 +13,7 @@
  * @param parent The parent widget.
  */
 DialogHeaderWidget::DialogHeaderWidget(const QString& title, QWidget* parent)
-    : QWidget(parent),
+    : QFrame(parent),
       m_title_label(new QLabel(title, this)),
       m_close_button(new QPushButton(this)),
       m_layout(new QHBoxLayout(this))
@@ -23,11 +23,12 @@ DialogHeaderWidget::DialogHeaderWidget(const QString& title, QWidget* parent)
     m_layout->addWidget(m_title_label);
     m_layout->addStretch();
     m_layout->addWidget(m_close_button);
+    m_layout->setContentsMargins(0, 0, 0, 0);
     setLayout(m_layout);
 
     setObjectName("DialogHeaderWidget");
     m_close_button->setObjectName("DialogHeaderCloseButton");
-    m_close_button->setFixedSize(24, 24);
+    m_close_button->setFixedSize(12, 12);
     m_close_button->setFlat(true);
     m_close_button->setIcon(style()->standardIcon(QStyle::SP_TitleBarCloseButton, nullptr, this));
 
