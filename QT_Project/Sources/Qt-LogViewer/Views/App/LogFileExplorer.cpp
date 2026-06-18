@@ -1,6 +1,7 @@
 #include "Qt-LogViewer/Views/App/LogFileExplorer.h"
 
 #include <QCursor>
+#include <QFileInfo>
 #include <QInputDialog>
 #include <QMessageBox>
 #include <QModelIndex>
@@ -9,6 +10,7 @@
 #include "Qt-LogViewer/Models/LogFileInfo.h"
 #include "Qt-LogViewer/Models/LogFileTreeItem.h"
 #include "Qt-LogViewer/Models/LogFileTreeModel.h"
+#include "Qt-LogViewer/Services/DesktopServices.h"
 #include "ui_LogFileExplorer.h"
 
 /**
@@ -195,6 +197,24 @@ auto LogFileExplorer::init_context_menu() -> void
         [[maybe_unused]] const bool dispatched = dispatch_current_if_type(
             LogFileTreeItem::Type::File,
             [this](const LogFileInfo& info) { emit remove_file_requested(info); });
+    });
+
+    m_file_context_menu->addSeparator();
+
+    auto* open_folder_action = new QAction(tr("Open Containing Folder"), m_file_context_menu);
+    m_file_context_menu->addAction(open_folder_action);
+    connect(open_folder_action, &QAction::triggered, this, [this]() {
+        [[maybe_unused]] const bool dispatched =
+            dispatch_current_if_type(LogFileTreeItem::Type::File, [this](const LogFileInfo& info) {
+                const QString folder_path = QFileInfo(info.get_file_path()).absolutePath();
+                const bool opened = DesktopServices::open_folder(folder_path);
+
+                if (!opened)
+                {
+                    QMessageBox::warning(this, tr("Open Containing Folder"),
+                                         tr("Could not open folder:\n%1").arg(folder_path));
+                }
+            });
     });
 
     // Session context menu
