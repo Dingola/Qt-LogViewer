@@ -16,6 +16,7 @@
 #include <QPainterPath>
 #include <QPen>
 #include <QResizeEvent>
+#include <QTimer>
 
 /**
  * @brief Constructs a Dialog with a custom header.
@@ -251,6 +252,23 @@ void Dialog::showEvent(QShowEvent* event)
     }
 
     QDialog::showEvent(event);
+
+    auto enforce_acceptable_size = [this]() {
+        if (layout() != nullptr)
+        {
+            layout()->activate();
+        }
+
+        const QSize acceptable_size = QLayout::closestAcceptableSize(this, size());
+        if (acceptable_size != size())
+        {
+            resize(acceptable_size);
+        }
+    };
+
+    enforce_acceptable_size();
+
+    QTimer::singleShot(0, this, [this, enforce_acceptable_size]() { enforce_acceptable_size(); });
 }
 
 /**
