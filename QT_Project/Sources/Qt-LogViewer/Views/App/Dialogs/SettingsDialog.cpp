@@ -1,7 +1,9 @@
 #include "Qt-LogViewer/Views/App/Dialogs/SettingsDialog.h"
 
 #include <QDebug>
+#include <QFileInfo>
 
+#include "Qt-LogViewer/Services/DesktopServices.h"
 #include "Qt-LogViewer/Services/LogViewerSettings.h"
 #include "ui_SettingsDialog.h"
 
@@ -43,6 +45,17 @@ SettingsDialog::SettingsDialog(LogViewerSettings* settings, QWidget* parent)
 
     m_applied_language = selected_language();
     m_applied_theme = selected_theme();
+
+    ui->lineEditConfigLocation->setText(m_settings != nullptr ? m_settings->fileName()
+                                                              : tr("No settings file"));
+    ui->lineEditConfigLocation->setToolTip(m_settings != nullptr ? m_settings->fileName()
+                                                                 : tr("No settings file"));
+    connect(ui->toolButtonConfigLocation, &QToolButton::clicked, this, [this]() {
+        const QString settings_file = m_settings->fileName();
+        const QString config_folder = QFileInfo(settings_file).absolutePath();
+
+        DesktopServices::open_folder(config_folder);
+    });
 
     // Set initial category
     ui->listWidgetCategories->setCurrentRow(0);

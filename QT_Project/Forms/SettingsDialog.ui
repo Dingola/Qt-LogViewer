@@ -40,10 +40,10 @@
      <item>
       <widget class="QStackedWidget" name="stackedWidgetContent">
        <property name="currentIndex">
-        <number>1</number>
+        <number>0</number>
        </property>
        <widget class="QWidget" name="pageGeneral">
-        <layout class="QVBoxLayout" name="verticalLayout_5">
+        <layout class="QVBoxLayout" name="verticalLayout_6">
          <item>
           <widget class="QLabel" name="pageGeneralTitle">
            <property name="text">
@@ -88,6 +88,57 @@
              <widget class="QLabel" name="labelLangDesc">
               <property name="text">
                <string>Select your preferred language for the application interface. Changes will take effect immediately upon clicking Apply or OK.</string>
+              </property>
+              <property name="wordWrap">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
+          <widget class="QGroupBox" name="groupBox_3">
+           <property name="title">
+            <string/>
+           </property>
+           <layout class="QVBoxLayout" name="verticalLayout_5">
+            <item>
+             <widget class="QLabel" name="labelConfig">
+              <property name="text">
+               <string>Configuration</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <layout class="QHBoxLayout" name="horizontalLayout_4">
+              <item>
+               <widget class="QLabel" name="labelConfigLocation">
+                <property name="text">
+                 <string>Location</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QLineEdit" name="lineEditConfigLocation">
+                <property name="readOnly">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QToolButton" name="toolButtonConfigLocation">
+                <property name="text">
+                 <string>...</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <widget class="QLabel" name="labelConfigDesc">
+              <property name="text">
+               <string>View the location where application settings are stored. You can open the folder to back up, inspect, or reset configuration files.</string>
               </property>
               <property name="wordWrap">
                <bool>true</bool>
