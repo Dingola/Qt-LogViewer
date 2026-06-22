@@ -210,14 +210,11 @@ MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
             &MainWindow::handle_loading_error);
     connect(m_controller, &LogViewerController::view_file_paths_changed, this,
             [this](const QUuid& view_id, const QVector<QString>& file_paths) {
-                const int tab_count = ui->tabWidgetLog->count();
-                for (int i = 0; i < tab_count; ++i)
+                const bool updated = ui->tabWidgetLog->set_view_file_paths(view_id, file_paths);
+
+                if (!updated)
                 {
-                    auto* view = qobject_cast<LogViewWidget*>(ui->tabWidgetLog->widget(i));
-                    if (view != nullptr && view->get_view_id() == view_id)
-                    {
-                        view->set_view_file_paths(file_paths);
-                    }
+                    qWarning() << "Could not update tab file paths for view:" << view_id;
                 }
             });
 
@@ -364,12 +361,12 @@ auto MainWindow::setup_filter_bar() -> void
  */
 auto MainWindow::setup_tab_widget() -> void
 {
-    ui->tabWidgetLog->setTabsClosable(true);
-    ui->tabWidgetLog->setElideMode(Qt::ElideRight);
-    ui->tabWidgetLog->tabBar()->setMovable(true);
+    ui->tabWidgetLog->setup_default_behavior();
 
     connect(ui->tabWidgetLog, &QTabWidget::currentChanged, this, [this](int index) {
-        auto* log_view_widget = qobject_cast<LogViewWidget*>(ui->tabWidgetLog->widget(index));
+        Q_UNUSED(index);
+
+        LogViewWidget* log_view_widget = ui->tabWidgetLog->current_log_view();
         if (log_view_widget != nullptr)
         {
             QUuid view_id = log_view_widget->get_view_id();
@@ -379,14 +376,17 @@ auto MainWindow::setup_tab_widget() -> void
             update_pagination_widget();
         }
     });
-    connect(ui->tabWidgetLog, &TabWidget::about_to_close_tab, this, [this](int index) {
-        auto* log_view_widget = qobject_cast<LogViewWidget*>(ui->tabWidgetLog->widget(index));
-        if (log_view_widget != nullptr)
-        {
-            QUuid view_id = log_view_widget->get_view_id();
-            m_controller->remove_view(view_id);
-        }
-    });
+    connect(ui->tabWidgetLog, &TabWidget::about_to_close_tab, this,
+            [this](int index, QWidget* widget) {
+                Q_UNUSED(widget);
+
+                LogViewWidget* log_view_widget = ui->tabWidgetLog->log_view_at(index);
+                if (log_view_widget != nullptr)
+                {
+                    QUuid view_id = log_view_widget->get_view_id();
+                    m_controller->remove_view(view_id);
+                }
+            });
     connect(ui->tabWidgetLog, &TabWidget::close_tab_requested, this, [this](int index) {
         Q_UNUSED(index);
         if (ui->tabWidgetLog->count() == 0)
@@ -814,17 +814,7 @@ void MainWindow::resizeEvent(QResizeEvent* event)
 
     if (ui != nullptr && ui->tabWidgetLog != nullptr)
     {
-        const int tab_count = ui->tabWidgetLog->count();
-        if (tab_count > 0)
-        {
-            QWidget* current = ui->tabWidgetLog->currentWidget();
-            auto* log_view_widget = qobject_cast<LogViewWidget*>(current);
-
-            if (log_view_widget != nullptr)
-            {
-                log_view_widget->auto_resize_columns();
-            }
-        }
+        ui->tabWidgetLog->auto_resize_current_columns();
     }
 }
 
@@ -1002,7 +992,7 @@ auto MainWindow::handle_current_view_id_changed(const QUuid& view_id) -> void
     m_log_level_pie_chart_widget->set_log_level_counts(level_counts);
     ui->logFilterBarWidget->set_log_level_counts(level_counts);
 
-    auto* log_view_widget = qobject_cast<LogViewWidget*>(ui->tabWidgetLog->currentWidget());
+    LogViewWidget* log_view_widget = ui->tabWidgetLog->current_log_view();
 
     if (log_view_widget != nullptr)
     {
@@ -1026,23 +1016,11 @@ auto MainWindow::handle_current_view_id_changed(const QUuid& view_id) -> void
  */
 auto MainWindow::handle_view_removed(const QUuid& view_id) -> void
 {
-    bool tab_removed = false;
-    int tab_count = ui->tabWidgetLog->count();
+    const bool removed = ui->tabWidgetLog->remove_view_tab_by_id(view_id);
 
-    for (int i = 0; i < tab_count && !tab_removed; ++i)
+    if (!removed)
     {
-        auto* log_view_widget = qobject_cast<LogViewWidget*>(ui->tabWidgetLog->widget(i));
-
-        if (log_view_widget != nullptr)
-        {
-            QUuid tab_view_id = log_view_widget->get_view_id();
-
-            if (tab_view_id == view_id)
-            {
-                ui->tabWidgetLog->removeTab(i);
-                tab_removed = true;
-            }
-        }
+        qWarning() << "Could not remove tab for view:" << view_id;
     }
 
     ui->logFilterBarWidget->set_app_names({});
@@ -1219,7 +1197,7 @@ auto MainWindow::restore_view_from_json(const QString& session_id,
 
     const QUuid view_id = m_controller->import_view_state_for_session(session_id, state);
 
-    auto* log_view_widget = create_log_view_widget_for_view(view_id, state);
+    LogViewWidget* log_view_widget = create_log_view_widget_for_view(view_id, state);
 
     const QVector<QString> view_paths = m_controller->get_view_file_paths(view_id);
     log_view_widget->set_view_file_paths(view_paths);
@@ -1227,10 +1205,13 @@ auto MainWindow::restore_view_from_json(const QString& session_id,
     const QString tab_title = state.tab_title.isEmpty() && !view_paths.isEmpty()
                                   ? QFileInfo(view_paths.first()).fileName()
                                   : state.tab_title;
-    const int tab_index = ui->tabWidgetLog->addTab(log_view_widget, tab_title);
-    ui->tabWidgetLog->setCurrentIndex(tab_index);
 
-    log_view_widget->auto_resize_columns();
+    const int tab_index = ui->tabWidgetLog->add_log_view_tab(log_view_widget, tab_title, true);
+
+    if (tab_index < 0)
+    {
+        qWarning() << "Failed to add restored view tab:" << view_id;
+    }
 }
 
 /**
@@ -1347,10 +1328,7 @@ auto MainWindow::create_log_view_widget_for_view(const QUuid& view_id,
  */
 auto MainWindow::close_all_tabs() -> void
 {
-    while (ui->tabWidgetLog->count() > 0)
-    {
-        ui->tabWidgetLog->removeTab(0);
-    }
+    ui->tabWidgetLog->close_all_view_tabs();
 }
 
 /**
@@ -1387,15 +1365,18 @@ auto MainWindow::handle_log_file_open_requested(const LogFileInfo& log_file_info
     m_controller->set_current_view(view_id);
 
     SessionViewState empty_state;
-    auto* log_view_widget = create_log_view_widget_for_view(view_id, empty_state);
+    LogViewWidget* log_view_widget = create_log_view_widget_for_view(view_id, empty_state);
 
     QVector<QString> file_paths = m_controller->get_view_file_paths(view_id);
     log_view_widget->set_view_file_paths(file_paths);
 
     QString tab_title = log_file_info.get_file_name();
-    int tab_index = ui->tabWidgetLog->addTab(log_view_widget, tab_title);
-    ui->tabWidgetLog->setCurrentIndex(tab_index);
-    log_view_widget->auto_resize_columns();
+    const int tab_index = ui->tabWidgetLog->add_log_view_tab(log_view_widget, tab_title, true);
+
+    if (tab_index < 0)
+    {
+        qWarning() << "Failed to add log view tab for file:" << log_file_info.get_file_path();
+    }
 
     m_session_controller->request_expand_session(session_id);
 
