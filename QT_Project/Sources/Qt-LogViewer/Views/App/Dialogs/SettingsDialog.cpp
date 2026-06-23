@@ -46,6 +46,7 @@ SettingsDialog::SettingsDialog(LogViewerSettings* settings, QWidget* parent)
     m_applied_language = selected_language();
     m_applied_theme = selected_theme();
 
+    ui->listWidgetCategories->setProperty("isContent", true);
     ui->lineEditConfigLocation->setText(m_settings != nullptr ? m_settings->fileName()
                                                               : tr("No settings file"));
     ui->lineEditConfigLocation->setToolTip(m_settings != nullptr ? m_settings->fileName()
