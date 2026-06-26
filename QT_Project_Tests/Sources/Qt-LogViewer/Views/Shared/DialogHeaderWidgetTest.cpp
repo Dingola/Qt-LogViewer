@@ -41,7 +41,7 @@ TEST_F(DialogHeaderWidgetTest, ConstructorWiringAndDefaults)
     auto* close_btn = m_header->findChild<QPushButton*>(QStringLiteral("DialogHeaderCloseButton"));
     ASSERT_NE(close_btn, nullptr);
     EXPECT_TRUE(close_btn->isFlat());
-    EXPECT_EQ(close_btn->size(), QSize(24, 24));
+    EXPECT_EQ(close_btn->size(), QSize(12, 12));
     EXPECT_FALSE(close_btn->icon().isNull());
 }
 
