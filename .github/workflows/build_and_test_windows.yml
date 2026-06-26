@@ -57,9 +57,10 @@ jobs:
 
       # Configure CMake
       - name: Configure CMake
+        shell: pwsh
         run: |
-          cmake -B build -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} `
-                -DCMAKE_PREFIX_PATH="C:\Qt\${{ env.QT_VERSION }}\msvc2022_64" `
+          cmake -S . -B build -G "Visual Studio 17 2022" -A x64 `
+                -DCMAKE_PREFIX_PATH="$env:Qt6_DIR" `
                 -DMAIN_PROJECT_NAME=${{ env.MAIN_PROJECT_NAME }} `
                 -D${{ env.MAIN_PROJECT_NAME }}_BUILD_TARGET_TYPE=${{ env.BUILD_TARGET_TYPE }} `
                 -D${{ env.MAIN_PROJECT_NAME }}_BUILD_TEST_PROJECT=${{ env.BUILD_TEST_PROJECT }} `
