@@ -78,11 +78,100 @@
     @label-font-weight: 400;
 
     /* --- GLOBAL GEOMETRY ------------------------------------------------------ */
+    /* QDialog */
     @dialog-border-width: 2;
     @dialog-border-radius: 0;
+
+    /* QToolTip */
     @tooltip-border-width: 1;
+
+    /* QLineEdit */
     @line-edit-border-width: 2;
     @line-edit-border-radius: 12;
+
+    /* QComboBox */
+    @combo-box-border-width: 1;
+    @combo-box-border-radius: 6;
+    @combo-box-drop-down-width: 20;
+    @combo-box-arrow-width: 10;
+    @combo-box-arrow-height: 10;
+
+    /* QCheckBox */
+    @checkbox-spacing: 6;
+    @checkbox-indicator-width: 14;
+    @checkbox-indicator-height: 14;
+    @checkbox-indicator-border-width: 2;
+    @checkbox-indicator-border-width-disabled: 1;
+    @checkbox-indicator-border-radius: 2;
+
+    /* QPushButton */
+    @button-border-radius: 6;
+
+    /* QToolButton */
+    @tool-button-border-width: 2;
+    @tool-button-border-radius: 10;
+    @tool-button-size: 32;
+    @tool-button-inline-size: 24;
+
+    /* QTableView */
+    @table-border-width: 1;
+    @table-item-padding: 8;
+    @table-header-padding: 2;
+    @table-header-border-width: 1;
+    @table-header-border-radius: 0;
+
+    /* QPlainTextEdit */
+    @plain-text-edit-border-width: 1;
+    @plain-text-edit-border-radius: 8;
+
+    /* QMenuBar */
+    @menu-bar-item-padding: 4px 10px;
+
+    /* QMenu */
+    @menu-border-width: 1;
+    @menu-item-padding: 6px 20px;
+    @menu-inline-margin-top: 4;
+    @menu-inline-min-width: 240;
+    @menu-inline-padding: 6px 10px;
+    @menu-inline-border-radius: 8;
+
+    /* QScrollBar */
+    @scroll-bar-size: 10;
+    @scroll-bar-handle-radius: 5;
+
+    /* QTreeView */
+    @tree-margin: 2;
+    @tree-border-radius: 6;
+    @tree-item-padding: 5px 5px 5px 5px;
+    @tree-item-margin: 5px 2px 0px 0px;
+    @tree-item-border-radius: 8;
+    @tree-branch-icon-size: 16;
+    @tree-branch-pen-width: 1;
+    @tree-branch-hlength: 10;
+
+    /* QTabWidget */
+    @tab-widget-pane-border-width: 1;
+    @tab-widget-padding-top: 2;
+
+    /* QTabBar */
+    @tab-bar-tab-border-width: 1;
+    @tab-bar-tab-padding: 6px 12px;
+    @tab-bar-tab-border-radius-top: 6;
+    @tab-bar-tab-selected-border-top-width: 2;
+    @tab-bar-scroller-width: 60;
+    @tab-bar-tear-width: 0;
+    @tab-bar-arrow-padding: 4;
+
+    /* Custom TabWidget */
+    @custom-tab-widget-close-icon-size: 18;
+
+    /* Specific Widget Specs: #tabWidgetLog */
+    @tab-widget-log-pane-border-radius: 0;
+    @custom-tab-widget-log-tab-min-height: 28;
+    @custom-tab-widget-log-tab-padding: 0 12px;
+    @custom-tab-widget-log-tab-border-radius-top: 0;
+    @custom-tab-widget-log-tab-min-width: 120;
+    @custom-tab-widget-log-tab-max-width: 180;
 }
 
 @Variables[Name="Dark"] {
@@ -140,24 +229,123 @@
     @line-edit-text-color-disabled: @text-color-disabled;
     @line-edit-text-color-placeholder: @text-color-tertiary;
 
+    /* ComboBox */
+    @combo-box-bg-color: @Neutral-5;
+    @combo-box-bg-color-hover: @Neutral-12;
+    @combo-box-bg-color-disabled: @Neutral-14;
+    @combo-box-border-color: @border-color-primary;
+    @combo-box-selection-bg-color: @Brand-Accent-700;
+    @combo-box-text-color: @text-color-primary;
+    @combo-box-text-color-disabled: @text-color-disabled;
+
+    /* CheckBox */
+    @checkbox-indicator-bg-color: @Neutral-5;
+    @checkbox-indicator-bg-color-checked: @Brand-Accent-700;
+    @checkbox-indicator-bg-color-hover: @Brand-Accent-600;
+    @checkbox-indicator-bg-color-disabled: @Neutral-14;
+    @checkbox-indicator-border-color: @Neutral-5;
+    @checkbox-text-color: @text-color-primary;
+    @checkbox-text-color-disabled: @text-color-disabled;
+
+    /* Button */
+    @button-bg-color: @Brand-Accent-700;
+    @button-bg-color-hover: @Brand-Accent-600;
+    @button-bg-color-pressed: @Brand-Accent-750;
+    @button-bg-color-disabled: @Neutral-14;
+    @button-text-color: @text-color-primary;
+    @button-text-color-disabled: @text-color-disabled;
+
+    /* ToolButton */
+    @tool-button-bg-color: transparent;
+    @tool-button-bg-color-hover: @button-bg-color-hover;
+    @tool-button-bg-color-disabled: @Neutral-14;
+    @tool-button-border-color-hover: @Neutral-12;
+    @tool-button-text-color: @text-color-primary;
+    @tool-button-text-color-disabled: @text-color-disabled;
+
+    /* ToolButton Variant: Inline Menu */
+    @tool-button-inline-bg-color: transparent;
+    @tool-button-inline-bg-color-hover: @Neutral-12;
+    @tool-button-inline-bg-color-pressed: @Neutral-5;
+
+    /* ToolButton */
+    @tool-button-bg-color: @Neutral-5;
+    @tool-button-bg-color-hover: @button-bg-color-hover;
+    @tool-button-bg-color-disabled: @Neutral-14;
+    @tool-button-border-color-hover: @Brand-Accent-500;
+    @tool-button-text-color: @text-color-primary;
+    @tool-button-text-color-disabled: @text-color-disabled;
+
+    /* ToolButton Variant: Inline Menu */
+    @tool-button-inline-bg-color: @Neutral-5;
+    @tool-button-inline-bg-color-hover: @Neutral-12;
+    @tool-button-inline-bg-color-pressed: @Neutral-4;
+
+    /* Table View */
+    @table-bg-color: @Neutral-3;
+    @table-selection-bg-color: @Brand-Accent-900;
+    @table-hover-row-color: @Brand-Accent-800;
+    @table-alternate-bg-color: @Neutral-15;
+    @table-text-color: @text-color-primary;
+
+    /* Table Header */
+    @table-header-bg-color: @Neutral-4;
+    @table-header-bg-color-hover: @Neutral-12;
+    @table-header-bg-color-pressed: @Neutral-5;
+    @table-header-text-color: @text-color-primary;
+
+    /* PlainTextEdit */
+    @plain-text-edit-bg-color: @Neutral-3;
+    @plain-text-edit-bg-color-disabled: @Neutral-14;
+    @plain-text-edit-border-color: @border-color-primary;
+    @plain-text-edit-text-color: @text-color-primary;
+    @plain-text-edit-text-color-disabled: @text-color-disabled;
+
+    /* MenuBar */
+    @menu-bar-bg-color: @Neutral-4;
+    @menu-bar-item-bg-color-selected: @Brand-Accent-700;
+    @menu-bar-text-color: @text-color-primary;
+
+    /* Menu */
+    @menu-bg-color: @Neutral-3;
+    @menu-item-bg-color-selected: @Brand-Accent-700;
+    @menu-border-color: @border-color-primary;
+    @menu-text-color: @text-color-primary;
+    @menu-text-color-disabled: @text-color-disabled;
+
+    /* ScrollBars */
+    @scroll-bar-track-color: @ColorLogFilterBarBackground;
+    @scroll-bar-handle-color: @Brand-Accent-700;
+    @scroll-bar-handle-color-hover: @Brand-Accent-600;
+
+    /* TreeView */
+    @tree-bg-color: @Neutral-3;
+    @tree-text-color: @text-color-primary;
+    @tree-item-bg-color: @Neutral-5;
+    @tree-item-bg-color-hover: @Neutral-12;
+    @tree-item-bg-color-selected: @Brand-Accent-700;
+
+    /* QTabWidget */
+    @tab-widget-bg-color: @Neutral-3;
+    @tab-widget-pane-bg-color: @Neutral-3;
+
+    /* QTabBar */
+    @tab-bar-tab-bg-color: @Neutral-5;
+    @tab-bar-tab-bg-color-selected: @Neutral-12;
+    @tab-bar-tab-bg-color-hover: @Neutral-12;
+    @tab-bar-tab-text-color-active: @text-color-primary;
+    @tab-bar-tab-text-color-inactive: @text-color-secondary;
+
+    /* Custom TabWidget */
+    @custom-tab-widget-close-icon-color: @Neutral-6;
+    @custom-tab-widget-close-icon-color-hover: @Severity-Info;
+    @custom-tab-widget-tool-button-bg-color: transparent;
+    @custom-tab-widget-tool-button-bg-color-hover: @Neutral-5;
+    @custom-tab-widget-tool-button-bg-color-pressed: @Neutral-4;
 
     /* Inputs / Bars */
     @ColorLogFilterBarBackground: @Neutral-3;
     @ColorLogFilterBarWidgetBackground: @Neutral-3;
-
-    /* ComboBox */
-    @ColorComboBoxBackground: @Neutral-5;
-    @ColorComboBoxBackgroundHover: @Neutral-12;
-    @ColorComboBoxBackgroundDisabled: @Neutral-14;
-    @ColorComboBoxBorder: @border-color-primary;
-    @ColorComboBoxSelectionBackground: @Brand-Accent-700;
-
-    /* CheckBox */
-    @ColorCheckBoxIndicatorBackground: @Neutral-5;
-    @ColorCheckBoxIndicatorChecked: @Brand-Accent-700;
-    @ColorCheckBoxIndicatorHover: @Brand-Accent-600;
-    @ColorCheckBoxIndicatorDisabled: @Neutral-14;
-    @ColorCheckBoxIndicatorBorderColor: @Neutral-5;
 
     /* Severity */
     @ColorTrace: @Severity-Trace;
@@ -173,51 +361,8 @@
     @ColorErrorHover: @Severity-ErrorHover;
     @ColorFatalHover: @Severity-FatalHover;
 
-    /* Buttons / ToolButtons */
-    @ColorButtonBackground: @Brand-Accent-700;
-    @ColorButtonBackgroundHover: @Brand-Accent-600;
-    @ColorButtonBackgroundPressed: @Brand-Accent-750;
-    @ColorButtonBackgroundDisabled: @Neutral-14;
-
-    @ColorToolButtonBackground: @Neutral-5;
-    @ColorToolButtonBackgroundDisabled: @Neutral-14;
-    @ColorToolButtonBorderHover: @Brand-Accent-500;
-
-    @ColorToolButtonBackgroundInlineMenu: @Neutral-5;
-    @ColorToolButtonBackgroundInlineMenuHover: @Neutral-12;
-    @ColorToolButtonBackgroundInlineMenuPressed: @Neutral-4;
-
     /* Table */
     @ColorTableBackground: @Neutral-3;
-    @ColorTableSelectionBackground: @Brand-Accent-900;
-    @ColorTableHoverRow: @Brand-Accent-800;
-    @ColorTableAlternateRow: @Neutral-15;
-
-    /* Header (QHeaderView::section) */
-    @ColorHeaderBackground: @Neutral-4;
-    @ColorHeaderBackgroundHover: @Neutral-12;
-    @ColorHeaderPressed: @Neutral-5;
-
-    /* Tabs */
-    @ColorTabWidgetBackground: @Neutral-3;
-    @ColorTabWidgetCloseIconColor: @Neutral-6;
-    @ColorTabWidgetCloseIconColorHover: @Severity-Info;
-    @ColorTabWidgetCloseIconPx: 18;
-    @ColorTabWidgetToolButtonBg: transparent;
-    @ColorTabWidgetToolButtonBgHover: @Neutral-5;
-    @ColorTabWidgetToolButtonBgPressed: @Neutral-4;
-
-    @ColorTabPaneBackground: @ColorTableBackground;
-    @ColorTabBackground: @Neutral-5;
-    @ColorTabSelectedBackground: @Neutral-12;
-    @ColorTabHoverBackground: @Neutral-12;
-    @ColorTabText: @text-color-primary;
-    @ColorTabTextInactive: @text-color-secondary;
-
-    /* TreeView */
-    @ColorTreeViewItemBackground: @Neutral-5;
-    @ColorTreeViewItemBackgroundHover: @Neutral-12;
-    @ColorTreeViewItemBackgroundSelected: @Brand-Accent-700;
 
     /* Window Title Bar */
     @ColorWindowButtonColor: @Neutral-6;
@@ -238,21 +383,8 @@
     @ColorDockWidgetToolButtonBgHover: @Neutral-5;
     @ColorDockWidgetToolButtonBgPressed: @Neutral-4;
 
-    /* MenuBar */
-    @ColorMenuBarBackground: @Neutral-4;
-    @ColorMenuBarItemSelectedBackground: @Brand-Accent-700;
-
-    /* Menu */
-    @ColorMenuBackground: @Neutral-3;
-    @ColorMenuItemSelectedBackground: @Brand-Accent-700;
-
-    /* ScrollBars */
-    @ColorScrollBarTrack: @ColorLogFilterBarBackground;
-    @ColorScrollBarHandle: @Brand-Accent-700;
-    @ColorScrollBarHandleHover: @Brand-Accent-600;
-
     /* Log File Explorer */
-    @ColorLogFileExplorerBackground: @ColorTableBackground;
+    @ColorLogFileExplorerBackground: @Neutral-3;
 
     /* Pie Chart */
     @ColorPieChartEmptyRing: @Neutral-12;
@@ -310,7 +442,6 @@
     @border-color-secondary: @Neutral-1;
     @border-color-disabled: @Neutral-22;
 
-
     /* --- COMPONENT TOKENS ----------------------------------------------------- */
 
     /* Base Widget */
@@ -352,23 +483,110 @@
     @line-edit-text-color-disabled: @text-color-disabled;
     @line-edit-text-color-placeholder: @text-color-tertiary;
 
+    /* ComboBox */
+    @combo-box-bg-color: @Neutral-6;
+    @combo-box-bg-color-hover: @Neutral-17;
+    @combo-box-bg-color-disabled: @Neutral-18;
+    @combo-box-border-color: @border-color-primary;
+    @combo-box-selection-bg-color: @Brand-Accent-100;
+    @combo-box-text-color: @text-color-primary;
+    @combo-box-text-color-disabled: @text-color-disabled;
+
+    /* CheckBox */
+    @checkbox-indicator-bg-color: @Neutral-6;
+    @checkbox-indicator-bg-color-checked: @Brand-Accent-300;
+    @checkbox-indicator-bg-color-hover: @Brand-Accent-100;
+    @checkbox-indicator-bg-color-disabled: @Neutral-18;
+    @checkbox-indicator-border-color: @Brand-Accent-100;
+    @checkbox-text-color: @text-color-primary;
+    @checkbox-text-color-disabled: @text-color-disabled;
+
+    /* Button */
+    @button-bg-color: @Brand-Accent-700;
+    @button-bg-color-hover: @Brand-Accent-600;
+    @button-bg-color-pressed: @Brand-Accent-800;
+    @button-bg-color-disabled: @Neutral-23;
+    @button-text-color: @text-color-primary;
+    @button-text-color-disabled: @text-color-disabled;
+
+    /* ToolButton */
+    @tool-button-bg-color: @Neutral-6;
+    @tool-button-bg-color-hover: @button-bg-color-hover;
+    @tool-button-bg-color-disabled: @Neutral-18;
+    @tool-button-border-color-hover: @Brand-Accent-500;
+    @tool-button-text-color: @text-color-primary;
+    @tool-button-text-color-disabled: @text-color-disabled;
+
+    /* ToolButton Variant: Inline Menu */
+    @tool-button-inline-bg-color: @Neutral-6;
+    @tool-button-inline-bg-color-hover: @Neutral-17;
+    @tool-button-inline-bg-color-pressed: @Neutral-21;
+
+    /* Table View */
+    @table-bg-color: @Neutral-6;
+    @table-selection-bg-color: @Brand-Accent-100;
+    @table-hover-row-color: @Brand-Accent-5;
+    @table-alternate-bg-color: @Neutral-16;
+    @table-text-color: @text-color-primary;
+
+    /* Table Header */
+    @table-header-bg-color: @Neutral-6;
+    @table-header-bg-color-hover: @Neutral-17;
+    @table-header-bg-color-pressed: @Neutral-22;
+    @table-header-text-color: @text-color-primary;
+
+    /* PlainTextEdit */
+    @plain-text-edit-bg-color: @Neutral-6;
+    @plain-text-edit-bg-color-disabled: @Neutral-23;
+    @plain-text-edit-border-color: @border-color-primary;
+    @plain-text-edit-text-color: @text-color-primary;
+    @plain-text-edit-text-color-disabled: @text-color-disabled;
+
+    /* MenuBar */
+    @menu-bar-bg-color: @Neutral-16;
+    @menu-bar-item-bg-color-selected: @Brand-Accent-100;
+    @menu-bar-text-color: @text-color-primary;
+
+    /* Menu */
+    @menu-bg-color: @Neutral-17;
+    @menu-item-bg-color-selected: @Brand-Accent-100;
+    @menu-border-color: @border-color-primary;
+    @menu-text-color: @text-color-primary;
+    @menu-text-color-disabled: @text-color-disabled;
+
+    /* ScrollBars */
+    @scroll-bar-track-color: @Neutral-19;
+    @scroll-bar-handle-color: @Brand-Accent-100;
+    @scroll-bar-handle-color-hover: @Brand-Accent-200;
+
+    /* TreeView */
+    @tree-bg-color: @Neutral-6;
+    @tree-text-color: @text-color-primary;
+    @tree-item-bg-color: @Neutral-4;
+    @tree-item-bg-color-hover: @Neutral-12;
+    @tree-item-bg-color-selected: @Brand-Accent-100;
+
+    /* QTabWidget */
+    @tab-widget-bg-color: @Neutral-19;
+    @tab-widget-pane-bg-color: @Neutral-6;
+
+    /* QTabBar */
+    @tab-bar-tab-bg-color: @Neutral-19;
+    @tab-bar-tab-bg-color-selected: @Neutral-17;
+    @tab-bar-tab-bg-color-hover: @Neutral-17;
+    @tab-bar-tab-text-color-active: @text-color-primary;
+    @tab-bar-tab-text-color-inactive: @text-color-secondary;
+
+    /* Custom TabWidget */
+    @custom-tab-widget-close-icon-color: @Neutral-7;
+    @custom-tab-widget-close-icon-color-hover: @Severity-Info;
+    @custom-tab-widget-tool-button-bg-color: transparent;
+    @custom-tab-widget-tool-button-bg-color-hover: @Neutral-6;
+    @custom-tab-widget-tool-button-bg-color-pressed: @Neutral-21;
+
     /* Inputs / Bars */
     @ColorLogFilterBarBackground: @Neutral-19;
     @ColorLogFilterBarWidgetBackground: @Neutral-19;
-
-    /* ComboBox */
-    @ColorComboBoxBackground: @Neutral-6;
-    @ColorComboBoxBackgroundHover: @Neutral-17;
-    @ColorComboBoxBackgroundDisabled: @Neutral-18;
-    @ColorComboBoxBorder: @border-color-primary;
-    @ColorComboBoxSelectionBackground: @Brand-Accent-100;
-
-    /* CheckBox */
-    @ColorCheckBoxIndicatorBackground: @Neutral-6;
-    @ColorCheckBoxIndicatorChecked: @Brand-Accent-300;
-    @ColorCheckBoxIndicatorHover: @Brand-Accent-100;
-    @ColorCheckBoxIndicatorDisabled: @Neutral-18;
-    @ColorCheckBoxIndicatorBorderColor: @Brand-Accent-100;
 
     /* Severity */
     @ColorTrace: @Severity-Trace;
@@ -384,51 +602,8 @@
     @ColorErrorHover: @Severity-ErrorHover;
     @ColorFatalHover: @Severity-FatalHover;
 
-    /* Buttons / ToolButtons */
-    @ColorButtonBackground: @Brand-Accent-700;
-    @ColorButtonBackgroundHover: @Brand-Accent-600;
-    @ColorButtonBackgroundPressed: @Brand-Accent-800;
-    @ColorButtonBackgroundDisabled: @Neutral-23;
-
-    @ColorToolButtonBackground: @Neutral-6;
-    @ColorToolButtonBackgroundDisabled: @Neutral-18;
-    @ColorToolButtonBorderHover: @Brand-Accent-500;
-
-    @ColorToolButtonBackgroundInlineMenu: @Neutral-6;
-    @ColorToolButtonBackgroundInlineMenuHover: @Neutral-17;
-    @ColorToolButtonBackgroundInlineMenuPressed: @Neutral-21;
-
     /* Table */
     @ColorTableBackground: @Neutral-6;
-    @ColorTableSelectionBackground: @Brand-Accent-100;
-    @ColorTableHoverRow: @Brand-Accent-50;
-    @ColorTableAlternateRow: @Neutral-16;
-
-    /* Header (QHeaderView::section) */
-    @ColorHeaderBackground: @Neutral-6;
-    @ColorHeaderBackgroundHover: @Neutral-17;
-    @ColorHeaderPressed: @Neutral-22;
-
-    /* Tabs */
-    @ColorTabWidgetBackground: @Neutral-19;
-    @ColorTabWidgetCloseIconColor: @Neutral-7;
-    @ColorTabWidgetCloseIconColorHover: @Severity-Info;
-    @ColorTabWidgetCloseIconPx: 18;
-    @ColorTabWidgetToolButtonBg: transparent;
-    @ColorTabWidgetToolButtonBgHover: @Neutral-6;
-    @ColorTabWidgetToolButtonBgPressed: @Neutral-21;
-
-    @ColorTabPaneBackground: @ColorTableBackground;
-    @ColorTabBackground: @Neutral-19;
-    @ColorTabSelectedBackground: @Neutral-17;
-    @ColorTabHoverBackground: @Neutral-17;
-    @ColorTabText: @text-color-primary;
-    @ColorTabTextInactive: @text-color-secondary;
-
-    /* TreeView */
-    @ColorTreeViewItemBackground: @Neutral-4;
-    @ColorTreeViewItemBackgroundHover: @Neutral-12;
-    @ColorTreeViewItemBackgroundSelected: @Brand-Accent-100;
 
     /* Window Title Bar */
     @ColorWindowButtonColor: @Neutral-7;
@@ -449,21 +624,8 @@
     @ColorDockWidgetToolButtonBgHover: transparent;
     @ColorDockWidgetToolButtonBgPressed: @Neutral-21;
 
-    /* MenuBar */
-    @ColorMenuBarBackground: @Neutral-16;
-    @ColorMenuBarItemSelectedBackground: @Brand-Accent-100;
-
-    /* Menu */
-    @ColorMenuBackground: @Neutral-17;
-    @ColorMenuItemSelectedBackground: @Brand-Accent-100;
-
-    /* ScrollBars */
-    @ColorScrollBarTrack: @Neutral-19;
-    @ColorScrollBarHandle: @Brand-Accent-100;
-    @ColorScrollBarHandleHover: @Brand-Accent-200;
-
     /* Log File Explorer */
-    @ColorLogFileExplorerBackground: @ColorTableBackground;
+    @ColorLogFileExplorerBackground: @Neutral-6;
 
     /* Pie Chart */
     @ColorPieChartEmptyRing: @Neutral-16;
@@ -662,396 +824,455 @@ QLineEdit[text=""] {
     color: @line-edit-text-color-placeholder;
 }
 
-/* === ComboBox === */
+/* --- ComboBoxes ----------------------------------------------------------- */
 QComboBox {
-    background-color: @ColorComboBoxBackground;
-    border: 1px solid @ColorComboBoxBorder;
-    border-radius: 6px;
     padding: 4px;
     padding-left: 8px;
     padding-right: 8px;
-    color: @text-color-primary;
+    border: @combo-box-border-width solid @combo-box-border-color;
+    border-radius: @combo-box-border-radius;
+    background-color: @combo-box-bg-color;
+    color: @combo-box-text-color;
 }
+
 QComboBox:hover {
-    background-color: @ColorComboBoxBackgroundHover;
+    background-color: @combo-box-bg-color-hover;
 }
+
 QComboBox:disabled {
-    background-color: @ColorComboBoxBackgroundDisabled;
-    color: @text-color-disabled;
+    background-color: @combo-box-bg-color-disabled;
+    color: @combo-box-text-color-disabled;
 }
+
 QComboBox::drop-down {
-    border: none;
     subcontrol-origin: padding;
     subcontrol-position: top right;
-    width: 20px;
+    width: @combo-box-drop-down-width;
+    border: none;
 }
-/* TODO: 
- * - ::down-arrow: use themed SVG, fix margins/alignment.
- */
+
 QComboBox::down-arrow {
     image: url(:/Resources/down-arrow.svg);
-    border: none;
-    background-color: transparent;
-    width: 10px;
-    height: 10px;
     margin: 0 4px;
-}
-QComboBox QAbstractItemView {
-    background-color: @ColorComboBoxBackground;
-    border: 1px solid @ColorComboBoxBorder;
-    border-radius: 6px;
-    selection-background-color: @ColorComboBoxSelectionBackground;
-    selection-color: @text-color-primary;
-}
-
-/* === CheckBox === */
-QCheckBox {
-    spacing: 6px;
+    width: @combo-box-arrow-width;
+    height: @combo-box-arrow-height;
+    border: none;
     background-color: transparent;
-    color: @text-color-primary;
 }
-QCheckBox::indicator {
-    width: 14px;
-    height: 14px;
-    background-color: @ColorCheckBoxIndicatorBackground;
-    border: 2px solid @ColorCheckBoxIndicatorBorderColor;
-    border-radius: 2px;
+
+QComboBox QAbstractItemView {
+    border: @combo-box-border-width solid @combo-box-border-color;
+    border-radius: @combo-box-border-radius;
+    background-color: @combo-box-bg-color;
+    selection-background-color: @combo-box-selection-bg-color;
+    selection-color: @combo-box-text-color;
 }
-QCheckBox::indicator:checked {
-    background-color: @ColorCheckBoxIndicatorChecked;
-    border: 2px solid @ColorCheckBoxIndicatorChecked;
+
+/* --- CheckBoxes ----------------------------------------------------------- */
+QCheckBox {
+    spacing: @checkbox-spacing;
+    background-color: transparent;
+    color: @checkbox-text-color;
 }
-QCheckBox::indicator:hover {
-    background-color: @ColorCheckBoxIndicatorHover;
-}
+
 QCheckBox:disabled {
-    color: @text-color-disabled;
+    color: @checkbox-text-color-disabled;
 }
+
+QCheckBox::indicator {
+    width: @checkbox-indicator-width;
+    height: @checkbox-indicator-height;
+    border: @checkbox-indicator-border-width solid @checkbox-indicator-border-color;
+    border-radius: @checkbox-indicator-border-radius;
+    background-color: @checkbox-indicator-bg-color;
+}
+
+QCheckBox::indicator:checked {
+    border: @checkbox-indicator-border-width solid @checkbox-indicator-bg-color-checked;
+    background-color: @checkbox-indicator-bg-color-checked;
+}
+
+QCheckBox::indicator:hover {
+    background-color: @checkbox-indicator-bg-color-hover;
+}
+
 QCheckBox::indicator:disabled {
-    background-color: @ColorCheckBoxIndicatorDisabled;
-    border: 1px solid @border-color-disabled;
+    border: @checkbox-indicator-border-width-disabled solid @border-color-disabled;
+    background-color: @checkbox-indicator-bg-color-disabled;
 }
 
-/* === PushButton === */
+/* --- PushButtons ---------------------------------------------------------- */
 QPushButton {
-    background-color: @ColorButtonBackground;
-    color: @text-color-primary;
-    border: none;
-    border-radius: 6px;
     padding: 6px 12px;
+    border: none;
+    border-radius: @button-border-radius;
+    background-color: @button-bg-color;
+    color: @button-text-color;
 }
+
 QPushButton:hover {
-    background-color: @ColorButtonBackgroundHover;
+    background-color: @button-bg-color-hover;
 }
+
 QPushButton:pressed {
-    background-color: @ColorButtonBackgroundPressed;
+    background-color: @button-bg-color-pressed;
 }
+
 QPushButton:disabled {
-    background-color: @ColorButtonBackgroundDisabled;
-    color: @text-color-disabled;
+    background-color: @button-bg-color-disabled;
+    color: @button-text-color-disabled;
 }
 
-/* === ToolButton (Pagination) === */
+/* --- ToolButtons ---------------------------------------------------------- */
 QToolButton {
-    background-color: @ColorToolButtonBackground;
-    border: 2px solid @border-color-primary;
-    border-radius: 10px;
-    color: @text-color-primary;
-    min-width: 32px;
-    max-width: 32px;
-    max-height: 32px;
+    min-width: @tool-button-size;
+    max-width: @tool-button-size;
+    max-height: @tool-button-size;
     padding: 0;
+    border: @tool-button-border-width solid @border-color-primary;
+    border-radius: @tool-button-border-radius;
+    background-color: @tool-button-bg-color;
+    color: @tool-button-text-color;
 }
+
 QToolButton:hover {
-    border: 2px solid @ColorToolButtonBorderHover;
-    background-color: @ColorButtonBackgroundHover;
-    color: @text-color-primary;
+    border: @tool-button-border-width solid @tool-button-border-color-hover;
+    background-color: @tool-button-bg-color-hover;
+    color: @tool-button-text-color;
 }
+
 QToolButton:disabled {
-    background-color: @ColorToolButtonBackgroundDisabled;
-    color: @text-color-disabled;
-    border: 2px solid @border-color-disabled;
+    border: @tool-button-border-width solid @border-color-disabled;
+    background-color: @tool-button-bg-color-disabled;
+    color: @tool-button-text-color-disabled;
 }
 
+/* ToolButton Variant: Inline Menu */
 QToolButton[variant="inline-menu"] {
-    min-width: 24px;
-    max-width: 24px;
-    min-height: 24px;
-    max-height: 24px;
-    padding: 0px;
+    min-width: @tool-button-inline-size;
+    max-width: @tool-button-inline-size;
+    min-height: @tool-button-inline-size;
+    max-height: @tool-button-inline-size;
+    padding: 0;
     border: none;
-    background-color: @ColorToolButtonBackgroundInlineMenu;
-}
-QToolButton[variant="inline-menu"]:hover {
-    background-color: @ColorToolButtonBackgroundInlineMenuHover;
-    border: none;
-}
-QToolButton[variant="inline-menu"]:pressed {
-    background-color: @ColorToolButtonBackgroundInlineMenuPressed;
-    border: none;
+    background-color: @tool-button-inline-bg-color;
 }
 
-/* === TableView === */
+QToolButton[variant="inline-menu"]:hover {
+    border: none;
+    background-color: @tool-button-inline-bg-color-hover;
+}
+
+QToolButton[variant="inline-menu"]:pressed {
+    border: none;
+    background-color: @tool-button-inline-bg-color-pressed;
+}
+
+/* --- TableViews ----------------------------------------------------------- */
 QTableView {
-    background-color: @ColorTableBackground;
-    gridline-color: @border-color-primary;
-    color: @text-color-primary;
-    border: 1px solid @border-color-primary;
-    selection-background-color: @ColorTableSelectionBackground;
-    selection-color: @text-color-primary;
     outline: none;
-    qproperty-hover_row_color: @ColorTableHoverRow;
-    alternate-background-color: @ColorTableAlternateRow;
+    border: @table-border-width solid @border-color-primary;
+    gridline-color: @border-color-primary;
+    background-color: @table-bg-color;
+    alternate-background-color: @table-alternate-bg-color;
+    color: @table-text-color;
+    selection-background-color: @table-selection-bg-color;
+    selection-color: @table-text-color;
+
+    qproperty-hover_row_color: @table-hover-row-color;
 }
+
 QTableView::item {
-    border: 0px;
-    padding: 8px;
+    padding: @table-item-padding;
+    border: 0;
 }
+
 QTableView::item:selected:focus {
-    background: @ColorTableSelectionBackground;
+    background: @table-selection-bg-color;
 }
+
 QTableView::item:!selected:focus {
     background: transparent;
 }
+
 QHeaderView::section {
-    background-color: @ColorHeaderBackground;
-    color: @text-color-primary;
-    padding: 2px;
-    border: 1px solid @border-color-primary;
-    border-radius: 0px;
+    padding: @table-header-padding;
+    border: @table-header-border-width solid @border-color-primary;
+    border-radius: @table-header-border-radius;
+    background-color: @table-header-bg-color;
+    color: @table-header-text-color;
 }
+
 QHeaderView::section:hover {
-    background-color: @ColorHeaderBackgroundHover;
+    background-color: @table-header-bg-color-hover;
 }
+
 QHeaderView::section:pressed {
-    background-color: @ColorHeaderPressed;
+    background-color: @table-header-bg-color-pressed;
 }
+
 QTableCornerButton::section {
-    background-color: @ColorHeaderBackground;
     border: none;
+    background-color: @table-header-bg-color;
 }
 
-/* === PlainTextEdit === */
+/* --- PlainTextEdits ------------------------------------------------------- */
 QPlainTextEdit {
-    background-color: @ColorTableBackground;
-    color: @text-color-primary;
-    border: 1px solid @border-color-primary;
-    border-radius: 8px;
     padding: 6px;
+    border: @plain-text-edit-border-width solid @plain-text-edit-border-color;
+    border-radius: @plain-text-edit-border-radius;
+    background-color: @plain-text-edit-bg-color;
+    color: @plain-text-edit-text-color;
 }
+
 QPlainTextEdit:disabled {
-    background-color: @ColorButtonBackgroundDisabled;
-    color: @text-color-disabled;
+    background-color: @plain-text-edit-bg-color-disabled;
+    color: @plain-text-edit-text-color-disabled;
 }
 
-/* === MenuBar === */
+/* --- MenuBar -------------------------------------------------------------- */
 QMenuBar {
-    background-color: @ColorMenuBarBackground;
-    color: @text-color-primary;
+    background-color: @menu-bar-bg-color;
+    color: @menu-bar-text-color;
 }
+
 QMenuBar::item {
+    padding: @menu-bar-item-padding;
     background: transparent;
-    padding: 4px 10px;
 }
+
 QMenuBar::item:selected {
-    background: @ColorMenuBarItemSelectedBackground;
+    background: @menu-bar-item-bg-color-selected;
 }
 
-/* === Menu === */
+/* --- Menus ---------------------------------------------------------------- */
 QMenu {
-    background-color: @ColorMenuBackground;
-    border: 1px solid @border-color-primary;
+    border: @menu-border-width solid @menu-border-color;
+    background-color: @menu-bg-color;
 }
+
 QMenu::item {
-    padding: 6px 20px;
+    padding: @menu-item-padding;
     background-color: transparent;
-    color: @text-color-primary;
+    color: @menu-text-color;
 }
+
 QMenu::item:selected {
-    background-color: @ColorMenuItemSelectedBackground;
-    color: @text-color-primary;
+    background-color: @menu-item-bg-color-selected;
+    color: @menu-text-color;
 }
+
 QMenu::item:disabled {
-    color: @text-color-disabled;
+    color: @menu-text-color-disabled;
 }
 
+/* Menu Variant: Inline Menu */
 QMenu[variant="inline-menu"] {
-    margin-top: 4px;
-    min-width: 240px;
-    padding: 6px 10px;
-    border-radius: 8px;
-}
-QMenu[variant="inline-menu"]::item {
-    padding: 6px 20px;
+    margin-top: @menu-inline-margin-top;
+    min-width: @menu-inline-min-width;
+    padding: @menu-inline-padding;
+    border-radius: @menu-inline-border-radius;
 }
 
-/* === ScrollBar === */
-QScrollBar:vertical,
-QScrollBar:horizontal {
-    background-color: @ColorScrollBarTrack;
-    border: none;
-    width: 10px;
-    height: 10px;
+QMenu[variant="inline-menu"]::item {
+    padding: @menu-item-padding;
 }
+
+/* --- ScrollBars ----------------------------------------------------------- */
+QScrollBar:vertical {
+    width: @scroll-bar-size;
+    border: none;
+    background-color: @scroll-bar-track-color;
+}
+
+QScrollBar:horizontal {
+    height: @scroll-bar-size;
+    border: none;
+    background-color: @scroll-bar-track-color;
+}
+
 QScrollBar::handle:vertical,
 QScrollBar::handle:horizontal {
-    background-color: @ColorScrollBarHandle;
-    border-radius: 5px;
+    border-radius: @scroll-bar-handle-radius;
+    background-color: @scroll-bar-handle-color;
 }
+
 QScrollBar::handle:hover {
-    background-color: @ColorScrollBarHandleHover;
+    background-color: @scroll-bar-handle-color-hover;
 }
-QScrollBar::add-line, QScrollBar::sub-line {
-    background: none;
+
+QScrollBar::add-line,
+QScrollBar::sub-line {
+    width: 0;
+    height: 0;
     border: none;
-    height: 0px;
-    width: 0px;
-}
-QScrollBar::add-page, QScrollBar::sub-page {
     background: none;
 }
 
-/* === TreeView === */
+QScrollBar::add-page,
+QScrollBar::sub-page {
+    background: none;
+}
+
+/* --- TreeViews ------------------------------------------------------------ */
 QTreeView {
-    margin: 2px;
-    background-color: @ColorTableBackground;
-    border-radius: 6px;
-    color: @text-color-primary;
     outline: none;
+    margin: @tree-margin;
+    border-radius: @tree-border-radius;
+    background-color: @tree-bg-color;
+    color: @tree-text-color;
 }
+
 QTreeView::item {
-    padding-top: 5px;
-    padding-bottom: 5px;
-    padding-left: 5px;
-    margin-top: 5px;
-    margin-right: 2px;
-    background: @ColorTreeViewItemBackground;
-    border-radius: 8px;
+    margin: @tree-item-margin;
+    padding: @tree-item-padding;
+    border-radius: @tree-item-border-radius;
+    background: @tree-item-bg-color;
 }
+
 QTreeView::item:hover {
-    background: @ColorTreeViewItemBackgroundHover;
+    background: @tree-item-bg-color-hover;
 }
+
 QTreeView::item:selected {
-    background: @ColorTreeViewItemBackgroundSelected;
-    color: @text-color-primary;
+    background: @tree-item-bg-color-selected;
+    color: @tree-text-color;
 }
+
 QTreeView::branch {
-    background: @ColorTableBackground;
+    background: @tree-bg-color;
 }
+
 QTreeView::branch:has-siblings:!adjoins-item {
-    background: @ColorTableBackground;
+    background: @tree-bg-color;
 }
+
 QTreeView::branch:has-siblings:adjoins-item {
-    background: @ColorTableBackground;
+    background: @tree-bg-color;
 }
+
 QTreeView::branch:!has-children:!has-siblings:adjoins-item {
-    background: @ColorTableBackground;
+    background: @tree-bg-color;
 }
+
 QTreeView::branch:closed:has-children:has-siblings {
-    background: @ColorTableBackground;
+    background: @tree-bg-color;
 }
+
 QTreeView::branch:has-children:!has-siblings:closed {
-    background: @ColorTableBackground;
+    background: @tree-bg-color;
 }
+
 QTreeView::branch:open:has-children:has-siblings {
-    background: @ColorTableBackground;
+    background: @tree-bg-color;
 }
+
 QTreeView::branch:open:has-children:!has-siblings {
-    background: @ColorTableBackground;
+    background: @tree-bg-color;
 }
 
+/* --- Custom TreeView ---------------------------------------------------- */
 TreeView {
-    qproperty-tree_view_branch_icon_open:   ":/Resources/Icons/branch-open.svg";
+    qproperty-tree_view_branch_icon_open: ":/Resources/Icons/branch-open.svg";
     qproperty-tree_view_branch_icon_closed: ":/Resources/Icons/branch-closed.svg";
-    qproperty-tree_view_branch_icon_color:  @Severity-Info;
-    qproperty-tree_view_branch_icon_px:     16;
-    qproperty-tree_view_branch_pen_width:   1;
-    qproperty-tree_view_branch_hlength_px:  10;
-    qproperty-tree_view_branch_top_vline:   false;
+    qproperty-tree_view_branch_icon_color: @Severity-Info;
+    qproperty-tree_view_branch_icon_px: @tree-branch-icon-size;
+    qproperty-tree_view_branch_pen_width: @tree-branch-pen-width;
+    qproperty-tree_view_branch_hlength_px: @tree-branch-hlength;
+    qproperty-tree_view_branch_top_vline: false;
 }
 
-/* === Tabs === */
+/* --- QTabWidget ----------------------------------------------------------- */
 QTabWidget::pane {
-    border: 1px solid @border-color-primary;
-    background: @ColorTabPaneBackground;
-}
-QTabWidget > QWidget {
-    background: @ColorTabWidgetBackground;
-    padding-top: 2px;
-}
-QTabBar::tab {
-    background: @ColorTabBackground;
-    border: 1px solid @border-color-primary;
-    padding: 6px 12px;
-    border-top-left-radius: 6px;
-    border-top-right-radius: 6px;
-    color: @ColorTabTextInactive;
-}
-QTabBar::tab:hover {
-    background: @ColorTabHoverBackground;
-}
-QTabBar::tab:selected {
-    background: @ColorTabSelectedBackground;
-    color: @ColorTabText;
-    border-bottom-color: @ColorTabPaneBackground;
-    border-top: 2px solid @Brand-Accent-600;
-}
-QTabBar::scroller {
-    width: 60px;
-}
-QTabBar::tear {
-    width: 0px;
-}
-QTabBar QToolButton::right-arrow {
-    image: url(:/Resources/right-arrow.svg);
-    padding: 4px;
-}
-QTabBar QToolButton::left-arrow {
-    image: url(:/Resources/left-arrow.svg);
-    padding: 4px;
+    border: @tab-widget-pane-border-width solid @border-color-primary;
+    background: @tab-widget-pane-bg-color;
 }
 
-/* === TabWidget === */
+QTabWidget > QWidget {
+    padding-top: @tab-widget-padding-top;
+    background: @tab-widget-bg-color;
+}
+
+/* --- QTabBar -------------------------------------------------------------- */
+QTabBar::tab {
+    padding: @tab-bar-tab-padding;
+    border: @tab-bar-tab-border-width solid @border-color-primary;
+    border-top-left-radius: @tab-bar-tab-border-radius-top;
+    border-top-right-radius: @tab-bar-tab-border-radius-top;
+    background: @tab-bar-tab-bg-color;
+    color: @tab-bar-tab-text-color-inactive;
+}
+
+QTabBar::tab:hover {
+    background: @tab-bar-tab-bg-color-hover;
+}
+
+QTabBar::tab:selected {
+    border-top: @tab-bar-tab-selected-border-top-width solid @Brand-Accent-600;
+    border-bottom-color: @tab-widget-pane-bg-color;
+    background: @tab-bar-tab-bg-color-selected;
+    color: @tab-bar-tab-text-color-active;
+}
+
+QTabBar::scroller {
+    width: @tab-bar-scroller-width;
+}
+
+QTabBar::tear {
+    width: @tab-bar-tear-width;
+}
+
+QTabBar QToolButton::right-arrow {
+    padding: @tab-bar-arrow-padding;
+    image: url(:/Resources/right-arrow.svg);
+}
+
+QTabBar QToolButton::left-arrow {
+    padding: @tab-bar-arrow-padding;
+    image: url(:/Resources/left-arrow.svg);
+}
+
+/* --- TabWidget ------------------------------------------------------------ */
 TabWidget {
-    qproperty-close_icon_color: @ColorTabWidgetCloseIconColor;
-    qproperty-close_icon_color_hover: @ColorTabWidgetCloseIconColorHover;
-    qproperty-close_icon_px: @ColorTabWidgetCloseIconPx;
+    qproperty-close_icon_color: @custom-tab-widget-close-icon-color;
+    qproperty-close_icon_color_hover: @custom-tab-widget-close-icon-color-hover;
+    qproperty-close_icon_px: @custom-tab-widget-close-icon-size;
 }
 
 TabWidget QToolButton {
-    background-color: @ColorTabWidgetToolButtonBg;
-    border: none;
-    border-radius: 0px;
-    padding: 0px;
-    min-height: 0px;
+    min-height: 0;
     max-height: 9999px;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background-color: @custom-tab-widget-tool-button-bg-color;
 }
 
 TabWidget QToolButton:hover {
-    background-color: @ColorTabWidgetToolButtonBgHover;
     border: none;
+    background-color: @custom-tab-widget-tool-button-bg-color-hover;
 }
 
 TabWidget QToolButton:pressed {
-    background-color: @ColorTabWidgetToolButtonBgPressed;
+    background-color: @custom-tab-widget-tool-button-bg-color-pressed;
 }
 
 TabWidget QToolButton:disabled {
     border: none;
 }
 
-/* === TabWidgetLog Specific Styles === */
-QTabWidget#tabWidgetLog::pane  {
-    border-radius: 0px;
+/* --- Specific TabWidget IDs ----------------------------------------------- */
+QTabWidget#tabWidgetLog::pane {
+    border-radius: @tab-widget-log-pane-border-radius;
 }
 
 TabWidget#tabWidgetLog TabBar::tab {
-    min-height: 28px;
-    padding: 0 12px;
-    border-top-left-radius: 0px;
-    border-top-right-radius: 0px;
-    min-width: 120px;
-    max-width: 180px;
+    min-width: @custom-tab-widget-log-tab-min-width;
+    max-width: @custom-tab-widget-log-tab-max-width;
+    min-height: @custom-tab-widget-log-tab-min-height;
+    padding: @custom-tab-widget-log-tab-padding;
+    border-top-left-radius: @custom-tab-widget-log-tab-border-radius-top;
+    border-top-right-radius: @custom-tab-widget-log-tab-border-radius-top;
 }
 
 /* === DockerWidget === */
@@ -1156,7 +1377,7 @@ LogViewWidget QToolButton {
     padding: 4px;
     border: 1px solid @border-color-primary;
     border-radius: 6px;
-    background-color: @ColorToolButtonBackground;
+    background-color: @tool-button-bg-color;
     color: @text-color-primary;
 }
 
