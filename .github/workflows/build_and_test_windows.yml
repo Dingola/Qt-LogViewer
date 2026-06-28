@@ -26,7 +26,7 @@ env:
 jobs:
   build_and_test:
     name: Build and Test on Windows Latest
-    runs-on: windows-latest
+    runs-on: windows-2022
     steps:
       # Checkout the repository and submodules
       - name: Checkout repository (and submodules)
@@ -55,14 +55,10 @@ jobs:
         with:
           cmake-version: '4.1.1'
 
-      # Set up MSVC Environment
-      - name: Set up MSVC Environment
-        uses: ilammy/msvc-dev-cmd@v1
-
       # Configure CMake
       - name: Configure CMake
         run: |
-          cmake -G "Visual Studio 17 2022" -B build -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} `
+          cmake -B build -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} `
                 -DCMAKE_PREFIX_PATH="C:\Qt\${{ env.QT_VERSION }}\msvc2022_64" `
                 -DMAIN_PROJECT_NAME=${{ env.MAIN_PROJECT_NAME }} `
                 -D${{ env.MAIN_PROJECT_NAME }}_BUILD_TARGET_TYPE=${{ env.BUILD_TARGET_TYPE }} `
