@@ -3,6 +3,8 @@
 #include <QDateTime>
 #include <QTemporaryFile>
 #include <QTextStream>
+#include <chrono>
+#include <iostream>
 
 /**
  * @brief Sets up the test fixture for each test.
@@ -235,4 +237,87 @@ TEST_F(LogParserTest, LogParserWithNoPlaceholders)
     // Should not match anything else
     QRegularExpressionMatch mismatch = regex.match("other text");
     EXPECT_FALSE(mismatch.hasMatch());
+}
+
+/**
+ * @test Measures baseline runtime of parse_line for a stable valid log line.
+ */
+TEST_F(LogParserTest, ParseLinePerformanceBaseline)
+{
+    const QString line =
+        "2024-01-01 12:34:56 Debug This is a debug message MyApp [file.cpp:42 (func())]";
+    const QString file_path = "dummy.log";
+    constexpr int iterations = 200000;
+
+    volatile int parsed_count = 0;
+
+    auto start = std::chrono::steady_clock::now();
+    for (int i = 0; i < iterations; ++i)
+    {
+        LogEntry entry = m_parser->parse_line(line, file_path);
+        if (!entry.get_level().isEmpty())
+        {
+            ++parsed_count;
+        }
+    }
+    auto end = std::chrono::steady_clock::now();
+
+    const auto elapsed_us =
+        std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+    const double avg_us_per_line =
+        static_cast<double>(elapsed_us) / static_cast<double>(iterations);
+
+    EXPECT_EQ(parsed_count, iterations);
+
+    std::cout << "[PERF] LogParser::parse_line baseline: " << elapsed_us << " us total for "
+              << iterations << " iterations (" << avg_us_per_line << " us/line)" << std::endl;
+}
+
+/**
+ * @test Measures baseline runtime of parse_file for a representative synthetic file.
+ */
+TEST_F(LogParserTest, ParseFilePerformanceBaseline)
+{
+    constexpr int lines_per_file = 10000;
+    constexpr int runs = 5;
+
+    QTemporaryFile temp_file;
+    ASSERT_TRUE(temp_file.open());
+
+    QTextStream out(&temp_file);
+    for (int i = 0; i < lines_per_file; ++i)
+    {
+        out << "2024-01-01 12:34:56 Info Message " << i << " MyApp [file.cpp:42 (func())]\n";
+    }
+    out.flush();
+    temp_file.close();
+
+    // Warmup run to reduce first-run variance in the measured runs.
+    QVector<LogEntry> warmup_entries = m_parser->parse_file(temp_file.fileName());
+    ASSERT_EQ(warmup_entries.size(), lines_per_file);
+
+    qint64 total_elapsed_ms = 0;
+    int total_entries = 0;
+
+    for (int run = 0; run < runs; ++run)
+    {
+        auto start = std::chrono::steady_clock::now();
+        QVector<LogEntry> entries = m_parser->parse_file(temp_file.fileName());
+        auto end = std::chrono::steady_clock::now();
+
+        EXPECT_EQ(entries.size(), lines_per_file);
+
+        total_entries += entries.size();
+        total_elapsed_ms +=
+            std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    }
+
+    const double avg_ms_per_run = static_cast<double>(total_elapsed_ms) / static_cast<double>(runs);
+    const double entries_per_second =
+        (static_cast<double>(total_entries) * 1000.0) / static_cast<double>(total_elapsed_ms);
+
+    std::cout << "[PERF] LogParser::parse_file baseline: " << total_elapsed_ms << " ms total for "
+              << runs << " runs x " << lines_per_file << " lines"
+              << " (avg " << avg_ms_per_run << " ms/run, " << entries_per_second << " lines/s)"
+              << std::endl;
 }

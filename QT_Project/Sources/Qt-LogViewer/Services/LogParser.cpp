@@ -45,10 +45,10 @@ auto LogParser::parse_file(const QString& file_path) const -> QVector<LogEntry>
     if (file_opened)
     {
         QTextStream in(&file);
+        QString line;
 
-        while (!in.atEnd())
+        while (in.readLineInto(&line))
         {
-            QString line = in.readLine();
             LogEntry entry = parse_line(line, file_path);
 
             if (!entry.get_level().isEmpty())
@@ -74,23 +74,49 @@ auto LogParser::parse_line(const QString& line, const QString& file_path) const 
 
     if (match.hasMatch())
     {
-        QMap<QString, QString> values;
+        QString timestamp_value;
+        QString level;
+        QString message;
+        QString app_name;
+        bool has_timestamp = false;
+        bool has_message = false;
 
         for (int i = 0; i < m_field_order.fields.size(); ++i)
         {
-            values[m_field_order.fields[i]] = match.captured(i + 1);
+            const QString& field_name = m_field_order.fields.at(i);
+            const QString captured_value = match.captured(i + 1);
+
+            if (field_name == "timestamp")
+            {
+                timestamp_value = captured_value;
+                has_timestamp = true;
+            }
+            else if (field_name == "level")
+            {
+                level = captured_value;
+            }
+            else if (field_name == "message")
+            {
+                message = captured_value;
+                has_message = true;
+            }
+            else if (field_name == "app_name")
+            {
+                app_name = captured_value;
+            }
         }
 
         QDateTime timestamp;
 
-        if (values.contains("timestamp"))
+        if (has_timestamp)
         {
-            timestamp = parse_timestamp(values["timestamp"]);
+            timestamp = parse_timestamp(timestamp_value);
         }
 
-        QString level = values.value("level");
-        QString message = values.value("message").trimmed();
-        QString app_name = values.value("app_name");
+        if (has_message)
+        {
+            message = message.trimmed();
+        }
 
         LogFileInfo file_info(file_path, app_name);
         result = LogEntry(timestamp, level, message, file_info);
@@ -225,15 +251,10 @@ auto LogParser::parse_timestamp(const QString& value) const -> QDateTime
     // Try configured explicit formats.
     if (!parsed.isValid())
     {
-        for (qsizetype i = 0; i < m_timestamp_formats.size(); ++i)
+        const qsizetype format_count = m_timestamp_formats.size();
+        for (qsizetype i = 0; i < format_count && !parsed.isValid(); ++i)
         {
-            const QString fmt = m_timestamp_formats.at(i);
-            QDateTime candidate = QDateTime::fromString(value, fmt);
-            if (candidate.isValid())
-            {
-                parsed = candidate;
-                i = m_timestamp_formats.size();
-            }
+            parsed = QDateTime::fromString(value, m_timestamp_formats.at(i));
         }
     }
 
