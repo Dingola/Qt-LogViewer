@@ -24,6 +24,35 @@ LogSortFilterProxyModel::LogSortFilterProxyModel(QObject* parent): QSortFilterPr
 }
 
 /**
+ * @brief Toggles the ingestion mode to optimize mass inserts.
+ * @param active True to pause sorting/filtering for ingestion, false to resume.
+ */
+auto LogSortFilterProxyModel::set_ingestion_mode(bool active) -> void
+{
+    if (m_ingestion_active != active)
+    {
+        m_ingestion_active = active;
+        setDynamicSortFilter(!active);
+
+        if (!active)
+        {
+            // Resuming from ingestion: force a full refilter and resort.
+            invalidate();
+        }
+    }
+}
+
+/**
+ * @brief Returns whether ingestion mode is currently active.
+ * @return True if dynamic sort/filter is suspended.
+ */
+auto LogSortFilterProxyModel::is_ingestion_mode_active() const noexcept -> bool
+{
+    bool active = m_ingestion_active;
+    return active;
+}
+
+/**
  * @brief Sets the application name filter.
  * @param app_name The application name to filter by (empty for no filter).
  */
@@ -88,15 +117,18 @@ auto LogSortFilterProxyModel::set_search_filter(const QString& search_text, cons
         recalc_active_filters();
         invalidateFilter();
 
-        // Force repaint of all cells for updated highlight ranges.
-        // Emit dataChanged for HighlightRangesRole across the entire proxy range.
-        const int rows = rowCount();
-        const int cols = columnCount();
-        if (rows > 0 && cols > 0)
+        if (!m_ingestion_active)
         {
-            const QModelIndex top_left = index(0, 0);
-            const QModelIndex bottom_right = index(rows - 1, cols - 1);
-            emit dataChanged(top_left, bottom_right, {HighlightRangesRole});
+            // Force repaint of all cells for updated highlight ranges.
+            // Emit dataChanged for HighlightRangesRole across the entire proxy range.
+            const int rows = rowCount();
+            const int cols = columnCount();
+            if (rows > 0 && cols > 0)
+            {
+                const QModelIndex top_left = index(0, 0);
+                const QModelIndex bottom_right = index(rows - 1, cols - 1);
+                emit dataChanged(top_left, bottom_right, {HighlightRangesRole});
+            }
         }
     }
 }

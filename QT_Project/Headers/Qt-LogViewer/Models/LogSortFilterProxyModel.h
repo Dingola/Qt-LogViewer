@@ -51,6 +51,18 @@ class LogSortFilterProxyModel: public QSortFilterProxyModel
         explicit LogSortFilterProxyModel(QObject* parent = nullptr);
 
         /**
+         * @brief Toggles the ingestion mode to optimize mass inserts.
+         * @param active True to pause sorting/filtering for ingestion, false to resume.
+         */
+        auto set_ingestion_mode(bool active) -> void;
+
+        /**
+         * @brief Returns whether ingestion mode is currently active.
+         * @return True if dynamic sort/filter is suspended.
+         */
+        [[nodiscard]] auto is_ingestion_mode_active() const noexcept -> bool;
+
+        /**
          * @brief Sets the application name filter.
          * @param app_name The application name to filter by (empty for no filter).
          */
@@ -241,6 +253,7 @@ class LogSortFilterProxyModel: public QSortFilterProxyModel
         bool m_use_regex = false;
         QRegularExpression m_search_regex;
         bool m_any_filter_active = false;
+        bool m_ingestion_active = false;
         QString m_show_only_file_path;
         QSet<QString> m_hidden_file_paths;
         // Highlight cache: source_row -> (source_column -> vector of (start,length))

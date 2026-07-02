@@ -140,6 +140,17 @@ LogViewerController::LogViewerController(const QString& log_format, QObject* par
             else
             {
                 qDebug().nospace() << "[Controller] no next item started (idle or empty queue).";
+
+                // Queues are done; turn off ingestion mode mapped to any view
+                const QVector<QUuid> ids = m_views->get_all_view_ids();
+                for (const QUuid& id: ids)
+                {
+                    auto* proxy = get_sort_filter_proxy(id);
+                    if (proxy != nullptr)
+                    {
+                        proxy->set_ingestion_mode(false);
+                    }
+                }
             }
         }
     });
@@ -304,10 +315,22 @@ auto LogViewerController::load_log_file(const QString& file_path) -> QUuid
     QUuid view_id = m_views->create_view();
 
     auto* ctx = m_views->get_context(view_id);
+    auto* proxy = get_sort_filter_proxy(view_id);
+
+    if (proxy != nullptr)
+    {
+        proxy->set_ingestion_mode(true);
+    }
+
     if (ctx != nullptr)
     {
         ctx->append_entries(entries);
         m_views->set_loaded_files(view_id, QList<LogFileInfo>{loaded_log_file});
+    }
+
+    if (proxy != nullptr)
+    {
+        proxy->set_ingestion_mode(false);
     }
 
     return view_id;
@@ -330,12 +353,23 @@ auto LogViewerController::load_log_file(const QUuid& view_id, const QString& fil
 
     if (ctx != nullptr && !is_file_loaded(view_id, file_path))
     {
+        auto* proxy = get_sort_filter_proxy(view_id);
+        if (proxy != nullptr)
+        {
+            proxy->set_ingestion_mode(true);
+        }
+
         auto entries = m_ingest->load_file_sync(file_path);
         const QString app_name = (!entries.isEmpty()) ? entries.first().get_app_name()
                                                       : LogLoader::identify_app(file_path);
 
         ctx->append_entries(entries);
         m_views->add_loaded_file(view_id, LogFileInfo(file_path, app_name));
+
+        if (proxy != nullptr)
+        {
+            proxy->set_ingestion_mode(false);
+        }
 
         success = true;
     }
@@ -358,6 +392,12 @@ auto LogViewerController::load_log_files(const QVector<QString>& file_paths) -> 
         QList<LogFileInfo> loaded_log_files;
         view_id = m_views->create_view();
 
+        auto* proxy = get_sort_filter_proxy(view_id);
+        if (proxy != nullptr)
+        {
+            proxy->set_ingestion_mode(true);
+        }
+
         for (const QString& file_path: file_paths)
         {
             QVector<LogEntry> entries = m_ingest->load_file_sync(file_path);
@@ -375,6 +415,11 @@ auto LogViewerController::load_log_files(const QVector<QString>& file_paths) -> 
         }
 
         m_views->set_loaded_files(view_id, loaded_log_files);
+
+        if (proxy != nullptr)
+        {
+            proxy->set_ingestion_mode(false);
+        }
     }
 
     return view_id;
@@ -473,6 +518,12 @@ auto LogViewerController::load_log_files_async(const QVector<QString>& file_path
 auto LogViewerController::cancel_loading(const QUuid& view_id) -> void
 {
     m_ingest->cancel_for_view(view_id);
+
+    auto* proxy = get_sort_filter_proxy(view_id);
+    if (proxy != nullptr)
+    {
+        proxy->set_ingestion_mode(false);
+    }
 }
 
 /**
@@ -1129,6 +1180,12 @@ auto LogViewerController::remove_log_file(const QUuid& view_id, const QString& f
  */
 auto LogViewerController::enqueue_async(const QUuid& view_id, const QString& file_path) -> void
 {
+    auto* proxy = get_sort_filter_proxy(view_id);
+    if (proxy != nullptr)
+    {
+        proxy->set_ingestion_mode(true);
+    }
+
     m_ingest->enqueue_stream(view_id, file_path);
 }
 
