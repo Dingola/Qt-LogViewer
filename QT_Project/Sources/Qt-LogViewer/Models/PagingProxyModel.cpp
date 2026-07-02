@@ -128,35 +128,34 @@ void PagingProxyModel::setSourceModel(QAbstractItemModel* source_model)
     {
         disconnect(sourceModel(), nullptr, this, nullptr);
     }
+
     QAbstractProxyModel::setSourceModel(source_model);
 
     if (source_model != nullptr)
     {
-        connect(source_model, &QAbstractItemModel::modelReset, this, [this]() {
-            validate_current_page();
-            beginResetModel();
-            endResetModel();
-        });
-        connect(source_model, &QAbstractItemModel::dataChanged, this, [this]() {
-            validate_current_page();
-            beginResetModel();
-            endResetModel();
-        });
-        connect(source_model, &QAbstractItemModel::layoutChanged, this, [this]() {
-            validate_current_page();
-            beginResetModel();
-            endResetModel();
-        });
-        connect(source_model, &QAbstractItemModel::rowsInserted, this, [this]() {
-            validate_current_page();
-            beginResetModel();
-            endResetModel();
-        });
-        connect(source_model, &QAbstractItemModel::rowsRemoved, this, [this]() {
-            validate_current_page();
-            beginResetModel();
-            endResetModel();
-        });
+        connect(source_model, &QAbstractItemModel::dataChanged, this,
+                &PagingProxyModel::on_source_data_changed);
+
+        connect(source_model, &QAbstractItemModel::rowsAboutToBeInserted, this,
+                &PagingProxyModel::on_source_rows_about_to_be_inserted);
+
+        connect(source_model, &QAbstractItemModel::rowsInserted, this,
+                &PagingProxyModel::on_source_rows_inserted);
+
+        connect(source_model, &QAbstractItemModel::rowsAboutToBeRemoved, this,
+                &PagingProxyModel::on_source_rows_about_to_be_removed);
+
+        connect(source_model, &QAbstractItemModel::rowsRemoved, this,
+                &PagingProxyModel::on_source_rows_removed);
+
+        connect(source_model, &QAbstractItemModel::layoutChanged, this,
+                &PagingProxyModel::on_source_layout_changed);
+
+        connect(source_model, &QAbstractItemModel::modelAboutToBeReset, this,
+                &PagingProxyModel::on_source_model_about_to_be_reset);
+
+        connect(source_model, &QAbstractItemModel::modelReset, this,
+                &PagingProxyModel::on_source_model_reset);
     }
 }
 
@@ -362,5 +361,340 @@ auto PagingProxyModel::validate_current_page() -> void
     if (m_current_page > total_pages)
     {
         m_current_page = total_pages;
+    }
+}
+
+/**
+ * @brief Forwards source data changes only for rows visible on the active page.
+ * @param top_left Top-left source index of the changed range.
+ * @param bottom_right Bottom-right source index of the changed range.
+ * @param roles List of changed roles.
+ */
+void PagingProxyModel::on_source_data_changed(const QModelIndex& top_left,
+                                              const QModelIndex& bottom_right,
+                                              const QList<int>& roles)
+{
+    if (sourceModel() != nullptr)
+    {
+        if (!top_left.parent().isValid() && !bottom_right.parent().isValid())
+        {
+            int visible_rows = rowCount(QModelIndex());
+            int visible_columns = columnCount(QModelIndex());
+
+            if (visible_rows > 0 && visible_columns > 0)
+            {
+                int visible_start = get_page_offset();
+                int visible_end = visible_start + visible_rows - 1;
+                int changed_start = std::max(top_left.row(), visible_start);
+                int changed_end = std::min(bottom_right.row(), visible_end);
+
+                if (changed_start <= changed_end)
+                {
+                    int left_column = std::max(0, top_left.column());
+                    int right_column = std::min(bottom_right.column(), visible_columns - 1);
+
+                    if (left_column <= right_column)
+                    {
+                        int proxy_top_row = changed_start - visible_start;
+                        int proxy_bottom_row = changed_end - visible_start;
+                        QModelIndex proxy_top_left = index(proxy_top_row, left_column);
+                        QModelIndex proxy_bottom_right = index(proxy_bottom_row, right_column);
+
+                        if (proxy_top_left.isValid() && proxy_bottom_right.isValid())
+                        {
+                            emit dataChanged(proxy_top_left, proxy_bottom_right, roles);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * @brief Handles source row insertion begin notification cleanly.
+ * @param parent Parent index in source model.
+ * @param start First inserted row in source model.
+ * @param end Last inserted row in source model.
+ */
+void PagingProxyModel::on_source_rows_about_to_be_inserted(const QModelIndex& parent, int start,
+                                                           int end)
+{
+    m_pending_insert = false;
+    m_pending_remove = false;
+    m_pending_reset = false;
+    m_pending_visible_data_refresh = false;
+    m_pending_previous_page = m_current_page;
+
+    if (sourceModel() != nullptr && !parent.isValid())
+    {
+        int change_count = end - start + 1;
+        int old_total_rows = sourceModel()->rowCount(QModelIndex());
+        int old_proxy_rows = calculate_row_count_for_total_rows(old_total_rows);
+        int new_proxy_rows = calculate_row_count_for_total_rows(old_total_rows + change_count);
+
+        if (!m_paging_enabled)
+        {
+            beginInsertRows(QModelIndex(), start, end);
+            m_pending_insert = true;
+        }
+        else
+        {
+            int visible_start = get_page_offset();
+            int grow_count = new_proxy_rows - old_proxy_rows;
+
+            if (start < visible_start)
+            {
+                m_pending_reset = true;
+            }
+            else
+            {
+                if (grow_count > 0)
+                {
+                    int proxy_first = start - visible_start;
+
+                    if (proxy_first < 0)
+                    {
+                        proxy_first = 0;
+                    }
+
+                    if (proxy_first > old_proxy_rows)
+                    {
+                        proxy_first = old_proxy_rows;
+                    }
+
+                    int proxy_last = proxy_first + grow_count - 1;
+
+                    beginInsertRows(QModelIndex(), proxy_first, proxy_last);
+                    m_pending_insert = true;
+                }
+
+                int visible_capacity_end = visible_start + m_page_size - 1;
+
+                if (start <= visible_capacity_end)
+                {
+                    if (grow_count == 0)
+                    {
+                        m_pending_visible_data_refresh = true;
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * @brief Handles source row insertion completion notification cleanly.
+ * @param parent Parent index in source model.
+ * @param start First inserted row in source model.
+ * @param end Last inserted row in source model.
+ */
+void PagingProxyModel::on_source_rows_inserted(const QModelIndex& parent, int /*start*/,
+                                               int /*end*/)
+{
+    if (!parent.isValid())
+    {
+        validate_current_page();
+
+        if (m_pending_insert)
+        {
+            endInsertRows();
+        }
+
+        bool page_changed = m_current_page != m_pending_previous_page;
+
+        if (m_pending_reset || page_changed)
+        {
+            beginResetModel();
+            endResetModel();
+        }
+        else if (m_pending_visible_data_refresh)
+        {
+            refresh_visible_page_data();
+        }
+
+        m_pending_insert = false;
+        m_pending_remove = false;
+        m_pending_reset = false;
+        m_pending_visible_data_refresh = false;
+    }
+}
+
+/**
+ * @brief Handles source row removal begin notification cleanly.
+ * @param parent Parent index in source model.
+ * @param start First removed row in source model.
+ * @param end Last removed row in source model.
+ */
+void PagingProxyModel::on_source_rows_about_to_be_removed(const QModelIndex& parent, int start,
+                                                          int end)
+{
+    m_pending_insert = false;
+    m_pending_remove = false;
+    m_pending_reset = false;
+    m_pending_visible_data_refresh = false;
+    m_pending_previous_page = m_current_page;
+
+    if (sourceModel() != nullptr && !parent.isValid())
+    {
+        int change_count = end - start + 1;
+        int old_total_rows = sourceModel()->rowCount(QModelIndex());
+        int old_proxy_rows = calculate_row_count_for_total_rows(old_total_rows);
+        int new_proxy_rows = calculate_row_count_for_total_rows(old_total_rows - change_count);
+
+        if (!m_paging_enabled)
+        {
+            beginRemoveRows(QModelIndex(), start, end);
+            m_pending_remove = true;
+        }
+        else
+        {
+            int visible_start = get_page_offset();
+            int shrink_count = old_proxy_rows - new_proxy_rows;
+
+            if (start < visible_start)
+            {
+                m_pending_reset = true;
+            }
+            else
+            {
+                if (shrink_count > 0 && old_proxy_rows > 0)
+                {
+                    int proxy_first = start - visible_start;
+
+                    if (proxy_first < 0)
+                    {
+                        proxy_first = 0;
+                    }
+
+                    if (proxy_first >= old_proxy_rows)
+                    {
+                        proxy_first = old_proxy_rows - 1;
+                    }
+
+                    int proxy_last = proxy_first + shrink_count - 1;
+
+                    beginRemoveRows(QModelIndex(), proxy_first, proxy_last);
+                    m_pending_remove = true;
+                }
+
+                int visible_end = visible_start + old_proxy_rows - 1;
+
+                if (start <= visible_end)
+                {
+                    if (shrink_count == 0)
+                    {
+                        m_pending_visible_data_refresh = true;
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * @brief Handles source row removal completion notification cleanly.
+ * @param parent Parent index in source model.
+ * @param start First removed row in source model.
+ * @param end Last removed row in source model.
+ */
+void PagingProxyModel::on_source_rows_removed(const QModelIndex& parent, int /*start*/, int /*end*/)
+{
+    if (!parent.isValid())
+    {
+        validate_current_page();
+
+        if (m_pending_remove)
+        {
+            endRemoveRows();
+        }
+
+        bool page_changed = m_current_page != m_pending_previous_page;
+
+        if (m_pending_reset || page_changed)
+        {
+            beginResetModel();
+            endResetModel();
+        }
+        else if (m_pending_visible_data_refresh)
+        {
+            refresh_visible_page_data();
+        }
+
+        m_pending_insert = false;
+        m_pending_remove = false;
+        m_pending_reset = false;
+        m_pending_visible_data_refresh = false;
+    }
+}
+
+/**
+ * @brief Fallback proxy reset when source layout changes.
+ */
+void PagingProxyModel::on_source_layout_changed()
+{
+    validate_current_page();
+    beginResetModel();
+    endResetModel();
+}
+
+/**
+ * @brief Pre-reset model handle.
+ */
+void PagingProxyModel::on_source_model_about_to_be_reset()
+{
+    beginResetModel();
+}
+
+/**
+ * @brief Fallback proxy reset when source model is reset.
+ */
+void PagingProxyModel::on_source_model_reset()
+{
+    validate_current_page();
+    endResetModel();
+}
+
+/**
+ * @brief Returns visible row count for a hypothetical source row count.
+ * @param total_rows Source row count to evaluate.
+ * @return Visible proxy row count for current page/paging state.
+ */
+auto PagingProxyModel::calculate_row_count_for_total_rows(int total_rows) const -> int
+{
+    int result = 0;
+
+    if (!m_paging_enabled)
+    {
+        if (total_rows > 0)
+        {
+            result = total_rows;
+        }
+    }
+    else
+    {
+        int offset = get_page_offset();
+        int page_rows = std::min(m_page_size, total_rows - offset);
+
+        if (page_rows > 0)
+        {
+            result = page_rows;
+        }
+    }
+
+    return result;
+}
+
+/**
+ * @brief Emits dataChanged for the full visible page range.
+ */
+auto PagingProxyModel::refresh_visible_page_data() -> void
+{
+    int rows = rowCount(QModelIndex());
+    int columns = columnCount(QModelIndex());
+
+    if (rows > 0 && columns > 0)
+    {
+        emit dataChanged(index(0, 0), index(rows - 1, columns - 1), QList<int>());
     }
 }

@@ -143,8 +143,84 @@ class PagingProxyModel: public QAbstractProxyModel
          */
         auto validate_current_page() -> void;
 
+    private slots:
+        /**
+         * @brief Forwards source data changes only for rows visible on the active page.
+         * @param top_left Top-left source index of the changed range.
+         * @param bottom_right Bottom-right source index of the changed range.
+         * @param roles List of changed roles.
+         */
+        void on_source_data_changed(const QModelIndex& top_left, const QModelIndex& bottom_right,
+                                    const QList<int>& roles);
+
+        /**
+         * @brief Handles source row insertion begin notification cleanly.
+         * @param parent Parent index in source model.
+         * @param start First inserted row in source model.
+         * @param end Last inserted row in source model.
+         */
+        void on_source_rows_about_to_be_inserted(const QModelIndex& parent, int start, int end);
+
+        /**
+         * @brief Handles source row insertion completion notification cleanly.
+         * @param parent Parent index in source model.
+         * @param start First inserted row in source model.
+         * @param end Last inserted row in source model.
+         */
+        void on_source_rows_inserted(const QModelIndex& parent, int start, int end);
+
+        /**
+         * @brief Handles source row removal begin notification cleanly.
+         * @param parent Parent index in source model.
+         * @param start First removed row in source model.
+         * @param end Last removed row in source model.
+         */
+        void on_source_rows_about_to_be_removed(const QModelIndex& parent, int start, int end);
+
+        /**
+         * @brief Handles source row removal completion notification cleanly.
+         * @param parent Parent index in source model.
+         * @param start First removed row in source model.
+         * @param end Last removed row in source model.
+         */
+        void on_source_rows_removed(const QModelIndex& parent, int start, int end);
+
+        /**
+         * @brief Fallback proxy reset when source layout changes.
+         */
+        void on_source_layout_changed();
+
+        /**
+         * @brief Pre-reset model handle.
+         */
+        void on_source_model_about_to_be_reset();
+
+        /**
+         * @brief Fallback proxy reset when source model is reset.
+         */
+        void on_source_model_reset();
+
+    private:
+        /**
+         * @brief Returns visible row count for a hypothetical source row count.
+         * @param total_rows Source row count to evaluate.
+         * @return Visible proxy row count for current page/paging state.
+         */
+        [[nodiscard]] auto calculate_row_count_for_total_rows(int total_rows) const -> int;
+
+        /**
+         * @brief Emits dataChanged for the full visible page range.
+         */
+        auto refresh_visible_page_data() -> void;
+
     private:
         bool m_paging_enabled = true;
         int m_page_size = 25;
         int m_current_page = 1;
+
+        bool m_pending_insert = false;
+        bool m_pending_remove = false;
+        bool m_pending_reset = false;
+        bool m_pending_visible_data_refresh = false;
+        int m_pending_previous_page = 1;
 };
