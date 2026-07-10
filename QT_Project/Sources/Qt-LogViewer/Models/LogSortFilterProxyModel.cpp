@@ -21,6 +21,7 @@ LogSortFilterProxyModel::LogSortFilterProxyModel(QObject* parent): QSortFilterPr
     setDynamicSortFilter(true);
 
     m_collator.setCaseSensitivity(Qt::CaseInsensitive);
+    m_collator.setNumericMode(true);
 }
 
 /**
@@ -446,209 +447,170 @@ auto LogSortFilterProxyModel::lessThan(const QModelIndex& source_left,
                                        const QModelIndex& source_right) const -> bool
 {
     bool is_less = false;
-    const bool both_timestamp_columns = (source_left.column() == LogModel::Timestamp) &&
-                                        (source_right.column() == LogModel::Timestamp);
+    const int col = source_left.column();
 
-    if (both_timestamp_columns)
+    if (col == LogModel::Timestamp)
     {
-        const QVariant left_value_variant = sourceModel()->data(source_left, Qt::DisplayRole);
-        const QVariant right_value_variant = sourceModel()->data(source_right, Qt::DisplayRole);
+        const QDateTime left_dt = sourceModel()->data(source_left, Qt::DisplayRole).toDateTime();
+        const QDateTime right_dt = sourceModel()->data(source_right, Qt::DisplayRole).toDateTime();
 
-        const QDateTime left_datetime = left_value_variant.toDateTime();
-        const QDateTime right_datetime = right_value_variant.toDateTime();
-
-        if (left_datetime.isValid() && right_datetime.isValid())
+        if (left_dt.isValid() && right_dt.isValid())
         {
-            is_less = (left_datetime < right_datetime);
+            is_less = (left_dt < right_dt);
         }
         else
         {
-            const QString left_string =
-                sourceModel()->data(source_left, Qt::DisplayRole).toString();
-            const QString right_string =
-                sourceModel()->data(source_right, Qt::DisplayRole).toString();
-
-            is_less = (m_collator.compare(left_string, right_string) < 0);
+            const QString left_str = sourceModel()->data(source_left, Qt::DisplayRole).toString();
+            const QString right_str = sourceModel()->data(source_right, Qt::DisplayRole).toString();
+            is_less = (m_collator.compare(left_str, right_str) < 0);
         }
     }
     else
     {
-        const QString left_string = sourceModel()->data(source_left, Qt::DisplayRole).toString();
-        const QString right_string = sourceModel()->data(source_right, Qt::DisplayRole).toString();
+        const QString left_str = sourceModel()->data(source_left, Qt::DisplayRole).toString();
+        const QString right_str = sourceModel()->data(source_right, Qt::DisplayRole).toString();
 
-        is_less = (m_collator.compare(left_string, right_string) < 0);
+        if (col == LogModel::AppName || col == LogModel::Message)
+        {
+            is_less = (m_collator.compare(left_str, right_str) < 0);
+        }
+        else
+        {
+            is_less = (QString::compare(left_str, right_str, Qt::CaseInsensitive) < 0);
+        }
     }
 
     return is_less;
 }
 
 /**
- * @brief Checks if a specific row passes the current filters, including file filters.
+ * @brief Checks if a specific row passes the current filters.
+ * @param row The row in the source model.
+ * @param parent The parent index in the source model.
  */
 auto LogSortFilterProxyModel::row_passes_filter(int row, const QModelIndex& parent) const -> bool
 {
     bool accepted = true;
 
-    // Per-file filter (needs file path from the source model entry)
-    QString file_path;
-    const auto* log_model = qobject_cast<const LogModel*>(sourceModel());
-    if (log_model != nullptr)
+    if (m_any_filter_active)
     {
-        if (row >= 0 && row < log_model->rowCount())
-        {
-            const LogEntry entry = log_model->get_entry(row);
-            file_path = entry.get_file_info().get_file_path();
-        }
-    }
+        QAbstractItemModel* src = sourceModel();
 
-    if (!m_show_only_file_path.isEmpty())
-    {
-        if (file_path != m_show_only_file_path)
+        // 1. File Filters
+        if (!m_show_only_file_path.isEmpty() || !m_hidden_file_paths.isEmpty())
         {
-            accepted = false;
-        }
-    }
-    if (accepted && !m_hidden_file_paths.isEmpty())
-    {
-        if (m_hidden_file_paths.contains(file_path))
-        {
-            accepted = false;
-        }
-    }
-
-    if (accepted)
-    {
-        if (!m_any_filter_active)
-        {
-            accepted = true;
-        }
-        else
-        {
-            QModelIndex index_app = sourceModel()->index(row, LogModel::AppName, parent);
-            QModelIndex index_level = sourceModel()->index(row, LogModel::Level, parent);
-            QModelIndex index_message = sourceModel()->index(row, LogModel::Message, parent);
-
-            // App name filter
-            if (!m_app_name_filter.isEmpty())
+            const auto* log_model = qobject_cast<const LogModel*>(src);
+            if (log_model != nullptr && row >= 0 && row < log_model->rowCount())
             {
-                const QString app_name = sourceModel()->data(index_app, Qt::DisplayRole).toString();
-                if (app_name != m_app_name_filter)
+                const LogEntry entry = log_model->get_entry(row);
+                const QString file_path = entry.get_file_info().get_file_path();
+
+                if (!m_show_only_file_path.isEmpty() && file_path != m_show_only_file_path)
+                {
+                    accepted = false;
+                }
+
+                if (accepted && !m_hidden_file_paths.isEmpty() &&
+                    m_hidden_file_paths.contains(file_path))
                 {
                     accepted = false;
                 }
             }
-
-            // Level filter
-            if (accepted && !m_log_level_filters.isEmpty())
+            else
             {
-                const QString level = sourceModel()->data(index_level, Qt::DisplayRole).toString();
-                const QString normalized_level = level.trimmed().toLower();
-                if (!m_log_level_filters.contains(normalized_level))
+                accepted = false;
+            }
+        }
+
+        // 2. App Name Filter
+        if (accepted && !m_app_name_filter.isEmpty())
+        {
+            const QString app =
+                src->data(src->index(row, LogModel::AppName, parent), Qt::DisplayRole).toString();
+            if (app != m_app_name_filter)
+            {
+                accepted = false;
+            }
+        }
+
+        // 3. Level Filter
+        if (accepted && !m_log_level_filters.isEmpty())
+        {
+            const QString level =
+                src->data(src->index(row, LogModel::Level, parent), Qt::DisplayRole).toString();
+            const QStringView level_view = QStringView{level}.trimmed();
+
+            bool level_matched = false;
+
+            for (const QString& filter_lvl: m_log_level_filters)
+            {
+                if (level_view.compare(filter_lvl, Qt::CaseInsensitive) == 0)
                 {
-                    accepted = false;
+                    level_matched = true;
+                    break;
                 }
             }
 
-            // Search filter
-            if (accepted && !m_search_text.isEmpty())
+            if (!level_matched)
             {
-                const bool all_fields =
-                    (m_search_field.compare("All Fields", Qt::CaseInsensitive) == 0);
-                const QString message_value =
-                    sourceModel()->data(index_message, Qt::DisplayRole).toString();
-                const QString level_value =
-                    sourceModel()->data(index_level, Qt::DisplayRole).toString();
-                const QString app_value =
-                    sourceModel()->data(index_app, Qt::DisplayRole).toString();
+                accepted = false;
+            }
+        }
 
-                if (m_use_regex)
+        // 4. Search Filter (Lazy Evaluation & Short-Circuit)
+        if (accepted && !m_search_text.isEmpty())
+        {
+            const bool is_message =
+                (m_search_field.compare(QStringLiteral("Message"), Qt::CaseInsensitive) == 0);
+            const bool is_level =
+                (m_search_field.compare(QStringLiteral("Level"), Qt::CaseInsensitive) == 0);
+            const bool is_app =
+                (m_search_field.compare(QStringLiteral("AppName"), Qt::CaseInsensitive) == 0);
+
+            // If the field name isn't explicitly recognized, fall back to evaluating all fields
+            const bool all_fields = !is_message && !is_level && !is_app;
+
+            bool matched = false;
+
+            const auto check_match = [&](const QString& value) -> bool {
+                bool found = false;
+                if (m_use_regex && m_search_regex.isValid())
                 {
-                    if (!m_search_regex.isValid())
-                    {
-                        accepted = false;
-                    }
-                    else if (all_fields)
-                    {
-                        if (!m_search_regex.match(message_value).hasMatch() &&
-                            !m_search_regex.match(level_value).hasMatch() &&
-                            !m_search_regex.match(app_value).hasMatch())
-                        {
-                            accepted = false;
-                        }
-                    }
-                    else if (m_search_field.compare("Message", Qt::CaseInsensitive) == 0)
-                    {
-                        if (!m_search_regex.match(message_value).hasMatch())
-                        {
-                            accepted = false;
-                        }
-                    }
-                    else if (m_search_field.compare("Level", Qt::CaseInsensitive) == 0)
-                    {
-                        if (!m_search_regex.match(level_value).hasMatch())
-                        {
-                            accepted = false;
-                        }
-                    }
-                    else if (m_search_field.compare("AppName", Qt::CaseInsensitive) == 0)
-                    {
-                        if (!m_search_regex.match(app_value).hasMatch())
-                        {
-                            accepted = false;
-                        }
-                    }
-                    else
-                    {
-                        if (!m_search_regex.match(message_value).hasMatch() &&
-                            !m_search_regex.match(level_value).hasMatch() &&
-                            !m_search_regex.match(app_value).hasMatch())
-                        {
-                            accepted = false;
-                        }
-                    }
+                    found = m_search_regex.match(value).hasMatch();
                 }
-                else
+                else if (!m_use_regex)
                 {
-                    if (all_fields)
-                    {
-                        if (!message_value.contains(m_search_text, Qt::CaseInsensitive) &&
-                            !level_value.contains(m_search_text, Qt::CaseInsensitive) &&
-                            !app_value.contains(m_search_text, Qt::CaseInsensitive))
-                        {
-                            accepted = false;
-                        }
-                    }
-                    else if (m_search_field.compare("Message", Qt::CaseInsensitive) == 0)
-                    {
-                        if (!message_value.contains(m_search_text, Qt::CaseInsensitive))
-                        {
-                            accepted = false;
-                        }
-                    }
-                    else if (m_search_field.compare("Level", Qt::CaseInsensitive) == 0)
-                    {
-                        if (!level_value.contains(m_search_text, Qt::CaseInsensitive))
-                        {
-                            accepted = false;
-                        }
-                    }
-                    else if (m_search_field.compare("AppName", Qt::CaseInsensitive) == 0)
-                    {
-                        if (!app_value.contains(m_search_text, Qt::CaseInsensitive))
-                        {
-                            accepted = false;
-                        }
-                    }
-                    else
-                    {
-                        if (!message_value.contains(m_search_text, Qt::CaseInsensitive) &&
-                            !level_value.contains(m_search_text, Qt::CaseInsensitive) &&
-                            !app_value.contains(m_search_text, Qt::CaseInsensitive))
-                        {
-                            accepted = false;
-                        }
-                    }
+                    found = value.contains(m_search_text, Qt::CaseInsensitive);
                 }
+                return found;
+            };
+
+            if (all_fields || is_message)
+            {
+                const QString msg =
+                    src->data(src->index(row, LogModel::Message, parent), Qt::DisplayRole)
+                        .toString();
+                matched = check_match(msg);
+            }
+
+            if (!matched && (all_fields || is_level))
+            {
+                const QString lvl =
+                    src->data(src->index(row, LogModel::Level, parent), Qt::DisplayRole).toString();
+                matched = check_match(lvl);
+            }
+
+            if (!matched && (all_fields || is_app))
+            {
+                const QString app =
+                    src->data(src->index(row, LogModel::AppName, parent), Qt::DisplayRole)
+                        .toString();
+                matched = check_match(app);
+            }
+
+            if (!matched)
+            {
+                accepted = false;
             }
         }
     }

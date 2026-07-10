@@ -10,7 +10,7 @@
  * @brief Test fixture for LogSortFilterProxyModel.
  *
  * Covers app/level/search filters, file visibility filters (show-only, hidden), signals,
- * and sorting behavior.
+ * sorting behavior and performance benchmarks.
  */
 class LogSortFilterProxyModelTest: public ::testing::Test
 {
@@ -25,6 +25,12 @@ class LogSortFilterProxyModelTest: public ::testing::Test
          * @brief Builds a small dataset with two files and mixed levels/messages/app names.
          */
         auto seed_data() -> void;
+
+        /**
+         * @brief Rapidly builds a large dataset for performance benchmarks.
+         * @param count Number of entries to generate.
+         */
+        auto seed_large_data(int count) -> void;
 
         LogModel* m_model = nullptr;
         LogSortFilterProxyModel* m_proxy = nullptr;

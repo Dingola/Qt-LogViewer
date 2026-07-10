@@ -5,6 +5,8 @@
 #include <QSignalSpy>
 #include <QString>
 #include <QVector>
+#include <chrono>
+#include <iostream>
 
 /**
  * @brief Sets up the test fixture for each test.
@@ -41,6 +43,32 @@ auto LogSortFilterProxyModelTest::seed_data() -> void
                                 "DEBUG", "Debugging", LogFileInfo("fileB.log", "AppB")));
     m_model->add_entry(LogEntry(QDateTime::fromString("2024-01-01 10:03:00", "yyyy-MM-dd HH:mm:ss"),
                                 "INFO", "User login", LogFileInfo("fileB.log", "AppB")));
+}
+
+/**
+ * @brief Rapidly builds a large dataset for performance benchmarks.
+ * @param count Number of entries to generate.
+ */
+auto LogSortFilterProxyModelTest::seed_large_data(int count) -> void
+{
+    QVector<LogEntry> entries;
+    entries.reserve(count);
+    QDateTime base_time = QDateTime::fromString("2024-01-01 10:00:00", "yyyy-MM-dd HH:mm:ss");
+
+    for (int i = 0; i < count; ++i)
+    {
+        const QString level =
+            (i % 4 == 0) ? QStringLiteral("ERROR")
+                         : ((i % 3 == 0) ? QStringLiteral("DEBUG") : QStringLiteral("INFO"));
+        const QString app = (i % 2 == 0) ? QStringLiteral("AppA") : QStringLiteral("AppB");
+        const QString msg =
+            QStringLiteral("This is a synthesized test message for entry number %1").arg(i);
+
+        entries.append(LogEntry(base_time.addMSecs(i), level, msg, LogFileInfo("perf.log", app)));
+    }
+
+    m_model->clear();
+    m_model->add_entries(entries);
 }
 
 /**
@@ -442,4 +470,63 @@ TEST_F(LogSortFilterProxyModelTest, DynamicFilterChangesWithFileFilters)
     m_proxy->clear_hidden_files();
     EXPECT_EQ(m_proxy->rowCount(), 4);
     EXPECT_FALSE(m_proxy->has_active_filters());
+}
+
+/**
+ * @test Measures baseline sorting runtime for a massive dataset (Level column).
+ */
+TEST_F(LogSortFilterProxyModelTest, Performance_Sorting_Baseline)
+{
+    const int count = 100000;
+    seed_large_data(count);
+
+    auto start = std::chrono::steady_clock::now();
+    m_proxy->sort(LogModel::Level, Qt::AscendingOrder);
+    auto end = std::chrono::steady_clock::now();
+
+    const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+
+    std::cout << "[PERF] LogSortFilterProxyModel::sort(Level) baseline: " << elapsed
+              << " ms total for " << count << " rows." << std::endl;
+}
+
+/**
+ * @test Measures baseline level-filtering runtime for a massive dataset.
+ */
+TEST_F(LogSortFilterProxyModelTest, Performance_Filtering_Level_Baseline)
+{
+    const int count = 100000;
+    seed_large_data(count);
+
+    QSet<QString> levels = {"ERROR"};
+
+    auto start = std::chrono::steady_clock::now();
+    m_proxy->set_log_level_filters(levels);
+    auto end = std::chrono::steady_clock::now();
+
+    const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+
+    // Since every 4th entry in seed_large_data is ERROR, we expect count / 4
+    EXPECT_EQ(m_proxy->rowCount(), count / 4);
+
+    std::cout << "[PERF] LogSortFilterProxyModel::set_log_level_filters baseline: " << elapsed
+              << " ms total for " << count << " rows." << std::endl;
+}
+
+/**
+ * @test Measures baseline regex search filtering runtime for a massive dataset.
+ */
+TEST_F(LogSortFilterProxyModelTest, Performance_Filtering_Regex_Baseline)
+{
+    const int count = 100000;
+    seed_large_data(count);
+
+    auto start = std::chrono::steady_clock::now();
+    m_proxy->set_search_filter("entry number 9[0-9]{3}$", "Message", true);
+    auto end = std::chrono::steady_clock::now();
+
+    const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+
+    std::cout << "[PERF] LogSortFilterProxyModel::set_search_filter (Regex) baseline: " << elapsed
+              << " ms total for " << count << " rows." << std::endl;
 }
