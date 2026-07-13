@@ -15,6 +15,8 @@
 #include <QString>
 #include <QVector>
 
+#include "Qt-LogViewer/Models/SearchFields.h"
+
 /**
  * @class LogSortFilterProxyModel
  * @brief Proxy model for filtering and sorting log entries in the LogModel.
@@ -77,10 +79,10 @@ class LogSortFilterProxyModel: public QSortFilterProxyModel
         /**
          * @brief Sets the search string and field.
          * @param search_text The text or regex to search for.
-         * @param field The field to search in ("Message", "Level", "AppName", etc.).
+         * @param field The field to search in.
          * @param use_regex Whether to interpret search_text as a regular expression.
          */
-        auto set_search_filter(const QString& search_text, const QString& field,
+        auto set_search_filter(const QString& search_text, SearchField field,
                                bool use_regex) -> void;
 
         /**
@@ -141,7 +143,7 @@ class LogSortFilterProxyModel: public QSortFilterProxyModel
          * @brief Returns the current search field.
          * @return The search field string.
          */
-        [[nodiscard]] auto get_search_field() const noexcept -> QString;
+        [[nodiscard]] auto get_search_field() const noexcept -> SearchField;
 
         /**
          * @brief Returns the internal collator used for string comparisons in sorting.
@@ -249,7 +251,7 @@ class LogSortFilterProxyModel: public QSortFilterProxyModel
         QString m_app_name_filter;
         QSet<QString> m_log_level_filters;
         QString m_search_text;
-        QString m_search_field;
+        SearchField m_search_field = SearchField::AllFields;
         bool m_use_regex = false;
         QRegularExpression m_search_regex;
         bool m_any_filter_active = false;

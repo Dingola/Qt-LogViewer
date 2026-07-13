@@ -571,7 +571,7 @@ auto LogViewerController::set_log_level_filters(const QUuid& view_id,
  * @param field The field to search in.
  * @param use_regex Whether to use regex.
  */
-auto LogViewerController::set_search_filter(const QString& search_text, const QString& field,
+auto LogViewerController::set_search_filter(const QString& search_text, SearchField field,
                                             bool use_regex) -> void
 {
     set_search_filter(m_views->get_current_view(), search_text, field, use_regex);
@@ -585,7 +585,7 @@ auto LogViewerController::set_search_filter(const QString& search_text, const QS
  * @param use_regex Whether to use regex.
  */
 auto LogViewerController::set_search_filter(const QUuid& view_id, const QString& search_text,
-                                            const QString& field, bool use_regex) -> void
+                                            SearchField field, bool use_regex) -> void
 {
     m_filters->set_search(view_id, search_text, field, use_regex);
 }
@@ -779,21 +779,22 @@ auto LogViewerController::get_search_text(const QUuid& view_id) const -> QString
 
 /**
  * @brief Returns the current search field.
- * @return The search field string.
+ * @return The search field.
  */
-auto LogViewerController::get_search_field() const -> QString
+auto LogViewerController::get_search_field() const -> SearchField
 {
-    return get_search_field(m_views->get_current_view());
+    SearchField field = get_search_field(m_views->get_current_view());
+    return field;
 }
 
 /**
  * @brief Returns the search field for the specified view.
  * @param view_id The QUuid of the view.
- * @return The search field string.
+ * @return The search field.
  */
-auto LogViewerController::get_search_field(const QUuid& view_id) const -> QString
+auto LogViewerController::get_search_field(const QUuid& view_id) const -> SearchField
 {
-    QString field = m_filters->get_search_field(view_id);
+    SearchField field = m_filters->get_search_field(view_id);
     return field;
 }
 

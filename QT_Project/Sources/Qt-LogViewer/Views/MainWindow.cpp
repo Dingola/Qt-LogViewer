@@ -30,6 +30,7 @@
 #include "Qt-LogViewer/Models/PagingProxyModel.h"
 #include "Qt-LogViewer/Models/RecentItemsModel.h"
 #include "Qt-LogViewer/Models/RecentListSchema.h"
+#include "Qt-LogViewer/Models/SearchFields.h"
 #include "Qt-LogViewer/Services/LogViewerSettings.h"
 #include "Qt-LogViewer/Services/SessionManager.h"
 #include "Qt-LogViewer/Services/SessionRepository.h"
@@ -966,9 +967,11 @@ void MainWindow::handle_show_settings_dialog_requested()
 auto MainWindow::handle_search_changed() -> void
 {
     QString search_text = ui->logFilterBarWidget->get_search_text();
-    QString field = ui->logFilterBarWidget->get_search_field();
+    SearchField field = ui->logFilterBarWidget->get_search_field();
     bool use_regex = ui->logFilterBarWidget->get_use_regex();
-    qDebug() << "Search filter:" << search_text << "Field:" << field << "Regex:" << use_regex;
+    QString field_key = to_string(field);
+
+    qDebug() << "Search filter:" << search_text << "Field:" << field_key << "Regex:" << use_regex;
     m_controller->set_search_filter(search_text, field, use_regex);
     update_pagination_widget();
 }
@@ -1242,7 +1245,10 @@ auto MainWindow::parse_view_state_from_json(const QJsonObject& view_obj) -> Sess
     const QJsonObject filters_obj = view_obj.value(QStringLiteral("filters")).toObject();
     state.filters.app_name = filters_obj.value(QStringLiteral("app_name")).toString();
     state.filters.search_text = filters_obj.value(QStringLiteral("search_text")).toString();
-    state.filters.search_field = filters_obj.value(QStringLiteral("search_field")).toString();
+    const QByteArray search_field_key =
+        filters_obj.value(QStringLiteral("search_field")).toString().toLatin1();
+    state.filters.search_field = from_latin1_string_view(
+        QLatin1StringView(search_field_key.constData(), search_field_key.size()));
     state.filters.use_regex = filters_obj.value(QStringLiteral("use_regex")).toBool();
     state.filters.show_only_file = filters_obj.value(QStringLiteral("show_only_file")).toString();
 

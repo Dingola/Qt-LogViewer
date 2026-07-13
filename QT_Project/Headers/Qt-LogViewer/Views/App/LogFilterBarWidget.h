@@ -1,9 +1,13 @@
 #pragma once
 
+#include <QMap>
+#include <QPair>
 #include <QSet>
 #include <QString>
-#include <QStringList>
+#include <QVector>
 #include <QWidget>
+
+#include "Qt-LogViewer/Models/SearchFields.h"
 
 namespace Ui
 {
@@ -82,7 +86,7 @@ class LogFilterBarWidget: public QWidget
          *
          * @param fields The list of search fields.
          */
-        auto set_search_fields(const QStringList& fields) -> void;
+        auto set_search_fields(const QVector<QPair<QString, SearchField>>& fields) -> void;
 
         /**
          * @brief Sets the placeholder text for the search line edit in the search bar widget.
@@ -131,7 +135,7 @@ class LogFilterBarWidget: public QWidget
          *
          * @return The search field.
          */
-        [[nodiscard]] auto get_search_field() const -> QString;
+        [[nodiscard]] auto get_search_field() const -> SearchField;
 
         /**
          * @brief Returns whether regex is enabled.
@@ -183,7 +187,7 @@ class LogFilterBarWidget: public QWidget
          * @param field The search field.
          * @param regex True if regex is enabled.
          */
-        void search_requested(const QString& text, const QString& field, bool regex);
+        void search_requested(const QString& text, SearchField field, bool regex);
 
         /**
          * @brief Emitted when the search text changes.
@@ -195,7 +199,7 @@ class LogFilterBarWidget: public QWidget
          * @brief Emitted when the search field changes.
          * @param field The new search field.
          */
-        void search_field_changed(const QString& field);
+        void search_field_changed(SearchField field);
 
         /**
          * @brief Emitted when the regex checkbox is toggled.

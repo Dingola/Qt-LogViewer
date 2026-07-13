@@ -8,9 +8,9 @@
 #include <QUuid>
 #include <QVector>
 
-// Value types used by value in API
 #include "Qt-LogViewer/Models/LogEntry.h"
 #include "Qt-LogViewer/Models/LogFileInfo.h"
+#include "Qt-LogViewer/Models/SearchFields.h"
 #include "Qt-LogViewer/Models/SessionTypes.h"
 
 // Forward declarations (pointers only)
@@ -198,7 +198,7 @@ class LogViewerController: public QObject
          * @param field The field to search in.
          * @param use_regex Whether to use regex.
          */
-        auto set_search_filter(const QString& search_text, const QString& field,
+        auto set_search_filter(const QString& search_text, SearchField field,
                                bool use_regex) -> void;
 
         /**
@@ -208,8 +208,8 @@ class LogViewerController: public QObject
          * @param field The field to search in.
          * @param use_regex Whether to use regex.
          */
-        auto set_search_filter(const QUuid& view_id, const QString& search_text,
-                               const QString& field, bool use_regex) -> void;
+        auto set_search_filter(const QUuid& view_id, const QString& search_text, SearchField field,
+                               bool use_regex) -> void;
 
         /**
          * @brief Returns the LogModel for the current view.
@@ -328,16 +328,16 @@ class LogViewerController: public QObject
 
         /**
          * @brief Returns the current search field.
-         * @return The search field string.
+         * @return The search field.
          */
-        [[nodiscard]] auto get_search_field() const -> QString;
+        [[nodiscard]] auto get_search_field() const -> SearchField;
 
         /**
          * @brief Returns the search field for the specified view.
          * @param view_id The QUuid of the view.
-         * @return The search field string.
+         * @return The search field.
          */
-        [[nodiscard]] auto get_search_field(const QUuid& view_id) const -> QString;
+        [[nodiscard]] auto get_search_field(const QUuid& view_id) const -> SearchField;
 
         /**
          * @brief Returns whether the search text is treated as a regex.

@@ -643,7 +643,7 @@ auto SessionController::build_view_json(const QUuid& view_id) const -> QJsonObje
         }
         filters_obj.insert(QStringLiteral("log_levels"), levels_arr);
         filters_obj.insert(QStringLiteral("search_text"), state.filters.search_text);
-        filters_obj.insert(QStringLiteral("search_field"), state.filters.search_field);
+        filters_obj.insert(QStringLiteral("search_field"), to_string(state.filters.search_field));
         filters_obj.insert(QStringLiteral("use_regex"), state.filters.use_regex);
         filters_obj.insert(QStringLiteral("show_only_file"), state.filters.show_only_file);
 

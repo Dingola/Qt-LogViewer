@@ -2,10 +2,13 @@
 
 #include <QColor>
 #include <QMargins>
+#include <QPair>
 #include <QString>
-#include <QStringList>
 #include <QToolButton>
+#include <QVector>
 #include <QWidget>
+
+#include "Qt-LogViewer/Models/SearchFields.h"
 
 namespace Ui
 {
@@ -72,9 +75,13 @@ class SearchBarWidget: public QWidget
         /**
          * @brief Sets the available search fields in the combo box.
          *
+         * Each pair contains:
+         * - first: visible display text
+         * - second: stable internal enum value
+         *
          * @param fields The list of search fields.
          */
-        auto set_search_fields(const QStringList& fields) -> void;
+        auto set_search_fields(const QVector<QPair<QString, SearchField>>& fields) -> void;
 
         /**
          * @brief Sets the placeholder text for the search line edit.
@@ -95,7 +102,7 @@ class SearchBarWidget: public QWidget
          *
          * @return The search field.
          */
-        [[nodiscard]] auto get_search_field() const -> QString;
+        [[nodiscard]] auto get_search_field() const -> SearchField;
 
         /**
          * @brief Returns whether regex is enabled.
@@ -169,7 +176,7 @@ class SearchBarWidget: public QWidget
          * @param field The search field.
          * @param regex True if regex is enabled.
          */
-        void search_requested(const QString& text, const QString& field, bool regex);
+        void search_requested(const QString& text, SearchField field, bool regex);
 
         /**
          * @brief Emitted when the search text changes.
@@ -181,7 +188,7 @@ class SearchBarWidget: public QWidget
          * @brief Emitted when the search field changes.
          * @param field The new search field.
          */
-        void search_field_changed(const QString& field);
+        void search_field_changed(SearchField field);
 
         /**
          * @brief Emitted when the regex checkbox is toggled.
@@ -217,6 +224,17 @@ class SearchBarWidget: public QWidget
         auto eventFilter(QObject* watched, QEvent* event) -> bool override;
 
     private:
+        /**
+         * @brief Populates the default translated search fields.
+         */
+        auto populate_default_search_fields() -> void;
+
+        /**
+         * @brief Applies the given search fields while preserving selection if possible.
+         * @param fields The fields to apply.
+         */
+        auto set_search_fields_internal(const QVector<QPair<QString, SearchField>>& fields) -> void;
+
         /**
          * @brief Creates and configures the clear button as a child of the line edit.
          */
@@ -257,4 +275,7 @@ class SearchBarWidget: public QWidget
 
         // Stored original text margins so they can be restored when the clear button is hidden.
         QMargins m_original_text_margins;
+
+        QVector<QPair<QString, SearchField>> m_search_fields;
+        bool m_use_default_search_fields = true;
 };

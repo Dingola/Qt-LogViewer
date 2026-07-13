@@ -10,6 +10,7 @@
 #include <Qt>
 
 #include "Qt-LogViewer/Models/LogFileInfo.h"
+#include "Qt-LogViewer/Models/SearchFields.h"
 
 /**
  * @file SessionTypes.h
@@ -69,7 +70,7 @@ struct FilterState {
         QString app_name;
         QSet<QString> log_levels;
         QString search_text;
-        QString search_field;
+        SearchField search_field{SearchField::AllFields};
         bool use_regex{false};
         QString show_only_file;
         QSet<QString> hidden_files;

@@ -7,11 +7,11 @@
 #include <QUuid>
 #include <QVector>
 
-// Forward declarations (pointers/references only)
+// Forward declarations
 class ViewRegistry;
 class LogSortFilterProxyModel;
 
-// Kept because FilterState is used/returned by value
+#include "Qt-LogViewer/Models/SearchFields.h"
 #include "Qt-LogViewer/Models/SessionTypes.h"
 
 /**
@@ -64,7 +64,7 @@ class FilterCoordinator: public QObject
          * @param field Field to search in.
          * @param use_regex Whether to treat text as regex.
          */
-        auto set_search(const QUuid& view_id, const QString& text, const QString& field,
+        auto set_search(const QUuid& view_id, const QString& text, SearchField field,
                         bool use_regex) -> void;
 
         /**
@@ -114,9 +114,9 @@ class FilterCoordinator: public QObject
         /**
          * @brief Get current search field for a view.
          * @param view_id Target view.
-         * @return Search field string.
+         * @return Search field.
          */
-        [[nodiscard]] auto get_search_field(const QUuid& view_id) const -> QString;
+        [[nodiscard]] auto get_search_field(const QUuid& view_id) const -> SearchField;
 
         /**
          * @brief Get whether the current search uses regex for a view.

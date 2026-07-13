@@ -61,7 +61,7 @@ auto FilterCoordinator::set_log_levels(const QUuid& view_id, const QSet<QString>
  * @param field Field to search in.
  * @param use_regex Whether to treat text as a regex.
  */
-auto FilterCoordinator::set_search(const QUuid& view_id, const QString& text, const QString& field,
+auto FilterCoordinator::set_search(const QUuid& view_id, const QString& text, SearchField field,
                                    bool use_regex) -> void
 {
     auto* proxy = get_sort_filter_proxy(view_id);
@@ -235,12 +235,12 @@ auto FilterCoordinator::get_search_text(const QUuid& view_id) const -> QString
 /**
  * @brief Get current search field for a view.
  * @param view_id Target view id.
- * @return Search field string.
+ * @return Search field.
  */
-auto FilterCoordinator::get_search_field(const QUuid& view_id) const -> QString
+auto FilterCoordinator::get_search_field(const QUuid& view_id) const -> SearchField
 {
     auto* proxy = get_sort_filter_proxy(view_id);
-    QString field = (proxy != nullptr) ? proxy->get_search_field() : QString();
+    SearchField field = (proxy != nullptr) ? proxy->get_search_field() : SearchField::AllFields;
     return field;
 }
 

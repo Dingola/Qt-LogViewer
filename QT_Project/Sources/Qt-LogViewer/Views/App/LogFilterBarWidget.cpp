@@ -103,7 +103,8 @@ auto LogFilterBarWidget::set_log_level_counts(const QMap<QString, int>& level_co
  *
  * @param fields The list of search fields.
  */
-auto LogFilterBarWidget::set_search_fields(const QStringList& fields) -> void
+auto LogFilterBarWidget::set_search_fields(const QVector<QPair<QString, SearchField>>& fields)
+    -> void
 {
     ui->searchBarWidget->set_search_fields(fields);
 }
@@ -183,7 +184,7 @@ auto LogFilterBarWidget::get_search_text() const -> QString
  *
  * @return The search field.
  */
-auto LogFilterBarWidget::get_search_field() const -> QString
+auto LogFilterBarWidget::get_search_field() const -> SearchField
 {
     return ui->searchBarWidget->get_search_field();
 }

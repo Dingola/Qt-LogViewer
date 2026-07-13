@@ -1,13 +1,17 @@
 #include "Qt-LogViewer/Views/App/SearchBarWidget.h"
 
+#include <QCheckBox>
+#include <QComboBox>
 #include <QEvent>
 #include <QFontMetrics>
 #include <QLineEdit>
+#include <QPushButton>
 #include <QResizeEvent>
-#include <QString>
+#include <QSize>
 #include <QStyle>
 #include <QStyleOptionFrame>
 #include <QToolButton>
+#include <QVariant>
 
 #include "QtWidgetsCommonLib/Utils/UiUtils.h"
 #include "ui_SearchBarWidget.h"
@@ -17,6 +21,10 @@ using QtWidgetsCommonLib::UiUtils;
 namespace
 {
 constexpr auto k_search_placeholder_text = QT_TRANSLATE_NOOP("SearchBarWidget", "Search...");
+constexpr auto k_all_fields_text = QT_TRANSLATE_NOOP("SearchBarWidget", "All Fields");
+constexpr auto k_message_text = QT_TRANSLATE_NOOP("SearchBarWidget", "Message");
+constexpr auto k_level_text = QT_TRANSLATE_NOOP("SearchBarWidget", "Level");
+constexpr auto k_app_name_text = QT_TRANSLATE_NOOP("SearchBarWidget", "AppName");
 }  // namespace
 
 /**
@@ -30,8 +38,8 @@ SearchBarWidget::SearchBarWidget(QWidget* parent): QWidget(parent), ui(new Ui::S
 {
     ui->setupUi(this);
 
-    ui->comboBoxSearchArea->addItems(QStringList()
-                                     << "All Fields" << "Message" << "Level" << "AppName");
+    qRegisterMetaType<SearchField>("SearchField");
+    populate_default_search_fields();
 
     ui->lineEditSearch->setPlaceholderText(tr(k_search_placeholder_text));
     QIcon search_icon(
@@ -62,8 +70,8 @@ SearchBarWidget::SearchBarWidget(QWidget* parent): QWidget(parent), ui(new Ui::S
             emit search_requested(get_search_text(), get_search_field(), get_use_regex());
         }
     });
-    connect(ui->comboBoxSearchArea, &QComboBox::currentTextChanged, this,
-            [this] { emit search_field_changed(get_search_field()); });
+    connect(ui->comboBoxSearchArea, qOverload<int>(&QComboBox::currentIndexChanged), this,
+            [this](int) { emit search_field_changed(get_search_field()); });
     connect(ui->checkBoxRegEx, &QCheckBox::toggled, this,
             [this] { emit regex_toggled(get_use_regex()); });
     connect(ui->checkBoxLiveSearch, &QCheckBox::toggled, this, [this] {
@@ -83,6 +91,68 @@ SearchBarWidget::SearchBarWidget(QWidget* parent): QWidget(parent), ui(new Ui::S
 SearchBarWidget::~SearchBarWidget()
 {
     delete ui;
+}
+
+/**
+ * @brief Populates the default translated search fields.
+ */
+auto SearchBarWidget::populate_default_search_fields() -> void
+{
+    QVector<QPair<QString, SearchField>> fields;
+    fields.append({tr(k_all_fields_text), SearchField::AllFields});
+    fields.append({tr(k_message_text), SearchField::Message});
+    fields.append({tr(k_level_text), SearchField::Level});
+    fields.append({tr(k_app_name_text), SearchField::AppName});
+
+    m_use_default_search_fields = true;
+    set_search_fields_internal(fields);
+}
+
+/**
+ * @brief Applies the given search fields while preserving selection if possible.
+ * @param fields The fields to apply.
+ */
+auto SearchBarWidget::set_search_fields_internal(const QVector<QPair<QString, SearchField>>& fields)
+    -> void
+{
+    SearchField selected_field = SearchField::AllFields;
+
+    if (ui->comboBoxSearchArea->count() > 0)
+    {
+        selected_field = get_search_field();
+    }
+
+    m_search_fields = fields;
+
+    const bool previous = ui->comboBoxSearchArea->blockSignals(true);
+    ui->comboBoxSearchArea->clear();
+
+    int selected_index = -1;
+    int index = 0;
+
+    for (const auto& field: fields)
+    {
+        ui->comboBoxSearchArea->addItem(field.first, QVariant::fromValue(field.second));
+
+        if ((selected_index < 0) && (field.second == selected_field))
+        {
+            selected_index = index;
+        }
+
+        ++index;
+    }
+
+    if (selected_index < 0 && ui->comboBoxSearchArea->count() > 0)
+    {
+        selected_index = 0;
+    }
+
+    if (selected_index >= 0)
+    {
+        ui->comboBoxSearchArea->setCurrentIndex(selected_index);
+    }
+
+    ui->comboBoxSearchArea->blockSignals(previous);
 }
 
 /**
@@ -183,6 +253,7 @@ auto SearchBarWidget::position_clear_button() -> void
             {
                 continue;
             }
+
             // Check if button is on the left side (leading position)
             if (btn->x() < contents.center().x())
             {
@@ -361,6 +432,12 @@ auto SearchBarWidget::changeEvent(QEvent* event) -> void
     {
         ui->retranslateUi(this);
         ui->lineEditSearch->setPlaceholderText(tr(k_search_placeholder_text));
+
+        if (m_use_default_search_fields)
+        {
+            populate_default_search_fields();
+        }
+
         if (m_clear_button != nullptr)
         {
             m_clear_button->setToolTip(tr("Clear"));
@@ -433,10 +510,10 @@ auto SearchBarWidget::eventFilter(QObject* watched, QEvent* event) -> bool
  * @brief Sets the available search fields in the combo box.
  * @param fields The list of search fields.
  */
-auto SearchBarWidget::set_search_fields(const QStringList& fields) -> void
+auto SearchBarWidget::set_search_fields(const QVector<QPair<QString, SearchField>>& fields) -> void
 {
-    ui->comboBoxSearchArea->clear();
-    ui->comboBoxSearchArea->addItems(fields);
+    m_use_default_search_fields = false;
+    set_search_fields_internal(fields);
 }
 
 /**
@@ -462,9 +539,16 @@ auto SearchBarWidget::get_search_text() const -> QString
  * @brief Returns the currently selected search field.
  * @return The search field.
  */
-auto SearchBarWidget::get_search_field() const -> QString
+auto SearchBarWidget::get_search_field() const -> SearchField
 {
-    QString result = ui->comboBoxSearchArea->currentText();
+    SearchField result = SearchField::AllFields;
+    const QVariant data = ui->comboBoxSearchArea->currentData();
+
+    if (data.isValid() && data.canConvert<SearchField>())
+    {
+        result = data.value<SearchField>();
+    }
+
     return result;
 }
 

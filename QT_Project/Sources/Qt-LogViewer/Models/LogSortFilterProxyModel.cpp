@@ -90,10 +90,10 @@ auto LogSortFilterProxyModel::set_log_level_filters(const QSet<QString>& levels)
 /**
  * @brief Sets the search string and field.
  * @param search_text The text or regex to search for.
- * @param field The field to search in ("Message", "Level", "AppName", etc.).
+ * @param field The field to search in.
  * @param use_regex Whether to interpret search_text as a regular expression.
  */
-auto LogSortFilterProxyModel::set_search_filter(const QString& search_text, const QString& field,
+auto LogSortFilterProxyModel::set_search_filter(const QString& search_text, SearchField field,
                                                 bool use_regex) -> void
 {
     bool changed =
@@ -250,11 +250,11 @@ auto LogSortFilterProxyModel::get_search_text() const noexcept -> QString
 
 /**
  * @brief Returns the current search field.
- * @return The search field string.
+ * @return The search field.
  */
-auto LogSortFilterProxyModel::get_search_field() const noexcept -> QString
+auto LogSortFilterProxyModel::get_search_field() const noexcept -> SearchField
 {
-    QString value = m_search_field;
+    SearchField value = m_search_field;
     return value;
 }
 
@@ -349,16 +349,25 @@ auto LogSortFilterProxyModel::data(const QModelIndex& index, int role) const -> 
             const int source_column = src_index.column();
 
             // Check if this column should be searched
-            const bool all_fields =
-                (m_search_field.compare("All Fields", Qt::CaseInsensitive) == 0);
-            const bool should_check =
-                all_fields ||
-                ((m_search_field.compare("Message", Qt::CaseInsensitive) == 0) &&
-                 (source_column == LogModel::Message)) ||
-                ((m_search_field.compare("Level", Qt::CaseInsensitive) == 0) &&
-                 (source_column == LogModel::Level)) ||
-                ((m_search_field.compare("AppName", Qt::CaseInsensitive) == 0) &&
-                 (source_column == LogModel::AppName));
+            bool should_check = false;
+
+            switch (m_search_field)
+            {
+            case SearchField::AllFields:
+                should_check = true;
+                break;
+            case SearchField::Message:
+                should_check = (source_column == LogModel::Message);
+                break;
+            case SearchField::Level:
+                should_check = (source_column == LogModel::Level);
+                break;
+            case SearchField::AppName:
+                should_check = (source_column == LogModel::AppName);
+                break;
+            case SearchField::Count:
+                break;
+            }
 
             if (should_check)
             {
@@ -560,15 +569,12 @@ auto LogSortFilterProxyModel::row_passes_filter(int row, const QModelIndex& pare
         // 4. Search Filter (Lazy Evaluation & Short-Circuit)
         if (accepted && !m_search_text.isEmpty())
         {
-            const bool is_message =
-                (m_search_field.compare(QStringLiteral("Message"), Qt::CaseInsensitive) == 0);
-            const bool is_level =
-                (m_search_field.compare(QStringLiteral("Level"), Qt::CaseInsensitive) == 0);
-            const bool is_app =
-                (m_search_field.compare(QStringLiteral("AppName"), Qt::CaseInsensitive) == 0);
+            const bool is_message = (m_search_field == SearchField::Message);
+            const bool is_level = (m_search_field == SearchField::Level);
+            const bool is_app = (m_search_field == SearchField::AppName);
 
-            // If the field name isn't explicitly recognized, fall back to evaluating all fields
-            const bool all_fields = !is_message && !is_level && !is_app;
+            // If the field isn't explicitly recognized, fall back to evaluating all fields
+            const bool all_fields = (m_search_field == SearchField::AllFields);
 
             bool matched = false;
 
