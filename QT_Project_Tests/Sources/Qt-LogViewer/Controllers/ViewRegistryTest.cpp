@@ -101,10 +101,8 @@ TEST_F(ViewRegistryTest, CreateViewWithFixedIdAndEnsureView)
 }
 
 /**
- * @brief remove_view removes context, clears current when matching, and does not emit view_removed
- * (class does not emit on remove).
- *
- * Note: Implementation does not emit view_removed; we assert removal and current reset behavior.
+ * @brief Verifies that remove_view removes the context, clears the current view when necessary,
+ *        and emits view_removed exactly once for each successfully removed view.
  */
 TEST_F(ViewRegistryTest, RemoveViewClearsContextAndCurrentIfMatching)
 {
@@ -113,24 +111,35 @@ TEST_F(ViewRegistryTest, RemoveViewClearsContextAndCurrentIfMatching)
     const QUuid id1 = m_registry->create_view();
     const QUuid id2 = m_registry->create_view();
 
-    // Set current to id2
-    QSignalSpy spy_current(m_registry, &ViewRegistry::current_view_id_changed);
-    const bool set_ok = m_registry->set_current_view(id2);
-    EXPECT_TRUE(set_ok);
-    EXPECT_EQ(m_registry->get_current_view(), id2);
-    EXPECT_EQ(spy_current.count(), 1);
+    QSignalSpy current_view_spy(m_registry, &ViewRegistry::current_view_id_changed);
+    QSignalSpy removed_spy(m_registry, &ViewRegistry::view_removed);
 
-    // Remove id1: current unchanged
+    const bool set_ok = m_registry->set_current_view(id2);
+    ASSERT_TRUE(set_ok);
+    EXPECT_EQ(m_registry->get_current_view(), id2);
+    EXPECT_EQ(current_view_spy.count(), 1);
+
+    // Removing a non-current view leaves the current view unchanged.
     const bool removed_id1 = m_registry->remove_view(id1);
+
     EXPECT_TRUE(removed_id1);
     EXPECT_EQ(m_registry->get_context(id1), nullptr);
     EXPECT_EQ(m_registry->get_current_view(), id2);
+    ASSERT_EQ(removed_spy.count(), 1);
+    EXPECT_EQ(removed_spy.at(0).at(0).toUuid(), id1);
 
-    // Remove id2: current becomes null
+    // Removing the current view clears the current ID.
     const bool removed_id2 = m_registry->remove_view(id2);
+
     EXPECT_TRUE(removed_id2);
     EXPECT_EQ(m_registry->get_context(id2), nullptr);
     EXPECT_TRUE(m_registry->get_current_view().isNull());
+    ASSERT_EQ(removed_spy.count(), 2);
+    EXPECT_EQ(removed_spy.at(1).at(0).toUuid(), id2);
+
+    // Removing an already removed view must not emit another signal.
+    EXPECT_FALSE(m_registry->remove_view(id2));
+    EXPECT_EQ(removed_spy.count(), 2);
 }
 
 /**

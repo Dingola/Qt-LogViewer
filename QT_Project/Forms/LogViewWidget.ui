@@ -23,6 +23,16 @@
        </property>
       </widget>
      </item>
+      <item>
+        <widget class="QCheckBox" name="checkBoxLiveTail">
+          <property name="text">
+            <string>Live tail</string>
+          </property>
+          <property name="checked">
+            <bool>true</bool>
+          </property>
+        </widget>
+      </item>
      <item>
       <widget class="LogFilterWidget" name="logFilterWidget" native="true"/>
      </item>

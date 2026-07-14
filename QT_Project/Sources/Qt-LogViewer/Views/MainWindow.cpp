@@ -1251,6 +1251,8 @@ auto MainWindow::parse_view_state_from_json(const QJsonObject& view_obj) -> Sess
         QLatin1StringView(search_field_key.constData(), search_field_key.size()));
     state.filters.use_regex = filters_obj.value(QStringLiteral("use_regex")).toBool();
     state.filters.show_only_file = filters_obj.value(QStringLiteral("show_only_file")).toString();
+    state.filters.live_tailing_enabled =
+        filters_obj.value(QStringLiteral("live_tailing_enabled")).toBool(true);
 
     const QJsonArray levels_arr = filters_obj.value(QStringLiteral("log_levels")).toArray();
     for (const auto& lv: levels_arr)
@@ -1299,6 +1301,8 @@ auto MainWindow::create_log_view_widget_for_view(const QUuid& view_id,
     const QMap<QString, int> level_counts = m_controller->get_log_level_counts(view_id);
     log_view_widget->set_log_level_counts(level_counts);
 
+    log_view_widget->set_live_tailing_enabled(state.filters.live_tailing_enabled);
+
     connect(log_view_widget, &LogViewWidget::current_row_changed, this,
             &MainWindow::update_log_details);
     connect(log_view_widget, &LogViewWidget::app_filter_changed, this, [this](const QString& app) {
@@ -1324,6 +1328,10 @@ auto MainWindow::create_log_view_widget_for_view(const QUuid& view_id,
             [this, view_id](const QString& file_path) {
                 m_controller->remove_log_file(view_id, file_path);
                 update_pagination_widget();
+            });
+    connect(log_view_widget, &LogViewWidget::live_tailing_toggled, this,
+            [this, view_id](bool enabled) {
+                m_controller->set_live_tailing_enabled(view_id, enabled);
             });
 
     return log_view_widget;

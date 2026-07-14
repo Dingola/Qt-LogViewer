@@ -23,6 +23,8 @@ class LogModel;
 class LogSortFilterProxyModel;
 class PagingProxyModel;
 class LogFileTreeModel;
+class LogHistoryService;
+class LogTailerService;
 
 /**
  * @file LogViewerController.h
@@ -472,6 +474,32 @@ class LogViewerController: public QObject
         auto import_view_state_for_session(const QString& session_id,
                                            const SessionViewState& state) -> QUuid;
 
+        /**
+         * @brief Enables or disables live tailing for a view.
+         * @param view_id Target view.
+         * @param enabled True to start tailing loaded files.
+         */
+        auto set_live_tailing_enabled(const QUuid& view_id, bool enabled) -> void;
+
+        /**
+         * @brief Returns whether live tailing is enabled for a view.
+         * @param view_id Target view.
+         * @return True when enabled.
+         */
+        [[nodiscard]] auto get_live_tailing_enabled(const QUuid& view_id) const -> bool;
+
+        /**
+         * @brief Searches every SQLite-archived entry for a view.
+         * @param view_id Target view.
+         * @param search_text Plain-text FTS query.
+         * @param search_field Field to search.
+         * @param limit Maximum result count.
+         * @return Matching archive entries.
+         */
+        [[nodiscard]] auto search_history(const QUuid& view_id, const QString& search_text,
+                                          SearchField search_field,
+                                          int limit = 100000) const -> QVector<LogEntry>;
+
     signals:
         /**
          * @brief Signal emitted when the current view ID changes.
@@ -571,4 +599,7 @@ class LogViewerController: public QObject
         FileCatalogController* m_catalog{nullptr};
         ViewRegistry* m_views{nullptr};
         FilterCoordinator* m_filters{nullptr};
+        LogHistoryService* m_history_service{nullptr};
+        LogTailerService* m_tailer_service{nullptr};
+        QSet<QUuid> m_live_tailing_views;
 };

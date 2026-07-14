@@ -19,8 +19,10 @@
 #include "Qt-LogViewer/Models/LogModel.h"
 #include "Qt-LogViewer/Models/LogSortFilterProxyModel.h"
 #include "Qt-LogViewer/Models/PagingProxyModel.h"
+#include "Qt-LogViewer/Services/LogHistoryService.h"
 #include "Qt-LogViewer/Services/LogLoader.h"
 #include "Qt-LogViewer/Services/LogLoadingService.h"
+#include "Qt-LogViewer/Services/LogTailerService.h"
 
 /**
  * @brief Constructs a LogViewerController.
@@ -35,6 +37,24 @@ LogViewerController::LogViewerController(const QString& log_format, QObject* par
       m_views(new ViewRegistry(this)),
       m_filters(new FilterCoordinator(m_views, this))
 {
+    // Initialize services
+    m_history_service = new LogHistoryService(this);
+    m_tailer_service = new LogTailerService(log_format, this);
+
+    connect(m_tailer_service, &LogTailerService::entries_available, this,
+            [this](const QUuid& view_id, const QString&, const QVector<LogEntry>& entries) {
+                if (!m_is_shutting_down)
+                {
+                    LogViewContext* context = m_views->get_context(view_id);
+
+                    if (context != nullptr)
+                    {
+                        m_history_service->add_entries(view_id, entries);
+                        context->append_entries(entries);
+                    }
+                }
+            });
+
     connect(m_views, &ViewRegistry::current_view_id_changed, this,
             [this](const QUuid& view_id) { emit current_view_id_changed(view_id); });
     connect(m_views, &ViewRegistry::view_removed, this,
@@ -57,6 +77,7 @@ LogViewerController::LogViewerController(const QString& log_format, QObject* par
                         auto* ctx = m_views->get_context(view_id);
                         if (ctx != nullptr)
                         {
+                            m_history_service->add_entries(view_id, batch);
                             ctx->append_entries(batch);
                         }
                     }
@@ -109,6 +130,11 @@ LogViewerController::LogViewerController(const QString& log_format, QObject* par
                     if (!view_id.isNull())
                     {
                         emit loading_finished(view_id, file_path);
+
+                        if (m_live_tailing_views.contains(view_id))
+                        {
+                            m_tailer_service->start_tailing(view_id, file_path);
+                        }
                     }
                     // IMPORTANT: Do not clear active state here; wait for idle to avoid
                     // dropping a late-arriving last batch for very small files.
@@ -157,12 +183,29 @@ LogViewerController::LogViewerController(const QString& log_format, QObject* par
 }
 
 /**
- * @brief Destroys the LogViewerController. Cancels any ongoing streaming to avoid
- *        background emissions during shutdown.
+ * @brief Destroys the LogViewerController.
+ *
+ * Stops ingestion and live-tail callbacks before QObject-owned services are destroyed so no
+ * background or watcher callback can target a removed view.
  */
 LogViewerController::~LogViewerController()
 {
     m_is_shutting_down = true;
+
+    if (m_tailer_service != nullptr)
+    {
+        m_tailer_service->stop_all_tailing();
+    }
+
+    if (m_ingest != nullptr)
+    {
+        const QVector<QUuid> view_ids = m_views->get_all_view_ids();
+
+        for (const QUuid& view_id: view_ids)
+        {
+            m_ingest->cancel_for_view(view_id);
+        }
+    }
 }
 
 /**
@@ -203,49 +246,50 @@ auto LogViewerController::get_all_view_ids() const -> QVector<QUuid>
 }
 
 /**
- * @brief Removes a view and all associated models and proxies.
- * @param view_id The QUuid of the view to remove.
- * @return True if the view was removed, false if not found.
+ * @brief Removes a view and all resources associated with it.
+ * @param view_id View identifier to remove.
+ * @return True if the view existed and was removed.
+ *
+ * Tailing is stopped and archived history is deleted before the view context is destroyed.
  */
 auto LogViewerController::remove_view(const QUuid& view_id) -> bool
 {
-    bool removed = m_views->remove_view(view_id);
+    bool removed = false;
 
-    if (removed)
+    if (!view_id.isNull() && m_views->get_context(view_id) != nullptr)
     {
         cancel_loading(view_id);
+
+        if (m_tailer_service != nullptr)
+        {
+            m_tailer_service->stop_tailing_view(view_id);
+        }
+
+        if (m_history_service != nullptr)
+        {
+            m_history_service->remove_view_entries(view_id);
+        }
+
+        m_live_tailing_views.remove(view_id);
+        removed = m_views->remove_view(view_id);
     }
 
     return removed;
 }
 
 /**
- * @brief Removes all views and clears all associated models and proxies.
+ * @brief Removes every view and releases associated loading, tailing, and history resources.
  *
- * This method is used when closing a session to ensure no stale data remains.
- * Emits `view_removed` for each removed view.
+ * Each view is removed through remove_view() so lifecycle cleanup is identical for normal removal,
+ * session closing, and application shutdown.
  */
 auto LogViewerController::clear_all_views() -> void
 {
-    // Cancel any pending async loads
-    if (m_ingest != nullptr)
-    {
-        const QVector<QUuid> ids = m_views->get_all_view_ids();
-        for (const QUuid& view_id: ids)
-        {
-            m_ingest->cancel_for_view(view_id);
-        }
-    }
+    const QVector<QUuid> view_ids = m_views->get_all_view_ids();
 
-    // Remove all views (this also emits view_removed for each)
-    if (m_views != nullptr)
+    for (const QUuid& view_id: view_ids)
     {
-        const QVector<QUuid> ids = m_views->get_all_view_ids();
-        for (const QUuid& view_id: ids)
-        {
-            m_views->remove_view(view_id);
-            emit view_removed(view_id);
-        }
+        remove_view(view_id);
     }
 }
 
@@ -302,19 +346,21 @@ auto LogViewerController::add_log_files_to_session(const QString& session_id,
 }
 
 /**
- * @brief Loads a single log file and creates a new view (model/proxy) for it.
- * @param file_path The LogFileInfo to load and display.
- * @return QUuid of the created view, or an empty QUuid if the file is already loaded.
+ * @brief Loads a single log file into a new view.
+ * @param file_path Path to the log file.
+ * @return Identifier of the created view.
  */
 auto LogViewerController::load_log_file(const QString& file_path) -> QUuid
 {
-    auto entries = m_ingest->load_file_sync(file_path);
-    QString app_name =
-        (!entries.isEmpty()) ? entries.first().get_app_name() : LogLoader::identify_app(file_path);
-    LogFileInfo loaded_log_file(file_path, app_name);
-    QUuid view_id = m_views->create_view();
+    const QVector<LogEntry> entries = m_ingest->load_file_sync(file_path);
+    const QString app_name =
+        !entries.isEmpty() ? entries.first().get_app_name() : LogLoader::identify_app(file_path);
+    const LogFileInfo loaded_log_file(file_path, app_name);
+    const QUuid view_id = m_views->create_view();
 
-    auto* ctx = m_views->get_context(view_id);
+    set_live_tailing_enabled(view_id, true);
+
+    auto* context = m_views->get_context(view_id);
     auto* proxy = get_sort_filter_proxy(view_id);
 
     if (proxy != nullptr)
@@ -322,9 +368,10 @@ auto LogViewerController::load_log_file(const QString& file_path) -> QUuid
         proxy->set_ingestion_mode(true);
     }
 
-    if (ctx != nullptr)
+    if (context != nullptr)
     {
-        ctx->append_entries(entries);
+        m_history_service->add_entries(view_id, entries);
+        context->append_entries(entries);
         m_views->set_loaded_files(view_id, QList<LogFileInfo>{loaded_log_file});
     }
 
@@ -333,15 +380,16 @@ auto LogViewerController::load_log_file(const QString& file_path) -> QUuid
         proxy->set_ingestion_mode(false);
     }
 
+    m_tailer_service->start_tailing(view_id, file_path);
+
     return view_id;
 }
 
 /**
- * @brief Loads a single log file into an existing view (model/proxy).
- * @param view_id The target view to load the file into.
- * @param file_path The path to the log file.
- * @return True if the file was loaded and entries appended; false if the file was already present
- * or the view does not exist.
+ * @brief Loads a single log file into an existing view.
+ * @param view_id Target view identifier.
+ * @param file_path Path to the log file.
+ * @return True when the file was loaded.
  */
 auto LogViewerController::load_log_file(const QUuid& view_id, const QString& file_path) -> bool
 {
@@ -349,26 +397,33 @@ auto LogViewerController::load_log_file(const QUuid& view_id, const QString& fil
 
     ensure_view_models(view_id);
 
-    auto* ctx = m_views->get_context(view_id);
+    auto* context = m_views->get_context(view_id);
 
-    if (ctx != nullptr && !is_file_loaded(view_id, file_path))
+    if (context != nullptr && !is_file_loaded(view_id, file_path))
     {
         auto* proxy = get_sort_filter_proxy(view_id);
+
         if (proxy != nullptr)
         {
             proxy->set_ingestion_mode(true);
         }
 
-        auto entries = m_ingest->load_file_sync(file_path);
-        const QString app_name = (!entries.isEmpty()) ? entries.first().get_app_name()
-                                                      : LogLoader::identify_app(file_path);
+        const QVector<LogEntry> entries = m_ingest->load_file_sync(file_path);
+        const QString app_name = !entries.isEmpty() ? entries.first().get_app_name()
+                                                    : LogLoader::identify_app(file_path);
 
-        ctx->append_entries(entries);
+        m_history_service->add_entries(view_id, entries);
+        context->append_entries(entries);
         m_views->add_loaded_file(view_id, LogFileInfo(file_path, app_name));
 
         if (proxy != nullptr)
         {
             proxy->set_ingestion_mode(false);
+        }
+
+        if (get_live_tailing_enabled(view_id))
+        {
+            m_tailer_service->start_tailing(view_id, file_path);
         }
 
         success = true;
@@ -378,10 +433,9 @@ auto LogViewerController::load_log_file(const QUuid& view_id, const QString& fil
 }
 
 /**
- * @brief Loads log files from the specified file paths and creates a new view (model/proxy) for
- * them.
- * @param file_paths A vector of file paths to load logs from.
- * @return QUuid of the created view, or an empty QUuid if no files were loaded.
+ * @brief Loads multiple log files into a new view.
+ * @param file_paths Paths to load.
+ * @return Identifier of the created view, or a null identifier for an empty request.
  */
 auto LogViewerController::load_log_files(const QVector<QString>& file_paths) -> QUuid
 {
@@ -391,8 +445,10 @@ auto LogViewerController::load_log_files(const QVector<QString>& file_paths) -> 
     {
         QList<LogFileInfo> loaded_log_files;
         view_id = m_views->create_view();
+        set_live_tailing_enabled(view_id, true);
 
         auto* proxy = get_sort_filter_proxy(view_id);
+
         if (proxy != nullptr)
         {
             proxy->set_ingestion_mode(true);
@@ -400,17 +456,18 @@ auto LogViewerController::load_log_files(const QVector<QString>& file_paths) -> 
 
         for (const QString& file_path: file_paths)
         {
-            QVector<LogEntry> entries = m_ingest->load_file_sync(file_path);
-            QString app_name = (!entries.isEmpty()) ? entries.first().get_app_name()
-                                                    : LogLoader::identify_app(file_path);
+            const QVector<LogEntry> entries = m_ingest->load_file_sync(file_path);
+            const QString app_name = !entries.isEmpty() ? entries.first().get_app_name()
+                                                        : LogLoader::identify_app(file_path);
 
-            LogFileInfo log_file_info(file_path, app_name);
-            loaded_log_files.append(log_file_info);
+            loaded_log_files.append(LogFileInfo(file_path, app_name));
 
-            auto* ctx = m_views->get_context(view_id);
-            if (ctx != nullptr)
+            auto* context = m_views->get_context(view_id);
+
+            if (context != nullptr)
             {
-                ctx->append_entries(entries);
+                m_history_service->add_entries(view_id, entries);
+                context->append_entries(entries);
             }
         }
 
@@ -419,6 +476,11 @@ auto LogViewerController::load_log_files(const QVector<QString>& file_paths) -> 
         if (proxy != nullptr)
         {
             proxy->set_ingestion_mode(false);
+        }
+
+        for (const QString& file_path: file_paths)
+        {
+            m_tailer_service->start_tailing(view_id, file_path);
         }
     }
 
@@ -435,6 +497,7 @@ auto LogViewerController::load_log_file_async(const QString& file_path,
                                               qsizetype batch_size) -> QUuid
 {
     QUuid view_id = m_views->create_view();
+    set_live_tailing_enabled(view_id, true);
 
     const QString app_name = LogLoader::identify_app(file_path);
     LogFileInfo loaded_log_file(file_path, app_name);
@@ -495,6 +558,7 @@ auto LogViewerController::load_log_files_async(const QVector<QString>& file_path
     if (!file_paths.isEmpty())
     {
         view_id = m_views->create_view();
+        set_live_tailing_enabled(view_id, true);
         QList<LogFileInfo> files_info;
 
         for (const QString& file_path: file_paths)
@@ -972,9 +1036,9 @@ auto LogViewerController::get_view_file_paths(const QUuid& view_id) const -> QVe
 }
 
 /**
- * @brief Exports a view's state (loaded files, filters, paging, sort) into a serializable snapshot.
- * @param view_id Target view id (use `get_current_view()` for the active view).
- * @return SessionViewState snapshot (empty/default if view not found).
+ * @brief Exports serializable state for a view.
+ * @param view_id Target view identifier.
+ * @return Session snapshot including the per-view live-tail setting.
  */
 auto LogViewerController::export_view_state(const QUuid& view_id) const -> SessionViewState
 {
@@ -983,6 +1047,7 @@ auto LogViewerController::export_view_state(const QUuid& view_id) const -> Sessi
     if (!view_id.isNull())
     {
         state = m_views->export_view_state(view_id, *m_filters);
+        state.filters.live_tailing_enabled = get_live_tailing_enabled(view_id);
     }
 
     return state;
@@ -1001,6 +1066,7 @@ auto LogViewerController::import_view_state(const SessionViewState& state) -> QU
     if (m_views != nullptr && m_filters != nullptr)
     {
         result = m_views->import_view_state(state, *m_filters);
+        set_live_tailing_enabled(result, state.filters.live_tailing_enabled);
 
         // Update explorer tree
         if (m_catalog != nullptr && !state.loaded_files.isEmpty())
@@ -1054,6 +1120,7 @@ auto LogViewerController::import_view_state_for_session(const QString& session_i
     if (m_views != nullptr && m_filters != nullptr)
     {
         result = m_views->import_view_state(state, *m_filters);
+        set_live_tailing_enabled(result, state.filters.live_tailing_enabled);
 
         // Update explorer tree with session context
         if (m_catalog != nullptr && !state.loaded_files.isEmpty() && !session_id.isEmpty())
@@ -1094,74 +1161,139 @@ auto LogViewerController::import_view_state_for_session(const QString& session_i
 }
 
 /**
- * @brief Removes a single log file from all views and from the LogFileTreeModel.
- *        If a view becomes empty, it is deleted and view_removed() is emitted.
- * @param file The LogFileInfo object to remove.
+ * @brief Enables or disables live tailing for a view.
+ * @param view_id Target view.
+ * @param enabled True to start tailing loaded files.
+ */
+auto LogViewerController::set_live_tailing_enabled(const QUuid& view_id, bool enabled) -> void
+{
+    if (enabled)
+    {
+        m_live_tailing_views.insert(view_id);
+
+        const QVector<QString> file_paths = get_view_file_paths(view_id);
+
+        for (const QString& file_path: file_paths)
+        {
+            m_tailer_service->start_tailing(view_id, file_path);
+        }
+    }
+    else
+    {
+        m_live_tailing_views.remove(view_id);
+        m_tailer_service->stop_tailing_view(view_id);
+    }
+}
+
+/**
+ * @brief Returns whether live tailing is enabled for a view.
+ * @param view_id Target view.
+ * @return True when enabled.
+ */
+auto LogViewerController::get_live_tailing_enabled(const QUuid& view_id) const -> bool
+{
+    const bool enabled = m_live_tailing_views.contains(view_id);
+    return enabled;
+}
+
+/**
+ * @brief Searches every SQLite-archived entry for a view.
+ * @param view_id Target view.
+ * @param search_text Plain-text FTS query.
+ * @param search_field Field to search.
+ * @param limit Maximum result count.
+ * @return Matching archive entries.
+ */
+auto LogViewerController::search_history(const QUuid& view_id, const QString& search_text,
+                                         SearchField search_field,
+                                         int limit) const -> QVector<LogEntry>
+{
+    QVector<LogEntry> entries;
+
+    if (m_history_service != nullptr)
+    {
+        entries = m_history_service->search_entries(view_id, search_text, search_field, limit);
+    }
+
+    return entries;
+}
+
+/**
+ * @brief Removes a file from every view and from the file tree.
+ * @param file File metadata identifying the path to remove.
+ *
+ * Tailing is stopped and the corresponding archived entries are deleted before the file is
+ * removed from each view model.
  */
 auto LogViewerController::remove_log_file(const LogFileInfo& file) -> void
 {
     QList<QUuid> views_to_remove;
+    const QString file_path = file.get_file_path();
+    const QVector<QUuid> view_ids = m_views->get_all_view_ids();
 
-    // Remove file from all views and purge associated model entries
-    QVector<QUuid> ids = m_views->get_all_view_ids();
-    for (const QUuid& view_id: ids)
+    for (const QUuid& view_id: view_ids)
     {
-        auto* ctx = m_views->get_context(view_id);
-        if (ctx != nullptr)
+        auto* context = m_views->get_context(view_id);
+
+        if (context != nullptr && is_file_loaded(view_id, file_path))
         {
-            QList<LogFileInfo> files = ctx->get_loaded_files();
+            m_tailer_service->stop_tailing(view_id, file_path);
+            m_history_service->remove_file_entries(view_id, file_path);
+
+            QList<LogFileInfo> files = context->get_loaded_files();
             files.erase(std::remove_if(files.begin(), files.end(),
-                                       [&file](const LogFileInfo& info) {
-                                           return info.get_file_path() == file.get_file_path();
+                                       [&file_path](const LogFileInfo& info) {
+                                           return info.get_file_path() == file_path;
                                        }),
                         files.end());
-            ctx->set_loaded_files(files);
 
-            ctx->remove_entries_by_file_path(file.get_file_path());
+            context->set_loaded_files(files);
+            context->remove_entries_by_file_path(file_path);
+            m_filters->adjust_visibility_on_file_removed(view_id, file_path);
 
-            if (ctx->get_entries().isEmpty())
+            if (context->get_entries().isEmpty())
             {
                 views_to_remove.append(view_id);
             }
 
-            emit view_file_paths_changed(view_id, ctx->get_file_paths());
-
-            m_filters->adjust_visibility_on_file_removed(view_id, file.get_file_path());
+            emit view_file_paths_changed(view_id, context->get_file_paths());
         }
     }
 
-    // Remove file from the tree model (delegated to catalog)
     if (m_catalog != nullptr)
     {
         m_catalog->remove_file(file);
     }
 
-    // Remove views that became empty and notify listeners
     for (const QUuid& view_id: views_to_remove)
     {
         remove_view(view_id);
-        emit view_removed(view_id);
     }
 }
 
 /**
- * @brief Removes a single log file from the specified view only.
- * @param view_id The target view.
- * @param file_path Absolute file path to remove from the view.
+ * @brief Removes a file from one view.
+ * @param view_id Target view identifier.
+ * @param file_path Absolute file path to remove.
  *
- * If the target view becomes empty, it is removed and `view_removed(view_id)` is emitted.
+ * Tailing is stopped and file-specific archive history is deleted before the live model is
+ * changed. An empty view is then removed through remove_view().
  */
 auto LogViewerController::remove_log_file(const QUuid& view_id, const QString& file_path) -> void
 {
-    const bool has_valid_args = !view_id.isNull() && !file_path.isEmpty();
+    const bool has_valid_args =
+        !view_id.isNull() && !file_path.isEmpty() && is_file_loaded(view_id, file_path);
     bool view_became_empty = false;
 
     if (has_valid_args)
     {
+        m_tailer_service->stop_tailing(view_id, file_path);
+        m_history_service->remove_file_entries(view_id, file_path);
+
         m_views->remove_entries_by_file(view_id, file_path);
         m_filters->adjust_visibility_on_file_removed(view_id, file_path);
 
-        QVector<LogEntry> entries = m_views->get_entries(view_id);
+        const QVector<LogEntry> entries = m_views->get_entries(view_id);
         view_became_empty = entries.isEmpty();
 
         emit view_file_paths_changed(view_id, get_view_file_paths(view_id));
@@ -1170,7 +1302,6 @@ auto LogViewerController::remove_log_file(const QUuid& view_id, const QString& f
     if (has_valid_args && view_became_empty)
     {
         remove_view(view_id);
-        emit view_removed(view_id);
     }
 }
 

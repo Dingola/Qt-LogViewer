@@ -65,6 +65,7 @@ struct RecentSessionRecord {
  * - use_regex: Whether search_text is interpreted as a regex.
  * - show_only_file: Absolute file path to exclusively show (empty = disabled).
  * - hidden_files: Set of absolute file paths hidden in the view.
+ * - live_tailing_enabled: Whether live tailing is enabled for the view.
  */
 struct FilterState {
         QString app_name;
@@ -74,6 +75,7 @@ struct FilterState {
         bool use_regex{false};
         QString show_only_file;
         QSet<QString> hidden_files;
+        bool live_tailing_enabled{true};
 };
 
 /**

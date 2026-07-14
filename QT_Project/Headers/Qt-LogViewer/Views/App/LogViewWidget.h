@@ -162,6 +162,18 @@ class LogViewWidget: public QWidget
          */
         auto set_view_file_paths(const QVector<QString>& file_paths) -> void;
 
+        /**
+         * @brief Sets the live tail checkbox state without emitting a user-change signal.
+         * @param enabled True to check the control.
+         */
+        auto set_live_tailing_enabled(bool enabled) -> void;
+
+        /**
+         * @brief Returns the live tail checkbox state.
+         * @return True when live tailing is enabled.
+         */
+        [[nodiscard]] auto get_live_tailing_enabled() const -> bool;
+
     signals:
         /**
          * @brief Emitted when the application filter selection changes.
@@ -205,6 +217,12 @@ class LogViewWidget: public QWidget
          * @param file_path Target file path.
          */
         void remove_file_requested(const QString& file_path);
+
+        /**
+         * @brief Emitted when the user changes the live tail state.
+         * @param enabled True when tailing should be enabled.
+         */
+        void live_tailing_toggled(bool enabled);
 
     protected:
         /**

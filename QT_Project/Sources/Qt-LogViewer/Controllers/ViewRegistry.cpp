@@ -87,12 +87,14 @@ auto ViewRegistry::remove_view(const QUuid& view_id) -> bool
     {
         delete m_contexts[view_id];
         m_contexts.remove(view_id);
-        removed = true;
 
         if (m_current_view_id == view_id)
         {
             m_current_view_id = QUuid();
         }
+
+        removed = true;
+        emit view_removed(view_id);
     }
 
     return removed;

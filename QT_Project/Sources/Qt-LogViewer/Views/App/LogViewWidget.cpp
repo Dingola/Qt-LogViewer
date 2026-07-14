@@ -1,6 +1,7 @@
 #include "Qt-LogViewer/Views/App/LogViewWidget.h"
 
 #include <QAbstractProxyModel>
+#include <QCheckBox>
 #include <QItemSelectionModel>
 #include <QLayout>
 #include <QMenu>
@@ -39,6 +40,7 @@ LogViewWidget::LogViewWidget(QWidget* parent)
             &LogViewWidget::app_filter_changed);
     connect(ui->logFilterWidget, &LogFilterWidget::log_level_filter_changed, this,
             &LogViewWidget::log_level_filter_changed);
+    connect(ui->checkBoxLiveTail, &QCheckBox::toggled, this, &LogViewWidget::live_tailing_toggled);
 
     // Forward current row changes in the table view
     QItemSelectionModel* selection_model = ui->logTableView->selectionModel();
@@ -414,4 +416,25 @@ auto LogViewWidget::changeEvent(QEvent* event) -> void
     }
 
     QWidget::changeEvent(event);
+}
+
+/**
+ * @brief Sets the live tail checkbox state without emitting a user-change signal.
+ * @param enabled True to check the control.
+ */
+auto LogViewWidget::set_live_tailing_enabled(bool enabled) -> void
+{
+    const bool signals_blocked = ui->checkBoxLiveTail->blockSignals(true);
+    ui->checkBoxLiveTail->setChecked(enabled);
+    ui->checkBoxLiveTail->blockSignals(signals_blocked);
+}
+
+/**
+ * @brief Returns the live tail checkbox state.
+ * @return True when live tailing is enabled.
+ */
+auto LogViewWidget::get_live_tailing_enabled() const -> bool
+{
+    const bool enabled = ui->checkBoxLiveTail->isChecked();
+    return enabled;
 }

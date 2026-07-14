@@ -653,6 +653,8 @@ auto SessionController::build_view_json(const QUuid& view_id) const -> QJsonObje
             hidden_arr.append(hf);
         }
         filters_obj.insert(QStringLiteral("hidden_files"), hidden_arr);
+        filters_obj.insert(QStringLiteral("live_tailing_enabled"),
+                           state.filters.live_tailing_enabled);
         view_obj.insert(QStringLiteral("filters"), filters_obj);
 
         view_obj.insert(QStringLiteral("page_size"), static_cast<int>(state.page_size));
