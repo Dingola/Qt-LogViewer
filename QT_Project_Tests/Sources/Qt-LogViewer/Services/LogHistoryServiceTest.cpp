@@ -307,3 +307,133 @@ TEST_F(LogHistoryServiceTest, CombinesStructuredQueryFilters)
 
     EXPECT_EQ(m_history_service->count_entries(query), 1);
 }
+
+/**
+ * @brief Verifies that text can be searched across the FTS5 fields.
+ */
+TEST_F(LogHistoryServiceTest, CountsEntriesMatchingSearchText)
+{
+    QVector<LogEntry> entries;
+    entries.append(create_entry(QStringLiteral("network connection established"),
+                                QStringLiteral("first.log")));
+    entries.append(
+        create_entry(QStringLiteral("database migration completed"), QStringLiteral("second.log")));
+    entries.append(
+        create_entry(QStringLiteral("network connection closed"), QStringLiteral("third.log")));
+
+    ASSERT_TRUE(m_history_service->add_entries(m_view_id, entries));
+
+    LogQuery query;
+    query.view_id = m_view_id;
+    query.search_text = QStringLiteral("network");
+
+    EXPECT_EQ(m_history_service->count_entries(query), 2);
+}
+
+/**
+ * @brief Verifies that text searching can be restricted to the message field.
+ */
+TEST_F(LogHistoryServiceTest, CountsEntriesMatchingSelectedSearchField)
+{
+    QVector<LogEntry> entries;
+    entries.append(create_entry(QStringLiteral("needle in message"), QStringLiteral("first.log"),
+                                QStringLiteral("INFO"), QStringLiteral("Frontend")));
+    entries.append(create_entry(QStringLiteral("ordinary message"), QStringLiteral("second.log"),
+                                QStringLiteral("INFO"), QStringLiteral("needle")));
+
+    ASSERT_TRUE(m_history_service->add_entries(m_view_id, entries));
+
+    LogQuery query;
+    query.view_id = m_view_id;
+    query.search_text = QStringLiteral("needle");
+    query.search_fields = {LogField::Message};
+
+    EXPECT_EQ(m_history_service->count_entries(query), 1);
+}
+
+/**
+ * @brief Verifies that text can be searched across multiple selected fields.
+ */
+TEST_F(LogHistoryServiceTest, CountsEntriesMatchingMultipleSearchFields)
+{
+    QVector<LogEntry> entries;
+    entries.append(create_entry(QStringLiteral("needle in message"), QStringLiteral("first.log"),
+                                QStringLiteral("INFO"), QStringLiteral("Frontend")));
+    entries.append(create_entry(QStringLiteral("ordinary message"), QStringLiteral("second.log"),
+                                QStringLiteral("INFO"), QStringLiteral("needle")));
+    entries.append(create_entry(QStringLiteral("ordinary message"), QStringLiteral("needle.log"),
+                                QStringLiteral("INFO"), QStringLiteral("Backend")));
+
+    ASSERT_TRUE(m_history_service->add_entries(m_view_id, entries));
+
+    LogQuery query;
+    query.view_id = m_view_id;
+    query.search_text = QStringLiteral("needle");
+    query.search_fields = {LogField::Message, LogField::AppName};
+
+    EXPECT_EQ(m_history_service->count_entries(query), 2);
+}
+
+/**
+ * @brief Verifies that text search and structured filters are combined.
+ */
+TEST_F(LogHistoryServiceTest, CombinesTextSearchWithStructuredFilters)
+{
+    QVector<LogEntry> entries;
+    entries.append(create_entry(QStringLiteral("network failed"), QStringLiteral("backend.log"),
+                                QStringLiteral("ERROR"), QStringLiteral("Backend")));
+    entries.append(create_entry(QStringLiteral("network connected"), QStringLiteral("backend.log"),
+                                QStringLiteral("INFO"), QStringLiteral("Backend")));
+    entries.append(create_entry(QStringLiteral("network failed"), QStringLiteral("frontend.log"),
+                                QStringLiteral("ERROR"), QStringLiteral("Frontend")));
+    entries.append(create_entry(QStringLiteral("database failed"), QStringLiteral("database.log"),
+                                QStringLiteral("ERROR"), QStringLiteral("Backend")));
+
+    ASSERT_TRUE(m_history_service->add_entries(m_view_id, entries));
+
+    LogQuery query;
+    query.view_id = m_view_id;
+    query.app_name = QStringLiteral("Backend");
+    query.log_levels = {QStringLiteral("ERROR")};
+    query.search_text = QStringLiteral("network");
+    query.search_fields = {LogField::Message};
+
+    EXPECT_EQ(m_history_service->count_entries(query), 1);
+}
+
+/**
+ * @brief Verifies that unsupported search fields do not broaden the query.
+ */
+TEST_F(LogHistoryServiceTest, RejectsUnsupportedSearchField)
+{
+    QVector<LogEntry> entries;
+    entries.append(create_entry(QStringLiteral("needle"), QStringLiteral("first.log")));
+
+    ASSERT_TRUE(m_history_service->add_entries(m_view_id, entries));
+
+    LogQuery query;
+    query.view_id = m_view_id;
+    query.search_text = QStringLiteral("needle");
+    query.search_fields = {QStringLiteral("thread_id")};
+
+    EXPECT_EQ(m_history_service->count_entries(query), 0);
+}
+
+/**
+ * @brief Verifies that regular-expression searches are not executed as FTS searches.
+ */
+TEST_F(LogHistoryServiceTest, RejectsRegexSearch)
+{
+    QVector<LogEntry> entries;
+    entries.append(create_entry(QStringLiteral("network failed"), QStringLiteral("first.log")));
+
+    ASSERT_TRUE(m_history_service->add_entries(m_view_id, entries));
+
+    LogQuery query;
+    query.view_id = m_view_id;
+    query.search_text = QStringLiteral("network.*failed");
+    query.search_fields = {LogField::Message};
+    query.use_regex = true;
+
+    EXPECT_EQ(m_history_service->count_entries(query), 0);
+}

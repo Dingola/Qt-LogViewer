@@ -19,26 +19,110 @@
 namespace
 {
 struct SqlFilter {
+        QString from_clause{QStringLiteral("log_entries AS entries")};
         QStringList predicates;
         QList<QPair<QString, QVariant>> bindings;
+        QString error;
 };
 
 /**
- * @brief Creates SQL predicates and bindings for structured log filters.
- * @param log_query Query containing the filter values.
- * @return Predicates and bound values for the query.
+ * @brief Maps a log field identifier to an FTS5 column name.
+ * @param field_id Stable log field identifier.
+ * @return FTS5 column name, or an empty string for an unsupported field.
  */
-[[nodiscard]] auto create_structured_filter(const LogQuery& log_query) -> SqlFilter
+[[nodiscard]] auto get_fts_column(const QString& field_id) -> QString
+{
+    QString column;
+
+    if (field_id == LogField::Level)
+    {
+        column = QStringLiteral("level");
+    }
+    else if (field_id == LogField::Message)
+    {
+        column = QStringLiteral("message");
+    }
+    else if (field_id == LogField::AppName)
+    {
+        column = QStringLiteral("app_name");
+    }
+    else if (field_id == LogField::FilePath)
+    {
+        column = QStringLiteral("file_path");
+    }
+
+    return column;
+}
+
+/**
+ * @brief Creates an FTS5 match expression for selected fields.
+ * @param search_fields Stable identifiers of fields included in searching.
+ * @param search_expression Escaped FTS5 search expression.
+ * @param error Receives an error description for unsupported fields.
+ * @return FTS5 match expression.
+ */
+[[nodiscard]] auto create_match_expression(const QSet<QString>& search_fields,
+                                           const QString& search_expression,
+                                           QString& error) -> QString
+{
+    QString match_expression = search_expression;
+
+    if (!search_fields.isEmpty())
+    {
+        QStringList columns;
+
+        for (const QString& field_id: search_fields)
+        {
+            const QString column = get_fts_column(field_id);
+
+            if (column.isEmpty())
+            {
+                error =
+                    QStringLiteral("Field is not available for text searching: %1").arg(field_id);
+                break;
+            }
+
+            columns.append(column);
+        }
+
+        if (error.isEmpty())
+        {
+            columns.sort();
+
+            if (columns.size() == 1)
+            {
+                match_expression =
+                    QStringLiteral("%1 : %2").arg(columns.first(), search_expression);
+            }
+            else
+            {
+                match_expression = QStringLiteral("{%1} : %2")
+                                       .arg(columns.join(QLatin1Char(' ')), search_expression);
+            }
+        }
+    }
+
+    return match_expression;
+}
+
+/**
+ * @brief Creates SQL predicates and bindings for a log query.
+ * @param log_query Query containing the filter values.
+ * @param search_expression Escaped FTS5 search expression.
+ * @return SQL source, predicates, bindings, and validation result.
+ */
+[[nodiscard]] auto create_query_filter(const LogQuery& log_query,
+                                       const QString& search_expression) -> SqlFilter
 {
     SqlFilter filter;
 
-    filter.predicates.append(QStringLiteral("view_id = :view_id"));
+    filter.predicates.append(QStringLiteral("entries.view_id = :view_id"));
     filter.bindings.append(
         {QStringLiteral(":view_id"), log_query.view_id.toString(QUuid::WithoutBraces)});
 
     if (!log_query.app_name.isEmpty())
     {
-        filter.predicates.append(QStringLiteral("app_name = :app_name"));
+        filter.predicates.append(QStringLiteral("entries.app_name = :app_name"));
         filter.bindings.append({QStringLiteral(":app_name"), log_query.app_name});
     }
 
@@ -57,13 +141,13 @@ struct SqlFilter {
             ++index;
         }
 
-        filter.predicates.append(QStringLiteral("LOWER(TRIM(level)) IN (%1)")
+        filter.predicates.append(QStringLiteral("LOWER(TRIM(entries.level)) IN (%1)")
                                      .arg(placeholders.join(QStringLiteral(", "))));
     }
 
     if (!log_query.show_only_file.isEmpty())
     {
-        filter.predicates.append(QStringLiteral("file_path = :show_only_file"));
+        filter.predicates.append(QStringLiteral("entries.file_path = :show_only_file"));
         filter.bindings.append({QStringLiteral(":show_only_file"), log_query.show_only_file});
     }
 
@@ -82,8 +166,32 @@ struct SqlFilter {
             ++index;
         }
 
-        filter.predicates.append(
-            QStringLiteral("file_path NOT IN (%1)").arg(placeholders.join(QStringLiteral(", "))));
+        filter.predicates.append(QStringLiteral("entries.file_path NOT IN (%1)")
+                                     .arg(placeholders.join(QStringLiteral(", "))));
+    }
+
+    if (!log_query.search_text.trimmed().isEmpty())
+    {
+        if (log_query.use_regex)
+        {
+            filter.error = QStringLiteral("Regular-expression search is not supported by FTS5");
+        }
+        else
+        {
+            const QString match_expression =
+                create_match_expression(log_query.search_fields, search_expression, filter.error);
+
+            if (filter.error.isEmpty())
+            {
+                filter.from_clause.append(
+                    QStringLiteral(" INNER JOIN log_entries_fts "
+                                   "ON log_entries_fts.rowid = entries.id"));
+
+                filter.predicates.append(QStringLiteral("log_entries_fts MATCH :match_expression"));
+
+                filter.bindings.append({QStringLiteral(":match_expression"), match_expression});
+            }
+        }
     }
 
     return filter;
@@ -196,23 +304,39 @@ auto LogHistoryService::count_entries(const LogQuery& log_query) const -> qsizet
 
     if (m_is_available && !log_query.view_id.isNull())
     {
-        const SqlFilter filter = create_structured_filter(log_query);
-        QSqlQuery query(QSqlDatabase::database(m_connection_name));
+        QString search_expression;
 
-        query.prepare(QStringLiteral("SELECT COUNT(*) "
-                                     "FROM log_entries "
-                                     "WHERE %1")
-                          .arg(filter.predicates.join(QStringLiteral(" AND "))));
-
-        bind_filter_values(query, filter.bindings);
-
-        if (query.exec() && query.next())
+        if (!log_query.search_text.trimmed().isEmpty() && !log_query.use_regex)
         {
-            entry_count = query.value(0).toLongLong();
+            search_expression = create_fts_query(log_query.search_text);
+        }
+
+        const SqlFilter filter = create_query_filter(log_query, search_expression);
+
+        if (filter.error.isEmpty())
+        {
+            QSqlQuery query(QSqlDatabase::database(m_connection_name));
+
+            query.prepare(
+                QStringLiteral("SELECT COUNT(*) "
+                               "FROM %1 "
+                               "WHERE %2")
+                    .arg(filter.from_clause, filter.predicates.join(QStringLiteral(" AND "))));
+
+            bind_filter_values(query, filter.bindings);
+
+            if (query.exec() && query.next())
+            {
+                entry_count = query.value(0).toLongLong();
+            }
+            else
+            {
+                qWarning() << "Counting log history entries failed:" << query.lastError().text();
+            }
         }
         else
         {
-            qWarning() << "Counting log history entries failed:" << query.lastError().text();
+            qWarning() << "Invalid log history query:" << filter.error;
         }
     }
 
