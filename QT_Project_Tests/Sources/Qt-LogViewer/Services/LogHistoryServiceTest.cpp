@@ -24,18 +24,22 @@ void LogHistoryServiceTest::TearDown()
     delete m_history_service;
     m_history_service = nullptr;
 }
+
 /**
  * @brief Creates one deterministic test entry.
  * @param message Entry message.
  * @param file_path Source file path.
+ * @param level Entry log level.
+ * @param app_name Entry application name.
  * @return Constructed parsed log entry.
  */
-auto LogHistoryServiceTest::create_entry(const QString& message,
-                                         const QString& file_path) const -> LogEntry
+auto LogHistoryServiceTest::create_entry(const QString& message, const QString& file_path,
+                                         const QString& level,
+                                         const QString& app_name) const -> LogEntry
 {
     const LogEntry entry(
-        QDateTime::fromString(QStringLiteral("2026-01-01T12:00:00.000Z"), Qt::ISODateWithMs),
-        QStringLiteral("INFO"), message, LogFileInfo(file_path, QStringLiteral("HistoryTestApp")));
+        QDateTime::fromString(QStringLiteral("2026-01-01T12:00:00.000Z"), Qt::ISODateWithMs), level,
+        message, LogFileInfo(file_path, app_name));
     return entry;
 }
 
@@ -191,4 +195,115 @@ TEST_F(LogHistoryServiceTest, ReturnsZeroForNullViewId)
     const LogQuery query;
 
     EXPECT_EQ(m_history_service->count_entries(query), 0);
+}
+
+/**
+ * @brief Verifies that entries can be counted by application name.
+ */
+TEST_F(LogHistoryServiceTest, CountsEntriesMatchingAppName)
+{
+    QVector<LogEntry> entries;
+    entries.append(create_entry(QStringLiteral("first"), QStringLiteral("first.log"),
+                                QStringLiteral("INFO"), QStringLiteral("Frontend")));
+    entries.append(create_entry(QStringLiteral("second"), QStringLiteral("second.log"),
+                                QStringLiteral("INFO"), QStringLiteral("Backend")));
+    entries.append(create_entry(QStringLiteral("third"), QStringLiteral("third.log"),
+                                QStringLiteral("ERROR"), QStringLiteral("Frontend")));
+
+    ASSERT_TRUE(m_history_service->add_entries(m_view_id, entries));
+
+    LogQuery query;
+    query.view_id = m_view_id;
+    query.app_name = QStringLiteral("Frontend");
+
+    EXPECT_EQ(m_history_service->count_entries(query), 2);
+}
+
+/**
+ * @brief Verifies that entries can be counted by multiple log levels.
+ */
+TEST_F(LogHistoryServiceTest, CountsEntriesMatchingLogLevels)
+{
+    QVector<LogEntry> entries;
+    entries.append(
+        create_entry(QStringLiteral("info"), QStringLiteral("info.log"), QStringLiteral("INFO")));
+    entries.append(create_entry(QStringLiteral("warning"), QStringLiteral("warning.log"),
+                                QStringLiteral("Warning")));
+    entries.append(create_entry(QStringLiteral("error"), QStringLiteral("error.log"),
+                                QStringLiteral(" error ")));
+    entries.append(create_entry(QStringLiteral("debug"), QStringLiteral("debug.log"),
+                                QStringLiteral("DEBUG")));
+
+    ASSERT_TRUE(m_history_service->add_entries(m_view_id, entries));
+
+    LogQuery query;
+    query.view_id = m_view_id;
+    query.log_levels = {QStringLiteral("WARNING"), QStringLiteral("ERROR")};
+
+    EXPECT_EQ(m_history_service->count_entries(query), 2);
+}
+
+/**
+ * @brief Verifies that only entries from the selected file are counted.
+ */
+TEST_F(LogHistoryServiceTest, CountsEntriesFromShowOnlyFile)
+{
+    QVector<LogEntry> entries;
+    entries.append(create_entry(QStringLiteral("first"), QStringLiteral("first.log")));
+    entries.append(create_entry(QStringLiteral("second"), QStringLiteral("second.log")));
+    entries.append(create_entry(QStringLiteral("third"), QStringLiteral("first.log")));
+
+    ASSERT_TRUE(m_history_service->add_entries(m_view_id, entries));
+
+    LogQuery query;
+    query.view_id = m_view_id;
+    query.show_only_file = QStringLiteral("first.log");
+
+    EXPECT_EQ(m_history_service->count_entries(query), 2);
+}
+
+/**
+ * @brief Verifies that entries from hidden files are excluded.
+ */
+TEST_F(LogHistoryServiceTest, ExcludesEntriesFromHiddenFiles)
+{
+    QVector<LogEntry> entries;
+    entries.append(create_entry(QStringLiteral("first"), QStringLiteral("first.log")));
+    entries.append(create_entry(QStringLiteral("second"), QStringLiteral("second.log")));
+    entries.append(create_entry(QStringLiteral("third"), QStringLiteral("third.log")));
+    entries.append(create_entry(QStringLiteral("fourth"), QStringLiteral("first.log")));
+
+    ASSERT_TRUE(m_history_service->add_entries(m_view_id, entries));
+
+    LogQuery query;
+    query.view_id = m_view_id;
+    query.hidden_files = {QStringLiteral("first.log"), QStringLiteral("third.log")};
+
+    EXPECT_EQ(m_history_service->count_entries(query), 1);
+}
+
+/**
+ * @brief Verifies that file, application, and level filters are combined.
+ */
+TEST_F(LogHistoryServiceTest, CombinesStructuredQueryFilters)
+{
+    QVector<LogEntry> entries;
+    entries.append(create_entry(QStringLiteral("matching"), QStringLiteral("active.log"),
+                                QStringLiteral("ERROR"), QStringLiteral("Backend")));
+    entries.append(create_entry(QStringLiteral("wrong level"), QStringLiteral("active.log"),
+                                QStringLiteral("INFO"), QStringLiteral("Backend")));
+    entries.append(create_entry(QStringLiteral("wrong app"), QStringLiteral("active.log"),
+                                QStringLiteral("ERROR"), QStringLiteral("Frontend")));
+    entries.append(create_entry(QStringLiteral("hidden"), QStringLiteral("hidden.log"),
+                                QStringLiteral("ERROR"), QStringLiteral("Backend")));
+
+    ASSERT_TRUE(m_history_service->add_entries(m_view_id, entries));
+
+    LogQuery query;
+    query.view_id = m_view_id;
+    query.app_name = QStringLiteral("Backend");
+    query.log_levels = {QStringLiteral("ERROR")};
+    query.hidden_files = {QStringLiteral("hidden.log")};
+
+    EXPECT_EQ(m_history_service->count_entries(query), 1);
 }

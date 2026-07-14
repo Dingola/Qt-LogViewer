@@ -7,10 +7,101 @@
 
 #include <QDir>
 #include <QFileInfo>
+#include <QList>
+#include <QPair>
 #include <QSqlDatabase>
 #include <QSqlError>
 #include <QSqlQuery>
 #include <QStandardPaths>
+#include <QStringList>
+#include <QVariant>
+
+namespace
+{
+struct SqlFilter {
+        QStringList predicates;
+        QList<QPair<QString, QVariant>> bindings;
+};
+
+/**
+ * @brief Creates SQL predicates and bindings for structured log filters.
+ * @param log_query Query containing the filter values.
+ * @return Predicates and bound values for the query.
+ */
+[[nodiscard]] auto create_structured_filter(const LogQuery& log_query) -> SqlFilter
+{
+    SqlFilter filter;
+
+    filter.predicates.append(QStringLiteral("view_id = :view_id"));
+    filter.bindings.append(
+        {QStringLiteral(":view_id"), log_query.view_id.toString(QUuid::WithoutBraces)});
+
+    if (!log_query.app_name.isEmpty())
+    {
+        filter.predicates.append(QStringLiteral("app_name = :app_name"));
+        filter.bindings.append({QStringLiteral(":app_name"), log_query.app_name});
+    }
+
+    if (!log_query.log_levels.isEmpty())
+    {
+        QStringList placeholders;
+        qsizetype index = 0;
+
+        for (const QString& level: log_query.log_levels)
+        {
+            const QString placeholder = QStringLiteral(":log_level_%1").arg(index);
+
+            placeholders.append(placeholder);
+            filter.bindings.append({placeholder, level.trimmed().toLower()});
+
+            ++index;
+        }
+
+        filter.predicates.append(QStringLiteral("LOWER(TRIM(level)) IN (%1)")
+                                     .arg(placeholders.join(QStringLiteral(", "))));
+    }
+
+    if (!log_query.show_only_file.isEmpty())
+    {
+        filter.predicates.append(QStringLiteral("file_path = :show_only_file"));
+        filter.bindings.append({QStringLiteral(":show_only_file"), log_query.show_only_file});
+    }
+
+    if (!log_query.hidden_files.isEmpty())
+    {
+        QStringList placeholders;
+        qsizetype index = 0;
+
+        for (const QString& file_path: log_query.hidden_files)
+        {
+            const QString placeholder = QStringLiteral(":hidden_file_%1").arg(index);
+
+            placeholders.append(placeholder);
+            filter.bindings.append({placeholder, file_path});
+
+            ++index;
+        }
+
+        filter.predicates.append(
+            QStringLiteral("file_path NOT IN (%1)").arg(placeholders.join(QStringLiteral(", "))));
+    }
+
+    return filter;
+}
+
+/**
+ * @brief Binds filter values to a prepared SQL query.
+ * @param query Prepared SQL query.
+ * @param bindings Placeholder and value pairs.
+ */
+auto bind_filter_values(QSqlQuery& query, const QList<QPair<QString, QVariant>>& bindings) -> void
+{
+    for (const auto& binding: bindings)
+    {
+        query.bindValue(binding.first, binding.second);
+    }
+}
+}  // namespace
 
 /**
  * @brief Constructs the history service and initializes the SQLite database.
@@ -95,7 +186,7 @@ auto LogHistoryService::add_entries(const QUuid& view_id, const QVector<LogEntry
 }
 
 /**
- * @brief Counts archived entries belonging to the requested view.
+ * @brief Counts archived entries matching a log query.
  * @param log_query Query describing the requested result set.
  * @return Number of matching entries, or zero when the query cannot be executed.
  */
@@ -105,15 +196,15 @@ auto LogHistoryService::count_entries(const LogQuery& log_query) const -> qsizet
 
     if (m_is_available && !log_query.view_id.isNull())
     {
+        const SqlFilter filter = create_structured_filter(log_query);
         QSqlQuery query(QSqlDatabase::database(m_connection_name));
 
-        query.prepare(
-            QStringLiteral("SELECT COUNT(*) "
-                           "FROM log_entries "
-                           "WHERE view_id = :view_id"));
+        query.prepare(QStringLiteral("SELECT COUNT(*) "
+                                     "FROM log_entries "
+                                     "WHERE %1")
+                          .arg(filter.predicates.join(QStringLiteral(" AND "))));
 
-        query.bindValue(QStringLiteral(":view_id"),
-                        log_query.view_id.toString(QUuid::WithoutBraces));
+        bind_filter_values(query, filter.bindings);
 
         if (query.exec() && query.next())
         {

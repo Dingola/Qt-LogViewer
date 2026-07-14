@@ -25,10 +25,14 @@ class LogHistoryServiceTest: public ::testing::Test
          * @brief Creates one deterministic test entry.
          * @param message Entry message.
          * @param file_path Source file path.
+         * @param level Entry log level.
+         * @param app_name Entry application name.
          * @return Constructed parsed log entry.
          */
-        [[nodiscard]] auto create_entry(const QString& message,
-                                        const QString& file_path) const -> LogEntry;
+        [[nodiscard]] auto create_entry(
+            const QString& message, const QString& file_path,
+            const QString& level = QStringLiteral("INFO"),
+            const QString& app_name = QStringLiteral("HistoryTestApp")) const -> LogEntry;
 
     protected:
         LogHistoryService* m_history_service{nullptr};
