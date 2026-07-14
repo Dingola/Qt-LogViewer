@@ -65,6 +65,14 @@ class LogHistoryService final: public QObject
                                              qsizetype limit) const -> QVector<LogEntry>;
 
         /**
+         * @brief Counts matching entries grouped by normalized log level.
+         * @param log_query Query describing the filtered result set.
+         * @return Map of uppercase log level names to matching entry counts.
+         */
+        [[nodiscard]] auto get_log_level_counts(const LogQuery& log_query) const
+            -> QMap<QString, qsizetype>;
+
+        /**
          * @brief Searches every archived entry belonging to a view.
          * @param view_id View to search.
          * @param search_text Plain-text search expression.

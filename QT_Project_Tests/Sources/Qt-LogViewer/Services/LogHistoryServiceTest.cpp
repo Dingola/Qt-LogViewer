@@ -627,3 +627,137 @@ TEST_F(LogHistoryServiceTest, RejectsUnsupportedSortField)
 
     EXPECT_TRUE(m_history_service->load_entries_page(query, 0, 10).isEmpty());
 }
+
+/**
+ * @brief Verifies that entries are counted by normalized log level.
+ */
+TEST_F(LogHistoryServiceTest, CountsEntriesGroupedByLogLevel)
+{
+    QVector<LogEntry> entries;
+    entries.append(
+        create_entry(QStringLiteral("first"), QStringLiteral("first.log"), QStringLiteral("INFO")));
+    entries.append(create_entry(QStringLiteral("second"), QStringLiteral("second.log"),
+                                QStringLiteral("info")));
+    entries.append(create_entry(QStringLiteral("third"), QStringLiteral("third.log"),
+                                QStringLiteral(" Warning ")));
+    entries.append(create_entry(QStringLiteral("fourth"), QStringLiteral("fourth.log"),
+                                QStringLiteral("CUSTOM")));
+
+    ASSERT_TRUE(m_history_service->add_entries(m_view_id, entries));
+
+    LogQuery query;
+    query.view_id = m_view_id;
+
+    const QMap<QString, qsizetype> counts = m_history_service->get_log_level_counts(query);
+
+    EXPECT_EQ(counts.value(QStringLiteral("INFO")), 2);
+    EXPECT_EQ(counts.value(QStringLiteral("WARNING")), 1);
+    EXPECT_EQ(counts.value(QStringLiteral("CUSTOM")), 1);
+}
+
+/**
+ * @brief Verifies that entries from other views are excluded.
+ */
+TEST_F(LogHistoryServiceTest, CountsLogLevelsOnlyForRequestedView)
+{
+    const QUuid other_view_id = QUuid::createUuid();
+
+    ASSERT_TRUE(m_history_service->add_entries(
+        m_view_id, {create_entry(QStringLiteral("current"), QStringLiteral("current.log"),
+                                 QStringLiteral("INFO"))}));
+
+    ASSERT_TRUE(m_history_service->add_entries(
+        other_view_id, {create_entry(QStringLiteral("other"), QStringLiteral("other.log"),
+                                     QStringLiteral("ERROR"))}));
+
+    LogQuery query;
+    query.view_id = m_view_id;
+
+    const QMap<QString, qsizetype> counts = m_history_service->get_log_level_counts(query);
+
+    EXPECT_EQ(counts.value(QStringLiteral("INFO")), 1);
+    EXPECT_FALSE(counts.contains(QStringLiteral("ERROR")));
+
+    m_history_service->remove_view_entries(other_view_id);
+}
+
+/**
+ * @brief Verifies that structured filters affect log level counts.
+ */
+TEST_F(LogHistoryServiceTest, AppliesStructuredFiltersToLogLevelCounts)
+{
+    QVector<LogEntry> entries;
+    entries.append(create_entry(QStringLiteral("backend error"), QStringLiteral("backend.log"),
+                                QStringLiteral("ERROR"), QStringLiteral("Backend")));
+    entries.append(create_entry(QStringLiteral("backend info"), QStringLiteral("backend.log"),
+                                QStringLiteral("INFO"), QStringLiteral("Backend")));
+    entries.append(create_entry(QStringLiteral("frontend error"), QStringLiteral("frontend.log"),
+                                QStringLiteral("ERROR"), QStringLiteral("Frontend")));
+    entries.append(create_entry(QStringLiteral("hidden warning"), QStringLiteral("hidden.log"),
+                                QStringLiteral("WARNING"), QStringLiteral("Backend")));
+
+    ASSERT_TRUE(m_history_service->add_entries(m_view_id, entries));
+
+    LogQuery query;
+    query.view_id = m_view_id;
+    query.app_name = QStringLiteral("Backend");
+    query.hidden_files = {QStringLiteral("hidden.log")};
+
+    const QMap<QString, qsizetype> counts = m_history_service->get_log_level_counts(query);
+
+    EXPECT_EQ(counts.value(QStringLiteral("ERROR")), 1);
+    EXPECT_EQ(counts.value(QStringLiteral("INFO")), 1);
+    EXPECT_FALSE(counts.contains(QStringLiteral("WARNING")));
+}
+
+/**
+ * @brief Verifies that text searching affects log level counts.
+ */
+TEST_F(LogHistoryServiceTest, AppliesTextSearchToLogLevelCounts)
+{
+    QVector<LogEntry> entries;
+    entries.append(create_entry(QStringLiteral("network failed"), QStringLiteral("first.log"),
+                                QStringLiteral("ERROR")));
+    entries.append(create_entry(QStringLiteral("network connected"), QStringLiteral("second.log"),
+                                QStringLiteral("INFO")));
+    entries.append(create_entry(QStringLiteral("database failed"), QStringLiteral("third.log"),
+                                QStringLiteral("ERROR")));
+
+    ASSERT_TRUE(m_history_service->add_entries(m_view_id, entries));
+
+    LogQuery query;
+    query.view_id = m_view_id;
+    query.search_text = QStringLiteral("network");
+    query.search_fields = {LogField::Message};
+
+    const QMap<QString, qsizetype> counts = m_history_service->get_log_level_counts(query);
+
+    EXPECT_EQ(counts.value(QStringLiteral("ERROR")), 1);
+    EXPECT_EQ(counts.value(QStringLiteral("INFO")), 1);
+}
+
+/**
+ * @brief Verifies that selected levels do not hide other facet counts.
+ */
+TEST_F(LogHistoryServiceTest, IgnoresSelectedLevelsWhenCountingLevelFacets)
+{
+    QVector<LogEntry> entries;
+    entries.append(create_entry(QStringLiteral("first"), QStringLiteral("first.log"),
+                                QStringLiteral("ERROR")));
+    entries.append(create_entry(QStringLiteral("second"), QStringLiteral("second.log"),
+                                QStringLiteral("INFO")));
+    entries.append(create_entry(QStringLiteral("third"), QStringLiteral("third.log"),
+                                QStringLiteral("WARNING")));
+
+    ASSERT_TRUE(m_history_service->add_entries(m_view_id, entries));
+
+    LogQuery query;
+    query.view_id = m_view_id;
+    query.log_levels = {QStringLiteral("ERROR")};
+
+    const QMap<QString, qsizetype> counts = m_history_service->get_log_level_counts(query);
+
+    EXPECT_EQ(counts.value(QStringLiteral("ERROR")), 1);
+    EXPECT_EQ(counts.value(QStringLiteral("INFO")), 1);
+    EXPECT_EQ(counts.value(QStringLiteral("WARNING")), 1);
+}

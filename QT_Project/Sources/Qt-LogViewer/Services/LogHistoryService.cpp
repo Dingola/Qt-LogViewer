@@ -471,6 +471,71 @@ auto LogHistoryService::load_entries_page(const LogQuery& log_query, qsizetype o
 }
 
 /**
+ * @brief Counts matching entries grouped by normalized log level.
+ * @param log_query Query describing the filtered result set.
+ * @return Map of uppercase log level names to matching entry counts.
+ */
+auto LogHistoryService::get_log_level_counts(const LogQuery& log_query) const
+    -> QMap<QString, qsizetype>
+{
+    QMap<QString, qsizetype> level_counts;
+
+    if (m_is_available && !log_query.view_id.isNull())
+    {
+        LogQuery facet_query = log_query;
+        facet_query.log_levels.clear();
+
+        QString search_expression;
+
+        if (!facet_query.search_text.trimmed().isEmpty() && !facet_query.use_regex)
+        {
+            search_expression = create_fts_query(facet_query.search_text);
+        }
+
+        const SqlFilter filter = create_query_filter(facet_query, search_expression);
+
+        if (filter.error.isEmpty())
+        {
+            QSqlQuery query(QSqlDatabase::database(m_connection_name));
+
+            query.prepare(
+                QStringLiteral("SELECT UPPER(TRIM(entries.level)), COUNT(*) "
+                               "FROM %1 "
+                               "WHERE %2 "
+                               "GROUP BY UPPER(TRIM(entries.level)) "
+                               "ORDER BY UPPER(TRIM(entries.level)) ASC")
+                    .arg(filter.from_clause, filter.predicates.join(QStringLiteral(" AND "))));
+
+            bind_filter_values(query, filter.bindings);
+
+            if (query.exec())
+            {
+                while (query.next())
+                {
+                    const QString level = query.value(0).toString();
+                    const qsizetype count = query.value(1).toLongLong();
+
+                    if (!level.isEmpty())
+                    {
+                        level_counts.insert(level, count);
+                    }
+                }
+            }
+            else
+            {
+                qWarning() << "Loading log level counts failed:" << query.lastError().text();
+            }
+        }
+        else
+        {
+            qWarning() << "Invalid log history query:" << filter.error;
+        }
+    }
+
+    return level_counts;
+}
+
+/**
  * @brief Searches every archived entry belonging to a view.
  * @param view_id View to search.
  * @param search_text Plain-text search expression.
