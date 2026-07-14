@@ -173,22 +173,22 @@ TEST_F(LogViewerControllerTest, FilterBySearchText)
     auto* proxy = m_controller->get_sort_filter_proxy();
     ASSERT_NE(proxy, nullptr);
 
-    m_controller->set_search_filter("Debug", "Message", false);
+    m_controller->set_search_filter("Debug", SearchField::Message, false);
     EXPECT_EQ(proxy->rowCount(), 1);
 
-    m_controller->set_search_filter("User", "Message", false);
+    m_controller->set_search_filter("User", SearchField::Message, false);
     EXPECT_EQ(proxy->rowCount(), 1);
 
-    m_controller->set_search_filter("AppA", "AppName", false);
+    m_controller->set_search_filter("AppA", SearchField::AppName, false);
     EXPECT_EQ(proxy->rowCount(), 2);
 
-    m_controller->set_search_filter("Crash", "Message", false);
+    m_controller->set_search_filter("Crash", SearchField::Message, false);
     EXPECT_EQ(proxy->rowCount(), 1);
 
-    m_controller->set_search_filter("NotFound", "Message", false);
+    m_controller->set_search_filter("NotFound", SearchField::Message, false);
     EXPECT_EQ(proxy->rowCount(), 0);
 
-    m_controller->set_search_filter("", "Message", false);
+    m_controller->set_search_filter("", SearchField::Message, false);
     EXPECT_EQ(proxy->rowCount(), 4);
 }
 
@@ -200,19 +200,19 @@ TEST_F(LogViewerControllerTest, FilterBySearchRegex)
     auto* proxy = m_controller->get_sort_filter_proxy();
     ASSERT_NE(proxy, nullptr);
 
-    m_controller->set_search_filter("^User.*", "Message", true);
+    m_controller->set_search_filter("^User.*", SearchField::Message, true);
     EXPECT_EQ(proxy->rowCount(), 1);
 
-    m_controller->set_search_filter(".*ing$", "Message", true);
+    m_controller->set_search_filter(".*ing$", SearchField::Message, true);
     EXPECT_EQ(proxy->rowCount(), 1);
 
-    m_controller->set_search_filter("Crash|Startup", "Message", true);
+    m_controller->set_search_filter("Crash|Startup", SearchField::Message, true);
     EXPECT_EQ(proxy->rowCount(), 2);
 
-    m_controller->set_search_filter("NoMatch", "Message", true);
+    m_controller->set_search_filter("NoMatch", SearchField::Message, true);
     EXPECT_EQ(proxy->rowCount(), 0);
 
-    m_controller->set_search_filter("", "Message", true);
+    m_controller->set_search_filter("", SearchField::Message, true);
     EXPECT_EQ(proxy->rowCount(), 4);
 }
 
@@ -541,11 +541,11 @@ TEST_F(LogViewerControllerTest, FilterGetters)
     EXPECT_EQ(m_controller->get_log_level_filters(m_view_id), levels);
     EXPECT_EQ(m_controller->get_log_level_filters(), levels);
 
-    m_controller->set_search_filter("Crash", "Message", false);
+    m_controller->set_search_filter("Crash", SearchField::Message, false);
     EXPECT_EQ(m_controller->get_search_text(), "Crash");
     EXPECT_EQ(m_controller->get_search_text(m_view_id), "Crash");
-    EXPECT_EQ(m_controller->get_search_field(), "Message");
-    EXPECT_EQ(m_controller->get_search_field(m_view_id), "Message");
+    EXPECT_EQ(m_controller->get_search_field(), SearchField::Message);
+    EXPECT_EQ(m_controller->get_search_field(m_view_id), SearchField::Message);
     EXPECT_FALSE(m_controller->is_search_regex());
     EXPECT_FALSE(m_controller->is_search_regex(m_view_id));
 }
@@ -584,7 +584,7 @@ TEST_F(LogViewerControllerTest, SetLogLevelFiltersInvalidViewId)
 TEST_F(LogViewerControllerTest, SetSearchFilterInvalidViewId)
 {
     QUuid invalid_id = QUuid::createUuid();
-    m_controller->set_search_filter(invalid_id, "NonExistentText", "Message", true);
+    m_controller->set_search_filter(invalid_id, "NonExistentText", SearchField::Message, true);
 
     auto* proxy = m_controller->get_sort_filter_proxy();
     ASSERT_NE(proxy, nullptr);

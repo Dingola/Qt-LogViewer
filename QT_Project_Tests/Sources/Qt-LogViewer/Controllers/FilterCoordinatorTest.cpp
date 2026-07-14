@@ -120,7 +120,7 @@ TEST_F(FilterCoordinatorTest, SetSearchAndGettersRoundtrip)
     ASSERT_NE(m_fc, nullptr);
 
     const QString text = QStringLiteral("needle");
-    const QString field = QStringLiteral("message");
+    const SearchField field = SearchField::Message;
     const bool use_regex = true;
 
     m_fc->set_search(m_view, text, field, use_regex);

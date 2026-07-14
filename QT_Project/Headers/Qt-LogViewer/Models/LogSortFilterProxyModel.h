@@ -141,7 +141,7 @@ class LogSortFilterProxyModel: public QSortFilterProxyModel
 
         /**
          * @brief Returns the current search field.
-         * @return The search field string.
+         * @return The selected search field.
          */
         [[nodiscard]] auto get_search_field() const noexcept -> SearchField;
 

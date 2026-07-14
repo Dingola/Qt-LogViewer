@@ -81,7 +81,7 @@ TEST_F(LogSortFilterProxyModelTest, ProxyInitiallyShowsAllEntries)
     EXPECT_EQ(m_proxy->get_app_name_filter(), QString());
     EXPECT_TRUE(m_proxy->get_log_level_filters().isEmpty());
     EXPECT_EQ(m_proxy->get_search_text(), QString());
-    EXPECT_EQ(m_proxy->get_search_field(), QString());
+    EXPECT_EQ(m_proxy->get_search_field(), SearchField::AllFields);
     EXPECT_FALSE(m_proxy->is_search_regex());
     EXPECT_EQ(m_proxy->get_show_only_file_path(), QString());
     EXPECT_TRUE(m_proxy->get_hidden_file_paths().isEmpty());
@@ -143,26 +143,26 @@ TEST_F(LogSortFilterProxyModelTest, FilterByLogLevelAndNormalization)
  */
 TEST_F(LogSortFilterProxyModelTest, FilterBySearchText)
 {
-    m_proxy->set_search_filter("Debug", "Message", false);
+    m_proxy->set_search_filter("Debug", SearchField::Message, false);
     EXPECT_EQ(m_proxy->rowCount(), 1);
     EXPECT_TRUE(m_proxy->has_active_filters());
     EXPECT_EQ(m_proxy->get_search_text(), QString("Debug"));
-    EXPECT_EQ(m_proxy->get_search_field(), QString("Message"));
+    EXPECT_EQ(m_proxy->get_search_field(), SearchField::Message);
     EXPECT_FALSE(m_proxy->is_search_regex());
 
-    m_proxy->set_search_filter("User", "Message", false);
+    m_proxy->set_search_filter("User", SearchField::Message, false);
     EXPECT_EQ(m_proxy->rowCount(), 1);
 
-    m_proxy->set_search_filter("AppA", "AppName", false);
+    m_proxy->set_search_filter("AppA", SearchField::AppName, false);
     EXPECT_EQ(m_proxy->rowCount(), 2);
 
-    m_proxy->set_search_filter("Crash", "Message", false);
+    m_proxy->set_search_filter("Crash", SearchField::Message, false);
     EXPECT_EQ(m_proxy->rowCount(), 1);
 
-    m_proxy->set_search_filter("NotFound", "Message", false);
+    m_proxy->set_search_filter("NotFound", SearchField::Message, false);
     EXPECT_EQ(m_proxy->rowCount(), 0);
 
-    m_proxy->set_search_filter("", "Message", false);
+    m_proxy->set_search_filter("", SearchField::Message, false);
     EXPECT_EQ(m_proxy->rowCount(), 4);
     EXPECT_FALSE(m_proxy->has_active_filters());
 }
@@ -172,24 +172,24 @@ TEST_F(LogSortFilterProxyModelTest, FilterBySearchText)
  */
 TEST_F(LogSortFilterProxyModelTest, FilterBySearchRegexAndInvalidRegex)
 {
-    m_proxy->set_search_filter("^User.*", "Message", true);
+    m_proxy->set_search_filter("^User.*", SearchField::Message, true);
     EXPECT_EQ(m_proxy->rowCount(), 1);
     EXPECT_TRUE(m_proxy->is_search_regex());
 
-    m_proxy->set_search_filter(".*ing$", "Message", true);
+    m_proxy->set_search_filter(".*ing$", SearchField::Message, true);
     EXPECT_EQ(m_proxy->rowCount(), 1);
 
-    m_proxy->set_search_filter("Crash|Startup", "Message", true);
+    m_proxy->set_search_filter("Crash|Startup", SearchField::Message, true);
     EXPECT_EQ(m_proxy->rowCount(), 2);
 
-    m_proxy->set_search_filter("NoMatch", "Message", true);
+    m_proxy->set_search_filter("NoMatch", SearchField::Message, true);
     EXPECT_EQ(m_proxy->rowCount(), 0);
 
     // Invalid regex should yield zero rows
-    m_proxy->set_search_filter("*", "Message", true);
+    m_proxy->set_search_filter("*", SearchField::Message, true);
     EXPECT_EQ(m_proxy->rowCount(), 0);
 
-    m_proxy->set_search_filter("", "Message", true);
+    m_proxy->set_search_filter("", SearchField::Message, true);
     EXPECT_EQ(m_proxy->rowCount(), 4);
     EXPECT_FALSE(m_proxy->has_active_filters());
 }
@@ -205,14 +205,14 @@ TEST_F(LogSortFilterProxyModelTest, CombinedAppNameLevelAndSearchFilter)
     m_proxy->set_log_level_filters(levels);
     EXPECT_EQ(m_proxy->rowCount(), 1);
 
-    m_proxy->set_search_filter("Crash", "Message", false);
+    m_proxy->set_search_filter("Crash", SearchField::Message, false);
     EXPECT_EQ(m_proxy->rowCount(), 1);
 
-    m_proxy->set_search_filter("Startup", "Message", false);
+    m_proxy->set_search_filter("Startup", SearchField::Message, false);
     EXPECT_EQ(m_proxy->rowCount(), 0);
 
     m_proxy->set_log_level_filters(QSet<QString>());
-    m_proxy->set_search_filter("", "Message", false);
+    m_proxy->set_search_filter("", SearchField::Message, false);
     m_proxy->set_app_name_filter("");
     EXPECT_EQ(m_proxy->rowCount(), 4);
     EXPECT_FALSE(m_proxy->has_active_filters());
@@ -224,25 +224,21 @@ TEST_F(LogSortFilterProxyModelTest, CombinedAppNameLevelAndSearchFilter)
 TEST_F(LogSortFilterProxyModelTest, SearchAllFields)
 {
     // Plain text, All Fields
-    m_proxy->set_search_filter("AppB", "All Fields", false);
+    m_proxy->set_search_filter("AppB", SearchField::AllFields, false);
     EXPECT_EQ(m_proxy->rowCount(), 2);
 
-    m_proxy->set_search_filter("startup", "All Fields", false);
+    m_proxy->set_search_filter("startup", SearchField::AllFields, false);
     EXPECT_EQ(m_proxy->rowCount(), 1);
 
     // Regex, All Fields
-    m_proxy->set_search_filter("^AppA$", "All Fields", true);
+    m_proxy->set_search_filter("^AppA$", SearchField::AllFields, true);
     EXPECT_EQ(m_proxy->rowCount(), 2);
 
-    m_proxy->set_search_filter("(User|Crash)", "All Fields", true);
-    EXPECT_EQ(m_proxy->rowCount(), 2);
-
-    // Unknown field should behave like All Fields
-    m_proxy->set_search_filter("AppA", "UnknownField", false);
+    m_proxy->set_search_filter("(User|Crash)", SearchField::AllFields, true);
     EXPECT_EQ(m_proxy->rowCount(), 2);
 
     // Reset
-    m_proxy->set_search_filter("", "All Fields", false);
+    m_proxy->set_search_filter("", SearchField::AllFields, false);
     EXPECT_EQ(m_proxy->rowCount(), 4);
 }
 
@@ -255,14 +251,14 @@ TEST_F(LogSortFilterProxyModelTest, GettersReflectState)
     QSet<QString> levels;
     levels.insert("DEBUG");
     m_proxy->set_log_level_filters(levels);
-    m_proxy->set_search_filter("login", "Message", false);
+    m_proxy->set_search_filter("login", SearchField::Message, false);
     m_proxy->set_show_only_file_path("fileB.log");
     m_proxy->hide_file("fileA.log");
 
     EXPECT_EQ(m_proxy->get_app_name_filter(), QString("AppB"));
     EXPECT_TRUE(m_proxy->get_log_level_filters().contains(QString("debug")));
     EXPECT_EQ(m_proxy->get_search_text(), QString("login"));
-    EXPECT_EQ(m_proxy->get_search_field(), QString("Message"));
+    EXPECT_EQ(m_proxy->get_search_field(), SearchField::Message);
     EXPECT_FALSE(m_proxy->is_search_regex());
     EXPECT_EQ(m_proxy->get_show_only_file_path(), QString("fileB.log"));
     EXPECT_TRUE(m_proxy->get_hidden_file_paths().contains(QString("fileA.log")));
@@ -446,7 +442,7 @@ TEST_F(LogSortFilterProxyModelTest, DynamicFilterChangesWithFileFilters)
     m_proxy->set_log_level_filters(levels);
     EXPECT_EQ(m_proxy->rowCount(), 1);
 
-    m_proxy->set_search_filter("Startup", "Message", false);
+    m_proxy->set_search_filter("Startup", SearchField::Message, false);
     EXPECT_EQ(m_proxy->rowCount(), 1);
 
     // Remove app filter, keep others (none set)
@@ -454,7 +450,7 @@ TEST_F(LogSortFilterProxyModelTest, DynamicFilterChangesWithFileFilters)
     EXPECT_EQ(m_proxy->rowCount(), 1);
 
     // Clear search, keep level
-    m_proxy->set_search_filter("", "Message", false);
+    m_proxy->set_search_filter("", SearchField::Message, false);
     EXPECT_EQ(m_proxy->rowCount(), 1);
 
     // Clear level; still constrained by show-only
@@ -522,7 +518,7 @@ TEST_F(LogSortFilterProxyModelTest, Performance_Filtering_Regex_Baseline)
     seed_large_data(count);
 
     auto start = std::chrono::steady_clock::now();
-    m_proxy->set_search_filter("entry number 9[0-9]{3}$", "Message", true);
+    m_proxy->set_search_filter("entry number 9[0-9]{3}$", SearchField::Message, true);
     auto end = std::chrono::steady_clock::now();
 
     const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();

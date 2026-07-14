@@ -79,7 +79,7 @@ TEST_F(LogFilterBarWidgetTest, ConstructionAndDefaultState)
     EXPECT_EQ(m_widget->get_current_app_name(), "Show All Apps");
     EXPECT_TRUE(m_widget->get_current_log_levels().isEmpty());
     EXPECT_EQ(m_widget->get_search_text(), "");
-    EXPECT_EQ(m_widget->get_search_field(), "All Fields");
+    EXPECT_EQ(m_widget->get_search_field(), SearchField::AllFields);
     EXPECT_FALSE(m_widget->get_use_regex());
 }
 
@@ -244,13 +244,17 @@ TEST_F(LogFilterBarWidgetTest, UncheckAllLogLevels)
  */
 TEST_F(LogFilterBarWidgetTest, SetAndGetSearchFields)
 {
-    QStringList fields = {"Message", "Source", "Thread"};
+    const QVector<QPair<QString, SearchField>> fields = {
+        {QStringLiteral("Message"), SearchField::Message},
+        {QStringLiteral("Source"), SearchField::AppName},
+        {QStringLiteral("Thread"), SearchField::Level},
+    };
     m_widget->set_search_fields(fields);
     auto* search_bar = get_search_bar_widget();
     ASSERT_NE(search_bar, nullptr);
     auto* combo = search_bar->findChild<QComboBox*>("comboBoxSearchArea");
     ASSERT_NE(combo, nullptr);
-    EXPECT_EQ(combo->count(), fields.size());
+    EXPECT_EQ(combo->count(), static_cast<int>(fields.size()));
     EXPECT_EQ(combo->itemText(0), "Message");
     EXPECT_EQ(combo->itemText(1), "Source");
     EXPECT_EQ(combo->itemText(2), "Thread");
