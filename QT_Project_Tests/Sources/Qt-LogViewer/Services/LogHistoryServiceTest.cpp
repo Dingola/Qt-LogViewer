@@ -437,3 +437,193 @@ TEST_F(LogHistoryServiceTest, RejectsRegexSearch)
 
     EXPECT_EQ(m_history_service->count_entries(query), 0);
 }
+
+/**
+ * @brief Verifies that pages are ordered by newest timestamp first.
+ */
+TEST_F(LogHistoryServiceTest, LoadsNewestEntriesFirstByDefault)
+{
+    const LogEntry oldest(
+        QDateTime::fromString(QStringLiteral("2026-01-01T08:00:00.000Z"), Qt::ISODateWithMs),
+        QStringLiteral("INFO"), QStringLiteral("oldest"),
+        LogFileInfo(QStringLiteral("test.log"), QStringLiteral("TestApp")));
+
+    const LogEntry newest(
+        QDateTime::fromString(QStringLiteral("2026-01-01T12:00:00.000Z"), Qt::ISODateWithMs),
+        QStringLiteral("INFO"), QStringLiteral("newest"),
+        LogFileInfo(QStringLiteral("test.log"), QStringLiteral("TestApp")));
+
+    const LogEntry middle(
+        QDateTime::fromString(QStringLiteral("2026-01-01T10:00:00.000Z"), Qt::ISODateWithMs),
+        QStringLiteral("INFO"), QStringLiteral("middle"),
+        LogFileInfo(QStringLiteral("test.log"), QStringLiteral("TestApp")));
+
+    ASSERT_TRUE(m_history_service->add_entries(m_view_id, {oldest, newest, middle}));
+
+    LogQuery query;
+    query.view_id = m_view_id;
+
+    const QVector<LogEntry> page = m_history_service->load_entries_page(query, 0, 2);
+
+    ASSERT_EQ(page.size(), 2);
+    EXPECT_EQ(page.at(0).get_message(), QStringLiteral("newest"));
+    EXPECT_EQ(page.at(1).get_message(), QStringLiteral("middle"));
+}
+
+/**
+ * @brief Verifies that offset and limit select the requested page.
+ */
+TEST_F(LogHistoryServiceTest, LoadsRequestedEntryPage)
+{
+    QVector<LogEntry> entries;
+    entries.append(create_entry(QStringLiteral("first"), QStringLiteral("test.log")));
+    entries.append(create_entry(QStringLiteral("second"), QStringLiteral("test.log")));
+    entries.append(create_entry(QStringLiteral("third"), QStringLiteral("test.log")));
+    entries.append(create_entry(QStringLiteral("fourth"), QStringLiteral("test.log")));
+    entries.append(create_entry(QStringLiteral("fifth"), QStringLiteral("test.log")));
+
+    ASSERT_TRUE(m_history_service->add_entries(m_view_id, entries));
+
+    LogQuery query;
+    query.view_id = m_view_id;
+
+    const QVector<LogEntry> page = m_history_service->load_entries_page(query, 2, 2);
+
+    ASSERT_EQ(page.size(), 2);
+    EXPECT_EQ(page.at(0).get_message(), QStringLiteral("third"));
+    EXPECT_EQ(page.at(1).get_message(), QStringLiteral("second"));
+}
+
+/**
+ * @brief Verifies ascending timestamp sorting.
+ */
+TEST_F(LogHistoryServiceTest, LoadsEntriesByAscendingTimestamp)
+{
+    const LogEntry newest(
+        QDateTime::fromString(QStringLiteral("2026-01-01T12:00:00.000Z"), Qt::ISODateWithMs),
+        QStringLiteral("INFO"), QStringLiteral("newest"),
+        LogFileInfo(QStringLiteral("test.log"), QStringLiteral("TestApp")));
+
+    const LogEntry oldest(
+        QDateTime::fromString(QStringLiteral("2026-01-01T08:00:00.000Z"), Qt::ISODateWithMs),
+        QStringLiteral("INFO"), QStringLiteral("oldest"),
+        LogFileInfo(QStringLiteral("test.log"), QStringLiteral("TestApp")));
+
+    ASSERT_TRUE(m_history_service->add_entries(m_view_id, {newest, oldest}));
+
+    LogQuery query;
+    query.view_id = m_view_id;
+    query.sort_field = LogField::Timestamp;
+    query.sort_order = Qt::AscendingOrder;
+
+    const QVector<LogEntry> page = m_history_service->load_entries_page(query, 0, 10);
+
+    ASSERT_EQ(page.size(), 2);
+    EXPECT_EQ(page.at(0).get_message(), QStringLiteral("oldest"));
+    EXPECT_EQ(page.at(1).get_message(), QStringLiteral("newest"));
+}
+
+/**
+ * @brief Verifies that insertion order resolves equal sort values.
+ */
+TEST_F(LogHistoryServiceTest, UsesInsertionOrderAsSortTieBreaker)
+{
+    QVector<LogEntry> entries;
+    entries.append(create_entry(QStringLiteral("first"), QStringLiteral("test.log")));
+    entries.append(create_entry(QStringLiteral("second"), QStringLiteral("test.log")));
+    entries.append(create_entry(QStringLiteral("third"), QStringLiteral("test.log")));
+
+    ASSERT_TRUE(m_history_service->add_entries(m_view_id, entries));
+
+    LogQuery query;
+    query.view_id = m_view_id;
+
+    const QVector<LogEntry> page = m_history_service->load_entries_page(query, 0, 10);
+
+    ASSERT_EQ(page.size(), 3);
+    EXPECT_EQ(page.at(0).get_message(), QStringLiteral("third"));
+    EXPECT_EQ(page.at(1).get_message(), QStringLiteral("second"));
+    EXPECT_EQ(page.at(2).get_message(), QStringLiteral("first"));
+}
+
+/**
+ * @brief Verifies sorting by a selected text field.
+ */
+TEST_F(LogHistoryServiceTest, LoadsEntriesSortedByMessage)
+{
+    QVector<LogEntry> entries;
+    entries.append(create_entry(QStringLiteral("Charlie"), QStringLiteral("test.log")));
+    entries.append(create_entry(QStringLiteral("alpha"), QStringLiteral("test.log")));
+    entries.append(create_entry(QStringLiteral("Bravo"), QStringLiteral("test.log")));
+
+    ASSERT_TRUE(m_history_service->add_entries(m_view_id, entries));
+
+    LogQuery query;
+    query.view_id = m_view_id;
+    query.sort_field = LogField::Message;
+    query.sort_order = Qt::AscendingOrder;
+
+    const QVector<LogEntry> page = m_history_service->load_entries_page(query, 0, 10);
+
+    ASSERT_EQ(page.size(), 3);
+    EXPECT_EQ(page.at(0).get_message(), QStringLiteral("alpha"));
+    EXPECT_EQ(page.at(1).get_message(), QStringLiteral("Bravo"));
+    EXPECT_EQ(page.at(2).get_message(), QStringLiteral("Charlie"));
+}
+
+/**
+ * @brief Verifies that page loading applies the same filters as entry counting.
+ */
+TEST_F(LogHistoryServiceTest, LoadsEntriesMatchingQueryFilters)
+{
+    QVector<LogEntry> entries;
+    entries.append(create_entry(QStringLiteral("network failed"), QStringLiteral("backend.log"),
+                                QStringLiteral("ERROR"), QStringLiteral("Backend")));
+    entries.append(create_entry(QStringLiteral("network connected"), QStringLiteral("backend.log"),
+                                QStringLiteral("INFO"), QStringLiteral("Backend")));
+    entries.append(create_entry(QStringLiteral("network failed"), QStringLiteral("frontend.log"),
+                                QStringLiteral("ERROR"), QStringLiteral("Frontend")));
+
+    ASSERT_TRUE(m_history_service->add_entries(m_view_id, entries));
+
+    LogQuery query;
+    query.view_id = m_view_id;
+    query.app_name = QStringLiteral("Backend");
+    query.log_levels = {QStringLiteral("ERROR")};
+    query.search_text = QStringLiteral("network");
+    query.search_fields = {LogField::Message};
+
+    const QVector<LogEntry> page = m_history_service->load_entries_page(query, 0, 10);
+
+    ASSERT_EQ(page.size(), 1);
+    EXPECT_EQ(page.first().get_message(), QStringLiteral("network failed"));
+    EXPECT_EQ(page.first().get_app_name(), QStringLiteral("Backend"));
+}
+
+/**
+ * @brief Verifies that invalid page ranges return no entries.
+ */
+TEST_F(LogHistoryServiceTest, RejectsInvalidPageRange)
+{
+    LogQuery query;
+    query.view_id = m_view_id;
+
+    EXPECT_TRUE(m_history_service->load_entries_page(query, -1, 10).isEmpty());
+    EXPECT_TRUE(m_history_service->load_entries_page(query, 0, 0).isEmpty());
+    EXPECT_TRUE(m_history_service->load_entries_page(query, 0, -1).isEmpty());
+}
+
+/**
+ * @brief Verifies that unsupported sort fields do not alter the SQL query.
+ */
+TEST_F(LogHistoryServiceTest, RejectsUnsupportedSortField)
+{
+    ASSERT_TRUE(m_history_service->add_entries(
+        m_view_id, {create_entry(QStringLiteral("entry"), QStringLiteral("test.log"))}));
+
+    LogQuery query;
+    query.view_id = m_view_id;
+    query.sort_field = QStringLiteral("duration_ms");
+
+    EXPECT_TRUE(m_history_service->load_entries_page(query, 0, 10).isEmpty());
+}

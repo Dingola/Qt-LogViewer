@@ -55,6 +55,16 @@ class LogHistoryService final: public QObject
         [[nodiscard]] auto count_entries(const LogQuery& log_query) const -> qsizetype;
 
         /**
+         * @brief Loads one page of archived entries matching a log query.
+         * @param log_query Query describing the requested result set and sorting.
+         * @param offset Zero-based offset within the complete result set.
+         * @param limit Maximum number of entries returned.
+         * @return Matching entries for the requested page.
+         */
+        [[nodiscard]] auto load_entries_page(const LogQuery& log_query, qsizetype offset,
+                                             qsizetype limit) const -> QVector<LogEntry>;
+
+        /**
          * @brief Searches every archived entry belonging to a view.
          * @param view_id View to search.
          * @param search_text Plain-text search expression.

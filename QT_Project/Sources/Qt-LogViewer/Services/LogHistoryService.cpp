@@ -55,6 +55,66 @@ struct SqlFilter {
 }
 
 /**
+ * @brief Creates a validated SQL ORDER BY expression.
+ * @param log_query Query containing the requested sorting.
+ * @param error Receives an error description for unsupported fields.
+ * @return SQL ORDER BY expression.
+ */
+[[nodiscard]] auto create_order_by_expression(const LogQuery& log_query, QString& error) -> QString
+{
+    QString column;
+
+    if (log_query.sort_field == LogField::Timestamp)
+    {
+        column = QStringLiteral("entries.timestamp_utc");
+    }
+    else if (log_query.sort_field == LogField::Level)
+    {
+        column = QStringLiteral("entries.level COLLATE NOCASE");
+    }
+    else if (log_query.sort_field == LogField::Message)
+    {
+        column = QStringLiteral("entries.message COLLATE NOCASE");
+    }
+    else if (log_query.sort_field == LogField::AppName)
+    {
+        column = QStringLiteral("entries.app_name COLLATE NOCASE");
+    }
+    else if (log_query.sort_field == LogField::FilePath)
+    {
+        column = QStringLiteral("entries.file_path COLLATE NOCASE");
+    }
+    else if (log_query.sort_field == LogField::InsertionOrder)
+    {
+        column = QStringLiteral("entries.id");
+    }
+    else
+    {
+        error = QStringLiteral("Field is not available for sorting: %1").arg(log_query.sort_field);
+    }
+
+    QString order_by;
+
+    if (error.isEmpty())
+    {
+        const QString direction = log_query.sort_order == Qt::DescendingOrder
+                                      ? QStringLiteral("DESC")
+                                      : QStringLiteral("ASC");
+
+        if (log_query.sort_field == LogField::InsertionOrder)
+        {
+            order_by = QStringLiteral("%1 %2").arg(column, direction);
+        }
+        else
+        {
+            order_by = QStringLiteral("%1 %2, entries.id %2").arg(column, direction);
+        }
+    }
+
+    return order_by;
+}
+
+/**
  * @brief Creates an FTS5 match expression for selected fields.
  * @param search_fields Stable identifiers of fields included in searching.
  * @param search_expression Escaped FTS5 search expression.
@@ -341,6 +401,73 @@ auto LogHistoryService::count_entries(const LogQuery& log_query) const -> qsizet
     }
 
     return entry_count;
+}
+
+/**
+ * @brief Loads one page of archived entries matching a log query.
+ * @param log_query Query describing the requested result set and sorting.
+ * @param offset Zero-based offset within the complete result set.
+ * @param limit Maximum number of entries returned.
+ * @return Matching entries for the requested page.
+ */
+auto LogHistoryService::load_entries_page(const LogQuery& log_query, qsizetype offset,
+                                          qsizetype limit) const -> QVector<LogEntry>
+{
+    QVector<LogEntry> entries;
+
+    if (m_is_available && !log_query.view_id.isNull() && offset >= 0 && limit > 0)
+    {
+        QString search_expression;
+
+        if (!log_query.search_text.trimmed().isEmpty() && !log_query.use_regex)
+        {
+            search_expression = create_fts_query(log_query.search_text);
+        }
+
+        const SqlFilter filter = create_query_filter(log_query, search_expression);
+        QString query_error = filter.error;
+        const QString order_by = create_order_by_expression(log_query, query_error);
+
+        if (query_error.isEmpty())
+        {
+            QSqlQuery query(QSqlDatabase::database(m_connection_name));
+
+            query.prepare(
+                QStringLiteral("SELECT entries.timestamp_utc, entries.level, entries.message, "
+                               "entries.app_name, entries.file_path "
+                               "FROM %1 "
+                               "WHERE %2 "
+                               "ORDER BY %3 "
+                               "LIMIT :limit OFFSET :offset")
+                    .arg(filter.from_clause, filter.predicates.join(QStringLiteral(" AND ")),
+                         order_by));
+
+            bind_filter_values(query, filter.bindings);
+            query.bindValue(QStringLiteral(":limit"), static_cast<qlonglong>(limit));
+            query.bindValue(QStringLiteral(":offset"), static_cast<qlonglong>(offset));
+
+            if (query.exec())
+            {
+                while (query.next())
+                {
+                    entries.append(
+                        create_log_entry(query.value(0).toString(), query.value(1).toString(),
+                                         query.value(2).toString(), query.value(3).toString(),
+                                         query.value(4).toString()));
+                }
+            }
+            else
+            {
+                qWarning() << "Loading log history page failed:" << query.lastError().text();
+            }
+        }
+        else
+        {
+            qWarning() << "Invalid log history query:" << query_error;
+        }
+    }
+
+    return entries;
 }
 
 /**
