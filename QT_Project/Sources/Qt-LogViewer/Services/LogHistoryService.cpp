@@ -95,6 +95,40 @@ auto LogHistoryService::add_entries(const QUuid& view_id, const QVector<LogEntry
 }
 
 /**
+ * @brief Counts archived entries belonging to the requested view.
+ * @param log_query Query describing the requested result set.
+ * @return Number of matching entries, or zero when the query cannot be executed.
+ */
+auto LogHistoryService::count_entries(const LogQuery& log_query) const -> qsizetype
+{
+    qsizetype entry_count = 0;
+
+    if (m_is_available && !log_query.view_id.isNull())
+    {
+        QSqlQuery query(QSqlDatabase::database(m_connection_name));
+
+        query.prepare(
+            QStringLiteral("SELECT COUNT(*) "
+                           "FROM log_entries "
+                           "WHERE view_id = :view_id"));
+
+        query.bindValue(QStringLiteral(":view_id"),
+                        log_query.view_id.toString(QUuid::WithoutBraces));
+
+        if (query.exec() && query.next())
+        {
+            entry_count = query.value(0).toLongLong();
+        }
+        else
+        {
+            qWarning() << "Counting log history entries failed:" << query.lastError().text();
+        }
+    }
+
+    return entry_count;
+}
+
+/**
  * @brief Searches every archived entry belonging to a view.
  * @param view_id View to search.
  * @param search_text Plain-text search expression.

@@ -117,3 +117,78 @@ TEST_F(LogHistoryServiceTest, RemovesAllHistoryForView)
 
     EXPECT_TRUE(results.isEmpty());
 }
+
+/**
+ * @brief Verifies that count_entries returns every archived entry for one view.
+ */
+TEST_F(LogHistoryServiceTest, CountsEntriesForView)
+{
+    ASSERT_TRUE(m_history_service->is_available());
+
+    QVector<LogEntry> entries;
+    entries.append(create_entry(QStringLiteral("first entry"), QStringLiteral("first.log")));
+    entries.append(create_entry(QStringLiteral("second entry"), QStringLiteral("second.log")));
+    entries.append(create_entry(QStringLiteral("third entry"), QStringLiteral("third.log")));
+
+    ASSERT_TRUE(m_history_service->add_entries(m_view_id, entries));
+
+    LogQuery query;
+    query.view_id = m_view_id;
+
+    EXPECT_EQ(m_history_service->count_entries(query), 3);
+}
+
+/**
+ * @brief Verifies that entries belonging to another view are not counted.
+ */
+TEST_F(LogHistoryServiceTest, CountsOnlyEntriesForRequestedView)
+{
+    ASSERT_TRUE(m_history_service->is_available());
+
+    const QUuid other_view_id = QUuid::createUuid();
+
+    QVector<LogEntry> current_view_entries;
+    current_view_entries.append(
+        create_entry(QStringLiteral("current view one"), QStringLiteral("current-one.log")));
+    current_view_entries.append(
+        create_entry(QStringLiteral("current view two"), QStringLiteral("current-two.log")));
+
+    QVector<LogEntry> other_view_entries;
+    other_view_entries.append(
+        create_entry(QStringLiteral("other view entry"), QStringLiteral("other.log")));
+
+    ASSERT_TRUE(m_history_service->add_entries(m_view_id, current_view_entries));
+    ASSERT_TRUE(m_history_service->add_entries(other_view_id, other_view_entries));
+
+    LogQuery query;
+    query.view_id = m_view_id;
+
+    EXPECT_EQ(m_history_service->count_entries(query), 2);
+
+    m_history_service->remove_view_entries(other_view_id);
+}
+
+/**
+ * @brief Verifies that a view without archived entries has a count of zero.
+ */
+TEST_F(LogHistoryServiceTest, ReturnsZeroForEmptyView)
+{
+    ASSERT_TRUE(m_history_service->is_available());
+
+    LogQuery query;
+    query.view_id = m_view_id;
+
+    EXPECT_EQ(m_history_service->count_entries(query), 0);
+}
+
+/**
+ * @brief Verifies that a query without a view identifier is rejected.
+ */
+TEST_F(LogHistoryServiceTest, ReturnsZeroForNullViewId)
+{
+    ASSERT_TRUE(m_history_service->is_available());
+
+    const LogQuery query;
+
+    EXPECT_EQ(m_history_service->count_entries(query), 0);
+}
