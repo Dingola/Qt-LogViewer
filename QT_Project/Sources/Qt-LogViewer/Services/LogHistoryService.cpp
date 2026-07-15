@@ -9,6 +9,7 @@
 #include <QFileInfo>
 #include <QList>
 #include <QPair>
+#include <QRegularExpression>
 #include <QSqlDatabase>
 #include <QSqlError>
 #include <QSqlQuery>
@@ -52,6 +53,50 @@ struct SqlFilter {
     }
 
     return column;
+}
+
+/**
+ * @brief Creates a SQL predicate for regular-expression searching.
+ * @param search_fields Fields included in searching.
+ * @param error Receives an error description for unsupported fields.
+ * @return SQL predicate combining the selected fields.
+ */
+[[nodiscard]] auto create_regex_predicate(const QSet<QString>& search_fields,
+                                          QString& error) -> QString
+{
+    QSet<QString> fields = search_fields;
+
+    if (fields.isEmpty())
+    {
+        fields = {LogField::Level, LogField::Message, LogField::AppName, LogField::FilePath};
+    }
+
+    QStringList predicates;
+
+    for (const QString& field_id: fields)
+    {
+        const QString column = get_fts_column(field_id);
+
+        if (column.isEmpty())
+        {
+            error = QStringLiteral("Field is not available for regular-expression searching: %1")
+                        .arg(field_id);
+            break;
+        }
+
+        predicates.append(QStringLiteral("entries.%1 REGEXP :regex_pattern").arg(column));
+    }
+
+    QString predicate;
+
+    if (error.isEmpty())
+    {
+        predicates.sort();
+
+        predicate = QStringLiteral("(%1)").arg(predicates.join(QStringLiteral(" OR ")));
+    }
+
+    return predicate;
 }
 
 /**
@@ -234,7 +279,27 @@ struct SqlFilter {
     {
         if (log_query.use_regex)
         {
-            filter.error = QStringLiteral("Regular-expression search is not supported by FTS5");
+            const QRegularExpression expression(log_query.search_text,
+                                                QRegularExpression::CaseInsensitiveOption);
+
+            if (!expression.isValid())
+            {
+                filter.error =
+                    QStringLiteral("Invalid regular expression: %1").arg(expression.errorString());
+            }
+            else
+            {
+                const QString predicate =
+                    create_regex_predicate(log_query.search_fields, filter.error);
+
+                if (filter.error.isEmpty())
+                {
+                    filter.predicates.append(predicate);
+
+                    filter.bindings.append({QStringLiteral(":regex_pattern"),
+                                            QStringLiteral("(?i)") + log_query.search_text});
+                }
+            }
         }
         else
         {
@@ -678,7 +743,14 @@ auto LogHistoryService::initialize_database() -> bool
 
         QSqlDatabase database =
             QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), m_connection_name);
+
         database.setDatabaseName(m_database_path);
+        database.setConnectOptions(QStringLiteral("QSQLITE_ENABLE_REGEXP"));
+
+        if (database.open())
+        {
+            initialized = create_schema();
+        }
 
         if (database.open())
         {

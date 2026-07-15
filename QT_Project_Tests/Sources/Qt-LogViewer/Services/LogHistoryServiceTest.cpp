@@ -420,22 +420,125 @@ TEST_F(LogHistoryServiceTest, RejectsUnsupportedSearchField)
 }
 
 /**
- * @brief Verifies that regular-expression searches are not executed as FTS searches.
+ * @brief Verifies case-insensitive regular-expression searching.
  */
-TEST_F(LogHistoryServiceTest, RejectsRegexSearch)
+TEST_F(LogHistoryServiceTest, CountsEntriesMatchingRegexSearch)
 {
     QVector<LogEntry> entries;
-    entries.append(create_entry(QStringLiteral("network failed"), QStringLiteral("first.log")));
+    entries.append(create_entry(QStringLiteral("Network timeout"), QStringLiteral("first.log")));
+    entries.append(create_entry(QStringLiteral("network connected"), QStringLiteral("second.log")));
+    entries.append(create_entry(QStringLiteral("database timeout"), QStringLiteral("third.log")));
 
     ASSERT_TRUE(m_history_service->add_entries(m_view_id, entries));
 
     LogQuery query;
     query.view_id = m_view_id;
-    query.search_text = QStringLiteral("network.*failed");
+    query.search_text = QStringLiteral("^network\\s+(timeout|connected)$");
+    query.search_fields = {LogField::Message};
+    query.use_regex = true;
+
+    EXPECT_EQ(m_history_service->count_entries(query), 2);
+}
+
+/**
+ * @brief Verifies that regular-expression searching respects selected fields.
+ */
+TEST_F(LogHistoryServiceTest, AppliesRegexToSelectedSearchField)
+{
+    QVector<LogEntry> entries;
+    entries.append(create_entry(QStringLiteral("ordinary message"), QStringLiteral("first.log"),
+                                QStringLiteral("INFO"), QStringLiteral("Backend-42")));
+    entries.append(create_entry(QStringLiteral("Backend-21"), QStringLiteral("second.log"),
+                                QStringLiteral("INFO"), QStringLiteral("Frontend")));
+
+    ASSERT_TRUE(m_history_service->add_entries(m_view_id, entries));
+
+    LogQuery query;
+    query.view_id = m_view_id;
+    query.search_text = QStringLiteral("^backend-\\d+$");
+    query.search_fields = {LogField::AppName};
+    query.use_regex = true;
+
+    EXPECT_EQ(m_history_service->count_entries(query), 1);
+
+    const QVector<LogEntry> page = m_history_service->load_entries_page(query, 0, 25);
+
+    ASSERT_EQ(page.size(), 1);
+    EXPECT_EQ(page.first().get_app_name(), QStringLiteral("Backend-42"));
+}
+
+/**
+ * @brief Verifies that regular-expression searching supports pagination.
+ */
+TEST_F(LogHistoryServiceTest, LoadsPageMatchingRegexSearch)
+{
+    QVector<LogEntry> entries;
+    entries.append(
+        create_entry(QStringLiteral("request-100 completed"), QStringLiteral("first.log")));
+    entries.append(
+        create_entry(QStringLiteral("request-200 failed"), QStringLiteral("second.log")));
+    entries.append(create_entry(QStringLiteral("background task"), QStringLiteral("third.log")));
+    entries.append(
+        create_entry(QStringLiteral("request-300 completed"), QStringLiteral("fourth.log")));
+
+    ASSERT_TRUE(m_history_service->add_entries(m_view_id, entries));
+
+    LogQuery query;
+    query.view_id = m_view_id;
+    query.search_text = QStringLiteral("^request-\\d+");
+    query.search_fields = {LogField::Message};
+    query.use_regex = true;
+
+    const QVector<LogEntry> page = m_history_service->load_entries_page(query, 1, 1);
+
+    ASSERT_EQ(page.size(), 1);
+    EXPECT_EQ(page.first().get_message(), QStringLiteral("request-200 failed"));
+}
+
+/**
+ * @brief Verifies that regular-expression searching affects level counts.
+ */
+TEST_F(LogHistoryServiceTest, AppliesRegexSearchToLogLevelCounts)
+{
+    QVector<LogEntry> entries;
+    entries.append(create_entry(QStringLiteral("network timeout"), QStringLiteral("first.log"),
+                                QStringLiteral("ERROR")));
+    entries.append(create_entry(QStringLiteral("network connected"), QStringLiteral("second.log"),
+                                QStringLiteral("INFO")));
+    entries.append(create_entry(QStringLiteral("database timeout"), QStringLiteral("third.log"),
+                                QStringLiteral("ERROR")));
+
+    ASSERT_TRUE(m_history_service->add_entries(m_view_id, entries));
+
+    LogQuery query;
+    query.view_id = m_view_id;
+    query.search_text = QStringLiteral("^network");
+    query.search_fields = {LogField::Message};
+    query.use_regex = true;
+
+    const QMap<QString, qsizetype> counts = m_history_service->get_log_level_counts(query);
+
+    EXPECT_EQ(counts.value(QStringLiteral("ERROR")), 1);
+    EXPECT_EQ(counts.value(QStringLiteral("INFO")), 1);
+}
+
+/**
+ * @brief Verifies that invalid regular expressions return no results.
+ */
+TEST_F(LogHistoryServiceTest, RejectsInvalidRegexSearch)
+{
+    ASSERT_TRUE(m_history_service->add_entries(
+        m_view_id, {create_entry(QStringLiteral("network failed"), QStringLiteral("first.log"))}));
+
+    LogQuery query;
+    query.view_id = m_view_id;
+    query.search_text = QStringLiteral("(");
     query.search_fields = {LogField::Message};
     query.use_regex = true;
 
     EXPECT_EQ(m_history_service->count_entries(query), 0);
+    EXPECT_TRUE(m_history_service->load_entries_page(query, 0, 25).isEmpty());
+    EXPECT_TRUE(m_history_service->get_log_level_counts(query).isEmpty());
 }
 
 /**
