@@ -25,6 +25,76 @@
 #include "Qt-LogViewer/Services/LogLoadingService.h"
 #include "Qt-LogViewer/Services/LogTailerService.h"
 
+namespace
+{
+/**
+ * @brief Maps the current search-field selection to log field identifiers.
+ * @param search_field Current search-field selection.
+ * @return Fields included in text searching.
+ */
+[[nodiscard]] auto get_query_search_fields(SearchField search_field) -> QSet<QString>
+{
+    QSet<QString> fields;
+
+    switch (search_field)
+    {
+    case SearchField::Message:
+        fields.insert(LogField::Message);
+        break;
+
+    case SearchField::Level:
+        fields.insert(LogField::Level);
+        break;
+
+    case SearchField::AppName:
+        fields.insert(LogField::AppName);
+        break;
+
+    case SearchField::AllFields:
+    case SearchField::Count:
+        break;
+    }
+
+    return fields;
+}
+
+/**
+ * @brief Maps a LogModel column to a stable log field identifier.
+ * @param column LogModel column index.
+ * @return Stable field identifier.
+ */
+[[nodiscard]] auto get_query_sort_field(int column) -> QString
+{
+    QString field = LogField::Timestamp;
+
+    switch (column)
+    {
+    case LogModel::Timestamp:
+        field = LogField::Timestamp;
+        break;
+
+    case LogModel::Level:
+        field = LogField::Level;
+        break;
+
+    case LogModel::Message:
+        field = LogField::Message;
+        break;
+
+    case LogModel::AppName:
+        field = LogField::AppName;
+        break;
+
+    case LogModel::Spacer:
+    case LogModel::ColumnCount:
+    default:
+        break;
+    }
+
+    return field;
+}
+}  // namespace
+
 /**
  * @brief Constructs a LogViewerController.
  * @param log_format The log format string for parsing.
@@ -812,6 +882,41 @@ auto LogViewerController::get_page_state(const QUuid& view_id) const -> const Lo
     }
 
     return state;
+}
+
+/**
+ * @brief Creates a log query from the filter and sorting state of a view.
+ * @param view_id Source view.
+ * @return Query representing the view state.
+ */
+auto LogViewerController::create_page_query(const QUuid& view_id) const -> LogQuery
+{
+    LogQuery query;
+    LogViewContext* context = get_view_context(view_id);
+
+    if (context != nullptr && m_filters != nullptr)
+    {
+        const FilterState filters = m_filters->export_filters(view_id);
+
+        query.view_id = view_id;
+        query.app_name = filters.app_name;
+        query.log_levels = filters.log_levels;
+        query.search_text = filters.search_text;
+        query.search_fields = get_query_search_fields(filters.search_field);
+        query.use_regex = filters.use_regex;
+        query.show_only_file = filters.show_only_file;
+        query.hidden_files = filters.hidden_files;
+
+        LogSortFilterProxyModel* sort_proxy = context->get_sort_proxy();
+
+        if (sort_proxy != nullptr)
+        {
+            query.sort_field = get_query_sort_field(sort_proxy->get_sort_column());
+            query.sort_order = sort_proxy->get_sort_order();
+        }
+    }
+
+    return query;
 }
 
 /**

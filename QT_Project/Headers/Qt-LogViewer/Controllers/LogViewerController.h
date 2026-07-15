@@ -295,6 +295,13 @@ class LogViewerController: public QObject
         [[nodiscard]] auto get_page_state(const QUuid& view_id) const -> const LogPageState*;
 
         /**
+         * @brief Creates a log query from the filter and sorting state of a view.
+         * @param view_id Source view.
+         * @return Query representing the view state.
+         */
+        [[nodiscard]] auto create_page_query(const QUuid& view_id) const -> LogQuery;
+
+        /**
          * @brief Returns the set of unique application names from the loaded logs in the current
          * view.
          * @return A set of application names.

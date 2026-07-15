@@ -881,3 +881,102 @@ TEST_F(LogViewerControllerTest, ReturnsNoPageStateBeforeQueryAssignment)
 {
     EXPECT_EQ(m_controller->get_page_state(m_view_id), nullptr);
 }
+
+/**
+ * @brief Verifies the default query sorting for a view.
+ */
+TEST_F(LogViewerControllerTest, CreatesNewestFirstPageQueryByDefault)
+{
+    const LogQuery query = m_controller->create_page_query(m_view_id);
+
+    EXPECT_EQ(query.view_id, m_view_id);
+    EXPECT_EQ(query.sort_field, LogField::Timestamp);
+    EXPECT_EQ(query.sort_order, Qt::DescendingOrder);
+}
+
+/**
+ * @brief Verifies that existing filters are copied into a page query.
+ */
+TEST_F(LogViewerControllerTest, CreatesPageQueryFromViewFilters)
+{
+    m_controller->set_app_name_filter(m_view_id, QStringLiteral("AppA"));
+
+    m_controller->set_log_level_filters(m_view_id, {QStringLiteral("error")});
+
+    m_controller->set_search_filter(m_view_id, QStringLiteral("Crash"), SearchField::Message,
+                                    false);
+
+    const LogQuery query = m_controller->create_page_query(m_view_id);
+
+    EXPECT_EQ(query.view_id, m_view_id);
+    EXPECT_EQ(query.app_name, QStringLiteral("AppA"));
+    EXPECT_EQ(query.log_levels, QSet<QString>{QStringLiteral("error")});
+    EXPECT_EQ(query.search_text, QStringLiteral("Crash"));
+    EXPECT_EQ(query.search_fields, QSet<QString>{LogField::Message});
+    EXPECT_FALSE(query.use_regex);
+}
+
+/**
+ * @brief Verifies mapping of the all-fields search selection.
+ */
+TEST_F(LogViewerControllerTest, RepresentsAllFieldsWithEmptySearchFieldSet)
+{
+    m_controller->set_search_filter(m_view_id, QStringLiteral("entry"), SearchField::AllFields,
+                                    false);
+
+    const LogQuery query = m_controller->create_page_query(m_view_id);
+
+    EXPECT_EQ(query.search_text, QStringLiteral("entry"));
+    EXPECT_TRUE(query.search_fields.isEmpty());
+}
+
+/**
+ * @brief Verifies that the selected table sorting is copied into a query.
+ */
+TEST_F(LogViewerControllerTest, CreatesPageQueryFromSelectedSorting)
+{
+    LogSortFilterProxyModel* proxy = m_controller->get_sort_filter_proxy(m_view_id);
+
+    ASSERT_NE(proxy, nullptr);
+
+    proxy->sort(LogModel::Message, Qt::AscendingOrder);
+
+    const LogQuery query = m_controller->create_page_query(m_view_id);
+
+    EXPECT_EQ(query.sort_field, LogField::Message);
+    EXPECT_EQ(query.sort_order, Qt::AscendingOrder);
+}
+
+/**
+ * @brief Verifies that file visibility is copied into a page query.
+ */
+TEST_F(LogViewerControllerTest, CreatesPageQueryFromFileVisibility)
+{
+    const QString first_file = m_temp_file_names.at(0);
+    const QString second_file = m_temp_file_names.at(1);
+
+    m_controller->set_show_only_file(m_view_id, first_file);
+
+    LogQuery query = m_controller->create_page_query(m_view_id);
+
+    EXPECT_EQ(query.show_only_file, first_file);
+    EXPECT_TRUE(query.hidden_files.isEmpty());
+
+    m_controller->set_show_only_file(m_view_id, QString());
+    m_controller->hide_file(m_view_id, second_file);
+
+    query = m_controller->create_page_query(m_view_id);
+
+    EXPECT_TRUE(query.show_only_file.isEmpty());
+    EXPECT_TRUE(query.hidden_files.contains(second_file));
+}
+
+/**
+ * @brief Verifies that an unknown view produces an unscoped query.
+ */
+TEST_F(LogViewerControllerTest, CreatesUnscopedQueryForUnknownView)
+{
+    const LogQuery query = m_controller->create_page_query(QUuid::createUuid());
+
+    EXPECT_TRUE(query.view_id.isNull());
+}

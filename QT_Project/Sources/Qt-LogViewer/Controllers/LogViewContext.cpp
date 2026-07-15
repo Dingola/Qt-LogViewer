@@ -33,6 +33,7 @@ LogViewContext::LogViewContext(QObject* parent)
       m_loaded_files()
 {
     m_sort_proxy->setSourceModel(m_model);
+    m_sort_proxy->sort(LogModel::Timestamp, Qt::DescendingOrder);
     m_paging_proxy->setSourceModel(m_sort_proxy);
 }
 
