@@ -70,6 +70,12 @@ class LogViewContext final: public QObject
         auto append_entries(const QVector<LogEntry>& entries) -> void;
 
         /**
+         * @brief Replaces the entries in the underlying model.
+         * @param entries Entries stored by the model.
+         */
+        auto replace_entries(const QVector<LogEntry>& entries) -> void;
+
+        /**
          * @brief Removes all entries belonging to the given file path from the model.
          * @param file_path Absolute file path to remove.
          */

@@ -86,6 +86,18 @@ auto LogViewContext::append_entries(const QVector<LogEntry>& entries) -> void
 }
 
 /**
+ * @brief Replaces the entries in the underlying model.
+ * @param entries Entries stored by the model.
+ */
+auto LogViewContext::replace_entries(const QVector<LogEntry>& entries) -> void
+{
+    if (m_model != nullptr)
+    {
+        m_model->set_entries(entries);
+    }
+}
+
+/**
  * @brief Removes all entries that belong to the given file path from the model.
  * @param file_path Absolute file path whose entries should be removed.
  */
