@@ -13,6 +13,7 @@
 #include "Qt-LogViewer/Controllers/FileCatalogController.h"
 #include "Qt-LogViewer/Controllers/FilterCoordinator.h"
 #include "Qt-LogViewer/Controllers/LogIngestController.h"
+#include "Qt-LogViewer/Controllers/LogPageCoordinator.h"
 #include "Qt-LogViewer/Controllers/LogViewContext.h"
 #include "Qt-LogViewer/Controllers/ViewRegistry.h"
 #include "Qt-LogViewer/Models/LogFileTreeModel.h"
@@ -39,7 +40,14 @@ LogViewerController::LogViewerController(const QString& log_format, QObject* par
 {
     // Initialize services
     m_history_service = new LogHistoryService(this);
+    m_page_coordinator = new LogPageCoordinator(m_history_service, m_views, this);
     m_tailer_service = new LogTailerService(log_format, this);
+
+    connect(m_page_coordinator, &LogPageCoordinator::page_loaded, this,
+            [this](const QUuid& view_id, qsizetype current_page, qsizetype total_pages,
+                   qsizetype total_entries) {
+                emit page_loaded(view_id, current_page, total_pages, total_entries);
+            });
 
     connect(m_tailer_service, &LogTailerService::entries_available, this,
             [this](const QUuid& view_id, const QString&, const QVector<LogEntry>& entries) {
@@ -716,6 +724,94 @@ auto LogViewerController::get_paging_proxy(const QUuid& view_id) -> PagingProxyM
     auto* ctx = m_views->get_context(view_id);
     PagingProxyModel* paging = (ctx != nullptr) ? ctx->get_paging_proxy() : nullptr;
     return paging;
+}
+
+/**
+ * @brief Assigns a paged log query to a view and loads its first page.
+ * @param view_id Target view.
+ * @param query Query describing filtering and sorting.
+ * @return True when the query was assigned and loaded.
+ */
+auto LogViewerController::set_page_query(const QUuid& view_id, const LogQuery& query) -> bool
+{
+    bool loaded = false;
+
+    if (m_page_coordinator != nullptr)
+    {
+        loaded = m_page_coordinator->set_query(view_id, query);
+    }
+
+    return loaded;
+}
+
+/**
+ * @brief Selects and loads a page for a view.
+ * @param view_id Target view.
+ * @param page One-based page number.
+ * @return True when the page was loaded.
+ */
+auto LogViewerController::set_current_page(const QUuid& view_id, qsizetype page) -> bool
+{
+    bool loaded = false;
+
+    if (m_page_coordinator != nullptr)
+    {
+        loaded = m_page_coordinator->set_current_page(view_id, page);
+    }
+
+    return loaded;
+}
+
+/**
+ * @brief Changes the page size and loads the first page.
+ * @param view_id Target view.
+ * @param page_size Positive number of entries per page.
+ * @return True when the page size was applied.
+ */
+auto LogViewerController::set_page_size(const QUuid& view_id, qsizetype page_size) -> bool
+{
+    bool loaded = false;
+
+    if (m_page_coordinator != nullptr)
+    {
+        loaded = m_page_coordinator->set_page_size(view_id, page_size);
+    }
+
+    return loaded;
+}
+
+/**
+ * @brief Reloads the current page for a view.
+ * @param view_id Target view.
+ * @return True when the page was loaded.
+ */
+auto LogViewerController::reload_page(const QUuid& view_id) -> bool
+{
+    bool loaded = false;
+
+    if (m_page_coordinator != nullptr)
+    {
+        loaded = m_page_coordinator->reload(view_id);
+    }
+
+    return loaded;
+}
+
+/**
+ * @brief Returns the paged query state for a view.
+ * @param view_id Target view.
+ * @return Page state, or nullptr when no query is assigned.
+ */
+auto LogViewerController::get_page_state(const QUuid& view_id) const -> const LogPageState*
+{
+    const LogPageState* state = nullptr;
+
+    if (m_page_coordinator != nullptr)
+    {
+        state = m_page_coordinator->get_page_state(view_id);
+    }
+
+    return state;
 }
 
 /**

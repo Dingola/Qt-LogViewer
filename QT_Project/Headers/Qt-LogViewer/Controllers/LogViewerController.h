@@ -10,6 +10,8 @@
 
 #include "Qt-LogViewer/Models/LogEntry.h"
 #include "Qt-LogViewer/Models/LogFileInfo.h"
+#include "Qt-LogViewer/Models/LogPageState.h"
+#include "Qt-LogViewer/Models/LogQuery.h"
 #include "Qt-LogViewer/Models/SearchFields.h"
 #include "Qt-LogViewer/Models/SessionTypes.h"
 
@@ -25,6 +27,7 @@ class PagingProxyModel;
 class LogFileTreeModel;
 class LogHistoryService;
 class LogTailerService;
+class LogPageCoordinator;
 
 /**
  * @file LogViewerController.h
@@ -252,6 +255,44 @@ class LogViewerController: public QObject
          * @return Pointer to the PagingProxyModel, or nullptr if not found.
          */
         [[nodiscard]] auto get_paging_proxy(const QUuid& view_id) -> PagingProxyModel*;
+
+        /**
+         * @brief Assigns a paged log query to a view and loads its first page.
+         * @param view_id Target view.
+         * @param query Query describing filtering and sorting.
+         * @return True when the query was assigned and loaded.
+         */
+        auto set_page_query(const QUuid& view_id, const LogQuery& query) -> bool;
+
+        /**
+         * @brief Selects and loads a page for a view.
+         * @param view_id Target view.
+         * @param page One-based page number.
+         * @return True when the page was loaded.
+         */
+        auto set_current_page(const QUuid& view_id, qsizetype page) -> bool;
+
+        /**
+         * @brief Changes the page size and loads the first page.
+         * @param view_id Target view.
+         * @param page_size Positive number of entries per page.
+         * @return True when the page size was applied.
+         */
+        auto set_page_size(const QUuid& view_id, qsizetype page_size) -> bool;
+
+        /**
+         * @brief Reloads the current page for a view.
+         * @param view_id Target view.
+         * @return True when the page was loaded.
+         */
+        auto reload_page(const QUuid& view_id) -> bool;
+
+        /**
+         * @brief Returns the paged query state for a view.
+         * @param view_id Target view.
+         * @return Page state, or nullptr when no query is assigned.
+         */
+        [[nodiscard]] auto get_page_state(const QUuid& view_id) const -> const LogPageState*;
 
         /**
          * @brief Returns the set of unique application names from the loaded logs in the current
@@ -543,6 +584,16 @@ class LogViewerController: public QObject
          */
         void view_file_paths_changed(const QUuid& view_id, const QVector<QString>& file_paths);
 
+        /**
+         * @brief Emitted after a query page has been loaded.
+         * @param view_id Updated view.
+         * @param current_page Current one-based page.
+         * @param total_pages Total number of available pages.
+         * @param total_entries Total number of matching entries.
+         */
+        auto page_loaded(const QUuid& view_id, qsizetype current_page, qsizetype total_pages,
+                         qsizetype total_entries) -> void;
+
     public slots:
         /**
          * @brief Removes a single log file from all views and from the LogFileTreeModel.
@@ -600,6 +651,7 @@ class LogViewerController: public QObject
         ViewRegistry* m_views{nullptr};
         FilterCoordinator* m_filters{nullptr};
         LogHistoryService* m_history_service{nullptr};
+        LogPageCoordinator* m_page_coordinator{nullptr};
         LogTailerService* m_tailer_service{nullptr};
         QSet<QUuid> m_live_tailing_views;
 };

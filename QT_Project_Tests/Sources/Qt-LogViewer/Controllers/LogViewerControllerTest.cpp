@@ -7,6 +7,8 @@
 
 #include "Qt-LogViewer/Models/LogFileTreeModel.h"
 #include "Qt-LogViewer/Models/LogModel.h"
+#include "Qt-LogViewer/Models/LogPageState.h"
+#include "Qt-LogViewer/Models/LogQuery.h"
 #include "Qt-LogViewer/Models/LogSortFilterProxyModel.h"
 #include "Qt-LogViewer/Models/PagingProxyModel.h"
 
@@ -787,4 +789,95 @@ TEST_F(LogViewerControllerTest, InvalidViewReturnsNullptr)
     EXPECT_EQ(m_controller->get_log_model(invalid_id), nullptr);
     EXPECT_EQ(m_controller->get_sort_filter_proxy(invalid_id), nullptr);
     EXPECT_EQ(m_controller->get_paging_proxy(invalid_id), nullptr);
+}
+
+/**
+ * @brief Verifies that a paged query is loaded through the main controller.
+ */
+TEST_F(LogViewerControllerTest, LoadsPagedQueryThroughController)
+{
+    LogQuery query;
+
+    ASSERT_TRUE(m_controller->set_page_query(m_view_id, query));
+
+    const LogPageState* state = m_controller->get_page_state(m_view_id);
+
+    ASSERT_NE(state, nullptr);
+    EXPECT_EQ(state->get_query().view_id, m_view_id);
+    EXPECT_EQ(state->get_current_page(), 1);
+    EXPECT_EQ(state->get_total_entries(), 4);
+    EXPECT_EQ(state->get_total_pages(), 1);
+
+    LogModel* model = m_controller->get_log_model(m_view_id);
+    ASSERT_NE(model, nullptr);
+    ASSERT_EQ(model->rowCount(), 4);
+
+    EXPECT_EQ(model->get_entry(0).get_message(), QStringLiteral("UserLogin"));
+    EXPECT_EQ(model->get_entry(3).get_message(), QStringLiteral("Startup"));
+}
+
+/**
+ * @brief Verifies page selection through the main controller.
+ */
+TEST_F(LogViewerControllerTest, LoadsSelectedPageThroughController)
+{
+    LogQuery query;
+
+    ASSERT_TRUE(m_controller->set_page_query(m_view_id, query));
+    ASSERT_TRUE(m_controller->set_page_size(m_view_id, 2));
+    ASSERT_TRUE(m_controller->set_current_page(m_view_id, 2));
+
+    const LogPageState* state = m_controller->get_page_state(m_view_id);
+
+    ASSERT_NE(state, nullptr);
+    EXPECT_EQ(state->get_page_size(), 2);
+    EXPECT_EQ(state->get_current_page(), 2);
+    EXPECT_EQ(state->get_total_pages(), 2);
+    EXPECT_EQ(state->get_total_entries(), 4);
+
+    LogModel* model = m_controller->get_log_model(m_view_id);
+    ASSERT_NE(model, nullptr);
+    ASSERT_EQ(model->rowCount(), 2);
+
+    EXPECT_EQ(model->get_entry(0).get_message(), QStringLiteral("Crash"));
+    EXPECT_EQ(model->get_entry(1).get_message(), QStringLiteral("Startup"));
+}
+
+/**
+ * @brief Verifies that page loading emits the resulting pagination state.
+ */
+TEST_F(LogViewerControllerTest, EmitsLoadedPageState)
+{
+    QSignalSpy spy(m_controller, &LogViewerController::page_loaded);
+
+    LogQuery query;
+
+    ASSERT_TRUE(m_controller->set_page_query(m_view_id, query));
+    ASSERT_EQ(spy.count(), 1);
+
+    const QList<QVariant> arguments = spy.takeFirst();
+
+    ASSERT_EQ(arguments.size(), 4);
+    EXPECT_EQ(arguments.at(0).toUuid(), m_view_id);
+    EXPECT_EQ(arguments.at(1).toLongLong(), 1);
+    EXPECT_EQ(arguments.at(2).toLongLong(), 1);
+    EXPECT_EQ(arguments.at(3).toLongLong(), 4);
+}
+
+/**
+ * @brief Verifies that unknown views reject paged queries.
+ */
+TEST_F(LogViewerControllerTest, RejectsPagedQueryForUnknownView)
+{
+    LogQuery query;
+
+    EXPECT_FALSE(m_controller->set_page_query(QUuid::createUuid(), query));
+}
+
+/**
+ * @brief Verifies that a view without a paged query has no page state.
+ */
+TEST_F(LogViewerControllerTest, ReturnsNoPageStateBeforeQueryAssignment)
+{
+    EXPECT_EQ(m_controller->get_page_state(m_view_id), nullptr);
 }
