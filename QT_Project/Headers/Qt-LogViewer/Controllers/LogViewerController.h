@@ -281,6 +281,15 @@ class LogViewerController: public QObject
         auto set_page_size(const QUuid& view_id, qsizetype page_size) -> bool;
 
         /**
+         * @brief Changes the sorting of a paged view and loads its first page.
+         * @param view_id Target view.
+         * @param column LogModel column.
+         * @param order Sort direction.
+         * @return True when the sorted page was loaded.
+         */
+        auto set_page_sort(const QUuid& view_id, int column, Qt::SortOrder order) -> bool;
+
+        /**
          * @brief Reloads the current page for a view.
          * @param view_id Target view.
          * @return True when the page was loaded.

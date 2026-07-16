@@ -216,8 +216,7 @@ struct SqlFilter {
  * @param search_expression Escaped FTS5 search expression.
  * @return SQL source, predicates, bindings, and validation result.
  */
-[[nodiscard]] auto create_query_filter(const LogQuery& log_query,
-                                       const QString& search_expression) -> SqlFilter
+[[nodiscard]] auto create_query_filter(const LogQuery& log_query) -> SqlFilter
 {
     SqlFilter filter;
 
@@ -303,18 +302,45 @@ struct SqlFilter {
         }
         else
         {
-            const QString match_expression =
-                create_match_expression(log_query.search_fields, search_expression, filter.error);
+            QSet<QString> fields = log_query.search_fields;
+
+            if (fields.isEmpty())
+            {
+                fields = {LogField::Level, LogField::Message, LogField::AppName,
+                          LogField::FilePath};
+            }
+
+            QStringList sorted_fields(fields.begin(), fields.end());
+            sorted_fields.sort();
+
+            QStringList search_predicates;
+            qsizetype index = 0;
+
+            for (const QString& field_id: sorted_fields)
+            {
+                const QString column = get_fts_column(field_id);
+
+                if (column.isEmpty())
+                {
+                    filter.error = QStringLiteral("Field is not available for text searching: %1")
+                                       .arg(field_id);
+                    break;
+                }
+
+                const QString placeholder = QStringLiteral(":search_text_%1").arg(index);
+
+                search_predicates.append(QStringLiteral("INSTR(LOWER(entries.%1), LOWER(%2)) > 0")
+                                             .arg(column, placeholder));
+
+                filter.bindings.append({placeholder, log_query.search_text.trimmed()});
+
+                ++index;
+            }
 
             if (filter.error.isEmpty())
             {
-                filter.from_clause.append(
-                    QStringLiteral(" INNER JOIN log_entries_fts "
-                                   "ON log_entries_fts.rowid = entries.id"));
-
-                filter.predicates.append(QStringLiteral("log_entries_fts MATCH :match_expression"));
-
-                filter.bindings.append({QStringLiteral(":match_expression"), match_expression});
+                filter.predicates.append(
+                    QStringLiteral("(%1)").arg(search_predicates.join(QStringLiteral(" OR "))));
             }
         }
     }
@@ -429,14 +455,7 @@ auto LogHistoryService::count_entries(const LogQuery& log_query) const -> qsizet
 
     if (m_is_available && !log_query.view_id.isNull())
     {
-        QString search_expression;
-
-        if (!log_query.search_text.trimmed().isEmpty() && !log_query.use_regex)
-        {
-            search_expression = create_fts_query(log_query.search_text);
-        }
-
-        const SqlFilter filter = create_query_filter(log_query, search_expression);
+        const SqlFilter filter = create_query_filter(log_query);
 
         if (filter.error.isEmpty())
         {
@@ -482,14 +501,7 @@ auto LogHistoryService::load_entries_page(const LogQuery& log_query, qsizetype o
 
     if (m_is_available && !log_query.view_id.isNull() && offset >= 0 && limit > 0)
     {
-        QString search_expression;
-
-        if (!log_query.search_text.trimmed().isEmpty() && !log_query.use_regex)
-        {
-            search_expression = create_fts_query(log_query.search_text);
-        }
-
-        const SqlFilter filter = create_query_filter(log_query, search_expression);
+        const SqlFilter filter = create_query_filter(log_query);
         QString query_error = filter.error;
         const QString order_by = create_order_by_expression(log_query, query_error);
 
@@ -550,14 +562,7 @@ auto LogHistoryService::get_log_level_counts(const LogQuery& log_query) const
         LogQuery facet_query = log_query;
         facet_query.log_levels.clear();
 
-        QString search_expression;
-
-        if (!facet_query.search_text.trimmed().isEmpty() && !facet_query.use_regex)
-        {
-            search_expression = create_fts_query(facet_query.search_text);
-        }
-
-        const SqlFilter filter = create_query_filter(facet_query, search_expression);
+        const SqlFilter filter = create_query_filter(facet_query);
 
         if (filter.error.isEmpty())
         {
@@ -816,11 +821,20 @@ auto LogHistoryService::create_schema() -> bool
  */
 auto LogHistoryService::create_fts_query(const QString& search_text) -> QString
 {
-    QString escaped = search_text;
-    escaped.replace(QLatin1Char('"'), QStringLiteral("\"\""));
+    const QStringList terms =
+        search_text.trimmed().split(QRegularExpression(QStringLiteral("\\s+")), Qt::SkipEmptyParts);
 
-    const QString query = QStringLiteral("\"%1\"").arg(escaped.trimmed());
-    return query;
+    QStringList expressions;
+    expressions.reserve(terms.size());
+
+    for (QString term: terms)
+    {
+        term.replace(QLatin1Char('"'), QStringLiteral("\"\""));
+
+        expressions.append(QStringLiteral("\"%1\"*").arg(term));
+    }
+
+    return expressions.join(QStringLiteral(" AND "));
 }
 
 /**

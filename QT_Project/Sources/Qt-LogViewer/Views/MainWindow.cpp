@@ -6,6 +6,7 @@
 #include <QDropEvent>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QHeaderView>
 #include <QIcon>
 #include <QJsonArray>
 #include <QJsonObject>
@@ -26,6 +27,8 @@
 #include "Qt-LogViewer/Models/LogEntry.h"
 #include "Qt-LogViewer/Models/LogFileTreeModel.h"
 #include "Qt-LogViewer/Models/LogModel.h"
+#include "Qt-LogViewer/Models/LogPageState.h"
+#include "Qt-LogViewer/Models/LogQuery.h"
 #include "Qt-LogViewer/Models/LogSortFilterProxyModel.h"
 #include "Qt-LogViewer/Models/PagingProxyModel.h"
 #include "Qt-LogViewer/Models/RecentItemsModel.h"
@@ -37,6 +40,7 @@
 #include "Qt-LogViewer/Views/App/Dialogs/SettingsDialog.h"
 #include "Qt-LogViewer/Views/App/LogFileExplorer.h"
 #include "Qt-LogViewer/Views/App/LogLevelPieChartWidget.h"
+#include "Qt-LogViewer/Views/App/LogTableView.h"
 #include "Qt-LogViewer/Views/App/LogViewWidget.h"
 #include "Qt-LogViewer/Views/App/StartPageWidget.h"
 #include "Qt-LogViewer/Views/Shared/DockWidget.h"
@@ -61,6 +65,31 @@ constexpr auto k_show_log_file_explorer_text =
     QT_TRANSLATE_NOOP("MainWindow", "Show Log File Explorer");
 constexpr auto k_show_log_details_text = QT_TRANSLATE_NOOP("MainWindow", "Show Log Details");
 constexpr auto k_untitled_session_text = QT_TRANSLATE_NOOP("MainWindow", "Untitled Session");
+
+/**
+ * @brief Maps a stable log field identifier to a table column.
+ * @param field Stable field identifier.
+ * @return LogModel column.
+ */
+[[nodiscard]] auto get_log_model_column(const QString& field) -> int
+{
+    int column = LogModel::Timestamp;
+
+    if (field == LogField::Level)
+    {
+        column = LogModel::Level;
+    }
+    else if (field == LogField::Message)
+    {
+        column = LogModel::Message;
+    }
+    else if (field == LogField::AppName)
+    {
+        column = LogModel::AppName;
+    }
+
+    return column;
+}
 }  // namespace
 
 using QtWidgetsCommonLib::AppMainWindow;
@@ -218,6 +247,28 @@ MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
                     qWarning() << "Could not update tab file paths for view:" << view_id;
                 }
             });
+    connect(m_controller, &LogViewerController::page_loaded, this,
+            [this](const QUuid& view_id, qsizetype current_page, qsizetype total_pages, qsizetype) {
+                if (view_id != m_controller->get_current_view())
+                {
+                    return;
+                }
+
+                ui->paginationWidget->set_pagination(static_cast<int>(current_page),
+                                                     static_cast<int>(total_pages));
+
+                const QMap<QString, int> level_counts = m_controller->get_log_level_counts(view_id);
+
+                ui->logFilterBarWidget->set_log_level_counts(level_counts);
+                m_log_level_pie_chart_widget->set_log_level_counts(level_counts);
+
+                LogViewWidget* log_view_widget = ui->tabWidgetLog->current_log_view();
+
+                if (log_view_widget != nullptr && log_view_widget->get_view_id() == view_id)
+                {
+                    log_view_widget->set_log_level_counts(level_counts);
+                }
+            });
 
     initialize_menu();
     rebuild_recent_menus();
@@ -289,23 +340,28 @@ auto MainWindow::setup_log_level_pie_chart() -> void
 }
 
 /**
- * @brief Sets up the log table view and pagination widget.
+ * @brief Sets up the pagination widget.
  */
 auto MainWindow::setup_pagination_widget() -> void
 {
     ui->paginationWidget->set_max_page_buttons(7);
 
-    connect(ui->paginationWidget, &PaginationWidget::page_changed, this,
-            [this](int page) { m_controller->get_paging_proxy()->set_current_page(page); });
+    connect(ui->paginationWidget, &PaginationWidget::page_changed, this, [this](int page) {
+        const QUuid view_id = m_controller->get_current_view();
+
+        if (!view_id.isNull())
+        {
+            m_controller->set_current_page(view_id, page);
+        }
+    });
+
     connect(ui->paginationWidget, &PaginationWidget::items_per_page_changed, this,
             [this](int items_per_page) {
-                auto* proxy = m_controller->get_paging_proxy();
+                const QUuid view_id = m_controller->get_current_view();
 
-                if (proxy != nullptr)
+                if (!view_id.isNull())
                 {
-                    proxy->set_page_size(items_per_page);
-                    proxy->set_current_page(1);
-                    update_pagination_widget();
+                    m_controller->set_page_size(view_id, items_per_page);
                 }
             });
 }
@@ -338,14 +394,23 @@ auto MainWindow::setup_filter_bar() -> void
     ui->logFilterBarWidget->set_available_log_levels(available_log_levels);
     connect(ui->logFilterBarWidget, &LogFilterBarWidget::app_filter_changed, this,
             [this](const QString& app_name) {
-                m_controller->set_app_name_filter(app_name);
-                update_pagination_widget();
+                const QUuid view_id = m_controller->get_current_view();
+
+                if (!view_id.isNull())
+                {
+                    m_controller->set_app_name_filter(view_id, app_name);
+                    reload_page_query(view_id);
+                }
             });
     connect(ui->logFilterBarWidget, &LogFilterBarWidget::log_level_filter_changed, this,
             [this](const QSet<QString>& log_levels) {
-                qDebug() << "Level filter set to:" << log_levels;
-                m_controller->set_log_level_filters(log_levels);
-                update_pagination_widget();
+                const QUuid view_id = m_controller->get_current_view();
+
+                if (!view_id.isNull())
+                {
+                    m_controller->set_log_level_filters(view_id, log_levels);
+                    reload_page_query(view_id);
+                }
             });
 
     // React only to search_requested; avoids double-calling when live search is on.
@@ -718,7 +783,7 @@ auto MainWindow::show_start_page_if_needed() -> void
 
 /**
  * @brief Updates the log details view when a row is selected.
- * @param current The current selected index.
+ * @param current Selected page-model index.
  */
 auto MainWindow::update_log_details(const QModelIndex& current) -> void
 {
@@ -726,47 +791,64 @@ auto MainWindow::update_log_details(const QModelIndex& current) -> void
 
     if (current.isValid())
     {
-        auto* paging_proxy = m_controller->get_paging_proxy();
-        auto* sort_filter_proxy = m_controller->get_sort_filter_proxy();
-        auto* model = m_controller->get_log_model();
+        LogModel* model = m_controller->get_log_model();
 
-        QModelIndex sort_index = paging_proxy->mapToSource(current);
-        QModelIndex source_index = sort_filter_proxy->mapToSource(sort_index);
-
-        if (source_index.isValid())
+        if (model != nullptr)
         {
-            LogEntry entry = model->get_entry(source_index.row());
-            details = QString("Timestamp: %1\nLevel: %2\nApp: %3\nMessage: %4")
-                          .arg(entry.get_timestamp().toString("yyyy-MM-dd HH:mm:ss"))
-                          .arg(entry.get_level())
-                          .arg(entry.get_app_name())
-                          .arg(entry.get_message());
+            const LogEntry entry = model->get_entry(current.row());
+
+            details =
+                QStringLiteral(
+                    "Timestamp: %1\n"
+                    "Level: %2\n"
+                    "App: %3\n"
+                    "Message: %4")
+                    .arg(entry.get_timestamp().toString(QStringLiteral("yyyy-MM-dd HH:mm:ss")))
+                    .arg(entry.get_level())
+                    .arg(entry.get_app_name())
+                    .arg(entry.get_message());
         }
     }
 
     m_log_details_text_edit->setPlainText(details);
-    qDebug() << "Log details updated for row:" << current.row();
 }
 
 /**
- * @brief Updates the pagination widget based on the current page and total pages.
- *
- * This method retrieves the current page and total pages from the proxy model,
- * ensures they are within valid ranges, and updates the pagination widget accordingly.
+ * @brief Updates the pagination widget from the current page state.
  */
 auto MainWindow::update_pagination_widget() -> void
 {
-    int total_pages = 0;
-    int current_page = 0;
-    auto* proxy = m_controller->get_paging_proxy();
+    int current_page = 1;
+    int total_pages = 1;
 
-    if (proxy != nullptr)
+    const QUuid view_id = m_controller->get_current_view();
+
+    if (!view_id.isNull())
     {
-        total_pages = proxy->get_total_pages();
-        current_page = proxy->get_current_page();
+        const LogPageState* state = m_controller->get_page_state(view_id);
+
+        if (state != nullptr)
+        {
+            current_page = static_cast<int>(state->get_current_page());
+            total_pages = static_cast<int>(state->get_total_pages());
+        }
     }
 
     ui->paginationWidget->set_pagination(current_page, total_pages);
+}
+
+/**
+ * @brief Rebuilds and loads the database query for a view.
+ * @param view_id Target view.
+ */
+auto MainWindow::reload_page_query(const QUuid& view_id) -> void
+{
+    if (!view_id.isNull())
+    {
+        const LogQuery query = m_controller->create_page_query(view_id);
+
+        m_controller->set_page_query(view_id, query);
+    }
 }
 
 /**
@@ -972,8 +1054,13 @@ auto MainWindow::handle_search_changed() -> void
     QString field_key = to_string(field);
 
     qDebug() << "Search filter:" << search_text << "Field:" << field_key << "Regex:" << use_regex;
-    m_controller->set_search_filter(search_text, field, use_regex);
-    update_pagination_widget();
+    const QUuid view_id = m_controller->get_current_view();
+
+    if (!view_id.isNull())
+    {
+        m_controller->set_search_filter(view_id, search_text, field, use_regex);
+        reload_page_query(view_id);
+    }
 }
 
 /**
@@ -1008,6 +1095,11 @@ auto MainWindow::handle_current_view_id_changed(const QUuid& view_id) -> void
 
         QVector<QString> file_paths = m_controller->get_view_file_paths(view_id);
         log_view_widget->set_view_file_paths(file_paths);
+    }
+
+    if (m_controller->get_page_state(view_id) == nullptr)
+    {
+        reload_page_query(view_id);
     }
 
     update_pagination_widget();
@@ -1289,8 +1381,43 @@ auto MainWindow::create_log_view_widget_for_view(const QUuid& view_id,
     auto* log_view_widget = new LogViewWidget(ui->tabWidgetLog);
     log_view_widget->set_view_id(view_id);
 
-    auto* paging_proxy = m_controller->get_paging_proxy(view_id);
-    log_view_widget->set_model(paging_proxy);
+    LogModel* page_model = m_controller->get_log_model(view_id);
+
+    log_view_widget->set_model(page_model);
+
+    LogQuery query = m_controller->create_page_query(view_id);
+
+    QHeaderView* header = log_view_widget->get_table_view()->horizontalHeader();
+
+    if (header != nullptr)
+    {
+        const bool blocked = header->blockSignals(true);
+
+        header->setSortIndicator(get_log_model_column(query.sort_field), query.sort_order);
+
+        header->blockSignals(blocked);
+    }
+
+    m_controller->set_page_query(view_id, query);
+
+    log_view_widget->set_file_visibility_state(query.show_only_file, query.hidden_files);
+
+    const qsizetype page_size = state.page_size > 0 ? state.page_size : 25;
+
+    m_controller->set_page_size(view_id, page_size);
+
+    if (state.current_page > 1)
+    {
+        m_controller->set_current_page(view_id, state.current_page);
+    }
+
+    if (header != nullptr)
+    {
+        connect(header, &QHeaderView::sortIndicatorChanged, this,
+                [this, view_id](int column, Qt::SortOrder order) {
+                    m_controller->set_page_sort(view_id, column, order);
+                });
+    }
 
     const QSet<QString> app_names = m_controller->get_app_names(view_id);
     log_view_widget->set_app_names(app_names);
@@ -1305,29 +1432,46 @@ auto MainWindow::create_log_view_widget_for_view(const QUuid& view_id,
 
     connect(log_view_widget, &LogViewWidget::current_row_changed, this,
             &MainWindow::update_log_details);
-    connect(log_view_widget, &LogViewWidget::app_filter_changed, this, [this](const QString& app) {
-        m_controller->set_app_name_filter(app);
-        update_pagination_widget();
-    });
+    connect(log_view_widget, &LogViewWidget::app_filter_changed, this,
+            [this, view_id](const QString& app) {
+                m_controller->set_app_name_filter(view_id, app);
+                reload_page_query(view_id);
+            });
     connect(log_view_widget, &LogViewWidget::log_level_filter_changed, this,
-            [this](const QSet<QString>& levels) {
-                m_controller->set_log_level_filters(levels);
-                update_pagination_widget();
+            [this, view_id](const QSet<QString>& levels) {
+                m_controller->set_log_level_filters(view_id, levels);
+                reload_page_query(view_id);
             });
     connect(log_view_widget, &LogViewWidget::toggle_visibility_requested, this,
-            [this, view_id](const QString& file_path) {
+            [this, view_id, log_view_widget](const QString& file_path) {
                 m_controller->toggle_file_visibility(view_id, file_path);
-                update_pagination_widget();
+
+                const LogQuery query = m_controller->create_page_query(view_id);
+
+                log_view_widget->set_file_visibility_state(query.show_only_file,
+                                                           query.hidden_files);
+
+                reload_page_query(view_id);
             });
     connect(log_view_widget, &LogViewWidget::show_only_file_requested, this,
-            [this, view_id](const QString& file_path) {
+            [this, view_id, log_view_widget](const QString& file_path) {
                 m_controller->set_show_only_file(view_id, file_path);
-                update_pagination_widget();
+
+                const LogQuery query = m_controller->create_page_query(view_id);
+
+                log_view_widget->set_file_visibility_state(query.show_only_file,
+                                                           query.hidden_files);
+
+                reload_page_query(view_id);
             });
     connect(log_view_widget, &LogViewWidget::remove_file_requested, this,
             [this, view_id](const QString& file_path) {
                 m_controller->remove_log_file(view_id, file_path);
-                update_pagination_widget();
+
+                if (m_controller->get_page_state(view_id) != nullptr)
+                {
+                    reload_page_query(view_id);
+                }
             });
     connect(log_view_widget, &LogViewWidget::live_tailing_toggled, this,
             [this, view_id](bool enabled) {
@@ -1469,10 +1613,18 @@ auto MainWindow::handle_loading_finished(const QUuid& view_id, const QString& fi
     statusBar()->showMessage(tr("Loaded %1 (%2 bytes)").arg(info.fileName()).arg(info.size()),
                              4000);
 
-    if (is_current)
+    if (m_controller->get_page_state(view_id) != nullptr)
+    {
+        m_controller->reload_page(view_id);
+    }
+    else
+    {
+        reload_page_query(view_id);
+    }
+
+    if (view_id == m_controller->get_current_view())
     {
         handle_current_view_id_changed(view_id);
-        update_pagination_widget();
     }
 }
 

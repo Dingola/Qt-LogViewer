@@ -851,6 +851,23 @@ auto LogViewerController::set_page_size(const QUuid& view_id, qsizetype page_siz
 }
 
 /**
+ * @brief Changes the sorting of a paged view and loads its first page.
+ * @param view_id Target view.
+ * @param column LogModel column.
+ * @param order Sort direction.
+ * @return True when the sorted page was loaded.
+ */
+auto LogViewerController::set_page_sort(const QUuid& view_id, int column,
+                                        Qt::SortOrder order) -> bool
+{
+    LogQuery query = create_page_query(view_id);
+    query.sort_field = get_query_sort_field(column);
+    query.sort_order = order;
+
+    return set_page_query(view_id, query);
+}
+
+/**
  * @brief Reloads the current page for a view.
  * @param view_id Target view.
  * @return True when the page was loaded.
@@ -907,12 +924,23 @@ auto LogViewerController::create_page_query(const QUuid& view_id) const -> LogQu
         query.show_only_file = filters.show_only_file;
         query.hidden_files = filters.hidden_files;
 
-        LogSortFilterProxyModel* sort_proxy = context->get_sort_proxy();
+        const LogPageState* page_state = get_page_state(view_id);
 
-        if (sort_proxy != nullptr)
+        if (page_state != nullptr)
         {
-            query.sort_field = get_query_sort_field(sort_proxy->get_sort_column());
-            query.sort_order = sort_proxy->get_sort_order();
+            query.sort_field = page_state->get_query().sort_field;
+            query.sort_order = page_state->get_query().sort_order;
+        }
+        else
+        {
+            LogSortFilterProxyModel* sort_proxy = context->get_sort_proxy();
+
+            if (sort_proxy != nullptr)
+            {
+                query.sort_field = get_query_sort_field(sort_proxy->get_sort_column());
+
+                query.sort_order = sort_proxy->get_sort_order();
+            }
         }
     }
 
@@ -929,7 +957,8 @@ auto LogViewerController::get_app_names() const -> QSet<QString>
 }
 
 /**
- * @brief Returns the set of unique application names from the loaded logs in the specified view.
+ * @brief Returns the set of unique application names from the loaded logs in the specified
+ * view.
  * @param view_id The QUuid of the view.
  * @return A set of application names.
  */
@@ -997,7 +1026,21 @@ auto LogViewerController::get_log_level_filters() const -> QSet<QString>
  */
 auto LogViewerController::get_log_level_counts(const QUuid& view_id) const -> QMap<QString, int>
 {
-    QMap<QString, int> counts = m_filters->get_log_level_counts(view_id);
+    QMap<QString, int> counts;
+
+    if (!view_id.isNull() && m_history_service != nullptr)
+    {
+        const LogQuery query = create_page_query(view_id);
+
+        const QMap<QString, qsizetype> history_counts =
+            m_history_service->get_log_level_counts(query);
+
+        for (auto it = history_counts.cbegin(); it != history_counts.cend(); ++it)
+        {
+            counts.insert(it.key(), static_cast<int>(it.value()));
+        }
+    }
+
     return counts;
 }
 
@@ -1255,8 +1298,8 @@ auto LogViewerController::export_view_state(const QUuid& view_id) const -> Sessi
 }
 
 /**
- * @brief Imports a single view state (files, filters, paging, sort) and returns the ensured view
- * id.
+ * @brief Imports a single view state (files, filters, paging, sort) and returns the ensured
+ * view id.
  * @param state The view state to apply.
  * @return QUuid of the imported/ensured view.
  */
@@ -1321,6 +1364,12 @@ auto LogViewerController::import_view_state_for_session(const QString& session_i
     if (m_views != nullptr && m_filters != nullptr)
     {
         result = m_views->import_view_state(state, *m_filters);
+
+        if (!result.isNull() && m_history_service != nullptr)
+        {
+            m_history_service->remove_view_entries(result);
+        }
+
         set_live_tailing_enabled(result, state.filters.live_tailing_enabled);
 
         // Update explorer tree with session context

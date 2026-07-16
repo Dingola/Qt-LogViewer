@@ -189,6 +189,20 @@ auto LogViewWidget::set_filter_widget_visible(bool visible) -> void
 }
 
 /**
+ * @brief Updates the visibility state of files in the view.
+ * @param show_only_file File displayed exclusively, or an empty string.
+ * @param hidden_files Files explicitly hidden from the view.
+ */
+auto LogViewWidget::set_file_visibility_state(const QString& show_only_file,
+                                              const QSet<QString>& hidden_files) -> void
+{
+    m_show_only_file = show_only_file;
+    m_hidden_files = hidden_files;
+
+    refresh_files_menu_states();
+}
+
+/**
  * @brief Resets all filter related UI elements (apps + levels).
  *
  * Clears application names, log levels, counts.
@@ -310,22 +324,6 @@ auto LogViewWidget::rebuild_files_menu() -> void
         }
         else
         {
-            // Determine current file filter state from proxy
-            QString show_only_path;
-            QSet<QString> hidden_paths;
-
-            auto* proxy_model = qobject_cast<QAbstractProxyModel*>(ui->logTableView->model());
-            if (proxy_model != nullptr)
-            {
-                auto* sort_proxy =
-                    qobject_cast<LogSortFilterProxyModel*>(proxy_model->sourceModel());
-                if (sort_proxy != nullptr)
-                {
-                    show_only_path = sort_proxy->get_show_only_file_path();
-                    hidden_paths = sort_proxy->get_hidden_file_paths();
-                }
-            }
-
             m_files_menu->addSeparator();
 
             for (const QString& path: m_view_file_paths)
@@ -334,8 +332,9 @@ auto LogViewWidget::rebuild_files_menu() -> void
                 widget_action->set_file_path(path);
 
                 // Effective hidden: explicitly hidden OR hidden by active show-only on another file
-                const bool hidden_effective = hidden_paths.contains(path) ||
-                                              (!show_only_path.isEmpty() && path != show_only_path);
+                const bool hidden_effective =
+                    m_hidden_files.contains(path) ||
+                    (!m_show_only_file.isEmpty() && path != m_show_only_file);
                 widget_action->set_hidden_effective(hidden_effective);
 
                 connect(
@@ -366,36 +365,29 @@ auto LogViewWidget::rebuild_files_menu() -> void
  */
 auto LogViewWidget::refresh_files_menu_states() -> void
 {
-    // Determine current file filter state from proxy
-    QString show_only_path;
-    QSet<QString> hidden_paths;
-
-    auto* proxy_lvl1 = qobject_cast<QAbstractProxyModel*>(ui->logTableView->model());
-    if (proxy_lvl1 != nullptr)
+    if (m_files_menu == nullptr)
     {
-        auto* sort_proxy = qobject_cast<LogSortFilterProxyModel*>(proxy_lvl1->sourceModel());
-        if (sort_proxy != nullptr)
-        {
-            show_only_path = sort_proxy->get_show_only_file_path();
-            hidden_paths = sort_proxy->get_hidden_file_paths();
-        }
+        return;
     }
 
-    if (m_files_menu != nullptr)
-    {
-        const QList<QAction*> actions = m_files_menu->actions();
-        for (QAction* act: actions)
-        {
-            auto* widget_action = qobject_cast<FilesInViewWidgetAction*>(act);
-            if (widget_action != nullptr)
-            {
-                const QString path = widget_action->get_file_path();
-                const bool hidden_effective = (hidden_paths.contains(path)) ||
-                                              (!show_only_path.isEmpty() && path != show_only_path);
+    const QList<QAction*> actions = m_files_menu->actions();
 
-                widget_action->set_hidden_effective(hidden_effective);
-            }
+    for (QAction* action: actions)
+    {
+        auto* widget_action = qobject_cast<FilesInViewWidgetAction*>(action);
+
+        if (widget_action == nullptr)
+        {
+            continue;
         }
+
+        const QString file_path = widget_action->get_file_path();
+
+        const bool hidden_effective =
+            m_hidden_files.contains(file_path) ||
+            (!m_show_only_file.isEmpty() && file_path != m_show_only_file);
+
+        widget_action->set_hidden_effective(hidden_effective);
     }
 }
 

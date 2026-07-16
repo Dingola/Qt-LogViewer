@@ -122,6 +122,14 @@ class LogViewWidget: public QWidget
         auto set_filter_widget_visible(bool visible) -> void;
 
         /**
+         * @brief Updates the visibility state of files in the view.
+         * @param show_only_file File displayed exclusively, or an empty string.
+         * @param hidden_files Files explicitly hidden from the view.
+         */
+        auto set_file_visibility_state(const QString& show_only_file,
+                                       const QSet<QString>& hidden_files) -> void;
+
+        /**
          * @brief Resets all filter related UI elements (apps + levels).
          *
          * Clears application names, log levels, counts.
@@ -258,4 +266,6 @@ class LogViewWidget: public QWidget
         QUuid m_view_id;
         QMenu* m_files_menu = nullptr;
         QVector<QString> m_view_file_paths;
+        QString m_show_only_file;
+        QSet<QString> m_hidden_files;
 };

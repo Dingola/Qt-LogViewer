@@ -139,6 +139,12 @@ class MainWindow: public QtWidgetsCommonLib::AppMainWindow
         auto update_pagination_widget() -> void;
 
         /**
+         * @brief Rebuilds and loads the database query for a view.
+         * @param view_id Target view.
+         */
+        auto reload_page_query(const QUuid& view_id) -> void;
+
+        /**
          * @brief Handles drag enter events to allow dropping log files.
          * @param event The drag enter event.
          */
