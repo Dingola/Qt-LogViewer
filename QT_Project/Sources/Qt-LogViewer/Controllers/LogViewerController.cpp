@@ -7,6 +7,7 @@
 #include "Qt-LogViewer/Controllers/LogViewerController.h"
 
 #include <QDebug>
+#include <QTimer>
 #include <algorithm>
 
 // Concrete includes for forward-declared types used in implementation
@@ -113,22 +114,46 @@ LogViewerController::LogViewerController(const QString& log_format, QObject* par
     m_page_coordinator = new LogPageCoordinator(m_history_service, m_views, this);
     m_tailer_service = new LogTailerService(log_format, this);
 
+    m_tail_refresh_timer = new QTimer(this);
+    m_tail_refresh_timer->setSingleShot(true);
+    m_tail_refresh_timer->setInterval(150);
+
     connect(m_page_coordinator, &LogPageCoordinator::page_loaded, this,
             [this](const QUuid& view_id, qsizetype current_page, qsizetype total_pages,
                    qsizetype total_entries) {
                 emit page_loaded(view_id, current_page, total_pages, total_entries);
             });
 
+    connect(m_tail_refresh_timer, &QTimer::timeout, this, [this]() {
+        const QSet<QUuid> views_to_refresh = m_pending_tail_refresh_views;
+        m_pending_tail_refresh_views.clear();
+
+        for (const QUuid& view_id: views_to_refresh)
+        {
+            const bool can_reload = !m_is_shutting_down &&
+                                    m_views->get_context(view_id) != nullptr &&
+                                    m_page_coordinator->get_page_state(view_id) != nullptr;
+
+            if (can_reload)
+            {
+                m_page_coordinator->reload(view_id);
+            }
+        }
+    });
+
     connect(m_tailer_service, &LogTailerService::entries_available, this,
             [this](const QUuid& view_id, const QString&, const QVector<LogEntry>& entries) {
-                if (!m_is_shutting_down)
-                {
-                    LogViewContext* context = m_views->get_context(view_id);
+                const bool can_process = !m_is_shutting_down && !entries.isEmpty() &&
+                                         m_views->get_context(view_id) != nullptr;
 
-                    if (context != nullptr)
+                if (can_process)
+                {
+                    const bool entries_added = m_history_service->add_entries(view_id, entries);
+
+                    if (entries_added)
                     {
-                        m_history_service->add_entries(view_id, entries);
-                        context->append_entries(entries);
+                        m_pending_tail_refresh_views.insert(view_id);
+                        m_tail_refresh_timer->start();
                     }
                 }
             });

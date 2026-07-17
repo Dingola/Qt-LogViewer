@@ -20,7 +20,7 @@ LogTailerService::LogTailerService(const QString& log_format, QObject* parent)
       m_parser(log_format),
       m_registrations()
 {
-    m_debounce_timer.setSingleShot(true);
+    m_debounce_timer.setSingleShot(false);
     m_debounce_timer.setInterval(150);
 
     connect(&m_watcher, &QFileSystemWatcher::fileChanged, this,
@@ -39,6 +39,7 @@ auto LogTailerService::start_tailing(const QUuid& view_id, const QString& file_p
 {
     const QFileInfo file_info(file_path);
     const QString absolute_file_path = file_info.absoluteFilePath();
+
     const bool valid_request =
         !view_id.isNull() && file_info.exists() && !has_registration(view_id, absolute_file_path);
 
@@ -52,6 +53,11 @@ auto LogTailerService::start_tailing(const QUuid& view_id, const QString& file_p
 
         m_registrations.append(registration);
         ensure_watches(absolute_file_path);
+
+        if (!m_debounce_timer.isActive())
+        {
+            m_debounce_timer.start();
+        }
     }
 }
 
@@ -77,6 +83,11 @@ auto LogTailerService::stop_tailing(const QUuid& view_id, const QString& file_pa
     }
 
     m_registrations = remaining_registrations;
+
+    if (m_registrations.isEmpty())
+    {
+        m_debounce_timer.stop();
+    }
 }
 
 /**
@@ -96,6 +107,11 @@ auto LogTailerService::stop_tailing_view(const QUuid& view_id) -> void
     }
 
     m_registrations = remaining_registrations;
+
+    if (m_registrations.isEmpty())
+    {
+        m_debounce_timer.stop();
+    }
 }
 
 /**
@@ -126,7 +142,11 @@ auto LogTailerService::set_debounce_interval_ms(int debounce_interval_ms) -> voi
 auto LogTailerService::handle_file_changed(const QString& path) -> void
 {
     Q_UNUSED(path);
-    m_debounce_timer.start();
+
+    if (!m_registrations.isEmpty() && !m_debounce_timer.isActive())
+    {
+        m_debounce_timer.start();
+    }
 }
 
 /**
@@ -136,7 +156,11 @@ auto LogTailerService::handle_file_changed(const QString& path) -> void
 auto LogTailerService::handle_directory_changed(const QString& path) -> void
 {
     Q_UNUSED(path);
-    m_debounce_timer.start();
+
+    if (!m_registrations.isEmpty() && !m_debounce_timer.isActive())
+    {
+        m_debounce_timer.start();
+    }
 }
 
 /**
