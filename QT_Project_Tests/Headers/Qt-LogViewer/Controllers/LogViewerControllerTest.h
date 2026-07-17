@@ -5,9 +5,9 @@
 #include <QSet>
 #include <QString>
 #include <QTemporaryFile>
+#include <QTest>
 #include <QUuid>
 #include <QVector>
-#include <QTest>
 
 #include "Qt-LogViewer/Controllers/LogViewerController.h"
 

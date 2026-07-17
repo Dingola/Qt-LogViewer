@@ -182,22 +182,23 @@ LogViewerController::LogViewerController(const QString& log_format, QObject* par
                 emit view_file_paths_changed(view_id, paths);
             });
 
-    // Batch parsed: append to the active view context.
     connect(m_ingest, &LogIngestController::entry_batch_parsed, this,
             [this](const QUuid& view_id, const QString& file_path, const QVector<LogEntry>& batch) {
-                if (!m_is_shutting_down)
+                const bool can_store = !m_is_shutting_down && !view_id.isNull() &&
+                                       !batch.isEmpty() && m_views->get_context(view_id) != nullptr;
+
+                if (can_store)
                 {
                     qDebug().nospace() << "[Controller] batch for view=" << view_id.toString()
                                        << " file=\"" << file_path << "\" count=" << batch.size();
 
-                    if (!view_id.isNull())
+                    const bool entries_added = m_history_service->add_entries(view_id, batch);
+
+                    if (!entries_added)
                     {
-                        auto* ctx = m_views->get_context(view_id);
-                        if (ctx != nullptr)
-                        {
-                            m_history_service->add_entries(view_id, batch);
-                            ctx->append_entries(batch);
-                        }
+                        qWarning().nospace() << "[Controller] could not archive batch for view="
+                                             << view_id.toString() << " file=\"" << file_path
+                                             << "\" count=" << batch.size();
                     }
                 }
             });

@@ -997,11 +997,7 @@ TEST_F(LogViewerControllerTest, LoadsTailedEntriesThroughPagedHistory)
 
     QFile file(m_temp_file_names.at(0));
 
-    ASSERT_TRUE(
-        file.open(
-            QIODevice::WriteOnly
-            | QIODevice::Append
-            | QIODevice::Text));
+    ASSERT_TRUE(file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text));
 
     QTextStream stream(&file);
     stream << "2024-01-01 10:04:00 ERROR LiveEntry AppA\n";
@@ -1010,12 +1006,9 @@ TEST_F(LogViewerControllerTest, LoadsTailedEntriesThroughPagedHistory)
 
     QTRY_COMPARE(model->rowCount(), 5);
 
-    EXPECT_EQ(
-        model->get_entry(0).get_message(),
-        QStringLiteral("LiveEntry"));
+    EXPECT_EQ(model->get_entry(0).get_message(), QStringLiteral("LiveEntry"));
 
-    const LogPageState* page_state =
-        m_controller->get_page_state(m_view_id);
+    const LogPageState* page_state = m_controller->get_page_state(m_view_id);
 
     ASSERT_NE(page_state, nullptr);
     EXPECT_EQ(page_state->get_total_entries(), 5);
@@ -1031,17 +1024,11 @@ TEST_F(LogViewerControllerTest, RefreshesPageOnceForTailedEntryBatch)
 
     ASSERT_TRUE(m_controller->set_page_query(m_view_id, query));
 
-    QSignalSpy page_loaded_spy(
-        m_controller,
-        &LogViewerController::page_loaded);
+    QSignalSpy page_loaded_spy(m_controller, &LogViewerController::page_loaded);
 
     QFile file(m_temp_file_names.at(0));
 
-    ASSERT_TRUE(
-        file.open(
-            QIODevice::WriteOnly
-            | QIODevice::Append
-            | QIODevice::Text));
+    ASSERT_TRUE(file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text));
 
     QTextStream stream(&file);
     stream << "2024-01-01 10:04:00 INFO FirstLiveEntry AppA\n";
@@ -1055,13 +1042,9 @@ TEST_F(LogViewerControllerTest, RefreshesPageOnceForTailedEntryBatch)
 
     QTRY_COMPARE(model->rowCount(), 6);
 
-    EXPECT_EQ(
-        model->get_entry(0).get_message(),
-        QStringLiteral("SecondLiveEntry"));
+    EXPECT_EQ(model->get_entry(0).get_message(), QStringLiteral("SecondLiveEntry"));
 
-    EXPECT_EQ(
-        model->get_entry(1).get_message(),
-        QStringLiteral("FirstLiveEntry"));
+    EXPECT_EQ(model->get_entry(1).get_message(), QStringLiteral("FirstLiveEntry"));
 
     EXPECT_EQ(page_loaded_spy.count(), 1);
 }
@@ -1069,77 +1052,89 @@ TEST_F(LogViewerControllerTest, RefreshesPageOnceForTailedEntryBatch)
 /**
  * @brief Verifies that live tailing does not replace a historical page.
  */
-TEST_F(
-    LogViewerControllerTest,
-    KeepsHistoricalPageStableWhileTailing)
+TEST_F(LogViewerControllerTest, KeepsHistoricalPageStableWhileTailing)
 {
     LogQuery query;
 
-    ASSERT_TRUE(
-        m_controller->set_page_query(
-            m_view_id,
-            query));
+    ASSERT_TRUE(m_controller->set_page_query(m_view_id, query));
 
-    ASSERT_TRUE(
-        m_controller->set_page_size(
-            m_view_id,
-            2));
+    ASSERT_TRUE(m_controller->set_page_size(m_view_id, 2));
 
-    ASSERT_TRUE(
-        m_controller->set_current_page(
-            m_view_id,
-            2));
+    ASSERT_TRUE(m_controller->set_current_page(m_view_id, 2));
 
-    LogModel* model =
-        m_controller->get_log_model(m_view_id);
+    LogModel* model = m_controller->get_log_model(m_view_id);
 
     ASSERT_NE(model, nullptr);
     ASSERT_EQ(model->rowCount(), 2);
 
-    const QString first_message =
-        model->get_entry(0).get_message();
+    const QString first_message = model->get_entry(0).get_message();
 
-    const QString second_message =
-        model->get_entry(1).get_message();
+    const QString second_message = model->get_entry(1).get_message();
 
-    QSignalSpy page_loaded_spy(
-        m_controller,
-        &LogViewerController::page_loaded);
+    QSignalSpy page_loaded_spy(m_controller, &LogViewerController::page_loaded);
 
-    QSignalSpy page_state_spy(
-        m_controller,
-        &LogViewerController::page_state_updated);
+    QSignalSpy page_state_spy(m_controller, &LogViewerController::page_state_updated);
 
     QFile file(m_temp_file_names.at(0));
 
-    ASSERT_TRUE(
-        file.open(
-            QIODevice::WriteOnly
-            | QIODevice::Append
-            | QIODevice::Text));
+    ASSERT_TRUE(file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text));
 
     QTextStream stream(&file);
-    stream
-        << "2024-01-01 10:04:00 ERROR LiveEntry AppA\n";
+    stream << "2024-01-01 10:04:00 ERROR LiveEntry AppA\n";
 
     stream.flush();
     file.close();
 
-    QTRY_COMPARE(
-        m_controller
-        ->get_page_state(m_view_id)
-        ->get_total_entries(),
-        static_cast<qsizetype>(5));
+    QTRY_COMPARE(m_controller->get_page_state(m_view_id)->get_total_entries(),
+                 static_cast<qsizetype>(5));
 
     EXPECT_EQ(model->rowCount(), 2);
-    EXPECT_EQ(
-        model->get_entry(0).get_message(),
-        first_message);
+    EXPECT_EQ(model->get_entry(0).get_message(), first_message);
 
-    EXPECT_EQ(
-        model->get_entry(1).get_message(),
-        second_message);
+    EXPECT_EQ(model->get_entry(1).get_message(), second_message);
 
     EXPECT_EQ(page_loaded_spy.count(), 0);
     EXPECT_EQ(page_state_spy.count(), 1);
+}
+
+/**
+ * @brief Verifies that asynchronous batches remain in history until the page is reloaded.
+ */
+TEST_F(LogViewerControllerTest, StoresAsynchronousBatchesWithoutGrowingVisibleModel)
+{
+    LogQuery query;
+
+    ASSERT_TRUE(m_controller->set_page_query(m_view_id, query));
+
+    LogModel* model = m_controller->get_log_model(m_view_id);
+
+    ASSERT_NE(model, nullptr);
+    ASSERT_EQ(model->rowCount(), 4);
+
+    QTemporaryFile* additional_file =
+        create_temp_file({QStringLiteral("2024-01-01 10:04:00 INFO AsyncFirst AppC"),
+                          QStringLiteral("2024-01-01 10:05:00 ERROR AsyncSecond AppC")});
+
+    ASSERT_NE(additional_file, nullptr);
+
+    QSignalSpy loading_finished_spy(m_controller, &LogViewerController::loading_finished);
+
+    ASSERT_TRUE(m_controller->load_log_file_async(m_view_id, additional_file->fileName(), 1));
+
+    QTRY_COMPARE(loading_finished_spy.count(), 1);
+
+    EXPECT_EQ(model->rowCount(), 4);
+
+    ASSERT_TRUE(m_controller->reload_page(m_view_id));
+
+    const LogPageState* page_state = m_controller->get_page_state(m_view_id);
+
+    ASSERT_NE(page_state, nullptr);
+    EXPECT_EQ(page_state->get_total_entries(), 6);
+
+    ASSERT_EQ(model->rowCount(), 6);
+
+    EXPECT_EQ(model->get_entry(0).get_message(), QStringLiteral("AsyncSecond"));
+
+    EXPECT_EQ(model->get_entry(1).get_message(), QStringLiteral("AsyncFirst"));
 }

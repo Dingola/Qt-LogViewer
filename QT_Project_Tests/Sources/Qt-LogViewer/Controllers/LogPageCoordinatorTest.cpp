@@ -202,80 +202,46 @@ TEST_F(LogPageCoordinatorTest, RejectsInvalidPageSize)
 /**
  * @brief Verifies that refreshing totals preserves a historical page.
  */
-TEST_F(
-    LogPageCoordinatorTest,
-    RefreshesTotalsWithoutReplacingHistoricalPage)
+TEST_F(LogPageCoordinatorTest, RefreshesTotalsWithoutReplacingHistoricalPage)
 {
     QVector<LogEntry> entries;
 
     for (int index = 1; index <= 30; ++index)
     {
-        entries.append(
-            create_entry(
-                QStringLiteral("entry-%1").arg(index),
-                QDateTime::fromString(
-                    QStringLiteral(
-                        "2026-01-01T12:00:00.000Z"),
-                    Qt::ISODateWithMs)));
+        entries.append(create_entry(
+            QStringLiteral("entry-%1").arg(index),
+            QDateTime::fromString(QStringLiteral("2026-01-01T12:00:00.000Z"), Qt::ISODateWithMs)));
     }
 
-    ASSERT_TRUE(
-        m_history_service->add_entries(
-            m_view_id,
-            entries));
+    ASSERT_TRUE(m_history_service->add_entries(m_view_id, entries));
 
     LogQuery query;
 
-    ASSERT_TRUE(
-        m_coordinator->set_query(
-            m_view_id,
-            query));
+    ASSERT_TRUE(m_coordinator->set_query(m_view_id, query));
 
-    ASSERT_TRUE(
-        m_coordinator->set_page_size(
-            m_view_id,
-            10));
+    ASSERT_TRUE(m_coordinator->set_page_size(m_view_id, 10));
 
-    ASSERT_TRUE(
-        m_coordinator->set_current_page(
-            m_view_id,
-            2));
+    ASSERT_TRUE(m_coordinator->set_current_page(m_view_id, 2));
 
-    LogViewContext* context =
-        m_views->get_context(m_view_id);
+    LogViewContext* context = m_views->get_context(m_view_id);
 
     ASSERT_NE(context, nullptr);
 
-    const QVector<LogEntry> visible_entries =
-        context->get_entries();
+    const QVector<LogEntry> visible_entries = context->get_entries();
 
-    QSignalSpy page_loaded_spy(
-        m_coordinator,
-        &LogPageCoordinator::page_loaded);
+    QSignalSpy page_loaded_spy(m_coordinator, &LogPageCoordinator::page_loaded);
 
-    QSignalSpy page_state_spy(
-        m_coordinator,
-        &LogPageCoordinator::page_state_updated);
+    QSignalSpy page_state_spy(m_coordinator, &LogPageCoordinator::page_state_updated);
 
-    const LogEntry new_entry =
-        create_entry(
-            QStringLiteral("new-entry"),
-            QDateTime::fromString(
-                QStringLiteral(
-                    "2026-01-01T13:00:00.000Z"),
-                Qt::ISODateWithMs));
+    const LogEntry new_entry = create_entry(
+        QStringLiteral("new-entry"),
+        QDateTime::fromString(QStringLiteral("2026-01-01T13:00:00.000Z"), Qt::ISODateWithMs));
 
-    ASSERT_TRUE(
-        m_history_service->add_entries(
-            m_view_id,
-            { new_entry }));
+    ASSERT_TRUE(m_history_service->add_entries(m_view_id, {new_entry}));
 
-    ASSERT_TRUE(
-        m_coordinator->refresh_total_entries(
-            m_view_id));
+    ASSERT_TRUE(m_coordinator->refresh_total_entries(m_view_id));
 
-    const LogPageState* page_state =
-        m_coordinator->get_page_state(m_view_id);
+    const LogPageState* page_state = m_coordinator->get_page_state(m_view_id);
 
     ASSERT_NE(page_state, nullptr);
 
@@ -283,40 +249,25 @@ TEST_F(
     EXPECT_EQ(page_state->get_total_entries(), 31);
     EXPECT_EQ(page_state->get_total_pages(), 4);
 
-    const QVector<LogEntry> refreshed_entries =
-        context->get_entries();
+    const QVector<LogEntry> refreshed_entries = context->get_entries();
 
-    ASSERT_EQ(
-        refreshed_entries.size(),
-        visible_entries.size());
+    ASSERT_EQ(refreshed_entries.size(), visible_entries.size());
 
-    for (qsizetype index = 0;
-         index < visible_entries.size();
-         ++index)
+    for (qsizetype index = 0; index < visible_entries.size(); ++index)
     {
-        EXPECT_EQ(
-            refreshed_entries.at(index).get_timestamp(),
-            visible_entries.at(index).get_timestamp());
+        EXPECT_EQ(refreshed_entries.at(index).get_timestamp(),
+                  visible_entries.at(index).get_timestamp());
 
-        EXPECT_EQ(
-            refreshed_entries.at(index).get_level(),
-            visible_entries.at(index).get_level());
+        EXPECT_EQ(refreshed_entries.at(index).get_level(), visible_entries.at(index).get_level());
 
-        EXPECT_EQ(
-            refreshed_entries.at(index).get_message(),
-            visible_entries.at(index).get_message());
+        EXPECT_EQ(refreshed_entries.at(index).get_message(),
+                  visible_entries.at(index).get_message());
 
-        EXPECT_EQ(
-            refreshed_entries.at(index).get_app_name(),
-            visible_entries.at(index).get_app_name());
+        EXPECT_EQ(refreshed_entries.at(index).get_app_name(),
+                  visible_entries.at(index).get_app_name());
 
-        EXPECT_EQ(
-            refreshed_entries.at(index)
-            .get_file_info()
-            .get_file_path(),
-            visible_entries.at(index)
-            .get_file_info()
-            .get_file_path());
+        EXPECT_EQ(refreshed_entries.at(index).get_file_info().get_file_path(),
+                  visible_entries.at(index).get_file_info().get_file_path());
     }
 
     EXPECT_EQ(page_loaded_spy.count(), 0);
