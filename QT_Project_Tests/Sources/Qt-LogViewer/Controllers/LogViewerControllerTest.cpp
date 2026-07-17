@@ -1138,3 +1138,92 @@ TEST_F(LogViewerControllerTest, StoresAsynchronousBatchesWithoutGrowingVisibleMo
 
     EXPECT_EQ(model->get_entry(1).get_message(), QStringLiteral("AsyncFirst"));
 }
+
+/**
+ * @brief Verifies that removing the visible file does not remove a view containing other files.
+ */
+TEST_F(LogViewerControllerTest, KeepsViewWhenRemovingFileFromHistoricalPage)
+{
+    LogQuery query;
+
+    ASSERT_TRUE(m_controller->set_page_query(m_view_id, query));
+
+    ASSERT_TRUE(m_controller->set_page_size(m_view_id, 1));
+
+    ASSERT_TRUE(m_controller->set_current_page(m_view_id, 4));
+
+    LogModel* model = m_controller->get_log_model(m_view_id);
+
+    ASSERT_NE(model, nullptr);
+    ASSERT_EQ(model->rowCount(), 1);
+
+    const QString file_to_remove = model->get_entry(0).get_file_info().get_file_path();
+
+    ASSERT_TRUE(m_controller->is_file_loaded(m_view_id, file_to_remove));
+
+    QSignalSpy view_removed_spy(m_controller, &LogViewerController::view_removed);
+
+    m_controller->remove_log_file(m_view_id, file_to_remove);
+
+    EXPECT_EQ(view_removed_spy.count(), 0);
+
+    EXPECT_NE(m_controller->get_log_model(m_view_id), nullptr);
+
+    EXPECT_FALSE(m_controller->is_file_loaded(m_view_id, file_to_remove));
+
+    EXPECT_EQ(m_controller->get_view_file_paths(m_view_id).size(), 1);
+
+    const LogPageState* page_state = m_controller->get_page_state(m_view_id);
+
+    ASSERT_NE(page_state, nullptr);
+    EXPECT_EQ(page_state->get_current_page(), 1);
+    EXPECT_EQ(page_state->get_total_entries(), 2);
+    EXPECT_EQ(page_state->get_total_pages(), 2);
+
+    model = m_controller->get_log_model(m_view_id);
+
+    ASSERT_NE(model, nullptr);
+    ASSERT_EQ(model->rowCount(), 1);
+
+    EXPECT_NE(model->get_entry(0).get_file_info().get_file_path(), file_to_remove);
+}
+
+/**
+ * @brief Verifies that global file removal reloads every remaining paged view.
+ */
+TEST_F(LogViewerControllerTest, ReloadsPagedViewAfterGlobalFileRemoval)
+{
+    LogQuery query;
+
+    ASSERT_TRUE(m_controller->set_page_query(m_view_id, query));
+
+    ASSERT_TRUE(m_controller->set_page_size(m_view_id, 1));
+
+    const QString file_to_remove = m_temp_file_names.at(0);
+
+    LogFileInfo file_info(file_to_remove);
+
+    QSignalSpy view_removed_spy(m_controller, &LogViewerController::view_removed);
+
+    m_controller->remove_log_file(file_info);
+
+    EXPECT_EQ(view_removed_spy.count(), 0);
+
+    EXPECT_FALSE(m_controller->is_file_loaded(m_view_id, file_to_remove));
+
+    EXPECT_EQ(m_controller->get_view_file_paths(m_view_id).size(), 1);
+
+    const LogPageState* page_state = m_controller->get_page_state(m_view_id);
+
+    ASSERT_NE(page_state, nullptr);
+    EXPECT_EQ(page_state->get_current_page(), 1);
+    EXPECT_EQ(page_state->get_total_entries(), 2);
+    EXPECT_EQ(page_state->get_total_pages(), 2);
+
+    LogModel* model = m_controller->get_log_model(m_view_id);
+
+    ASSERT_NE(model, nullptr);
+    ASSERT_EQ(model->rowCount(), 1);
+
+    EXPECT_NE(model->get_entry(0).get_file_info().get_file_path(), file_to_remove);
+}

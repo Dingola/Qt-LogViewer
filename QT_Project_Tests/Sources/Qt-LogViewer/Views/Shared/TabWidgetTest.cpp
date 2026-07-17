@@ -417,3 +417,49 @@ TEST_F(TabWidgetTest, ContextMenuDisabledStillNotifies)
     ASSERT_GE(about_spy.count(), 1);
     EXPECT_EQ(about_spy.takeLast().at(0).toInt(), 0);
 }
+
+/**
+ * @test Closing a tab does not remove its neighbour when a listener removes it first.
+ */
+TEST_F(TabWidgetTest, DoesNotRemoveNeighbourWhenTabIsRemovedDuringCloseSignal)
+{
+    ASSERT_EQ(m_tab_widget->count(), 3);
+
+    QWidget* first_widget = m_tab_widget->widget(0);
+
+    QWidget* closing_widget = m_tab_widget->widget(1);
+
+    QWidget* last_widget = m_tab_widget->widget(2);
+
+    ASSERT_NE(first_widget, nullptr);
+    ASSERT_NE(closing_widget, nullptr);
+    ASSERT_NE(last_widget, nullptr);
+
+    const QMetaObject::Connection connection = QObject::connect(
+        m_tab_widget, &TabWidget::about_to_close_tab, m_tab_widget,
+        [this](int, QWidget* tab_widget) {
+            const int current_index = m_tab_widget->indexOf(tab_widget);
+
+            if (current_index >= 0)
+            {
+                m_tab_widget->removeTab(current_index);
+            }
+        },
+        Qt::DirectConnection);
+
+    auto* tab_bar = qobject_cast<TabBar*>(m_tab_widget->tabBar());
+
+    ASSERT_NE(tab_bar, nullptr);
+
+    tab_bar->close_tab_requested(1);
+
+    QObject::disconnect(connection);
+
+    EXPECT_EQ(m_tab_widget->count(), 2);
+
+    EXPECT_EQ(m_tab_widget->indexOf(closing_widget), -1);
+
+    EXPECT_GE(m_tab_widget->indexOf(first_widget), 0);
+
+    EXPECT_GE(m_tab_widget->indexOf(last_widget), 0);
+}

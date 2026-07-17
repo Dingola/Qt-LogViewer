@@ -187,16 +187,24 @@ void TabWidget::changeEvent(QEvent* event)
  */
 auto TabWidget::handle_close_tab_requested(int tab_index) -> void
 {
-    int idx = tab_index;
+    const bool valid_index = tab_index >= 0 && tab_index < count();
 
-    if (idx >= 0 && idx < count())
+    if (valid_index)
     {
-        QWidget* w = widget(idx);
-        emit about_to_close_tab(idx, w);
-        removeTab(idx);
-        if (w != nullptr)
+        QWidget* tab_widget = widget(tab_index);
+
+        emit about_to_close_tab(tab_index, tab_widget);
+
+        const int current_index = indexOf(tab_widget);
+
+        if (current_index >= 0)
         {
-            w->deleteLater();
+            removeTab(current_index);
+        }
+
+        if (tab_widget != nullptr)
+        {
+            tab_widget->deleteLater();
         }
     }
 }
@@ -209,20 +217,30 @@ auto TabWidget::handle_close_tab_requested(int tab_index) -> void
  */
 auto TabWidget::handle_close_other_tabs_requested(int tab_index) -> void
 {
-    int keep = tab_index;
+    const bool valid_index = tab_index >= 0 && tab_index < count();
 
-    if (keep >= 0 && keep < count())
+    if (valid_index)
     {
-        for (int i = count() - 1; i >= 0; --i)
+        QWidget* tab_to_keep = widget(tab_index);
+
+        for (int index = count() - 1; index >= 0; --index)
         {
-            if (i != keep)
+            QWidget* tab_widget = widget(index);
+
+            if (tab_widget != tab_to_keep)
             {
-                QWidget* w = widget(i);
-                emit about_to_close_tab(i, w);
-                removeTab(i);
-                if (w != nullptr)
+                emit about_to_close_tab(index, tab_widget);
+
+                const int current_index = indexOf(tab_widget);
+
+                if (current_index >= 0)
                 {
-                    w->deleteLater();
+                    removeTab(current_index);
+                }
+
+                if (tab_widget != nullptr)
+                {
+                    tab_widget->deleteLater();
                 }
             }
         }
@@ -237,18 +255,26 @@ auto TabWidget::handle_close_other_tabs_requested(int tab_index) -> void
  */
 auto TabWidget::handle_close_tabs_to_left_requested(int tab_index) -> void
 {
-    int idx = tab_index;
+    const bool has_tabs_to_close = tab_index > 0 && tab_index < count();
 
-    if (idx > 0)
+    if (has_tabs_to_close)
     {
-        for (int i = idx - 1; i >= 0; --i)
+        for (int index = tab_index - 1; index >= 0; --index)
         {
-            QWidget* w = widget(i);
-            emit about_to_close_tab(i, w);
-            removeTab(i);
-            if (w != nullptr)
+            QWidget* tab_widget = widget(index);
+
+            emit about_to_close_tab(index, tab_widget);
+
+            const int current_index = indexOf(tab_widget);
+
+            if (current_index >= 0)
             {
-                w->deleteLater();
+                removeTab(current_index);
+            }
+
+            if (tab_widget != nullptr)
+            {
+                tab_widget->deleteLater();
             }
         }
     }
@@ -262,18 +288,30 @@ auto TabWidget::handle_close_tabs_to_left_requested(int tab_index) -> void
  */
 auto TabWidget::handle_close_tabs_to_right_requested(int tab_index) -> void
 {
-    int idx = tab_index;
+    const bool has_tabs_to_close = tab_index >= 0 && tab_index < count() - 1;
 
-    if (idx >= 0 && idx < (count() - 1))
+    if (has_tabs_to_close)
     {
-        for (int i = count() - 1; i > idx; --i)
+        QWidget* boundary_widget = widget(tab_index);
+
+        while (indexOf(boundary_widget) >= 0 && indexOf(boundary_widget) < count() - 1)
         {
-            QWidget* w = widget(i);
-            emit about_to_close_tab(i, w);
-            removeTab(i);
-            if (w != nullptr)
+            QWidget* tab_widget = widget(count() - 1);
+
+            const int emitted_index = indexOf(tab_widget);
+
+            emit about_to_close_tab(emitted_index, tab_widget);
+
+            const int current_index = indexOf(tab_widget);
+
+            if (current_index >= 0)
             {
-                w->deleteLater();
+                removeTab(current_index);
+            }
+
+            if (tab_widget != nullptr)
+            {
+                tab_widget->deleteLater();
             }
         }
     }

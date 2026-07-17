@@ -1468,11 +1468,6 @@ auto MainWindow::create_log_view_widget_for_view(const QUuid& view_id,
     connect(log_view_widget, &LogViewWidget::remove_file_requested, this,
             [this, view_id](const QString& file_path) {
                 m_controller->remove_log_file(view_id, file_path);
-
-                if (m_controller->get_page_state(view_id) != nullptr)
-                {
-                    reload_page_query(view_id);
-                }
             });
     connect(log_view_widget, &LogViewWidget::live_tailing_toggled, this,
             [this, view_id](bool enabled) {
