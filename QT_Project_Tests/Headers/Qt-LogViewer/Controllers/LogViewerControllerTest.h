@@ -7,6 +7,7 @@
 #include <QTemporaryFile>
 #include <QUuid>
 #include <QVector>
+#include <QTest>
 
 #include "Qt-LogViewer/Controllers/LogViewerController.h"
 

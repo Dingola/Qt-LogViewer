@@ -295,6 +295,13 @@ LogViewerController::~LogViewerController()
 {
     m_is_shutting_down = true;
 
+    if (m_tail_refresh_timer != nullptr)
+    {
+        m_tail_refresh_timer->stop();
+    }
+
+    m_pending_tail_refresh_views.clear();
+
     if (m_tailer_service != nullptr)
     {
         m_tailer_service->stop_all_tailing();
@@ -374,6 +381,7 @@ auto LogViewerController::remove_view(const QUuid& view_id) -> bool
         }
 
         m_live_tailing_views.remove(view_id);
+        m_pending_tail_refresh_views.remove(view_id);
         removed = m_views->remove_view(view_id);
     }
 

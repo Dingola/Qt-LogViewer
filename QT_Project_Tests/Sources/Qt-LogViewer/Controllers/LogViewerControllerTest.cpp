@@ -980,3 +980,88 @@ TEST_F(LogViewerControllerTest, CreatesUnscopedQueryForUnknownView)
 
     EXPECT_TRUE(query.view_id.isNull());
 }
+
+/**
+ * @brief Verifies that appended entries are persisted and loaded into the current page.
+ */
+TEST_F(LogViewerControllerTest, LoadsTailedEntriesThroughPagedHistory)
+{
+    LogQuery query;
+
+    ASSERT_TRUE(m_controller->set_page_query(m_view_id, query));
+
+    LogModel* model = m_controller->get_log_model(m_view_id);
+
+    ASSERT_NE(model, nullptr);
+    ASSERT_EQ(model->rowCount(), 4);
+
+    QFile file(m_temp_file_names.at(0));
+
+    ASSERT_TRUE(
+        file.open(
+            QIODevice::WriteOnly
+            | QIODevice::Append
+            | QIODevice::Text));
+
+    QTextStream stream(&file);
+    stream << "2024-01-01 10:04:00 ERROR LiveEntry AppA\n";
+    stream.flush();
+    file.close();
+
+    QTRY_COMPARE(model->rowCount(), 5);
+
+    EXPECT_EQ(
+        model->get_entry(0).get_message(),
+        QStringLiteral("LiveEntry"));
+
+    const LogPageState* page_state =
+        m_controller->get_page_state(m_view_id);
+
+    ASSERT_NE(page_state, nullptr);
+    EXPECT_EQ(page_state->get_total_entries(), 5);
+    EXPECT_EQ(page_state->get_current_page(), 1);
+}
+
+/**
+ * @brief Verifies that one appended batch causes one page refresh.
+ */
+TEST_F(LogViewerControllerTest, RefreshesPageOnceForTailedEntryBatch)
+{
+    LogQuery query;
+
+    ASSERT_TRUE(m_controller->set_page_query(m_view_id, query));
+
+    QSignalSpy page_loaded_spy(
+        m_controller,
+        &LogViewerController::page_loaded);
+
+    QFile file(m_temp_file_names.at(0));
+
+    ASSERT_TRUE(
+        file.open(
+            QIODevice::WriteOnly
+            | QIODevice::Append
+            | QIODevice::Text));
+
+    QTextStream stream(&file);
+    stream << "2024-01-01 10:04:00 INFO FirstLiveEntry AppA\n";
+    stream << "2024-01-01 10:05:00 ERROR SecondLiveEntry AppA\n";
+    stream.flush();
+    file.close();
+
+    LogModel* model = m_controller->get_log_model(m_view_id);
+
+    ASSERT_NE(model, nullptr);
+
+    QTRY_COMPARE(model->rowCount(), 6);
+
+    EXPECT_EQ(
+        model->get_entry(0).get_message(),
+        QStringLiteral("SecondLiveEntry"));
+
+    EXPECT_EQ(
+        model->get_entry(1).get_message(),
+        QStringLiteral("FirstLiveEntry"));
+
+    EXPECT_EQ(page_loaded_spy.count(), 1);
+}
