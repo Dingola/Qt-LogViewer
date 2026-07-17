@@ -1065,3 +1065,81 @@ TEST_F(LogViewerControllerTest, RefreshesPageOnceForTailedEntryBatch)
 
     EXPECT_EQ(page_loaded_spy.count(), 1);
 }
+
+/**
+ * @brief Verifies that live tailing does not replace a historical page.
+ */
+TEST_F(
+    LogViewerControllerTest,
+    KeepsHistoricalPageStableWhileTailing)
+{
+    LogQuery query;
+
+    ASSERT_TRUE(
+        m_controller->set_page_query(
+            m_view_id,
+            query));
+
+    ASSERT_TRUE(
+        m_controller->set_page_size(
+            m_view_id,
+            2));
+
+    ASSERT_TRUE(
+        m_controller->set_current_page(
+            m_view_id,
+            2));
+
+    LogModel* model =
+        m_controller->get_log_model(m_view_id);
+
+    ASSERT_NE(model, nullptr);
+    ASSERT_EQ(model->rowCount(), 2);
+
+    const QString first_message =
+        model->get_entry(0).get_message();
+
+    const QString second_message =
+        model->get_entry(1).get_message();
+
+    QSignalSpy page_loaded_spy(
+        m_controller,
+        &LogViewerController::page_loaded);
+
+    QSignalSpy page_state_spy(
+        m_controller,
+        &LogViewerController::page_state_updated);
+
+    QFile file(m_temp_file_names.at(0));
+
+    ASSERT_TRUE(
+        file.open(
+            QIODevice::WriteOnly
+            | QIODevice::Append
+            | QIODevice::Text));
+
+    QTextStream stream(&file);
+    stream
+        << "2024-01-01 10:04:00 ERROR LiveEntry AppA\n";
+
+    stream.flush();
+    file.close();
+
+    QTRY_COMPARE(
+        m_controller
+        ->get_page_state(m_view_id)
+        ->get_total_entries(),
+        static_cast<qsizetype>(5));
+
+    EXPECT_EQ(model->rowCount(), 2);
+    EXPECT_EQ(
+        model->get_entry(0).get_message(),
+        first_message);
+
+    EXPECT_EQ(
+        model->get_entry(1).get_message(),
+        second_message);
+
+    EXPECT_EQ(page_loaded_spy.count(), 0);
+    EXPECT_EQ(page_state_spy.count(), 1);
+}

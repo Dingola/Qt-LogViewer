@@ -123,20 +123,35 @@ LogViewerController::LogViewerController(const QString& log_format, QObject* par
                    qsizetype total_entries) {
                 emit page_loaded(view_id, current_page, total_pages, total_entries);
             });
+    connect(m_page_coordinator, &LogPageCoordinator::page_state_updated, this,
+            [this](const QUuid& view_id, qsizetype current_page, qsizetype total_pages,
+                   qsizetype total_entries) {
+                emit page_state_updated(view_id, current_page, total_pages, total_entries);
+            });
 
     connect(m_tail_refresh_timer, &QTimer::timeout, this, [this]() {
         const QSet<QUuid> views_to_refresh = m_pending_tail_refresh_views;
+
         m_pending_tail_refresh_views.clear();
 
         for (const QUuid& view_id: views_to_refresh)
         {
-            const bool can_reload = !m_is_shutting_down &&
-                                    m_views->get_context(view_id) != nullptr &&
-                                    m_page_coordinator->get_page_state(view_id) != nullptr;
+            const LogPageState* page_state = m_page_coordinator->get_page_state(view_id);
 
-            if (can_reload)
+            const bool can_update = !m_is_shutting_down &&
+                                    m_views->get_context(view_id) != nullptr &&
+                                    page_state != nullptr;
+
+            if (can_update)
             {
-                m_page_coordinator->reload(view_id);
+                if (page_state->get_current_page() == 1)
+                {
+                    m_page_coordinator->reload(view_id);
+                }
+                else
+                {
+                    m_page_coordinator->refresh_total_entries(view_id);
+                }
             }
         }
     });

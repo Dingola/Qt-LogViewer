@@ -611,6 +611,16 @@ class LogViewerController: public QObject
         auto page_loaded(const QUuid& view_id, qsizetype current_page, qsizetype total_pages,
                          qsizetype total_entries) -> void;
 
+        /**
+         * @brief Emitted after pagination totals have changed without reloading the visible page.
+         * @param view_id Updated view.
+         * @param current_page Current one-based page.
+         * @param total_pages Total number of available pages.
+         * @param total_entries Total number of matching entries.
+         */
+        auto page_state_updated(const QUuid& view_id, qsizetype current_page, qsizetype total_pages,
+                                qsizetype total_entries) -> void;
+
     public slots:
         /**
          * @brief Removes a single log file from all views and from the LogFileTreeModel.

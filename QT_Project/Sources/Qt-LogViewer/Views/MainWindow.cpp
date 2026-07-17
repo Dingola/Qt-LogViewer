@@ -247,28 +247,29 @@ MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
                     qWarning() << "Could not update tab file paths for view:" << view_id;
                 }
             });
-    connect(m_controller, &LogViewerController::page_loaded, this,
-            [this](const QUuid& view_id, qsizetype current_page, qsizetype total_pages, qsizetype) {
-                if (view_id != m_controller->get_current_view())
-                {
-                    return;
-                }
+    const auto update_page_state = [this](const QUuid& view_id, qsizetype current_page,
+                                          qsizetype total_pages, qsizetype) {
+        if (view_id == m_controller->get_current_view())
+        {
+            ui->paginationWidget->set_pagination(static_cast<int>(current_page),
+                                                 static_cast<int>(total_pages));
 
-                ui->paginationWidget->set_pagination(static_cast<int>(current_page),
-                                                     static_cast<int>(total_pages));
+            const QMap<QString, int> level_counts = m_controller->get_log_level_counts(view_id);
 
-                const QMap<QString, int> level_counts = m_controller->get_log_level_counts(view_id);
+            ui->logFilterBarWidget->set_log_level_counts(level_counts);
+            m_log_level_pie_chart_widget->set_log_level_counts(level_counts);
 
-                ui->logFilterBarWidget->set_log_level_counts(level_counts);
-                m_log_level_pie_chart_widget->set_log_level_counts(level_counts);
+            LogViewWidget* log_view_widget = ui->tabWidgetLog->current_log_view();
 
-                LogViewWidget* log_view_widget = ui->tabWidgetLog->current_log_view();
+            if (log_view_widget != nullptr && log_view_widget->get_view_id() == view_id)
+            {
+                log_view_widget->set_log_level_counts(level_counts);
+            }
+        }
+    };
 
-                if (log_view_widget != nullptr && log_view_widget->get_view_id() == view_id)
-                {
-                    log_view_widget->set_log_level_counts(level_counts);
-                }
-            });
+    connect(m_controller, &LogViewerController::page_loaded, this, update_page_state);
+    connect(m_controller, &LogViewerController::page_state_updated, this, update_page_state);
 
     initialize_menu();
     rebuild_recent_menus();

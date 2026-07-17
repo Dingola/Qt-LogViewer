@@ -126,6 +126,36 @@ auto LogPageCoordinator::reload(const QUuid& view_id) -> bool
 }
 
 /**
+ * @brief Refreshes the result count without replacing the visible page.
+ * @param view_id Target view.
+ * @return True when the view and its page state are available.
+ */
+auto LogPageCoordinator::refresh_total_entries(const QUuid& view_id) -> bool
+{
+    bool updated = false;
+
+    if (m_history_service != nullptr && m_views != nullptr)
+    {
+        auto state = m_page_states.find(view_id);
+        LogViewContext* context = m_views->get_context(view_id);
+
+        if (state != m_page_states.end() && context != nullptr)
+        {
+            const qsizetype total_entries = m_history_service->count_entries(state->get_query());
+
+            state->set_total_entries(total_entries);
+
+            emit page_state_updated(view_id, state->get_current_page(), state->get_total_pages(),
+                                    state->get_total_entries());
+
+            updated = true;
+        }
+    }
+
+    return updated;
+}
+
+/**
  * @brief Returns the page state belonging to a view.
  * @param view_id Target view.
  * @return Page state, or nullptr when no query has been assigned.

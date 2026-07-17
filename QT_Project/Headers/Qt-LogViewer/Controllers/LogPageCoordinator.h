@@ -64,6 +64,13 @@ class LogPageCoordinator final: public QObject
         auto reload(const QUuid& view_id) -> bool;
 
         /**
+         * @brief Refreshes the result count without replacing the visible page.
+         * @param view_id Target view.
+         * @return True when the view and its page state are available.
+         */
+        auto refresh_total_entries(const QUuid& view_id) -> bool;
+
+        /**
          * @brief Returns the page state belonging to a view.
          * @param view_id Target view.
          * @return Page state, or nullptr when no query has been assigned.
@@ -80,6 +87,16 @@ class LogPageCoordinator final: public QObject
          */
         void page_loaded(const QUuid& view_id, qsizetype current_page, qsizetype total_pages,
                          qsizetype total_entries);
+
+        /**
+         * @brief Emitted after pagination totals have changed without reloading the model.
+         * @param view_id Updated view.
+         * @param current_page Current one-based page.
+         * @param total_pages Total number of available pages.
+         * @param total_entries Total number of matching entries.
+         */
+        void page_state_updated(const QUuid& view_id, qsizetype current_page, qsizetype total_pages,
+                                qsizetype total_entries);
 
     private:
         LogHistoryService* m_history_service;
