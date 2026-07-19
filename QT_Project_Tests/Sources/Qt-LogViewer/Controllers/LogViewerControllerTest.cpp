@@ -1227,3 +1227,24 @@ TEST_F(LogViewerControllerTest, ReloadsPagedViewAfterGlobalFileRemoval)
 
     EXPECT_NE(model->get_entry(0).get_file_info().get_file_path(), file_to_remove);
 }
+
+/**
+ * @brief Verifies that application names are loaded from the complete archived view.
+ */
+TEST_F(LogViewerControllerTest, LoadsApplicationNamesBeyondVisiblePage)
+{
+    LogQuery query;
+
+    ASSERT_TRUE(m_controller->set_page_query(m_view_id, query));
+
+    ASSERT_TRUE(m_controller->set_page_size(m_view_id, 1));
+
+    LogModel* model = m_controller->get_log_model(m_view_id);
+
+    ASSERT_NE(model, nullptr);
+    ASSERT_EQ(model->rowCount(), 1);
+
+    const QSet<QString> app_names = m_controller->get_app_names(m_view_id);
+
+    EXPECT_EQ(app_names, (QSet<QString>{QStringLiteral("AppA"), QStringLiteral("AppB")}));
+}

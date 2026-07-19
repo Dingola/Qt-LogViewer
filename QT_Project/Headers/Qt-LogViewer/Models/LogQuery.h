@@ -5,30 +5,12 @@
 #include <QUuid>
 #include <Qt>
 
+#include "Qt-LogViewer/Models/LogFieldDefinition.h"
+
 /**
  * @file LogQuery.h
  * @brief Defines the query contract for database-backed log retrieval.
  */
-
-/**
- * @brief Stable identifiers for the currently built-in log fields.
- *
- * LogQuery is not restricted to these identifiers. Additional fields supplied
- * by log parsers can later be used without extending an enum.
- */
-namespace LogField
-{
-inline const QString Timestamp{QStringLiteral("timestamp")};
-inline const QString Level{QStringLiteral("level")};
-inline const QString Message{QStringLiteral("message")};
-inline const QString AppName{QStringLiteral("app_name")};
-inline const QString FilePath{QStringLiteral("file_path")};
-
-/**
- * @brief Virtual field representing database insertion order.
- */
-inline const QString InsertionOrder{QStringLiteral("_insertion_order")};
-}  // namespace LogField
 
 /**
  * @brief Complete filter and sorting state for database-backed log retrieval.

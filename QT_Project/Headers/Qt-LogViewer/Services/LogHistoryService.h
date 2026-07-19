@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QObject>
+#include <QSet>
 #include <QString>
 #include <QUuid>
 #include <QVector>
@@ -71,6 +72,15 @@ class LogHistoryService final: public QObject
          */
         [[nodiscard]] auto get_log_level_counts(const LogQuery& log_query) const
             -> QMap<QString, qsizetype>;
+
+        /**
+         * @brief Returns distinct non-empty values stored for a filterable field.
+         * @param view_id View whose archived values are queried.
+         * @param field_id Stable field identifier.
+         * @return Distinct values, or an empty set for invalid arguments or unsupported fields.
+         */
+        [[nodiscard]] auto get_distinct_values(const QUuid& view_id,
+                                               const QString& field_id) const -> QSet<QString>;
 
         /**
          * @brief Searches every archived entry belonging to a view.

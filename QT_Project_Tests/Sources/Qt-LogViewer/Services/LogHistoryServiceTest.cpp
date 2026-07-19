@@ -864,3 +864,38 @@ TEST_F(LogHistoryServiceTest, IgnoresSelectedLevelsWhenCountingLevelFacets)
     EXPECT_EQ(counts.value(QStringLiteral("INFO")), 1);
     EXPECT_EQ(counts.value(QStringLiteral("WARNING")), 1);
 }
+
+/**
+ * @brief Verifies that distinct values include the complete archived view.
+ */
+TEST_F(LogHistoryServiceTest, LoadsDistinctValuesForStoredField)
+{
+    QVector<LogEntry> entries;
+
+    entries.append(create_entry(QStringLiteral("first"), QStringLiteral("first.log"),
+                                QStringLiteral("INFO"), QStringLiteral("Frontend")));
+
+    entries.append(create_entry(QStringLiteral("second"), QStringLiteral("second.log"),
+                                QStringLiteral("ERROR"), QStringLiteral("Backend")));
+
+    entries.append(create_entry(QStringLiteral("third"), QStringLiteral("third.log"),
+                                QStringLiteral("DEBUG"), QStringLiteral("Frontend")));
+
+    ASSERT_TRUE(m_history_service->add_entries(m_view_id, entries));
+
+    const QSet<QString> app_names =
+        m_history_service->get_distinct_values(m_view_id, LogField::AppName);
+
+    EXPECT_EQ(app_names, (QSet<QString>{QStringLiteral("Frontend"), QStringLiteral("Backend")}));
+}
+
+/**
+ * @brief Verifies that unknown fields cannot become SQL expressions.
+ */
+TEST_F(LogHistoryServiceTest, RejectsUnsupportedDistinctValueField)
+{
+    const QSet<QString> values =
+        m_history_service->get_distinct_values(m_view_id, QStringLiteral("unknown_field"));
+
+    EXPECT_TRUE(values.isEmpty());
+}

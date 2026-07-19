@@ -17,6 +17,8 @@
 #include <QStringList>
 #include <QVariant>
 
+#include "Qt-LogViewer/Models/LogFieldDefinition.h"
+
 namespace
 {
 struct SqlFilter {
@@ -42,6 +44,31 @@ struct SqlFilter {
     else if (field_id == LogField::Message)
     {
         column = QStringLiteral("message");
+    }
+    else if (field_id == LogField::AppName)
+    {
+        column = QStringLiteral("app_name");
+    }
+    else if (field_id == LogField::FilePath)
+    {
+        column = QStringLiteral("file_path");
+    }
+
+    return column;
+}
+
+/**
+ * @brief Maps a filterable field identifier to a stored SQL column.
+ * @param field_id Stable log field identifier.
+ * @return SQL column name, or an empty string for an unsupported field.
+ */
+[[nodiscard]] auto get_distinct_value_column(const QString& field_id) -> QString
+{
+    QString column;
+
+    if (field_id == LogField::Level)
+    {
+        column = QStringLiteral("level");
     }
     else if (field_id == LogField::AppName)
     {
@@ -603,6 +630,54 @@ auto LogHistoryService::get_log_level_counts(const LogQuery& log_query) const
     }
 
     return level_counts;
+}
+
+/**
+ * @brief Returns distinct non-empty values stored for a filterable field.
+ * @param view_id View whose archived values are queried.
+ * @param field_id Stable field identifier.
+ * @return Distinct values, or an empty set for invalid arguments or unsupported fields.
+ */
+auto LogHistoryService::get_distinct_values(const QUuid& view_id,
+                                            const QString& field_id) const -> QSet<QString>
+{
+    QSet<QString> values;
+    const QString column = get_distinct_value_column(field_id);
+
+    const bool can_query = m_is_available && !view_id.isNull() && !column.isEmpty();
+
+    if (can_query)
+    {
+        QSqlQuery query(QSqlDatabase::database(m_connection_name));
+
+        query.prepare(QStringLiteral("SELECT DISTINCT %1 "
+                                     "FROM log_entries "
+                                     "WHERE view_id = :view_id "
+                                     "AND %1 IS NOT NULL "
+                                     "AND %1 <> '' "
+                                     "ORDER BY %1 COLLATE NOCASE")
+                          .arg(column));
+
+        query.bindValue(QStringLiteral(":view_id"), view_id.toString(QUuid::WithoutBraces));
+
+        if (query.exec())
+        {
+            while (query.next())
+            {
+                values.insert(query.value(0).toString());
+            }
+        }
+        else
+        {
+            qWarning() << "Loading distinct log field values failed:" << query.lastError().text();
+        }
+    }
+    else if (m_is_available && !view_id.isNull() && column.isEmpty())
+    {
+        qWarning() << "Field is not available for distinct values:" << field_id;
+    }
+
+    return values;
 }
 
 /**

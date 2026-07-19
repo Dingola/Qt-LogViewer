@@ -997,7 +997,7 @@ auto LogViewerController::create_page_query(const QUuid& view_id) const -> LogQu
 }
 
 /**
- * @brief Returns the set of unique application names from the loaded logs in the current view.
+ * @brief Returns the set of unique application names from the current view.
  * @return A set of application names.
  */
 auto LogViewerController::get_app_names() const -> QSet<QString>
@@ -1006,8 +1006,7 @@ auto LogViewerController::get_app_names() const -> QSet<QString>
 }
 
 /**
- * @brief Returns the set of unique application names from the loaded logs in the specified
- * view.
+ * @brief Returns the set of unique application names from the specified view.
  * @param view_id The QUuid of the view.
  * @return A set of application names.
  */
@@ -1015,13 +1014,9 @@ auto LogViewerController::get_app_names(const QUuid& view_id) const -> QSet<QStr
 {
     QSet<QString> app_names;
 
-    auto* ctx = m_views->get_context(view_id);
-    if (ctx != nullptr)
+    if (m_history_service != nullptr && !view_id.isNull())
     {
-        for (const LogEntry& entry: ctx->get_entries())
-        {
-            app_names.insert(entry.get_app_name());
-        }
+        app_names = m_history_service->get_distinct_values(view_id, LogField::AppName);
     }
 
     return app_names;
