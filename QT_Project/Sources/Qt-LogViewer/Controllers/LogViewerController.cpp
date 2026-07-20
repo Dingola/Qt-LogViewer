@@ -7,6 +7,7 @@
 #include "Qt-LogViewer/Controllers/LogViewerController.h"
 
 #include <QDebug>
+#include <QFileInfo>
 #include <QTimer>
 #include <algorithm>
 
@@ -184,21 +185,37 @@ LogViewerController::LogViewerController(const QString& log_format, QObject* par
 
     connect(m_ingest, &LogIngestController::entry_batch_parsed, this,
             [this](const QUuid& view_id, const QString& file_path, const QVector<LogEntry>& batch) {
+                const QString absolute_file_path = QFileInfo(file_path).absoluteFilePath();
+
+                const bool ingest_already_failed =
+                    m_failed_ingest_files.value(view_id).contains(absolute_file_path);
+
                 const bool can_store = !m_is_shutting_down && !view_id.isNull() &&
-                                       !batch.isEmpty() && m_views->get_context(view_id) != nullptr;
+                                       !batch.isEmpty() && !ingest_already_failed &&
+                                       m_views->get_context(view_id) != nullptr;
 
                 if (can_store)
                 {
-                    qDebug().nospace() << "[Controller] batch for view=" << view_id.toString()
-                                       << " file=\"" << file_path << "\" count=" << batch.size();
+                    qDebug().nospace()
+                        << "[Controller] batch for view=" << view_id.toString() << " file=\""
+                        << absolute_file_path << "\" count=" << batch.size();
 
                     const bool entries_added = m_history_service->add_entries(view_id, batch);
 
                     if (!entries_added)
                     {
-                        qWarning().nospace() << "[Controller] could not archive batch for view="
-                                             << view_id.toString() << " file=\"" << file_path
-                                             << "\" count=" << batch.size();
+                        m_failed_ingest_files[view_id].insert(absolute_file_path);
+
+                        m_history_service->remove_file_entries(view_id, absolute_file_path);
+
+                        const QString message =
+                            QStringLiteral("Could not store parsed entries in the log history.");
+
+                        qWarning().nospace()
+                            << "[Controller] ingest failed for view=" << view_id.toString()
+                            << " file=\"" << absolute_file_path << '"';
+
+                        emit loading_error(view_id, absolute_file_path, message);
                     }
                 }
             });
@@ -223,40 +240,80 @@ LogViewerController::LogViewerController(const QString& log_format, QObject* par
     // Error pass-through.
     connect(m_ingest, &LogIngestController::error, this,
             [this](const QUuid& view_id, const QString& file_path, const QString& message) {
-                if (!m_is_shutting_down)
+                const QString absolute_file_path = QFileInfo(file_path).absoluteFilePath();
+
+                const bool can_handle = !m_is_shutting_down && !view_id.isNull();
+
+                if (can_handle)
                 {
                     qWarning().nospace()
                         << "[Controller] error view=" << view_id.toString() << " file=\""
-                        << file_path << "\" msg=\"" << message << '"';
+                        << absolute_file_path << "\" msg=\"" << message << '"';
 
-                    if (!view_id.isNull())
+                    emit loading_error(view_id, absolute_file_path, message);
+
+                    m_history_service->remove_file_entries(view_id, absolute_file_path);
+
+                    m_failed_ingest_files[view_id].remove(absolute_file_path);
+
+                    if (m_failed_ingest_files.value(view_id).isEmpty())
                     {
-                        emit loading_error(view_id, file_path, message);
+                        m_failed_ingest_files.remove(view_id);
                     }
-                    // IMPORTANT: Do not clear active state here; wait for idle to ensure
-                    // late batches are still routed to the active view.
+
+                    const bool file_is_registered = m_views->get_context(view_id) != nullptr &&
+                                                    is_file_loaded(view_id, absolute_file_path);
+
+                    if (file_is_registered)
+                    {
+                        remove_log_file(view_id, absolute_file_path);
+                    }
                 }
             });
 
     // Finished pass-through.
     connect(m_ingest, &LogIngestController::finished, this,
             [this](const QUuid& view_id, const QString& file_path) {
+                const QString absolute_file_path = QFileInfo(file_path).absoluteFilePath();
+
+                const bool ingest_failed =
+                    m_failed_ingest_files.value(view_id).contains(absolute_file_path);
+
+                const bool view_exists =
+                    !view_id.isNull() && m_views->get_context(view_id) != nullptr;
+
                 if (!m_is_shutting_down)
                 {
-                    qDebug().nospace() << "[Controller] finished view=" << view_id.toString()
-                                       << " file=\"" << file_path << '"';
+                    qDebug().nospace()
+                        << "[Controller] finished view=" << view_id.toString() << " file=\""
+                        << absolute_file_path << "\" success=" << !ingest_failed;
 
-                    if (!view_id.isNull())
+                    if (ingest_failed)
                     {
-                        emit loading_finished(view_id, file_path);
+                        m_failed_ingest_files[view_id].remove(absolute_file_path);
+
+                        if (m_failed_ingest_files.value(view_id).isEmpty())
+                        {
+                            m_failed_ingest_files.remove(view_id);
+                        }
+
+                        const bool file_is_registered =
+                            view_exists && is_file_loaded(view_id, absolute_file_path);
+
+                        if (file_is_registered)
+                        {
+                            remove_log_file(view_id, absolute_file_path);
+                        }
+                    }
+                    else if (view_exists)
+                    {
+                        emit loading_finished(view_id, absolute_file_path);
 
                         if (m_live_tailing_views.contains(view_id))
                         {
-                            m_tailer_service->start_tailing(view_id, file_path);
+                            m_tailer_service->start_tailing(view_id, absolute_file_path);
                         }
                     }
-                    // IMPORTANT: Do not clear active state here; wait for idle to avoid
-                    // dropping a late-arriving last batch for very small files.
                 }
             });
 
@@ -317,6 +374,7 @@ LogViewerController::~LogViewerController()
     }
 
     m_pending_tail_refresh_views.clear();
+    m_failed_ingest_files.clear();
 
     if (m_tailer_service != nullptr)
     {
@@ -398,6 +456,7 @@ auto LogViewerController::remove_view(const QUuid& view_id) -> bool
 
         m_live_tailing_views.remove(view_id);
         m_pending_tail_refresh_views.remove(view_id);
+        m_failed_ingest_files.remove(view_id);
         removed = m_views->remove_view(view_id);
     }
 

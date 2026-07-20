@@ -1395,3 +1395,58 @@ TEST_F(LogViewerControllerTest, ReloadsPageAfterSynchronousFileAddition)
 
     EXPECT_EQ(model->get_entry(1).get_message(), QStringLiteral("AddedFirst"));
 }
+
+/**
+ * @brief Verifies that an invalid asynchronous import is not reported as completed.
+ */
+TEST_F(LogViewerControllerTest, RemovesFailedAsynchronousImport)
+{
+    const QString invalid_file_path = QStringLiteral("C:/path/that/does/not/exist/missing.log");
+
+    QSignalSpy loading_error_spy(m_controller, &LogViewerController::loading_error);
+
+    QSignalSpy loading_finished_spy(m_controller, &LogViewerController::loading_finished);
+
+    QSignalSpy view_removed_spy(m_controller, &LogViewerController::view_removed);
+
+    const QUuid failed_view_id = m_controller->load_log_file_async(invalid_file_path, 1000);
+
+    ASSERT_FALSE(failed_view_id.isNull());
+
+    QTRY_COMPARE(loading_error_spy.count(), 1);
+
+    QTRY_COMPARE(view_removed_spy.count(), 1);
+
+    EXPECT_EQ(loading_finished_spy.count(), 0);
+
+    EXPECT_EQ(m_controller->get_log_model(failed_view_id), nullptr);
+
+    EXPECT_FALSE(m_controller->is_file_loaded(failed_view_id, invalid_file_path));
+}
+
+/**
+ * @brief Verifies that a successful asynchronous import is completed normally.
+ */
+TEST_F(LogViewerControllerTest, CompletesSuccessfulAsynchronousImport)
+{
+    QTemporaryFile* file =
+        create_temp_file({QStringLiteral("2024-01-01 12:00:00 INFO Imported AppD")});
+
+    ASSERT_NE(file, nullptr);
+
+    QSignalSpy loading_error_spy(m_controller, &LogViewerController::loading_error);
+
+    QSignalSpy loading_finished_spy(m_controller, &LogViewerController::loading_finished);
+
+    const QUuid view_id = m_controller->load_log_file_async(file->fileName(), 1);
+
+    ASSERT_FALSE(view_id.isNull());
+
+    QTRY_COMPARE(loading_finished_spy.count(), 1);
+
+    EXPECT_EQ(loading_error_spy.count(), 0);
+
+    EXPECT_NE(m_controller->get_log_model(view_id), nullptr);
+
+    EXPECT_TRUE(m_controller->is_file_loaded(view_id, file->fileName()));
+}

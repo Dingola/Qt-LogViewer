@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QHash>
 #include <QList>
 #include <QMap>
 #include <QObject>
@@ -684,4 +685,5 @@ class LogViewerController: public QObject
         QTimer* m_tail_refresh_timer{nullptr};
         QSet<QUuid> m_pending_tail_refresh_views;
         QSet<QUuid> m_live_tailing_views;
+        QHash<QUuid, QSet<QString>> m_failed_ingest_files;
 };
