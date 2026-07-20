@@ -2004,3 +2004,149 @@ TEST_F(LogViewerControllerTest, AppliesActiveFilterToTailedEntries)
     ASSERT_NE(page_state, nullptr);
     EXPECT_EQ(page_state->get_total_entries(), 6);
 }
+
+/**
+ * @brief Verifies that multiple restored session views retain separate files and filters.
+ */
+TEST_F(LogViewerControllerTest, RestoresMultipleSessionViewsIndependently)
+{
+    QTemporaryFile* first_file =
+        create_temp_file({QStringLiteral("2024-01-01 12:00:00 INFO FirstInfo FirstApp"),
+                          QStringLiteral("2024-01-01 12:01:00 ERROR FirstError FirstApp")});
+
+    QTemporaryFile* second_file =
+        create_temp_file({QStringLiteral("2024-01-01 13:00:00 DEBUG SecondDebug SecondApp"),
+                          QStringLiteral("2024-01-01 13:01:00 ERROR SecondError SecondApp")});
+
+    ASSERT_NE(first_file, nullptr);
+    ASSERT_NE(second_file, nullptr);
+
+    SessionViewState first_state;
+    first_state.id = QUuid::createUuid();
+    first_state.loaded_files = {LogFileInfo(first_file->fileName(), QStringLiteral("FirstApp"))};
+    first_state.filters.app_name = QStringLiteral("FirstApp");
+    first_state.filters.log_levels = {QStringLiteral("INFO")};
+    first_state.filters.live_tailing_enabled = false;
+
+    SessionViewState second_state;
+    second_state.id = QUuid::createUuid();
+    second_state.loaded_files = {LogFileInfo(second_file->fileName(), QStringLiteral("SecondApp"))};
+    second_state.filters.app_name = QStringLiteral("SecondApp");
+    second_state.filters.log_levels = {QStringLiteral("ERROR")};
+    second_state.filters.live_tailing_enabled = false;
+
+    QSignalSpy loading_finished_spy(m_controller, &LogViewerController::loading_finished);
+
+    const QUuid first_view_id =
+        m_controller->import_view_state_for_session(QStringLiteral("test-session"), first_state);
+
+    const QUuid second_view_id =
+        m_controller->import_view_state_for_session(QStringLiteral("test-session"), second_state);
+
+    ASSERT_EQ(first_view_id, first_state.id);
+    ASSERT_EQ(second_view_id, second_state.id);
+    ASSERT_NE(first_view_id, second_view_id);
+
+    QTRY_COMPARE(loading_finished_spy.count(), 2);
+
+    const LogQuery first_query = m_controller->create_page_query(first_view_id);
+
+    const LogQuery second_query = m_controller->create_page_query(second_view_id);
+
+    ASSERT_TRUE(m_controller->set_page_query(first_view_id, first_query));
+
+    ASSERT_TRUE(m_controller->set_page_query(second_view_id, second_query));
+
+    const LogPageState* first_page_state = m_controller->get_page_state(first_view_id);
+
+    const LogPageState* second_page_state = m_controller->get_page_state(second_view_id);
+
+    ASSERT_NE(first_page_state, nullptr);
+    ASSERT_NE(second_page_state, nullptr);
+
+    EXPECT_EQ(first_page_state->get_total_entries(), 1);
+
+    EXPECT_EQ(second_page_state->get_total_entries(), 1);
+
+    LogModel* first_model = m_controller->get_log_model(first_view_id);
+
+    LogModel* second_model = m_controller->get_log_model(second_view_id);
+
+    ASSERT_NE(first_model, nullptr);
+    ASSERT_NE(second_model, nullptr);
+
+    ASSERT_EQ(first_model->rowCount(), 1);
+    ASSERT_EQ(second_model->rowCount(), 1);
+
+    EXPECT_EQ(first_model->get_entry(0).get_message(), QStringLiteral("FirstInfo"));
+
+    EXPECT_EQ(first_model->get_entry(0).get_app_name(), QStringLiteral("FirstApp"));
+
+    EXPECT_EQ(second_model->get_entry(0).get_message(), QStringLiteral("SecondError"));
+
+    EXPECT_EQ(second_model->get_entry(0).get_app_name(), QStringLiteral("SecondApp"));
+
+    EXPECT_TRUE(m_controller->is_file_loaded(first_view_id, first_file->fileName()));
+
+    EXPECT_FALSE(m_controller->is_file_loaded(first_view_id, second_file->fileName()));
+
+    EXPECT_TRUE(m_controller->is_file_loaded(second_view_id, second_file->fileName()));
+
+    EXPECT_FALSE(m_controller->is_file_loaded(second_view_id, first_file->fileName()));
+
+    const SessionViewState exported_first_state = m_controller->export_view_state(first_view_id);
+
+    const SessionViewState exported_second_state = m_controller->export_view_state(second_view_id);
+
+    EXPECT_EQ(exported_first_state.filters.app_name, QStringLiteral("FirstApp"));
+
+    EXPECT_EQ(exported_first_state.filters.log_levels, (QSet<QString>{QStringLiteral("info")}));
+
+    EXPECT_EQ(exported_second_state.filters.app_name, QStringLiteral("SecondApp"));
+
+    EXPECT_EQ(exported_second_state.filters.log_levels, (QSet<QString>{QStringLiteral("error")}));
+}
+
+/**
+ * @brief Verifies that controller destruction prevents late import signals.
+ */
+TEST_F(LogViewerControllerTest, ShutsDownSafelyDuringAsynchronousImport)
+{
+    QVector<QString> lines;
+
+    for (int index = 0; index < 10000; ++index)
+    {
+        lines.append(
+            QStringLiteral("2024-01-01 12:00:00 INFO ShutdownEntry%1 ShutdownApp").arg(index));
+    }
+
+    QTemporaryFile* file = create_temp_file(lines);
+
+    ASSERT_NE(file, nullptr);
+
+    QSignalSpy batch_finished_spy(m_controller, &LogViewerController::loading_finished);
+
+    QSignalSpy loading_error_spy(m_controller, &LogViewerController::loading_error);
+
+    const QUuid view_id = m_controller->load_log_file_async(file->fileName(), 1);
+
+    ASSERT_FALSE(view_id.isNull());
+
+    QApplication::processEvents();
+    QTest::qWait(20);
+
+    delete m_controller;
+    m_controller = nullptr;
+
+    const int finished_count_after_shutdown = batch_finished_spy.count();
+
+    const int error_count_after_shutdown = loading_error_spy.count();
+
+    QApplication::processEvents();
+    QTest::qWait(100);
+    QApplication::processEvents();
+
+    EXPECT_EQ(batch_finished_spy.count(), finished_count_after_shutdown);
+
+    EXPECT_EQ(loading_error_spy.count(), error_count_after_shutdown);
+}
