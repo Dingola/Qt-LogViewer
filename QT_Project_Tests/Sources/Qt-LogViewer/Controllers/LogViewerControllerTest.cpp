@@ -120,7 +120,7 @@ TEST_F(LogViewerControllerTest, LoadsAllLogEntriesAndModels)
     EXPECT_EQ(proxy->rowCount(), 4);
     EXPECT_EQ(paging->rowCount(), 4);
 
-    auto entries = m_controller->get_log_entries();
+    auto entries = m_controller->get_page_entries();
     EXPECT_EQ(entries.size(), 4);
 }
 
@@ -376,7 +376,7 @@ TEST_F(LogViewerControllerTest, RemoveLogFile)
 {
     ASSERT_GE(m_temp_file_names.size(), 1);
     QString file1 = m_temp_file_names[0];
-    auto entries = m_controller->get_log_entries();
+    auto entries = m_controller->get_page_entries();
     LogFileInfo info;
     bool found = false;
 
@@ -693,9 +693,9 @@ TEST_F(LogViewerControllerTest, AddLogFilesToTree)
 /**
  * @brief Tests get_log_entries and get_entries_for_file methods.
  */
-TEST_F(LogViewerControllerTest, LogEntriesAccess)
+TEST_F(LogViewerControllerTest, PageEntriesAccess)
 {
-    auto entries = m_controller->get_log_entries();
+    auto entries = m_controller->get_page_entries();
     EXPECT_EQ(entries.size(), 4);
 
     ASSERT_GE(m_temp_file_names.size(), 1);
@@ -714,10 +714,10 @@ TEST_F(LogViewerControllerTest, LogEntriesAccess)
 
     ASSERT_FALSE(info.get_file_path().isEmpty());
 
-    auto file_entries = m_controller->get_entries_for_file(info);
+    auto file_entries = m_controller->get_page_entries_for_file(info);
     EXPECT_EQ(file_entries.size(), 2);
 
-    auto file_entries_view = m_controller->get_entries_for_file(m_view_id, info);
+    auto file_entries_view = m_controller->get_page_entries_for_file(m_view_id, info);
     ASSERT_EQ(file_entries.size(), file_entries_view.size());
 
     for (int i = 0; i < file_entries.size(); ++i)
@@ -736,47 +736,47 @@ TEST_F(LogViewerControllerTest, LogEntriesAccess)
 /**
  * @brief Tests get_entries_for_file for an invalid view_id.
  */
-TEST_F(LogViewerControllerTest, GetEntriesForFileInvalidViewId)
+TEST_F(LogViewerControllerTest, GetPageEntriesForFileInvalidViewId)
 {
     QUuid invalid_id = QUuid::createUuid();
     ASSERT_GE(m_temp_file_names.size(), 1);
     LogFileInfo info(m_temp_file_names[0]);
-    auto entries = m_controller->get_entries_for_file(invalid_id, info);
+    auto entries = m_controller->get_page_entries_for_file(invalid_id, info);
     EXPECT_TRUE(entries.isEmpty());
 }
 
 /**
  * @brief Tests get_entries_for_file for a valid view_id with no entries.
  */
-TEST_F(LogViewerControllerTest, GetEntriesForFileValidViewIdNoEntries)
+TEST_F(LogViewerControllerTest, GetPageEntriesForFileValidViewIdNoEntries)
 {
     QTemporaryFile* temp_file = create_temp_file({});
     ASSERT_NE(temp_file, nullptr);
 
     QUuid view_id = m_controller->load_log_file(temp_file->fileName());
     LogFileInfo info(temp_file->fileName());
-    auto entries = m_controller->get_entries_for_file(view_id, info);
+    auto entries = m_controller->get_page_entries_for_file(view_id, info);
     EXPECT_TRUE(entries.isEmpty());
 }
 
 /**
  * @brief Tests get_entries_for_file for a valid view_id with entries, but none match file_info.
  */
-TEST_F(LogViewerControllerTest, GetEntriesForFileValidViewIdNoMatch)
+TEST_F(LogViewerControllerTest, GetPageEntriesForFileValidViewIdNoMatch)
 {
     ASSERT_GE(m_temp_file_names.size(), 1);
     LogFileInfo info("nonexistent_file.log");
-    auto entries = m_controller->get_entries_for_file(m_view_id, info);
+    auto entries = m_controller->get_page_entries_for_file(m_view_id, info);
     EXPECT_TRUE(entries.isEmpty());
 }
 
 /**
  * @brief Tests get_log_entries for a view_id that does not exist.
  */
-TEST_F(LogViewerControllerTest, GetLogEntriesInvalidViewId)
+TEST_F(LogViewerControllerTest, GetPageEntriesInvalidViewId)
 {
     QUuid invalid_id = QUuid::createUuid();
-    auto entries = m_controller->get_log_entries(invalid_id);
+    auto entries = m_controller->get_page_entries(invalid_id);
     EXPECT_TRUE(entries.isEmpty());
 }
 
@@ -1247,4 +1247,75 @@ TEST_F(LogViewerControllerTest, LoadsApplicationNamesBeyondVisiblePage)
     const QSet<QString> app_names = m_controller->get_app_names(m_view_id);
 
     EXPECT_EQ(app_names, (QSet<QString>{QStringLiteral("AppA"), QStringLiteral("AppB")}));
+}
+
+/**
+ * @brief Verifies that page entry access does not expose entries outside the loaded page.
+ */
+TEST_F(LogViewerControllerTest, ReturnsOnlyCurrentlyLoadedPageEntries)
+{
+    LogQuery query;
+
+    ASSERT_TRUE(m_controller->set_page_query(m_view_id, query));
+
+    ASSERT_TRUE(m_controller->set_page_size(m_view_id, 1));
+
+    ASSERT_TRUE(m_controller->set_current_page(m_view_id, 2));
+
+    LogModel* model = m_controller->get_log_model(m_view_id);
+
+    ASSERT_NE(model, nullptr);
+    ASSERT_EQ(model->rowCount(), 1);
+
+    const QVector<LogEntry> page_entries = m_controller->get_page_entries(m_view_id);
+
+    ASSERT_EQ(page_entries.size(), 1);
+
+    EXPECT_EQ(page_entries.first().get_message(), model->get_entry(0).get_message());
+
+    EXPECT_EQ(page_entries.first().get_file_info().get_file_path(),
+              model->get_entry(0).get_file_info().get_file_path());
+}
+
+/**
+ * @brief Verifies that file-specific access is restricted to the current page.
+ */
+TEST_F(LogViewerControllerTest, FiltersFileEntriesWithinCurrentPage)
+{
+    LogQuery query;
+
+    ASSERT_TRUE(m_controller->set_page_query(m_view_id, query));
+
+    ASSERT_TRUE(m_controller->set_page_size(m_view_id, 1));
+
+    LogModel* model = m_controller->get_log_model(m_view_id);
+
+    ASSERT_NE(model, nullptr);
+    ASSERT_EQ(model->rowCount(), 1);
+
+    const LogFileInfo visible_file = model->get_entry(0).get_file_info();
+
+    const QVector<LogEntry> visible_file_entries =
+        m_controller->get_page_entries_for_file(m_view_id, visible_file);
+
+    ASSERT_EQ(visible_file_entries.size(), 1);
+
+    EXPECT_EQ(visible_file_entries.first().get_message(), model->get_entry(0).get_message());
+
+    QString other_file_path;
+
+    for (const QString& file_path: m_controller->get_view_file_paths(m_view_id))
+    {
+        if (file_path != visible_file.get_file_path())
+        {
+            other_file_path = file_path;
+        }
+    }
+
+    ASSERT_FALSE(other_file_path.isEmpty());
+
+    const QVector<LogEntry> other_file_entries =
+        m_controller->get_page_entries_for_file(m_view_id, LogFileInfo(other_file_path));
+
+    EXPECT_TRUE(other_file_entries.isEmpty());
 }

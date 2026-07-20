@@ -1183,56 +1183,67 @@ auto LogViewerController::get_log_file_tree_model() -> LogFileTreeModel*
 }
 
 /**
- * @brief Returns all log entries in the current view.
- * @return QVector<LogEntry> containing all entries.
+ * @brief Returns the entries held by the current view's page model.
+ * @return Entries of the currently loaded database page.
  */
-auto LogViewerController::get_log_entries() const -> QVector<LogEntry>
+auto LogViewerController::get_page_entries() const -> QVector<LogEntry>
 {
-    return get_log_entries(m_views->get_current_view());
+    return get_page_entries(m_views->get_current_view());
 }
 
 /**
- * @brief Returns all log entries in the specified view.
- * @param view_id The QUuid of the view.
- * @return QVector<LogEntry> containing all entries.
+ * @brief Returns the entries held by a view's page model.
+ * @param view_id Target view.
+ * @return Entries of the currently loaded database page.
  */
-auto LogViewerController::get_log_entries(const QUuid& view_id) const -> QVector<LogEntry>
+auto LogViewerController::get_page_entries(const QUuid& view_id) const -> QVector<LogEntry>
 {
-    QVector<LogEntry> result = m_views->get_entries(view_id);
-    return result;
-}
+    QVector<LogEntry> entries;
 
-/**
- * @brief Returns all log entries for a given file in the current view.
- * @param file_info The LogFileInfo for the file.
- * @return QVector<LogEntry> containing all entries for the file.
- */
-auto LogViewerController::get_entries_for_file(const LogFileInfo& file_info) -> QVector<LogEntry>
-{
-    return get_entries_for_file(m_views->get_current_view(), file_info);
-}
-
-/**
- * @brief Returns all log entries for a given file in the specified view.
- * @param view_id The QUuid of the view.
- * @param file_info The LogFileInfo for the file.
- * @return QVector<LogEntry> containing all entries for the file.
- */
-auto LogViewerController::get_entries_for_file(const QUuid& view_id,
-                                               const LogFileInfo& file_info) -> QVector<LogEntry>
-{
-    QVector<LogEntry> result;
-    QVector<LogEntry> entries = m_views->get_entries(view_id);
-
-    for (const auto& entry: entries)
+    if (m_views != nullptr)
     {
-        if (entry.get_file_info().get_file_path() == file_info.get_file_path())
+        entries = m_views->get_entries(view_id);
+    }
+
+    return entries;
+}
+
+/**
+ * @brief Returns entries for one file from the current page.
+ * @param file_info File whose visible page entries are requested.
+ * @return Matching entries from the currently loaded page.
+ */
+auto LogViewerController::get_page_entries_for_file(const LogFileInfo& file_info) const
+    -> QVector<LogEntry>
+{
+    return get_page_entries_for_file(m_views->get_current_view(), file_info);
+}
+
+/**
+ * @brief Returns entries for one file from a view's current page.
+ * @param view_id Target view.
+ * @param file_info File whose visible page entries are requested.
+ * @return Matching entries from the currently loaded page.
+ */
+auto LogViewerController::get_page_entries_for_file(
+    const QUuid& view_id, const LogFileInfo& file_info) const -> QVector<LogEntry>
+{
+    QVector<LogEntry> matching_entries;
+
+    const QVector<LogEntry> page_entries = get_page_entries(view_id);
+
+    for (const LogEntry& entry: page_entries)
+    {
+        const bool belongs_to_file =
+            entry.get_file_info().get_file_path() == file_info.get_file_path();
+
+        if (belongs_to_file)
         {
-            result.append(entry);
+            matching_entries.append(entry);
         }
     }
 
-    return result;
+    return matching_entries;
 }
 
 /**

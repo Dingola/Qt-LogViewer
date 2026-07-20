@@ -421,33 +421,34 @@ class LogViewerController: public QObject
         [[nodiscard]] auto get_log_file_tree_model() -> LogFileTreeModel*;
 
         /**
-         * @brief Returns all log entries in the current view.
-         * @return QVector<LogEntry> containing all entries.
+         * @brief Returns the entries held by the current view's page model.
+         * @return Entries of the currently loaded database page.
          */
-        [[nodiscard]] auto get_log_entries() const -> QVector<LogEntry>;
+        [[nodiscard]] auto get_page_entries() const -> QVector<LogEntry>;
 
         /**
-         * @brief Returns all log entries in the specified view.
-         * @param view_id The QUuid of the view.
-         * @return QVector<LogEntry> containing all entries.
+         * @brief Returns the entries held by a view's page model.
+         * @param view_id Target view.
+         * @return Entries of the currently loaded database page.
          */
-        [[nodiscard]] auto get_log_entries(const QUuid& view_id) const -> QVector<LogEntry>;
+        [[nodiscard]] auto get_page_entries(const QUuid& view_id) const -> QVector<LogEntry>;
 
         /**
-         * @brief Returns all log entries for a given file in the current view.
-         * @param file_info The LogFileInfo for the file.
-         * @return QVector<LogEntry> containing all entries for the file.
+         * @brief Returns entries for one file from the current page.
+         * @param file_info File whose visible page entries are requested.
+         * @return Matching entries from the currently loaded page.
          */
-        [[nodiscard]] auto get_entries_for_file(const LogFileInfo& file_info) -> QVector<LogEntry>;
+        [[nodiscard]] auto get_page_entries_for_file(const LogFileInfo& file_info) const
+            -> QVector<LogEntry>;
 
         /**
-         * @brief Returns all log entries for a given file in the specified view.
-         * @param view_id The QUuid of the view.
-         * @param file_info The LogFileInfo for the file.
-         * @return QVector<LogEntry> containing all entries for the file.
+         * @brief Returns entries for one file from a view's current page.
+         * @param view_id Target view.
+         * @param file_info File whose visible page entries are requested.
+         * @return Matching entries from the currently loaded page.
          */
-        [[nodiscard]] auto get_entries_for_file(const QUuid& view_id,
-                                                const LogFileInfo& file_info) -> QVector<LogEntry>;
+        [[nodiscard]] auto get_page_entries_for_file(
+            const QUuid& view_id, const LogFileInfo& file_info) const -> QVector<LogEntry>;
 
         /**
          * @brief Checks if a log file with the given file path is already loaded.
