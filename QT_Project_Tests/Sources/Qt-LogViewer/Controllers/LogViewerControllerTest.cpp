@@ -1766,3 +1766,241 @@ TEST_F(LogViewerControllerTest, StartsRestoredLiveTailingAfterImport)
 
     EXPECT_EQ(model->get_entry(0).get_message(), QStringLiteral("Tailed"));
 }
+
+/**
+ * @brief Verifies that text search and structured filters use one database query.
+ */
+TEST_F(LogViewerControllerTest, CombinesSearchWithStructuredFilters)
+{
+    m_controller->set_app_name_filter(m_view_id, QStringLiteral("AppA"));
+
+    m_controller->set_log_level_filters(m_view_id, {QStringLiteral("ERROR")});
+
+    m_controller->set_search_filter(m_view_id, QStringLiteral("Crash"), SearchField::Message,
+                                    false);
+
+    const LogQuery query = m_controller->create_page_query(m_view_id);
+
+    ASSERT_TRUE(m_controller->set_page_query(m_view_id, query));
+
+    const LogPageState* page_state = m_controller->get_page_state(m_view_id);
+
+    ASSERT_NE(page_state, nullptr);
+    EXPECT_EQ(page_state->get_current_page(), 1);
+    EXPECT_EQ(page_state->get_total_entries(), 1);
+    EXPECT_EQ(page_state->get_total_pages(), 1);
+
+    LogModel* model = m_controller->get_log_model(m_view_id);
+
+    ASSERT_NE(model, nullptr);
+    ASSERT_EQ(model->rowCount(), 1);
+
+    EXPECT_EQ(model->get_entry(0).get_message(), QStringLiteral("Crash"));
+
+    EXPECT_EQ(model->get_entry(0).get_level(), QStringLiteral("ERROR"));
+
+    EXPECT_EQ(model->get_entry(0).get_app_name(), QStringLiteral("AppA"));
+}
+
+/**
+ * @brief Verifies that hidden-file filtering excludes an otherwise matching regex result.
+ */
+TEST_F(LogViewerControllerTest, CombinesRegexSearchWithHiddenFiles)
+{
+    ASSERT_GE(m_temp_file_names.size(), 2);
+
+    const QString visible_file = m_temp_file_names.at(0);
+
+    const QString hidden_file = m_temp_file_names.at(1);
+
+    m_controller->hide_file(m_view_id, hidden_file);
+
+    m_controller->set_search_filter(m_view_id, QStringLiteral("^(Crash|Debugging)$"),
+                                    SearchField::Message, true);
+
+    const LogQuery query = m_controller->create_page_query(m_view_id);
+
+    ASSERT_TRUE(m_controller->set_page_query(m_view_id, query));
+
+    const LogPageState* page_state = m_controller->get_page_state(m_view_id);
+
+    ASSERT_NE(page_state, nullptr);
+    EXPECT_EQ(page_state->get_total_entries(), 1);
+
+    LogModel* model = m_controller->get_log_model(m_view_id);
+
+    ASSERT_NE(model, nullptr);
+    ASSERT_EQ(model->rowCount(), 1);
+
+    EXPECT_EQ(model->get_entry(0).get_message(), QStringLiteral("Crash"));
+
+    EXPECT_EQ(model->get_entry(0).get_file_info().get_file_path(), visible_file);
+
+    EXPECT_NE(model->get_entry(0).get_file_info().get_file_path(), hidden_file);
+}
+
+/**
+ * @brief Verifies that sorting is applied to the result of a show-only query.
+ */
+TEST_F(LogViewerControllerTest, CombinesShowOnlyFileWithSorting)
+{
+    ASSERT_GE(m_temp_file_names.size(), 2);
+
+    const QString visible_file = m_temp_file_names.at(0);
+
+    m_controller->set_show_only_file(m_view_id, visible_file);
+
+    const LogQuery query = m_controller->create_page_query(m_view_id);
+
+    ASSERT_TRUE(m_controller->set_page_query(m_view_id, query));
+
+    ASSERT_TRUE(m_controller->set_page_sort(m_view_id, LogModel::Message, Qt::AscendingOrder));
+
+    const LogPageState* page_state = m_controller->get_page_state(m_view_id);
+
+    ASSERT_NE(page_state, nullptr);
+    EXPECT_EQ(page_state->get_total_entries(), 2);
+
+    LogModel* model = m_controller->get_log_model(m_view_id);
+
+    ASSERT_NE(model, nullptr);
+    ASSERT_EQ(model->rowCount(), 2);
+
+    EXPECT_EQ(model->get_entry(0).get_message(), QStringLiteral("Crash"));
+
+    EXPECT_EQ(model->get_entry(1).get_message(), QStringLiteral("Startup"));
+
+    for (int row = 0; row < model->rowCount(); ++row)
+    {
+        EXPECT_EQ(model->get_entry(row).get_file_info().get_file_path(), visible_file);
+    }
+}
+
+/**
+ * @brief Verifies that changing filters selects the first result page.
+ */
+TEST_F(LogViewerControllerTest, ResetsToFirstPageAfterFilterChange)
+{
+    ASSERT_TRUE(m_controller->set_page_size(m_view_id, 1));
+
+    ASSERT_TRUE(m_controller->set_current_page(m_view_id, 4));
+
+    const LogPageState* page_state = m_controller->get_page_state(m_view_id);
+
+    ASSERT_NE(page_state, nullptr);
+    ASSERT_EQ(page_state->get_current_page(), 4);
+
+    m_controller->set_log_level_filters(m_view_id, {QStringLiteral("INFO")});
+
+    const LogQuery query = m_controller->create_page_query(m_view_id);
+
+    ASSERT_TRUE(m_controller->set_page_query(m_view_id, query));
+
+    page_state = m_controller->get_page_state(m_view_id);
+
+    ASSERT_NE(page_state, nullptr);
+    EXPECT_EQ(page_state->get_current_page(), 1);
+    EXPECT_EQ(page_state->get_total_entries(), 2);
+    EXPECT_EQ(page_state->get_total_pages(), 2);
+
+    LogModel* model = m_controller->get_log_model(m_view_id);
+
+    ASSERT_NE(model, nullptr);
+    ASSERT_EQ(model->rowCount(), 1);
+
+    EXPECT_EQ(model->get_entry(0).get_message(), QStringLiteral("UserLogin"));
+}
+
+/**
+ * @brief Verifies that clearing an empty search restores the complete result.
+ */
+TEST_F(LogViewerControllerTest, RestoresEntriesAfterClearingEmptySearch)
+{
+    m_controller->set_search_filter(m_view_id, QStringLiteral("NotPresent"), SearchField::Message,
+                                    false);
+
+    LogQuery query = m_controller->create_page_query(m_view_id);
+
+    ASSERT_TRUE(m_controller->set_page_query(m_view_id, query));
+
+    const LogPageState* page_state = m_controller->get_page_state(m_view_id);
+
+    ASSERT_NE(page_state, nullptr);
+    EXPECT_EQ(page_state->get_current_page(), 1);
+    EXPECT_EQ(page_state->get_total_entries(), 0);
+    EXPECT_EQ(page_state->get_total_pages(), 1);
+
+    LogModel* model = m_controller->get_log_model(m_view_id);
+
+    ASSERT_NE(model, nullptr);
+    EXPECT_EQ(model->rowCount(), 0);
+
+    m_controller->set_search_filter(m_view_id, QString(), SearchField::Message, false);
+
+    query = m_controller->create_page_query(m_view_id);
+
+    ASSERT_TRUE(m_controller->set_page_query(m_view_id, query));
+
+    page_state = m_controller->get_page_state(m_view_id);
+
+    ASSERT_NE(page_state, nullptr);
+    EXPECT_EQ(page_state->get_current_page(), 1);
+    EXPECT_EQ(page_state->get_total_entries(), 4);
+
+    ASSERT_EQ(model->rowCount(), 4);
+}
+
+/**
+ * @brief Verifies that tailed entries are evaluated by the active database filter.
+ */
+TEST_F(LogViewerControllerTest, AppliesActiveFilterToTailedEntries)
+{
+    ASSERT_GE(m_temp_file_names.size(), 1);
+
+    m_controller->set_log_level_filters(m_view_id, {QStringLiteral("ERROR")});
+
+    LogQuery query = m_controller->create_page_query(m_view_id);
+
+    ASSERT_TRUE(m_controller->set_page_query(m_view_id, query));
+
+    const LogPageState* page_state = m_controller->get_page_state(m_view_id);
+
+    ASSERT_NE(page_state, nullptr);
+    ASSERT_EQ(page_state->get_total_entries(), 1);
+
+    QFile file(m_temp_file_names.at(0));
+
+    ASSERT_TRUE(file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text));
+
+    QTextStream stream(&file);
+
+    stream << "2024-01-01 10:04:00 INFO FilteredOut AppA\n";
+
+    stream << "2024-01-01 10:05:00 ERROR FilteredIn AppA\n";
+
+    stream.flush();
+    file.close();
+
+    QTRY_COMPARE(m_controller->get_page_state(m_view_id)->get_total_entries(),
+                 static_cast<qsizetype>(2));
+
+    LogModel* model = m_controller->get_log_model(m_view_id);
+
+    ASSERT_NE(model, nullptr);
+    ASSERT_EQ(model->rowCount(), 2);
+
+    EXPECT_EQ(model->get_entry(0).get_message(), QStringLiteral("FilteredIn"));
+
+    EXPECT_EQ(model->get_entry(1).get_message(), QStringLiteral("Crash"));
+
+    m_controller->set_log_level_filters(m_view_id, {});
+
+    query = m_controller->create_page_query(m_view_id);
+
+    ASSERT_TRUE(m_controller->set_page_query(m_view_id, query));
+
+    page_state = m_controller->get_page_state(m_view_id);
+
+    ASSERT_NE(page_state, nullptr);
+    EXPECT_EQ(page_state->get_total_entries(), 6);
+}
