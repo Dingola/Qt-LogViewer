@@ -875,11 +875,19 @@ TEST_F(LogViewerControllerTest, RejectsPagedQueryForUnknownView)
 }
 
 /**
- * @brief Verifies that a view without a paged query has no page state.
+ * @brief Verifies that synchronous loading creates a database page state.
  */
-TEST_F(LogViewerControllerTest, ReturnsNoPageStateBeforeQueryAssignment)
+TEST_F(LogViewerControllerTest, CreatesPageStateDuringSynchronousLoading)
 {
-    EXPECT_EQ(m_controller->get_page_state(m_view_id), nullptr);
+    const LogPageState* page_state = m_controller->get_page_state(m_view_id);
+
+    ASSERT_NE(page_state, nullptr);
+
+    EXPECT_EQ(page_state->get_query().view_id, m_view_id);
+
+    EXPECT_EQ(page_state->get_current_page(), 1);
+
+    EXPECT_EQ(page_state->get_total_entries(), 4);
 }
 
 /**
@@ -931,19 +939,16 @@ TEST_F(LogViewerControllerTest, RepresentsAllFieldsWithEmptySearchFieldSet)
 }
 
 /**
- * @brief Verifies that the selected table sorting is copied into a query.
+ * @brief Verifies that database-backed sorting is retained in a page query.
  */
 TEST_F(LogViewerControllerTest, CreatesPageQueryFromSelectedSorting)
 {
-    LogSortFilterProxyModel* proxy = m_controller->get_sort_filter_proxy(m_view_id);
-
-    ASSERT_NE(proxy, nullptr);
-
-    proxy->sort(LogModel::Message, Qt::AscendingOrder);
+    ASSERT_TRUE(m_controller->set_page_sort(m_view_id, LogModel::Message, Qt::AscendingOrder));
 
     const LogQuery query = m_controller->create_page_query(m_view_id);
 
     EXPECT_EQ(query.sort_field, LogField::Message);
+
     EXPECT_EQ(query.sort_order, Qt::AscendingOrder);
 }
 
@@ -1318,4 +1323,75 @@ TEST_F(LogViewerControllerTest, FiltersFileEntriesWithinCurrentPage)
         m_controller->get_page_entries_for_file(m_view_id, LogFileInfo(other_file_path));
 
     EXPECT_TRUE(other_file_entries.isEmpty());
+}
+
+/**
+ * @brief Verifies that synchronous loading keeps only one database page in the model.
+ */
+TEST_F(LogViewerControllerTest, KeepsOnlyCurrentPageAfterSynchronousLoading)
+{
+    QVector<QString> lines;
+
+    for (int index = 1; index <= 30; ++index)
+    {
+        lines.append(QStringLiteral("2024-01-01 11:%1:00 INFO Entry%2 AppC")
+                         .arg(index, 2, 10, QLatin1Char('0'))
+                         .arg(index));
+    }
+
+    QTemporaryFile* file = create_temp_file(lines);
+
+    ASSERT_NE(file, nullptr);
+
+    const QUuid view_id = m_controller->load_log_file(file->fileName());
+
+    ASSERT_FALSE(view_id.isNull());
+
+    const LogPageState* page_state = m_controller->get_page_state(view_id);
+
+    ASSERT_NE(page_state, nullptr);
+
+    EXPECT_EQ(page_state->get_total_entries(), 30);
+
+    EXPECT_EQ(page_state->get_page_size(), 25);
+
+    EXPECT_EQ(page_state->get_total_pages(), 2);
+
+    LogModel* model = m_controller->get_log_model(view_id);
+
+    ASSERT_NE(model, nullptr);
+    EXPECT_EQ(model->rowCount(), 25);
+}
+
+/**
+ * @brief Verifies that synchronous file addition reloads the existing database page.
+ */
+TEST_F(LogViewerControllerTest, ReloadsPageAfterSynchronousFileAddition)
+{
+    LogPageState const* initial_state = m_controller->get_page_state(m_view_id);
+
+    ASSERT_NE(initial_state, nullptr);
+    ASSERT_EQ(initial_state->get_total_entries(), 4);
+
+    QTemporaryFile* additional_file =
+        create_temp_file({QStringLiteral("2024-01-01 10:04:00 INFO AddedFirst AppC"),
+                          QStringLiteral("2024-01-01 10:05:00 ERROR AddedSecond AppC")});
+
+    ASSERT_NE(additional_file, nullptr);
+
+    ASSERT_TRUE(m_controller->load_log_file(m_view_id, additional_file->fileName()));
+
+    const LogPageState* page_state = m_controller->get_page_state(m_view_id);
+
+    ASSERT_NE(page_state, nullptr);
+    EXPECT_EQ(page_state->get_total_entries(), 6);
+
+    LogModel* model = m_controller->get_log_model(m_view_id);
+
+    ASSERT_NE(model, nullptr);
+    ASSERT_EQ(model->rowCount(), 6);
+
+    EXPECT_EQ(model->get_entry(0).get_message(), QStringLiteral("AddedSecond"));
+
+    EXPECT_EQ(model->get_entry(1).get_message(), QStringLiteral("AddedFirst"));
 }

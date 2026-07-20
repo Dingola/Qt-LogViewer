@@ -480,34 +480,28 @@ auto LogViewerController::add_log_files_to_session(const QString& session_id,
 auto LogViewerController::load_log_file(const QString& file_path) -> QUuid
 {
     const QVector<LogEntry> entries = m_ingest->load_file_sync(file_path);
+
     const QString app_name =
         !entries.isEmpty() ? entries.first().get_app_name() : LogLoader::identify_app(file_path);
-    const LogFileInfo loaded_log_file(file_path, app_name);
+
+    const LogFileInfo loaded_file(file_path, app_name);
+
     const QUuid view_id = m_views->create_view();
 
-    set_live_tailing_enabled(view_id, true);
-
-    auto* context = m_views->get_context(view_id);
-    auto* proxy = get_sort_filter_proxy(view_id);
-
-    if (proxy != nullptr)
-    {
-        proxy->set_ingestion_mode(true);
-    }
+    LogViewContext* context = m_views->get_context(view_id);
 
     if (context != nullptr)
     {
         m_history_service->add_entries(view_id, entries);
-        context->append_entries(entries);
-        m_views->set_loaded_files(view_id, QList<LogFileInfo>{loaded_log_file});
-    }
 
-    if (proxy != nullptr)
-    {
-        proxy->set_ingestion_mode(false);
-    }
+        m_views->set_loaded_files(view_id, QList<LogFileInfo>{loaded_file});
 
-    m_tailer_service->start_tailing(view_id, file_path);
+        const LogQuery query = create_page_query(view_id);
+
+        m_page_coordinator->set_query(view_id, query);
+
+        set_live_tailing_enabled(view_id, true);
+    }
 
     return view_id;
 }
@@ -520,32 +514,36 @@ auto LogViewerController::load_log_file(const QString& file_path) -> QUuid
  */
 auto LogViewerController::load_log_file(const QUuid& view_id, const QString& file_path) -> bool
 {
-    bool success = false;
+    bool loaded = false;
 
     ensure_view_models(view_id);
 
-    auto* context = m_views->get_context(view_id);
+    LogViewContext* context = m_views->get_context(view_id);
 
-    if (context != nullptr && !is_file_loaded(view_id, file_path))
+    const bool can_load = context != nullptr && !is_file_loaded(view_id, file_path);
+
+    if (can_load)
     {
-        auto* proxy = get_sort_filter_proxy(view_id);
-
-        if (proxy != nullptr)
-        {
-            proxy->set_ingestion_mode(true);
-        }
-
         const QVector<LogEntry> entries = m_ingest->load_file_sync(file_path);
+
         const QString app_name = !entries.isEmpty() ? entries.first().get_app_name()
                                                     : LogLoader::identify_app(file_path);
 
         m_history_service->add_entries(view_id, entries);
-        context->append_entries(entries);
+
         m_views->add_loaded_file(view_id, LogFileInfo(file_path, app_name));
 
-        if (proxy != nullptr)
+        const LogPageState* page_state = m_page_coordinator->get_page_state(view_id);
+
+        if (page_state != nullptr)
         {
-            proxy->set_ingestion_mode(false);
+            m_page_coordinator->reload(view_id);
+        }
+        else
+        {
+            const LogQuery query = create_page_query(view_id);
+
+            m_page_coordinator->set_query(view_id, query);
         }
 
         if (get_live_tailing_enabled(view_id))
@@ -553,10 +551,10 @@ auto LogViewerController::load_log_file(const QUuid& view_id, const QString& fil
             m_tailer_service->start_tailing(view_id, file_path);
         }
 
-        success = true;
+        loaded = true;
     }
 
-    return success;
+    return loaded;
 }
 
 /**
@@ -570,45 +568,29 @@ auto LogViewerController::load_log_files(const QVector<QString>& file_paths) -> 
 
     if (!file_paths.isEmpty())
     {
-        QList<LogFileInfo> loaded_log_files;
         view_id = m_views->create_view();
-        set_live_tailing_enabled(view_id, true);
 
-        auto* proxy = get_sort_filter_proxy(view_id);
-
-        if (proxy != nullptr)
-        {
-            proxy->set_ingestion_mode(true);
-        }
+        QList<LogFileInfo> loaded_files;
 
         for (const QString& file_path: file_paths)
         {
             const QVector<LogEntry> entries = m_ingest->load_file_sync(file_path);
+
             const QString app_name = !entries.isEmpty() ? entries.first().get_app_name()
                                                         : LogLoader::identify_app(file_path);
 
-            loaded_log_files.append(LogFileInfo(file_path, app_name));
+            m_history_service->add_entries(view_id, entries);
 
-            auto* context = m_views->get_context(view_id);
-
-            if (context != nullptr)
-            {
-                m_history_service->add_entries(view_id, entries);
-                context->append_entries(entries);
-            }
+            loaded_files.append(LogFileInfo(file_path, app_name));
         }
 
-        m_views->set_loaded_files(view_id, loaded_log_files);
+        m_views->set_loaded_files(view_id, loaded_files);
 
-        if (proxy != nullptr)
-        {
-            proxy->set_ingestion_mode(false);
-        }
+        const LogQuery query = create_page_query(view_id);
 
-        for (const QString& file_path: file_paths)
-        {
-            m_tailer_service->start_tailing(view_id, file_path);
-        }
+        m_page_coordinator->set_query(view_id, query);
+
+        set_live_tailing_enabled(view_id, true);
     }
 
     return view_id;
