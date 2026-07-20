@@ -1583,3 +1583,75 @@ TEST_F(LogViewerControllerTest, RemovesSharedFileFromAllViewsGlobally)
 
     EXPECT_EQ(m_controller->get_page_state(second_view_id), nullptr);
 }
+
+/**
+ * @brief Verifies that removing a view cancels its active and pending imports.
+ */
+TEST_F(LogViewerControllerTest, CancelsActiveAndPendingImportsWhenRemovingView)
+{
+    QVector<QString> large_file_lines;
+
+    for (int index = 0; index < 5000; ++index)
+    {
+        large_file_lines.append(
+            QStringLiteral("2024-01-01 12:00:00 INFO ActiveEntry%1 ImportApp").arg(index));
+    }
+
+    QTemporaryFile* active_file = create_temp_file(large_file_lines);
+
+    QTemporaryFile* pending_file =
+        create_temp_file({QStringLiteral("2024-01-01 12:01:00 INFO PendingEntry ImportApp")});
+
+    ASSERT_NE(active_file, nullptr);
+    ASSERT_NE(pending_file, nullptr);
+
+    QSignalSpy loading_finished_spy(m_controller, &LogViewerController::loading_finished);
+
+    QSignalSpy view_removed_spy(m_controller, &LogViewerController::view_removed);
+
+    const QUuid removed_view_id =
+        m_controller->load_log_files_async({active_file->fileName(), pending_file->fileName()}, 1);
+
+    ASSERT_FALSE(removed_view_id.isNull());
+
+    ASSERT_TRUE(m_controller->is_file_loaded(removed_view_id, active_file->fileName()));
+
+    ASSERT_TRUE(m_controller->is_file_loaded(removed_view_id, pending_file->fileName()));
+
+    ASSERT_TRUE(m_controller->remove_view(removed_view_id));
+
+    EXPECT_EQ(view_removed_spy.count(), 1);
+
+    EXPECT_EQ(m_controller->get_log_model(removed_view_id), nullptr);
+
+    EXPECT_EQ(m_controller->get_page_state(removed_view_id), nullptr);
+
+    EXPECT_FALSE(m_controller->is_file_loaded(removed_view_id, active_file->fileName()));
+
+    EXPECT_FALSE(m_controller->is_file_loaded(removed_view_id, pending_file->fileName()));
+
+    QTemporaryFile* following_file =
+        create_temp_file({QStringLiteral("2024-01-01 12:02:00 INFO FollowingEntry ImportApp")});
+
+    ASSERT_NE(following_file, nullptr);
+
+    const QUuid following_view_id =
+        m_controller->load_log_file_async(following_file->fileName(), 1);
+
+    ASSERT_FALSE(following_view_id.isNull());
+
+    QTRY_COMPARE(loading_finished_spy.count(), 1);
+
+    const QList<QVariant> finished_arguments = loading_finished_spy.takeFirst();
+
+    ASSERT_EQ(finished_arguments.size(), 2);
+
+    EXPECT_EQ(finished_arguments.at(0).toUuid(), following_view_id);
+
+    EXPECT_EQ(QFileInfo(finished_arguments.at(1).toString()).absoluteFilePath(),
+              QFileInfo(following_file->fileName()).absoluteFilePath());
+
+    EXPECT_NE(m_controller->get_log_model(following_view_id), nullptr);
+
+    EXPECT_TRUE(m_controller->is_file_loaded(following_view_id, following_file->fileName()));
+}

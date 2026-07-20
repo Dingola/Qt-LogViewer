@@ -60,9 +60,13 @@ class LogViewLoadQueue
         auto clear_pending_for_view(const QUuid& view_id) -> void;
 
         /**
-         * @brief Cancels the active stream if it belongs to the specified view and clears pendings.
-         * @param loader Loader service used to cancel the active stream if needed.
+         * @brief Requests cancellation for the active stream and removes pending items for the
+         * view.
+         * @param loader Loader service used to cancel the active stream.
          * @param view_id Target view id.
+         *
+         * The active registration remains assigned until the loader reports streaming_idle.
+         * This keeps late signals associated with the stream that produced them.
          */
         auto cancel_if_active(LogLoadingService* loader, const QUuid& view_id) -> void;
 

@@ -119,23 +119,24 @@ auto LogViewLoadQueue::clear_pending_for_view(const QUuid& view_id) -> void
 }
 
 /**
- * @brief Cancels the active stream if it belongs to the specified view and clears pendings.
- * @param loader Loader service used to cancel the active stream if needed.
+ * @brief Requests cancellation for the active stream and removes pending items for the view.
+ * @param loader Loader service used to cancel the active stream.
  * @param view_id Target view id.
+ *
+ * The active registration remains assigned until the loader reports streaming_idle.
+ * This keeps late signals associated with the stream that produced them.
  */
 auto LogViewLoadQueue::cancel_if_active(LogLoadingService* loader, const QUuid& view_id) -> void
 {
-    const bool same_view = (m_active_view_id == view_id);
-    const bool can_cancel = same_view && (loader != nullptr);
+    const bool same_view = m_active_view_id == view_id;
+    const bool can_cancel = same_view && loader != nullptr;
 
     if (can_cancel)
     {
         qDebug().nospace() << "[Queue] cancel active view=" << view_id.toString() << " file=\""
-                           << m_active_file_path << "\"";
+                           << m_active_file_path << '"';
+
         loader->cancel_async();
-        m_active_view_id = QUuid();
-        m_active_file_path = QString();
-        m_active_batch_size = 1000;
     }
 
     clear_pending_for_view(view_id);

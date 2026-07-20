@@ -584,3 +584,58 @@ TEST_F(LogIngestControllerTest, DestructorCancelsAndDisconnectsNoLateSignals)
     // No new signals must have been forwarded after deletion.
     EXPECT_EQ(before_total, after_total);
 }
+
+/**
+ * @brief Verifies that cancellation does not reassign late signals to the next view.
+ */
+TEST_F(LogIngestControllerTest, KeepsCancelledStreamAssignedUntilLoaderIsIdle)
+{
+    ASSERT_NE(m_ctrl, nullptr);
+    ASSERT_FALSE(m_temp_log_path.isEmpty());
+
+    const QUuid cancelled_view_id = QUuid::createUuid();
+
+    const QUuid following_view_id = QUuid::createUuid();
+
+    QSignalSpy batch_spy(m_ctrl, &LogIngestController::entry_batch_parsed);
+
+    QSignalSpy finished_spy(m_ctrl, &LogIngestController::finished);
+
+    QSignalSpy idle_spy(m_ctrl, &LogIngestController::idle);
+
+    m_ctrl->enqueue_stream(cancelled_view_id, m_temp_log_path);
+
+    m_ctrl->start_next_if_idle(1);
+
+    m_ctrl->cancel_for_view(cancelled_view_id);
+
+    m_ctrl->enqueue_stream(following_view_id, m_temp_log_path);
+
+    m_ctrl->start_next_if_idle(1);
+
+    const QUuid active_after_cancel = m_ctrl->get_active_view_id();
+
+    EXPECT_EQ(active_after_cancel, cancelled_view_id);
+
+    QTRY_VERIFY(idle_spy.count() >= 1);
+
+    QTRY_VERIFY(finished_spy.count() >= 1);
+
+    for (const QList<QVariant>& arguments: batch_spy)
+    {
+        ASSERT_GE(arguments.size(), 1);
+
+        const QUuid signal_view_id = arguments.at(0).toUuid();
+
+        EXPECT_TRUE(signal_view_id == cancelled_view_id || signal_view_id == following_view_id);
+    }
+
+    for (const QList<QVariant>& arguments: finished_spy)
+    {
+        ASSERT_GE(arguments.size(), 1);
+
+        const QUuid signal_view_id = arguments.at(0).toUuid();
+
+        EXPECT_TRUE(signal_view_id == cancelled_view_id || signal_view_id == following_view_id);
+    }
+}

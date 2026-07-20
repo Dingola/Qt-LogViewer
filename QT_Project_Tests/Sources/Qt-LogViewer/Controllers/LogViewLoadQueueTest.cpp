@@ -207,32 +207,71 @@ TEST_F(LogViewLoadQueueTest, ClearPendingForViewRemovesOnlyTargets)
 }
 
 /**
- * @brief cancel_if_active clears active and pending for that view and resets batch size (with
- * loader).
+ * @brief Verifies that cancellation retains the active assignment and removes pending items.
  */
-TEST_F(LogViewLoadQueueTest, CancelIfActiveClearsActiveAndPendingWithLoader)
+TEST_F(LogViewLoadQueueTest, CancelIfActiveKeepsAssignmentUntilIdle)
 {
-    const QString pa1 = make_nonexistent_path();
-    const QString pa2 = make_nonexistent_path();
-    const QString pb1 = make_nonexistent_path();
+    const QUuid first_view_id = QUuid::createUuid();
 
-    m_queue.enqueue(m_view_a, pa1);
-    m_queue.enqueue(m_view_a, pa2);
-    m_queue.enqueue(m_view_b, pb1);
+    const QUuid second_view_id = QUuid::createUuid();
 
-    const bool started = m_queue.try_start_next(m_loader, 77);
-    EXPECT_TRUE(started);
-    EXPECT_EQ(m_queue.get_active_view_id(), m_view_a);
-    EXPECT_EQ(m_queue.get_active_file_path(), pa1);
+    const QString active_file_path =
+        QDir::temp().filePath(QStringLiteral("qt_lvq_nonexistent_%1.log")
+                                  .arg(QUuid::createUuid().toString(QUuid::WithoutBraces)));
+
+    const QString pending_first_view_path =
+        QDir::temp().filePath(QStringLiteral("qt_lvq_nonexistent_%1.log")
+                                  .arg(QUuid::createUuid().toString(QUuid::WithoutBraces)));
+
+    const QString pending_second_view_path =
+        QDir::temp().filePath(QStringLiteral("qt_lvq_nonexistent_%1.log")
+                                  .arg(QUuid::createUuid().toString(QUuid::WithoutBraces)));
+
+    LogLoadingService loader(QStringLiteral("{timestamp} {level} {message} {app_name}"));
+
+    m_queue.enqueue(first_view_id, active_file_path);
+
+    m_queue.enqueue(first_view_id, pending_first_view_path);
+
+    m_queue.enqueue(second_view_id, pending_second_view_path);
+
+    ASSERT_TRUE(m_queue.try_start_next(&loader, 77));
+
+    ASSERT_EQ(m_queue.get_active_view_id(), first_view_id);
+
+    ASSERT_EQ(m_queue.get_active_file_path(), active_file_path);
+
+    ASSERT_EQ(m_queue.get_active_batch_size(), 77);
+
+    ASSERT_EQ(m_queue.get_pending_count(), 2);
+
+    m_queue.cancel_if_active(&loader, first_view_id);
+
+    EXPECT_EQ(m_queue.get_active_view_id(), first_view_id);
+
+    EXPECT_EQ(m_queue.get_active_file_path(), active_file_path);
+
     EXPECT_EQ(m_queue.get_active_batch_size(), 77);
-    EXPECT_EQ(m_queue.get_pending_count(), 2);
 
-    m_queue.cancel_if_active(m_loader, m_view_a);
+    EXPECT_EQ(m_queue.get_pending_count(), 1);
+
+    m_queue.clear_active();
 
     EXPECT_TRUE(m_queue.get_active_view_id().isNull());
+
     EXPECT_TRUE(m_queue.get_active_file_path().isEmpty());
+
     EXPECT_EQ(m_queue.get_active_batch_size(), 1000);
-    EXPECT_EQ(m_queue.get_pending_count(), 1);
+
+    ASSERT_TRUE(m_queue.try_start_next(&loader, 25));
+
+    EXPECT_EQ(m_queue.get_active_view_id(), second_view_id);
+
+    EXPECT_EQ(m_queue.get_active_file_path(), pending_second_view_path);
+
+    EXPECT_EQ(m_queue.get_active_batch_size(), 25);
+
+    EXPECT_EQ(m_queue.get_pending_count(), 0);
 }
 
 /**
