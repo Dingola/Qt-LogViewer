@@ -1450,3 +1450,136 @@ TEST_F(LogViewerControllerTest, CompletesSuccessfulAsynchronousImport)
 
     EXPECT_TRUE(m_controller->is_file_loaded(view_id, file->fileName()));
 }
+
+/**
+ * @brief Verifies that closing one view preserves another view using the same file.
+ */
+TEST_F(LogViewerControllerTest, KeepsSharedFileLoadedAfterRemovingOneView)
+{
+    QTemporaryFile* shared_file =
+        create_temp_file({QStringLiteral("2024-01-01 12:00:00 INFO SharedEntry SharedApp")});
+
+    ASSERT_NE(shared_file, nullptr);
+
+    const QUuid first_view_id = m_controller->load_log_file(shared_file->fileName());
+
+    const QUuid second_view_id = m_controller->load_log_file(shared_file->fileName());
+
+    ASSERT_FALSE(first_view_id.isNull());
+    ASSERT_FALSE(second_view_id.isNull());
+    ASSERT_NE(first_view_id, second_view_id);
+
+    ASSERT_TRUE(m_controller->is_file_loaded(first_view_id, shared_file->fileName()));
+
+    ASSERT_TRUE(m_controller->is_file_loaded(second_view_id, shared_file->fileName()));
+
+    const LogPageState* first_page_state = m_controller->get_page_state(first_view_id);
+
+    const LogPageState* second_page_state = m_controller->get_page_state(second_view_id);
+
+    ASSERT_NE(first_page_state, nullptr);
+    ASSERT_NE(second_page_state, nullptr);
+
+    ASSERT_EQ(first_page_state->get_total_entries(), 1);
+
+    ASSERT_EQ(second_page_state->get_total_entries(), 1);
+
+    QSignalSpy view_removed_spy(m_controller, &LogViewerController::view_removed);
+
+    ASSERT_TRUE(m_controller->remove_view(first_view_id));
+
+    EXPECT_EQ(view_removed_spy.count(), 1);
+
+    EXPECT_EQ(m_controller->get_log_model(first_view_id), nullptr);
+
+    EXPECT_FALSE(m_controller->is_file_loaded(first_view_id, shared_file->fileName()));
+
+    EXPECT_NE(m_controller->get_log_model(second_view_id), nullptr);
+
+    EXPECT_TRUE(m_controller->is_file_loaded(second_view_id, shared_file->fileName()));
+
+    second_page_state = m_controller->get_page_state(second_view_id);
+
+    ASSERT_NE(second_page_state, nullptr);
+
+    EXPECT_EQ(second_page_state->get_total_entries(), 1);
+}
+
+/**
+ * @brief Verifies that a shared file continues tailing in the remaining view.
+ */
+TEST_F(LogViewerControllerTest, ContinuesTailingSharedFileInRemainingView)
+{
+    QTemporaryFile* shared_file =
+        create_temp_file({QStringLiteral("2024-01-01 12:00:00 INFO Initial SharedApp")});
+
+    ASSERT_NE(shared_file, nullptr);
+
+    const QUuid removed_view_id = m_controller->load_log_file(shared_file->fileName());
+
+    const QUuid remaining_view_id = m_controller->load_log_file(shared_file->fileName());
+
+    ASSERT_FALSE(removed_view_id.isNull());
+    ASSERT_FALSE(remaining_view_id.isNull());
+
+    ASSERT_TRUE(m_controller->remove_view(removed_view_id));
+
+    QFile file(shared_file->fileName());
+
+    ASSERT_TRUE(file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text));
+
+    QTextStream stream(&file);
+
+    stream << "2024-01-01 12:01:00 ERROR Tailed SharedApp\n";
+
+    stream.flush();
+    file.close();
+
+    QTRY_COMPARE(m_controller->get_page_state(remaining_view_id)->get_total_entries(),
+                 static_cast<qsizetype>(2));
+
+    EXPECT_EQ(m_controller->get_page_state(removed_view_id), nullptr);
+
+    LogModel* remaining_model = m_controller->get_log_model(remaining_view_id);
+
+    ASSERT_NE(remaining_model, nullptr);
+    ASSERT_EQ(remaining_model->rowCount(), 2);
+
+    EXPECT_EQ(remaining_model->get_entry(0).get_message(), QStringLiteral("Tailed"));
+}
+
+/**
+ * @brief Verifies that global file removal affects every view using the file.
+ */
+TEST_F(LogViewerControllerTest, RemovesSharedFileFromAllViewsGlobally)
+{
+    QTemporaryFile* shared_file =
+        create_temp_file({QStringLiteral("2024-01-01 12:00:00 INFO SharedEntry SharedApp")});
+
+    ASSERT_NE(shared_file, nullptr);
+
+    const QUuid first_view_id = m_controller->load_log_file(shared_file->fileName());
+
+    const QUuid second_view_id = m_controller->load_log_file(shared_file->fileName());
+
+    ASSERT_FALSE(first_view_id.isNull());
+    ASSERT_FALSE(second_view_id.isNull());
+
+    QSignalSpy view_removed_spy(m_controller, &LogViewerController::view_removed);
+
+    m_controller->remove_log_file(LogFileInfo(shared_file->fileName()));
+
+    EXPECT_EQ(view_removed_spy.count(), 2);
+
+    EXPECT_EQ(m_controller->get_log_model(first_view_id), nullptr);
+
+    EXPECT_EQ(m_controller->get_log_model(second_view_id), nullptr);
+
+    EXPECT_FALSE(m_controller->is_file_loaded(first_view_id, shared_file->fileName()));
+
+    EXPECT_FALSE(m_controller->is_file_loaded(second_view_id, shared_file->fileName()));
+
+    EXPECT_EQ(m_controller->get_page_state(first_view_id), nullptr);
+
+    EXPECT_EQ(m_controller->get_page_state(second_view_id), nullptr);
+}
