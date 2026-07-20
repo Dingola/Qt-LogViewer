@@ -1655,3 +1655,114 @@ TEST_F(LogViewerControllerTest, CancelsActiveAndPendingImportsWhenRemovingView)
 
     EXPECT_TRUE(m_controller->is_file_loaded(following_view_id, following_file->fileName()));
 }
+
+/**
+ * @brief Verifies that restoring the same session view does not duplicate archived entries.
+ */
+TEST_F(LogViewerControllerTest, RestoresSessionViewWithoutDuplicatingEntries)
+{
+    QTemporaryFile* session_file =
+        create_temp_file({QStringLiteral("2024-01-01 12:00:00 INFO SessionFirst SessionApp"),
+                          QStringLiteral("2024-01-01 12:01:00 ERROR SessionSecond SessionApp")});
+
+    ASSERT_NE(session_file, nullptr);
+
+    SessionViewState state;
+    state.id = QUuid::createUuid();
+    state.loaded_files = {LogFileInfo(session_file->fileName(), QStringLiteral("SessionApp"))};
+    state.filters.live_tailing_enabled = false;
+
+    QSignalSpy loading_finished_spy(m_controller, &LogViewerController::loading_finished);
+
+    const QUuid first_result =
+        m_controller->import_view_state_for_session(QStringLiteral("test-session"), state);
+
+    ASSERT_FALSE(first_result.isNull());
+    EXPECT_EQ(first_result, state.id);
+
+    QTRY_COMPARE(loading_finished_spy.count(), 1);
+
+    LogQuery query;
+
+    ASSERT_TRUE(m_controller->set_page_query(first_result, query));
+
+    const LogPageState* first_page_state = m_controller->get_page_state(first_result);
+
+    ASSERT_NE(first_page_state, nullptr);
+
+    EXPECT_EQ(first_page_state->get_total_entries(), 2);
+
+    const QUuid second_result =
+        m_controller->import_view_state_for_session(QStringLiteral("test-session"), state);
+
+    ASSERT_EQ(second_result, first_result);
+
+    QTRY_COMPARE(loading_finished_spy.count(), 2);
+
+    ASSERT_TRUE(m_controller->set_page_query(second_result, query));
+
+    const LogPageState* second_page_state = m_controller->get_page_state(second_result);
+
+    ASSERT_NE(second_page_state, nullptr);
+
+    EXPECT_EQ(second_page_state->get_total_entries(), 2);
+
+    LogModel* model = m_controller->get_log_model(second_result);
+
+    ASSERT_NE(model, nullptr);
+    ASSERT_EQ(model->rowCount(), 2);
+
+    EXPECT_EQ(model->get_entry(0).get_message(), QStringLiteral("SessionSecond"));
+
+    EXPECT_EQ(model->get_entry(1).get_message(), QStringLiteral("SessionFirst"));
+}
+
+/**
+ * @brief Verifies that restored live tailing starts after the initial import completes.
+ */
+TEST_F(LogViewerControllerTest, StartsRestoredLiveTailingAfterImport)
+{
+    QTemporaryFile* session_file =
+        create_temp_file({QStringLiteral("2024-01-01 12:00:00 INFO Initial SessionApp")});
+
+    ASSERT_NE(session_file, nullptr);
+
+    SessionViewState state;
+    state.id = QUuid::createUuid();
+    state.loaded_files = {LogFileInfo(session_file->fileName(), QStringLiteral("SessionApp"))};
+    state.filters.live_tailing_enabled = true;
+
+    QSignalSpy loading_finished_spy(m_controller, &LogViewerController::loading_finished);
+
+    const QUuid view_id =
+        m_controller->import_view_state_for_session(QStringLiteral("test-session"), state);
+
+    ASSERT_FALSE(view_id.isNull());
+
+    QTRY_COMPARE(loading_finished_spy.count(), 1);
+
+    LogQuery query;
+
+    ASSERT_TRUE(m_controller->set_page_query(view_id, query));
+
+    QFile file(session_file->fileName());
+
+    ASSERT_TRUE(file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text));
+
+    QTextStream stream(&file);
+
+    stream << "2024-01-01 12:01:00 ERROR Tailed SessionApp\n";
+
+    stream.flush();
+    file.close();
+
+    QTRY_COMPARE(m_controller->get_page_state(view_id)->get_total_entries(),
+                 static_cast<qsizetype>(2));
+
+    LogModel* model = m_controller->get_log_model(view_id);
+
+    ASSERT_NE(model, nullptr);
+    ASSERT_EQ(model->rowCount(), 2);
+
+    EXPECT_EQ(model->get_entry(0).get_message(), QStringLiteral("Tailed"));
+}

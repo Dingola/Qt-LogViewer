@@ -1406,7 +1406,24 @@ auto LogViewerController::import_view_state(const SessionViewState& state) -> QU
     if (m_views != nullptr && m_filters != nullptr)
     {
         result = m_views->import_view_state(state, *m_filters);
-        set_live_tailing_enabled(result, state.filters.live_tailing_enabled);
+
+        if (!result.isNull())
+        {
+            cancel_loading(result);
+
+            m_tailer_service->stop_tailing_view(result);
+
+            m_history_service->remove_view_entries(result);
+
+            if (state.filters.live_tailing_enabled)
+            {
+                m_live_tailing_views.insert(result);
+            }
+            else
+            {
+                m_live_tailing_views.remove(result);
+            }
+        }
 
         // Update explorer tree
         if (m_catalog != nullptr && !state.loaded_files.isEmpty())
@@ -1461,12 +1478,23 @@ auto LogViewerController::import_view_state_for_session(const QString& session_i
     {
         result = m_views->import_view_state(state, *m_filters);
 
-        if (!result.isNull() && m_history_service != nullptr)
+        if (!result.isNull())
         {
-            m_history_service->remove_view_entries(result);
-        }
+            cancel_loading(result);
 
-        set_live_tailing_enabled(result, state.filters.live_tailing_enabled);
+            m_tailer_service->stop_tailing_view(result);
+
+            m_history_service->remove_view_entries(result);
+
+            if (state.filters.live_tailing_enabled)
+            {
+                m_live_tailing_views.insert(result);
+            }
+            else
+            {
+                m_live_tailing_views.remove(result);
+            }
+        }
 
         // Update explorer tree with session context
         if (m_catalog != nullptr && !state.loaded_files.isEmpty() && !session_id.isEmpty())
