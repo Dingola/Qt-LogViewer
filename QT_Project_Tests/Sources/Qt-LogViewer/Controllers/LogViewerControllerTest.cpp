@@ -2150,3 +2150,103 @@ TEST_F(LogViewerControllerTest, ShutsDownSafelyDuringAsynchronousImport)
 
     EXPECT_EQ(loading_error_spy.count(), error_count_after_shutdown);
 }
+
+/**
+ * @brief Verifies that a missing synchronous file does not create a view.
+ */
+TEST_F(LogViewerControllerTest, RejectsMissingFileDuringSynchronousLoading)
+{
+    const QVector<QUuid> views_before = m_controller->get_all_view_ids();
+
+    const QString missing_file = QDir::temp().filePath(
+        QStringLiteral("missing-%1.log").arg(QUuid::createUuid().toString(QUuid::WithoutBraces)));
+
+    const QUuid result = m_controller->load_log_file(missing_file);
+
+    EXPECT_TRUE(result.isNull());
+
+    EXPECT_EQ(m_controller->get_all_view_ids(), views_before);
+
+    EXPECT_FALSE(m_controller->is_file_loaded(missing_file));
+}
+
+/**
+ * @brief Verifies that a missing file does not change an existing view.
+ */
+TEST_F(LogViewerControllerTest, RejectsMissingFileForExistingView)
+{
+    const QVector<QString> files_before = m_controller->get_view_file_paths(m_view_id);
+
+    const LogPageState* page_state_before = m_controller->get_page_state(m_view_id);
+
+    ASSERT_NE(page_state_before, nullptr);
+
+    const qsizetype entries_before = page_state_before->get_total_entries();
+
+    const QString missing_file = QDir::temp().filePath(
+        QStringLiteral("missing-%1.log").arg(QUuid::createUuid().toString(QUuid::WithoutBraces)));
+
+    EXPECT_FALSE(m_controller->load_log_file(m_view_id, missing_file));
+
+    EXPECT_EQ(m_controller->get_view_file_paths(m_view_id), files_before);
+
+    EXPECT_FALSE(m_controller->is_file_loaded(m_view_id, missing_file));
+
+    const LogPageState* page_state_after = m_controller->get_page_state(m_view_id);
+
+    ASSERT_NE(page_state_after, nullptr);
+
+    EXPECT_EQ(page_state_after->get_total_entries(), entries_before);
+}
+
+/**
+ * @brief Verifies that one invalid path prevents a synchronous multi-file import.
+ */
+TEST_F(LogViewerControllerTest, RejectsIncompleteSynchronousMultiFileImport)
+{
+    QTemporaryFile* valid_file =
+        create_temp_file({QStringLiteral("2024-01-01 12:00:00 INFO ValidEntry ImportApp")});
+
+    ASSERT_NE(valid_file, nullptr);
+
+    const QString missing_file = QDir::temp().filePath(
+        QStringLiteral("missing-%1.log").arg(QUuid::createUuid().toString(QUuid::WithoutBraces)));
+
+    const QVector<QUuid> views_before = m_controller->get_all_view_ids();
+
+    const QUuid result = m_controller->load_log_files({valid_file->fileName(), missing_file});
+
+    EXPECT_TRUE(result.isNull());
+
+    EXPECT_EQ(m_controller->get_all_view_ids(), views_before);
+
+    EXPECT_FALSE(m_controller->is_file_loaded(valid_file->fileName()));
+
+    EXPECT_FALSE(m_controller->is_file_loaded(missing_file));
+}
+
+/**
+ * @brief Verifies that an existing empty file remains a valid synchronous import.
+ */
+TEST_F(LogViewerControllerTest, LoadsExistingEmptyFileSynchronously)
+{
+    QTemporaryFile* empty_file = create_temp_file({});
+
+    ASSERT_NE(empty_file, nullptr);
+
+    const QUuid view_id = m_controller->load_log_file(empty_file->fileName());
+
+    ASSERT_FALSE(view_id.isNull());
+
+    EXPECT_TRUE(m_controller->is_file_loaded(view_id, empty_file->fileName()));
+
+    const LogPageState* page_state = m_controller->get_page_state(view_id);
+
+    ASSERT_NE(page_state, nullptr);
+    EXPECT_EQ(page_state->get_total_entries(), 0);
+
+    LogModel* model = m_controller->get_log_model(view_id);
+
+    ASSERT_NE(model, nullptr);
+    EXPECT_EQ(model->rowCount(), 0);
+}

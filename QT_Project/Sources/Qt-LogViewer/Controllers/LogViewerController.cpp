@@ -538,28 +538,50 @@ auto LogViewerController::add_log_files_to_session(const QString& session_id,
  */
 auto LogViewerController::load_log_file(const QString& file_path) -> QUuid
 {
-    const QVector<LogEntry> entries = m_ingest->load_file_sync(file_path);
+    QUuid view_id;
 
-    const QString app_name =
-        !entries.isEmpty() ? entries.first().get_app_name() : LogLoader::identify_app(file_path);
+    const QFileInfo file_info(file_path);
 
-    const LogFileInfo loaded_file(file_path, app_name);
+    const bool can_load = file_info.exists() && file_info.isFile() && file_info.isReadable();
 
-    const QUuid view_id = m_views->create_view();
-
-    LogViewContext* context = m_views->get_context(view_id);
-
-    if (context != nullptr)
+    if (can_load)
     {
-        m_history_service->add_entries(view_id, entries);
+        const QVector<LogEntry> entries = m_ingest->load_file_sync(file_path);
 
-        m_views->set_loaded_files(view_id, QList<LogFileInfo>{loaded_file});
+        const QString app_name = !entries.isEmpty() ? entries.first().get_app_name()
+                                                    : LogLoader::identify_app(file_path);
 
-        const LogQuery query = create_page_query(view_id);
+        const QUuid candidate_view_id = m_views->create_view();
 
-        m_page_coordinator->set_query(view_id, query);
+        const bool entries_stored =
+            entries.isEmpty() || m_history_service->add_entries(candidate_view_id, entries);
 
-        set_live_tailing_enabled(view_id, true);
+        if (entries_stored)
+        {
+            m_views->set_loaded_files(candidate_view_id,
+                                      QList<LogFileInfo>{LogFileInfo(file_path, app_name)});
+
+            const LogQuery query = create_page_query(candidate_view_id);
+
+            m_page_coordinator->set_query(candidate_view_id, query);
+
+            set_live_tailing_enabled(candidate_view_id, true);
+
+            view_id = candidate_view_id;
+        }
+        else
+        {
+            qWarning().nospace() << "[Controller] synchronous import failed for view="
+                                 << candidate_view_id.toString() << " file=\""
+                                 << file_info.absoluteFilePath() << '"';
+
+            remove_view(candidate_view_id);
+        }
+    }
+    else
+    {
+        qWarning().nospace() << "[Controller] synchronous import rejected file=\""
+                             << file_info.absoluteFilePath() << '"';
     }
 
     return view_id;
@@ -579,7 +601,10 @@ auto LogViewerController::load_log_file(const QUuid& view_id, const QString& fil
 
     LogViewContext* context = m_views->get_context(view_id);
 
-    const bool can_load = context != nullptr && !is_file_loaded(view_id, file_path);
+    const QFileInfo file_info(file_path);
+
+    const bool can_load = context != nullptr && !is_file_loaded(view_id, file_path) &&
+                          file_info.exists() && file_info.isFile() && file_info.isReadable();
 
     if (can_load)
     {
@@ -588,29 +613,39 @@ auto LogViewerController::load_log_file(const QUuid& view_id, const QString& fil
         const QString app_name = !entries.isEmpty() ? entries.first().get_app_name()
                                                     : LogLoader::identify_app(file_path);
 
-        m_history_service->add_entries(view_id, entries);
+        const bool entries_stored =
+            entries.isEmpty() || m_history_service->add_entries(view_id, entries);
 
-        m_views->add_loaded_file(view_id, LogFileInfo(file_path, app_name));
-
-        const LogPageState* page_state = m_page_coordinator->get_page_state(view_id);
-
-        if (page_state != nullptr)
+        if (entries_stored)
         {
-            m_page_coordinator->reload(view_id);
+            m_views->add_loaded_file(view_id, LogFileInfo(file_path, app_name));
+
+            const LogPageState* page_state = m_page_coordinator->get_page_state(view_id);
+
+            if (page_state != nullptr)
+            {
+                m_page_coordinator->reload(view_id);
+            }
+            else
+            {
+                const LogQuery query = create_page_query(view_id);
+
+                m_page_coordinator->set_query(view_id, query);
+            }
+
+            if (get_live_tailing_enabled(view_id))
+            {
+                m_tailer_service->start_tailing(view_id, file_path);
+            }
+
+            loaded = true;
         }
         else
         {
-            const LogQuery query = create_page_query(view_id);
-
-            m_page_coordinator->set_query(view_id, query);
+            qWarning().nospace() << "[Controller] synchronous import failed for view="
+                                 << view_id.toString() << " file=\"" << file_info.absoluteFilePath()
+                                 << '"';
         }
-
-        if (get_live_tailing_enabled(view_id))
-        {
-            m_tailer_service->start_tailing(view_id, file_path);
-        }
-
-        loaded = true;
     }
 
     return loaded;
@@ -624,32 +659,70 @@ auto LogViewerController::load_log_file(const QUuid& view_id, const QString& fil
 auto LogViewerController::load_log_files(const QVector<QString>& file_paths) -> QUuid
 {
     QUuid view_id;
+    bool valid_files = !file_paths.isEmpty();
 
-    if (!file_paths.isEmpty())
+    for (const QString& file_path: file_paths)
     {
-        view_id = m_views->create_view();
+        const QFileInfo file_info(file_path);
+
+        const bool valid_file = file_info.exists() && file_info.isFile() && file_info.isReadable();
+
+        if (!valid_file)
+        {
+            valid_files = false;
+
+            qWarning().nospace() << "[Controller] synchronous import rejected file=\""
+                                 << file_info.absoluteFilePath() << '"';
+        }
+    }
+
+    if (valid_files)
+    {
+        const QUuid candidate_view_id = m_views->create_view();
 
         QList<LogFileInfo> loaded_files;
+        bool entries_stored = true;
 
-        for (const QString& file_path: file_paths)
+        for (qsizetype index = 0; index < file_paths.size() && entries_stored; ++index)
         {
+            const QString& file_path = file_paths.at(index);
+
             const QVector<LogEntry> entries = m_ingest->load_file_sync(file_path);
 
             const QString app_name = !entries.isEmpty() ? entries.first().get_app_name()
                                                         : LogLoader::identify_app(file_path);
 
-            m_history_service->add_entries(view_id, entries);
+            entries_stored =
+                entries.isEmpty() || m_history_service->add_entries(candidate_view_id, entries);
 
-            loaded_files.append(LogFileInfo(file_path, app_name));
+            if (entries_stored)
+            {
+                loaded_files.append(LogFileInfo(file_path, app_name));
+            }
+            else
+            {
+                qWarning().nospace() << "[Controller] synchronous import failed for view="
+                                     << candidate_view_id.toString() << " file=\""
+                                     << QFileInfo(file_path).absoluteFilePath() << '"';
+            }
         }
 
-        m_views->set_loaded_files(view_id, loaded_files);
+        if (entries_stored)
+        {
+            m_views->set_loaded_files(candidate_view_id, loaded_files);
 
-        const LogQuery query = create_page_query(view_id);
+            const LogQuery query = create_page_query(candidate_view_id);
 
-        m_page_coordinator->set_query(view_id, query);
+            m_page_coordinator->set_query(candidate_view_id, query);
 
-        set_live_tailing_enabled(view_id, true);
+            set_live_tailing_enabled(candidate_view_id, true);
+
+            view_id = candidate_view_id;
+        }
+        else
+        {
+            remove_view(candidate_view_id);
+        }
     }
 
     return view_id;
