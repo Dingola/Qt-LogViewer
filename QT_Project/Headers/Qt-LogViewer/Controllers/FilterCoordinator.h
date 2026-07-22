@@ -9,7 +9,7 @@
 
 // Forward declarations
 class ViewRegistry;
-class LogSortFilterProxyModel;
+class LogViewContext;
 
 #include "Qt-LogViewer/Models/SearchFields.h"
 #include "Qt-LogViewer/Models/SessionTypes.h"
@@ -180,12 +180,20 @@ class FilterCoordinator: public QObject
 
     private:
         /**
-         * @brief Helper to access the sort/filter proxy for a given view.
+         * @brief Returns the context of the requested view.
          * @param view_id Target view.
-         * @return Proxy pointer or nullptr.
+         * @return View context or nullptr if the view does not exist.
          */
-        [[nodiscard]] auto get_sort_filter_proxy(const QUuid& view_id) const
-            -> LogSortFilterProxyModel*;
+        [[nodiscard]] auto get_context(const QUuid& view_id) const -> LogViewContext*;
 
+        /**
+         * @brief Normalizes log-level names for query comparisons.
+         * @param levels Log-level names to normalize.
+         * @return Trimmed, lowercase log-level names.
+         */
+        [[nodiscard]] static auto normalize_log_levels(const QSet<QString>& levels)
+            -> QSet<QString>;
+
+    private:
         ViewRegistry* m_views{nullptr};
 };

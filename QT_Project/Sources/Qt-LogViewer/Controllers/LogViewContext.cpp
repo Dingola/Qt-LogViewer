@@ -30,7 +30,8 @@ LogViewContext::LogViewContext(QObject* parent)
       m_model(new LogModel(this)),
       m_sort_proxy(new LogSortFilterProxyModel(this)),
       m_paging_proxy(new PagingProxyModel(this)),
-      m_loaded_files()
+      m_loaded_files(),
+      m_filter_state()
 {
     m_sort_proxy->setSourceModel(m_model);
     m_sort_proxy->sort(LogModel::Timestamp, Qt::DescendingOrder);
@@ -192,4 +193,22 @@ auto LogViewContext::get_file_paths() const -> QVector<QString>
 auto LogViewContext::clear_loaded_files() -> void
 {
     m_loaded_files.clear();
+}
+
+/**
+ * @brief Returns the filter state of this view.
+ * @return Current filter and file-visibility state.
+ */
+auto LogViewContext::get_filter_state() const -> FilterState
+{
+    return m_filter_state;
+}
+
+/**
+ * @brief Replaces the filter state of this view.
+ * @param state New filter and file-visibility state.
+ */
+auto LogViewContext::set_filter_state(const FilterState& state) -> void
+{
+    m_filter_state = state;
 }

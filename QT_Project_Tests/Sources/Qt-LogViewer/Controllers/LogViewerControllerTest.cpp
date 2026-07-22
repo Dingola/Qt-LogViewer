@@ -164,97 +164,135 @@ TEST_F(LogViewerControllerTest, LoadsAllLogEntriesAndModels)
 }
 
 /**
- * @brief Tests filtering by application name.
+ * @brief Tests database-backed filtering by application name.
  */
 TEST_F(LogViewerControllerTest, FilterByAppName)
 {
-    auto* proxy = m_controller->get_sort_filter_proxy();
-    ASSERT_NE(proxy, nullptr);
+    LogModel* model = m_controller->get_log_model();
+    ASSERT_NE(model, nullptr);
 
-    m_controller->set_app_name_filter("AppA");
-    EXPECT_EQ(proxy->rowCount(), 2);
+    m_controller->set_app_name_filter(QStringLiteral("AppA"));
+    ASSERT_TRUE(
+        m_controller->set_page_query(m_view_id, m_controller->create_page_query(m_view_id)));
+    EXPECT_EQ(model->rowCount(), 2);
 
-    m_controller->set_app_name_filter("AppB");
-    EXPECT_EQ(proxy->rowCount(), 2);
+    m_controller->set_app_name_filter(QStringLiteral("AppB"));
+    ASSERT_TRUE(
+        m_controller->set_page_query(m_view_id, m_controller->create_page_query(m_view_id)));
+    EXPECT_EQ(model->rowCount(), 2);
 
-    m_controller->set_app_name_filter("NonExistentApp");
-    EXPECT_EQ(proxy->rowCount(), 0);
+    m_controller->set_app_name_filter(QStringLiteral("NonExistentApp"));
+    ASSERT_TRUE(
+        m_controller->set_page_query(m_view_id, m_controller->create_page_query(m_view_id)));
+    EXPECT_EQ(model->rowCount(), 0);
 
-    m_controller->set_app_name_filter("");
-    EXPECT_EQ(proxy->rowCount(), 4);
+    m_controller->set_app_name_filter(QString());
+    ASSERT_TRUE(
+        m_controller->set_page_query(m_view_id, m_controller->create_page_query(m_view_id)));
+    EXPECT_EQ(model->rowCount(), 4);
 }
 
 /**
- * @brief Tests filtering by log level.
+ * @brief Tests database-backed filtering by log level.
  */
 TEST_F(LogViewerControllerTest, FilterByLogLevel)
 {
-    auto* proxy = m_controller->get_sort_filter_proxy();
-    ASSERT_NE(proxy, nullptr);
+    LogModel* model = m_controller->get_log_model();
+    ASSERT_NE(model, nullptr);
 
-    QSet<QString> levels;
-    levels.insert("INFO");
-    m_controller->set_log_level_filters(levels);
-    EXPECT_EQ(proxy->rowCount(), 2);
+    QSet<QString> levels{QStringLiteral("INFO")};
 
-    levels.insert("ERROR");
     m_controller->set_log_level_filters(levels);
-    EXPECT_EQ(proxy->rowCount(), 3);
+    ASSERT_TRUE(
+        m_controller->set_page_query(m_view_id, m_controller->create_page_query(m_view_id)));
+    EXPECT_EQ(model->rowCount(), 2);
+
+    levels.insert(QStringLiteral("ERROR"));
+
+    m_controller->set_log_level_filters(levels);
+    ASSERT_TRUE(
+        m_controller->set_page_query(m_view_id, m_controller->create_page_query(m_view_id)));
+    EXPECT_EQ(model->rowCount(), 3);
 
     levels.clear();
+
     m_controller->set_log_level_filters(levels);
-    EXPECT_EQ(proxy->rowCount(), 4);
+    ASSERT_TRUE(
+        m_controller->set_page_query(m_view_id, m_controller->create_page_query(m_view_id)));
+    EXPECT_EQ(model->rowCount(), 4);
 }
 
 /**
- * @brief Tests filtering by search string (plain text).
+ * @brief Tests database-backed plain-text searching.
  */
 TEST_F(LogViewerControllerTest, FilterBySearchText)
 {
-    auto* proxy = m_controller->get_sort_filter_proxy();
-    ASSERT_NE(proxy, nullptr);
+    LogModel* model = m_controller->get_log_model();
+    ASSERT_NE(model, nullptr);
 
-    m_controller->set_search_filter("Debug", SearchField::Message, false);
-    EXPECT_EQ(proxy->rowCount(), 1);
+    m_controller->set_search_filter(QStringLiteral("Debug"), SearchField::Message, false);
+    ASSERT_TRUE(
+        m_controller->set_page_query(m_view_id, m_controller->create_page_query(m_view_id)));
+    EXPECT_EQ(model->rowCount(), 1);
 
-    m_controller->set_search_filter("User", SearchField::Message, false);
-    EXPECT_EQ(proxy->rowCount(), 1);
+    m_controller->set_search_filter(QStringLiteral("User"), SearchField::Message, false);
+    ASSERT_TRUE(
+        m_controller->set_page_query(m_view_id, m_controller->create_page_query(m_view_id)));
+    EXPECT_EQ(model->rowCount(), 1);
 
-    m_controller->set_search_filter("AppA", SearchField::AppName, false);
-    EXPECT_EQ(proxy->rowCount(), 2);
+    m_controller->set_search_filter(QStringLiteral("AppA"), SearchField::AppName, false);
+    ASSERT_TRUE(
+        m_controller->set_page_query(m_view_id, m_controller->create_page_query(m_view_id)));
+    EXPECT_EQ(model->rowCount(), 2);
 
-    m_controller->set_search_filter("Crash", SearchField::Message, false);
-    EXPECT_EQ(proxy->rowCount(), 1);
+    m_controller->set_search_filter(QStringLiteral("Crash"), SearchField::Message, false);
+    ASSERT_TRUE(
+        m_controller->set_page_query(m_view_id, m_controller->create_page_query(m_view_id)));
+    EXPECT_EQ(model->rowCount(), 1);
 
-    m_controller->set_search_filter("NotFound", SearchField::Message, false);
-    EXPECT_EQ(proxy->rowCount(), 0);
+    m_controller->set_search_filter(QStringLiteral("NotFound"), SearchField::Message, false);
+    ASSERT_TRUE(
+        m_controller->set_page_query(m_view_id, m_controller->create_page_query(m_view_id)));
+    EXPECT_EQ(model->rowCount(), 0);
 
-    m_controller->set_search_filter("", SearchField::Message, false);
-    EXPECT_EQ(proxy->rowCount(), 4);
+    m_controller->set_search_filter(QString(), SearchField::Message, false);
+    ASSERT_TRUE(
+        m_controller->set_page_query(m_view_id, m_controller->create_page_query(m_view_id)));
+    EXPECT_EQ(model->rowCount(), 4);
 }
 
 /**
- * @brief Tests filtering by search string (regex).
+ * @brief Tests database-backed regular-expression searching.
  */
 TEST_F(LogViewerControllerTest, FilterBySearchRegex)
 {
-    auto* proxy = m_controller->get_sort_filter_proxy();
-    ASSERT_NE(proxy, nullptr);
+    LogModel* model = m_controller->get_log_model();
+    ASSERT_NE(model, nullptr);
 
-    m_controller->set_search_filter("^User.*", SearchField::Message, true);
-    EXPECT_EQ(proxy->rowCount(), 1);
+    m_controller->set_search_filter(QStringLiteral("^User.*"), SearchField::Message, true);
+    ASSERT_TRUE(
+        m_controller->set_page_query(m_view_id, m_controller->create_page_query(m_view_id)));
+    EXPECT_EQ(model->rowCount(), 1);
 
-    m_controller->set_search_filter(".*ing$", SearchField::Message, true);
-    EXPECT_EQ(proxy->rowCount(), 1);
+    m_controller->set_search_filter(QStringLiteral(".*ing$"), SearchField::Message, true);
+    ASSERT_TRUE(
+        m_controller->set_page_query(m_view_id, m_controller->create_page_query(m_view_id)));
+    EXPECT_EQ(model->rowCount(), 1);
 
-    m_controller->set_search_filter("Crash|Startup", SearchField::Message, true);
-    EXPECT_EQ(proxy->rowCount(), 2);
+    m_controller->set_search_filter(QStringLiteral("Crash|Startup"), SearchField::Message, true);
+    ASSERT_TRUE(
+        m_controller->set_page_query(m_view_id, m_controller->create_page_query(m_view_id)));
+    EXPECT_EQ(model->rowCount(), 2);
 
-    m_controller->set_search_filter("NoMatch", SearchField::Message, true);
-    EXPECT_EQ(proxy->rowCount(), 0);
+    m_controller->set_search_filter(QStringLiteral("NoMatch"), SearchField::Message, true);
+    ASSERT_TRUE(
+        m_controller->set_page_query(m_view_id, m_controller->create_page_query(m_view_id)));
+    EXPECT_EQ(model->rowCount(), 0);
 
-    m_controller->set_search_filter("", SearchField::Message, true);
-    EXPECT_EQ(proxy->rowCount(), 4);
+    m_controller->set_search_filter(QString(), SearchField::Message, true);
+    ASSERT_TRUE(
+        m_controller->set_page_query(m_view_id, m_controller->create_page_query(m_view_id)));
+    EXPECT_EQ(model->rowCount(), 4);
 }
 
 /**
@@ -596,12 +634,12 @@ TEST_F(LogViewerControllerTest, FilterGetters)
  */
 TEST_F(LogViewerControllerTest, SetAppNameFilterInvalidViewId)
 {
-    QUuid invalid_id = QUuid::createUuid();
-    m_controller->set_app_name_filter(invalid_id, "NonExistentApp");
+    const QUuid invalid_id = QUuid::createUuid();
 
-    auto* proxy = m_controller->get_sort_filter_proxy();
-    ASSERT_NE(proxy, nullptr);
-    EXPECT_EQ(proxy->get_app_name_filter(), "");
+    m_controller->set_app_name_filter(invalid_id, QStringLiteral("NonExistentApp"));
+
+    EXPECT_TRUE(m_controller->get_app_name_filter(invalid_id).isEmpty());
+    EXPECT_TRUE(m_controller->get_app_name_filter(m_view_id).isEmpty());
 }
 
 /**
@@ -609,14 +647,13 @@ TEST_F(LogViewerControllerTest, SetAppNameFilterInvalidViewId)
  */
 TEST_F(LogViewerControllerTest, SetLogLevelFiltersInvalidViewId)
 {
-    QUuid invalid_id = QUuid::createUuid();
-    QSet<QString> levels;
-    levels.insert("INFO");
+    const QUuid invalid_id = QUuid::createUuid();
+    const QSet<QString> levels{QStringLiteral("INFO")};
+
     m_controller->set_log_level_filters(invalid_id, levels);
 
-    auto* proxy = m_controller->get_sort_filter_proxy();
-    ASSERT_NE(proxy, nullptr);
-    EXPECT_EQ(proxy->get_log_level_filters().size(), 0);
+    EXPECT_TRUE(m_controller->get_log_level_filters(invalid_id).isEmpty());
+    EXPECT_TRUE(m_controller->get_log_level_filters(m_view_id).isEmpty());
 }
 
 /**
@@ -624,13 +661,16 @@ TEST_F(LogViewerControllerTest, SetLogLevelFiltersInvalidViewId)
  */
 TEST_F(LogViewerControllerTest, SetSearchFilterInvalidViewId)
 {
-    QUuid invalid_id = QUuid::createUuid();
-    m_controller->set_search_filter(invalid_id, "NonExistentText", SearchField::Message, true);
+    const QUuid invalid_id = QUuid::createUuid();
 
-    auto* proxy = m_controller->get_sort_filter_proxy();
-    ASSERT_NE(proxy, nullptr);
-    EXPECT_EQ(proxy->get_app_name_filter(), "");
-    EXPECT_EQ(proxy->get_log_level_filters().size(), 0);
+    m_controller->set_search_filter(invalid_id, QStringLiteral("NonExistentText"),
+                                    SearchField::Message, true);
+
+    EXPECT_TRUE(m_controller->get_search_text(invalid_id).isEmpty());
+    EXPECT_EQ(m_controller->get_search_field(invalid_id), SearchField::AllFields);
+    EXPECT_FALSE(m_controller->is_search_regex(invalid_id));
+
+    EXPECT_TRUE(m_controller->get_search_text(m_view_id).isEmpty());
 }
 
 /**

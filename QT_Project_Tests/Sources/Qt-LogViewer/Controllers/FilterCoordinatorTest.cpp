@@ -55,19 +55,20 @@ auto FilterCoordinatorTest::make_temp_abs_path(const QString& stem) const -> QSt
 }
 
 /**
- * @brief Helper to get the proxy model for a view id.
- *
+ * @brief Returns the filter state of a view.
  * @param view_id Target view id.
- * @return Pointer to LogSortFilterProxyModel if found; nullptr otherwise.
+ * @return Current filter state or a default state if the view does not exist.
  */
-auto FilterCoordinatorTest::proxy_for(const QUuid& view_id) const -> LogSortFilterProxyModel*
+auto FilterCoordinatorTest::filter_state_for(const QUuid& view_id) const -> FilterState
 {
-    auto* ctx = m_views->get_context(view_id);
-    return ctx != nullptr ? ctx->get_sort_proxy() : nullptr;
+    const LogViewContext* context = m_views->get_context(view_id);
+    const FilterState state = context != nullptr ? context->get_filter_state() : FilterState();
+
+    return state;
 }
 
 /**
- * @brief App-name setter delegates to proxy and getters return same value.
+ * @brief App-name setter updates the view state and coordinator getter.
  */
 TEST_F(FilterCoordinatorTest, SetAppNameAndGettersRoundtrip)
 {
@@ -76,44 +77,35 @@ TEST_F(FilterCoordinatorTest, SetAppNameAndGettersRoundtrip)
     const QString app = QStringLiteral("MyApp");
     m_fc->set_app_name(m_view, app);
 
-    auto* proxy = proxy_for(m_view);
-    ASSERT_NE(proxy, nullptr);
+    const FilterState state = filter_state_for(m_view);
 
-    EXPECT_EQ(proxy->get_app_name_filter(), app);
+    EXPECT_EQ(state.app_name, app);
     EXPECT_EQ(m_fc->get_app_name(m_view), app);
 }
 
 /**
- * @brief Log level filters delegate to proxy and getters return same set (case-insensitive).
- *
- * Note: LogSortFilterProxyModel normalizes levels to lowercase internally, so compare
- * case-insensitively.
+ * @brief Log-level filters are normalized and stored in the view state.
  */
 TEST_F(FilterCoordinatorTest, SetLogLevelsAndGettersRoundtrip)
 {
     ASSERT_NE(m_fc, nullptr);
 
-    QSet<QString> levels{QStringLiteral("Info"), QStringLiteral("Error"), QStringLiteral("Debug")};
+    const QSet<QString> levels{QStringLiteral("Info"), QStringLiteral(" Error "),
+                               QStringLiteral("DEBUG")};
+
+    const QSet<QString> expected{QStringLiteral("info"), QStringLiteral("error"),
+                                 QStringLiteral("debug")};
+
     m_fc->set_log_levels(m_view, levels);
 
-    auto* proxy = proxy_for(m_view);
-    ASSERT_NE(proxy, nullptr);
+    const FilterState state = filter_state_for(m_view);
 
-    auto to_lower = [](const QSet<QString>& s) {
-        QSet<QString> out;
-        for (const auto& v: s)
-        {
-            out.insert(v.toLower());
-        }
-        return out;
-    };
-
-    EXPECT_EQ(to_lower(proxy->get_log_level_filters()), to_lower(levels));
-    EXPECT_EQ(to_lower(m_fc->get_log_levels(m_view)), to_lower(levels));
+    EXPECT_EQ(state.log_levels, expected);
+    EXPECT_EQ(m_fc->get_log_levels(m_view), expected);
 }
 
 /**
- * @brief Search filter delegates to proxy and getters reflect text/field/regex.
+ * @brief Search settings are stored in the view state and returned by the coordinator.
  */
 TEST_F(FilterCoordinatorTest, SetSearchAndGettersRoundtrip)
 {
@@ -125,12 +117,11 @@ TEST_F(FilterCoordinatorTest, SetSearchAndGettersRoundtrip)
 
     m_fc->set_search(m_view, text, field, use_regex);
 
-    auto* proxy = proxy_for(m_view);
-    ASSERT_NE(proxy, nullptr);
+    const FilterState state = filter_state_for(m_view);
 
-    EXPECT_EQ(proxy->get_search_text(), text);
-    EXPECT_EQ(proxy->get_search_field(), field);
-    EXPECT_TRUE(proxy->is_search_regex());
+    EXPECT_EQ(state.search_text, text);
+    EXPECT_EQ(state.search_field, field);
+    EXPECT_TRUE(state.use_regex);
 
     EXPECT_EQ(m_fc->get_search_text(m_view), text);
     EXPECT_EQ(m_fc->get_search_field(m_view), field);
@@ -138,7 +129,7 @@ TEST_F(FilterCoordinatorTest, SetSearchAndGettersRoundtrip)
 }
 
 /**
- * @brief set_show_only applies path, unhides target, and reset clears hidden set.
+ * @brief Show-only unhides its target and resetting it clears hidden files.
  */
 TEST_F(FilterCoordinatorTest, ShowOnlyApplyAndReset)
 {
@@ -147,29 +138,28 @@ TEST_F(FilterCoordinatorTest, ShowOnlyApplyAndReset)
     const QString f1 = make_temp_abs_path("a");
     const QString f2 = make_temp_abs_path("b");
 
-    // Seed loaded files and hidden one of them
-    QList<LogFileInfo> files{LogFileInfo(f1), LogFileInfo(f2)};
-    m_views->set_loaded_files(m_view, files);
+    m_views->set_loaded_files(m_view, QList<LogFileInfo>{LogFileInfo(f1), LogFileInfo(f2)});
 
-    auto* proxy = proxy_for(m_view);
-    ASSERT_NE(proxy, nullptr);
+    m_fc->hide_file(m_view, f1);
 
-    proxy->hide_file(f1);
-    ASSERT_TRUE(proxy->get_hidden_file_paths().contains(f1));
+    FilterState state = filter_state_for(m_view);
+    ASSERT_TRUE(state.hidden_files.contains(f1));
 
-    // Apply show-only -> set, and target must be unhidden
     m_fc->set_show_only(m_view, f1);
-    EXPECT_EQ(proxy->get_show_only_file_path(), f1);
-    EXPECT_FALSE(proxy->get_hidden_file_paths().contains(f1));
 
-    // Reset show-only -> empty and hidden cleared
+    state = filter_state_for(m_view);
+    EXPECT_EQ(state.show_only_file, f1);
+    EXPECT_FALSE(state.hidden_files.contains(f1));
+
     m_fc->set_show_only(m_view, QString());
-    EXPECT_TRUE(proxy->get_show_only_file_path().isEmpty());
-    EXPECT_TRUE(proxy->get_hidden_file_paths().isEmpty());
+
+    state = filter_state_for(m_view);
+    EXPECT_TRUE(state.show_only_file.isEmpty());
+    EXPECT_TRUE(state.hidden_files.isEmpty());
 }
 
 /**
- * @brief toggle_visibility without show-only toggles hidden/unhidden for the file.
+ * @brief File visibility can be toggled without an active show-only filter.
  */
 TEST_F(FilterCoordinatorTest, ToggleVisibilityWithoutShowOnly)
 {
@@ -177,26 +167,25 @@ TEST_F(FilterCoordinatorTest, ToggleVisibilityWithoutShowOnly)
 
     const QString f1 = make_temp_abs_path("t1");
     const QString f2 = make_temp_abs_path("t2");
+
     m_views->set_loaded_files(m_view, QList<LogFileInfo>{LogFileInfo(f1), LogFileInfo(f2)});
 
-    auto* proxy = proxy_for(m_view);
-    ASSERT_NE(proxy, nullptr);
+    FilterState state = filter_state_for(m_view);
+    EXPECT_TRUE(state.show_only_file.isEmpty());
 
-    // No show-only active
-    EXPECT_TRUE(proxy->get_show_only_file_path().isEmpty());
-
-    // Toggle f1 -> hidden
     m_fc->toggle_visibility(m_view, f1);
-    EXPECT_TRUE(proxy->get_hidden_file_paths().contains(f1));
 
-    // Toggle f1 again -> unhidden
+    state = filter_state_for(m_view);
+    EXPECT_TRUE(state.hidden_files.contains(f1));
+
     m_fc->toggle_visibility(m_view, f1);
-    EXPECT_FALSE(proxy->get_hidden_file_paths().contains(f1));
+
+    state = filter_state_for(m_view);
+    EXPECT_FALSE(state.hidden_files.contains(f1));
 }
 
 /**
- * @brief toggle_visibility on current show-only target clears show-only and hides all remaining
- * files.
+ * @brief Toggling the show-only target clears show-only and hides every file.
  */
 TEST_F(FilterCoordinatorTest, ToggleVisibilityShowOnlyOnTargetHidesAll)
 {
@@ -204,26 +193,25 @@ TEST_F(FilterCoordinatorTest, ToggleVisibilityShowOnlyOnTargetHidesAll)
 
     const QString f1 = make_temp_abs_path("s1");
     const QString f2 = make_temp_abs_path("s2");
+
     m_views->set_loaded_files(m_view, QList<LogFileInfo>{LogFileInfo(f1), LogFileInfo(f2)});
 
-    auto* proxy = proxy_for(m_view);
-    ASSERT_NE(proxy, nullptr);
+    m_fc->set_show_only(m_view, f1);
 
-    proxy->set_show_only_file_path(f1);
-    ASSERT_EQ(proxy->get_show_only_file_path(), f1);
+    FilterState state = filter_state_for(m_view);
+    ASSERT_EQ(state.show_only_file, f1);
 
     m_fc->toggle_visibility(m_view, f1);
 
-    EXPECT_TRUE(proxy->get_show_only_file_path().isEmpty());
+    state = filter_state_for(m_view);
 
-    const QSet<QString> hidden = proxy->get_hidden_file_paths();
-    // All files in view should be hidden now
-    EXPECT_TRUE(hidden.contains(f1));
-    EXPECT_TRUE(hidden.contains(f2));
+    EXPECT_TRUE(state.show_only_file.isEmpty());
+    EXPECT_TRUE(state.hidden_files.contains(f1));
+    EXPECT_TRUE(state.hidden_files.contains(f2));
 }
 
 /**
- * @brief toggle_visibility on non-target while show-only active clears show-only and hides others.
+ * @brief Toggling another file clears show-only and keeps both selected files visible.
  */
 TEST_F(FilterCoordinatorTest, ToggleVisibilityShowOnlyOnOtherKeepsTwoVisible)
 {
@@ -232,42 +220,42 @@ TEST_F(FilterCoordinatorTest, ToggleVisibilityShowOnlyOnOtherKeepsTwoVisible)
     const QString f1 = make_temp_abs_path("x1");
     const QString f2 = make_temp_abs_path("x2");
     const QString f3 = make_temp_abs_path("x3");
+
     m_views->set_loaded_files(
         m_view, QList<LogFileInfo>{LogFileInfo(f1), LogFileInfo(f2), LogFileInfo(f3)});
 
-    auto* proxy = proxy_for(m_view);
-    ASSERT_NE(proxy, nullptr);
+    m_fc->set_show_only(m_view, f1);
+    m_fc->hide_file(m_view, f3);
 
-    proxy->set_show_only_file_path(f1);
-    // Pre-hide f3 to ensure pre-existing hidden survive (minus exceptions)
-    proxy->hide_file(f3);
-    ASSERT_TRUE(proxy->get_hidden_file_paths().contains(f3));
+    FilterState state = filter_state_for(m_view);
+    ASSERT_EQ(state.show_only_file, f1);
+    ASSERT_TRUE(state.hidden_files.contains(f3));
 
     m_fc->toggle_visibility(m_view, f2);
 
-    EXPECT_TRUE(proxy->get_show_only_file_path().isEmpty());
-    // After toggle, only f3 should remain hidden
-    const QSet<QString> hidden_after = proxy->get_hidden_file_paths();
-    EXPECT_FALSE(hidden_after.contains(f1));
-    EXPECT_FALSE(hidden_after.contains(f2));
-    EXPECT_TRUE(hidden_after.contains(f3));
+    state = filter_state_for(m_view);
+
+    EXPECT_TRUE(state.show_only_file.isEmpty());
+    EXPECT_FALSE(state.hidden_files.contains(f1));
+    EXPECT_FALSE(state.hidden_files.contains(f2));
+    EXPECT_TRUE(state.hidden_files.contains(f3));
 }
 
 /**
- * @brief hide_file delegates to proxy.
+ * @brief Hiding a file stores its path in the view filter state.
  */
-TEST_F(FilterCoordinatorTest, HideFileDelegates)
+TEST_F(FilterCoordinatorTest, HideFileUpdatesViewState)
 {
     ASSERT_NE(m_fc, nullptr);
 
     const QString f1 = make_temp_abs_path("h1");
+
     m_views->set_loaded_files(m_view, QList<LogFileInfo>{LogFileInfo(f1)});
 
-    auto* proxy = proxy_for(m_view);
-    ASSERT_NE(proxy, nullptr);
-
     m_fc->hide_file(m_view, f1);
-    EXPECT_TRUE(proxy->get_hidden_file_paths().contains(f1));
+
+    const FilterState state = filter_state_for(m_view);
+    EXPECT_TRUE(state.hidden_files.contains(f1));
 }
 
 /**
@@ -311,7 +299,7 @@ TEST_F(FilterCoordinatorTest, GetAvailableLogLevelsStaticOrder)
 }
 
 /**
- * @brief adjust_visibility_on_file_removed clears show-only and hides remaining if target removed.
+ * @brief Removing the show-only target clears it and hides every remaining file.
  */
 TEST_F(FilterCoordinatorTest, AdjustVisibilityOnFileRemovedClearsShowOnlyAndHideRemaining)
 {
@@ -322,26 +310,20 @@ TEST_F(FilterCoordinatorTest, AdjustVisibilityOnFileRemovedClearsShowOnlyAndHide
 
     m_views->set_loaded_files(m_view, QList<LogFileInfo>{LogFileInfo(f1), LogFileInfo(f2)});
 
-    auto* proxy = proxy_for(m_view);
-    ASSERT_NE(proxy, nullptr);
+    m_fc->set_show_only(m_view, f1);
 
-    proxy->set_show_only_file_path(f1);
-
-    // Simulate file removal from registry state first
     m_views->remove_entries_by_file(m_view, f1);
-
     m_fc->adjust_visibility_on_file_removed(m_view, f1);
 
-    EXPECT_TRUE(proxy->get_show_only_file_path().isEmpty());
+    const FilterState state = filter_state_for(m_view);
 
-    // Remaining should all be hidden (only f2 should remain in registry)
-    const QSet<QString> hidden = proxy->get_hidden_file_paths();
-    EXPECT_FALSE(hidden.contains(f1));
-    EXPECT_TRUE(hidden.contains(f2));
+    EXPECT_TRUE(state.show_only_file.isEmpty());
+    EXPECT_FALSE(state.hidden_files.contains(f1));
+    EXPECT_TRUE(state.hidden_files.contains(f2));
 }
 
 /**
- * @brief adjust_visibility_on_file_removed removes file from hidden set if it was hidden.
+ * @brief Removing a hidden file removes its path from the filter state.
  */
 TEST_F(FilterCoordinatorTest, AdjustVisibilityOnFileRemovedPrunesHiddenSet)
 {
@@ -352,65 +334,53 @@ TEST_F(FilterCoordinatorTest, AdjustVisibilityOnFileRemovedPrunesHiddenSet)
 
     m_views->set_loaded_files(m_view, QList<LogFileInfo>{LogFileInfo(f1), LogFileInfo(f2)});
 
-    auto* proxy = proxy_for(m_view);
-    ASSERT_NE(proxy, nullptr);
+    m_fc->hide_file(m_view, f1);
+    m_fc->hide_file(m_view, f2);
 
-    proxy->hide_file(f1);
-    proxy->hide_file(f2);
-    ASSERT_TRUE(proxy->get_hidden_file_paths().contains(f1));
-    ASSERT_TRUE(proxy->get_hidden_file_paths().contains(f2));
+    FilterState state = filter_state_for(m_view);
+    ASSERT_TRUE(state.hidden_files.contains(f1));
+    ASSERT_TRUE(state.hidden_files.contains(f2));
 
-    // Simulate removal of f1 from registry state
     m_views->remove_entries_by_file(m_view, f1);
-
     m_fc->adjust_visibility_on_file_removed(m_view, f1);
 
-    const QSet<QString> hidden = proxy->get_hidden_file_paths();
-    EXPECT_FALSE(hidden.contains(f1));
-    EXPECT_TRUE(hidden.contains(f2));
+    state = filter_state_for(m_view);
+
+    EXPECT_FALSE(state.hidden_files.contains(f1));
+    EXPECT_TRUE(state.hidden_files.contains(f2));
 }
 
 /**
- * @brief adjust_visibility_on_global_file_removed applies per-view logic across all views.
+ * @brief Global file removal updates visibility state in every affected view.
  */
 TEST_F(FilterCoordinatorTest, AdjustVisibilityOnGlobalFileRemovedUpdatesAllViews)
 {
     ASSERT_NE(m_fc, nullptr);
 
-    // Create a second view
     const QUuid v2 = m_views->create_view();
 
     const QString f1 = make_temp_abs_path("g1");
     const QString f2 = make_temp_abs_path("g2");
     const QString f3 = make_temp_abs_path("g3");
 
-    // View A: show-only on f1, files [f1, f2]
     m_views->set_loaded_files(m_view, QList<LogFileInfo>{LogFileInfo(f1), LogFileInfo(f2)});
-    auto* pA = proxy_for(m_view);
-    ASSERT_NE(pA, nullptr);
-    pA->set_show_only_file_path(f1);
+    m_fc->set_show_only(m_view, f1);
 
-    // View B: hidden includes f1 and f3, files [f1, f3]
     m_views->set_loaded_files(v2, QList<LogFileInfo>{LogFileInfo(f1), LogFileInfo(f3)});
-    auto* pB = proxy_for(v2);
-    ASSERT_NE(pB, nullptr);
-    pB->hide_file(f1);
-    pB->hide_file(f3);
+    m_fc->hide_file(v2, f1);
+    m_fc->hide_file(v2, f3);
 
-    // Simulate file removal in registry for both views
     m_views->remove_entries_by_file(m_view, f1);
     m_views->remove_entries_by_file(v2, f1);
 
-    // Apply global adjust
     m_fc->adjust_visibility_on_global_file_removed(f1);
 
-    // View A: show-only cleared, remaining (f2) hidden
-    EXPECT_TRUE(pA->get_show_only_file_path().isEmpty());
-    EXPECT_TRUE(pA->get_hidden_file_paths().contains(f2));
-    EXPECT_FALSE(pA->get_hidden_file_paths().contains(f1));
+    const FilterState first_state = filter_state_for(m_view);
+    EXPECT_TRUE(first_state.show_only_file.isEmpty());
+    EXPECT_TRUE(first_state.hidden_files.contains(f2));
+    EXPECT_FALSE(first_state.hidden_files.contains(f1));
 
-    // View B: removed file pruned from hidden, f3 remains hidden
-    const QSet<QString> hiddenB = pB->get_hidden_file_paths();
-    EXPECT_FALSE(hiddenB.contains(f1));
-    EXPECT_TRUE(hiddenB.contains(f3));
+    const FilterState second_state = filter_state_for(v2);
+    EXPECT_FALSE(second_state.hidden_files.contains(f1));
+    EXPECT_TRUE(second_state.hidden_files.contains(f3));
 }

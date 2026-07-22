@@ -7,14 +7,14 @@
 
 #include "Qt-LogViewer/Controllers/FilterCoordinator.h"
 #include "Qt-LogViewer/Controllers/ViewRegistry.h"
-#include "Qt-LogViewer/Models/LogSortFilterProxyModel.h"
+#include "Qt-LogViewer/Models/SessionTypes.h"
 
 /**
  * @file FilterCoordinatorTest.h
  * @brief Test fixture for FilterCoordinator.
  *
  * Covers:
- * - Delegation of app-name, log-level, and search filters to proxy and getters roundtrip.
+ * - Storage and retrieval of per-view filter state.
  * - File visibility operations: show-only, toggle, hide and reset behavior.
  * - Level counts from ViewRegistry entries and static available levels.
  * - Adjusting visibility on per-view and global file removal.
@@ -36,12 +36,11 @@ class FilterCoordinatorTest: public ::testing::Test
         [[nodiscard]] auto make_temp_abs_path(const QString& stem) const -> QString;
 
         /**
-         * @brief Helper to get the proxy model for a view id.
-         *
+         * @brief Returns the filter state of a view.
          * @param view_id Target view id.
-         * @return Pointer to LogSortFilterProxyModel if found; nullptr otherwise.
+         * @return Current filter state or a default state if the view does not exist.
          */
-        [[nodiscard]] auto proxy_for(const QUuid& view_id) const -> LogSortFilterProxyModel*;
+        [[nodiscard]] auto filter_state_for(const QUuid& view_id) const -> FilterState;
 
         ViewRegistry* m_views = nullptr;
         FilterCoordinator* m_fc = nullptr;

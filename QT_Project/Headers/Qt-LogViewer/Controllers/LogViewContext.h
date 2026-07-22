@@ -8,6 +8,7 @@
 // Value types used in API - need full definitions
 #include "Qt-LogViewer/Models/LogEntry.h"
 #include "Qt-LogViewer/Models/LogFileInfo.h"
+#include "Qt-LogViewer/Models/SessionTypes.h"
 
 // Forward declarations (pointer members only)
 class LogModel;
@@ -116,10 +117,23 @@ class LogViewContext final: public QObject
          */
         auto clear_loaded_files() -> void;
 
+        /**
+         * @brief Returns the filter state of this view.
+         * @return Current filter and file-visibility state.
+         */
+        [[nodiscard]] auto get_filter_state() const -> FilterState;
+
+        /**
+         * @brief Replaces the filter state of this view.
+         * @param state New filter and file-visibility state.
+         */
+        auto set_filter_state(const FilterState& state) -> void;
+
     private:
         LogModel* m_model;
         LogSortFilterProxyModel* m_sort_proxy;
         PagingProxyModel* m_paging_proxy;
 
         QList<LogFileInfo> m_loaded_files;
+        FilterState m_filter_state;
 };
