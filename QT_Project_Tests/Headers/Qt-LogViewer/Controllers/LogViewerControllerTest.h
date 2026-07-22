@@ -34,6 +34,13 @@ class LogViewerControllerTest: public ::testing::Test
          */
         auto create_temp_file(const QVector<QString>& lines) -> QTemporaryFile*;
 
+        /**
+         * @brief Creates a large temporary log file without buffering every line in a vector.
+         * @param entry_count Number of log entries to write.
+         * @return Created temporary file, or nullptr when file creation fails.
+         */
+        auto create_large_temp_file(qsizetype entry_count) -> QTemporaryFile*;
+
         LogViewerController* m_controller = nullptr;
         QVector<QTemporaryFile*> m_temp_files;
         QVector<QString> m_temp_file_names;

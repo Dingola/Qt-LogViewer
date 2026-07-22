@@ -1,5 +1,6 @@
 #include "Qt-LogViewer/Controllers/LogViewerControllerTest.h"
 
+#include <QElapsedTimer>
 #include <QFile>
 #include <QSet>
 #include <QSignalSpy>
@@ -58,6 +59,44 @@ auto LogViewerControllerTest::create_temp_file(const QVector<QString>& lines) ->
     m_temp_files.append(temp_file);
     m_temp_file_names.append(temp_file->fileName());
     return temp_file;
+}
+
+/**
+ * @brief Creates a large temporary log file without buffering every line in a vector.
+ * @param entry_count Number of log entries to write.
+ * @return Created temporary file, or nullptr when file creation fails.
+ */
+auto LogViewerControllerTest::create_large_temp_file(qsizetype entry_count) -> QTemporaryFile*
+{
+    QTemporaryFile* result = new QTemporaryFile();
+
+    result->setAutoRemove(false);
+
+    const bool can_write = entry_count >= 0 && result->open();
+
+    if (can_write)
+    {
+        QTextStream stream(result);
+
+        for (qsizetype index = 1; index <= entry_count; ++index)
+        {
+            stream << "2024-01-01 12:00:00 INFO "
+                   << "ControllerRecord" << QString::number(index) << " LargeControllerApp\n";
+        }
+
+        stream.flush();
+        result->close();
+
+        m_temp_files.append(result);
+        m_temp_file_names.append(result->fileName());
+    }
+    else
+    {
+        delete result;
+        result = nullptr;
+    }
+
+    return result;
 }
 
 /**
@@ -2249,4 +2288,101 @@ TEST_F(LogViewerControllerTest, LoadsExistingEmptyFileSynchronously)
 
     ASSERT_NE(model, nullptr);
     EXPECT_EQ(model->rowCount(), 0);
+}
+
+/**
+ * @brief Verifies that a large synchronous import keeps only the selected page in LogModel.
+ */
+TEST_F(LogViewerControllerTest, KeepsLargeSynchronousImportBoundedToCurrentPage)
+{
+    constexpr qsizetype entry_count = 100001;
+    constexpr qsizetype page_size = 25;
+    constexpr qsizetype middle_page = 2001;
+    constexpr qsizetype last_page = 4001;
+
+    QElapsedTimer file_timer;
+    file_timer.start();
+
+    QTemporaryFile* file = create_large_temp_file(entry_count);
+
+    const qint64 file_elapsed_ms = file_timer.elapsed();
+
+    ASSERT_NE(file, nullptr);
+
+    QElapsedTimer load_timer;
+    load_timer.start();
+
+    const QUuid view_id = m_controller->load_log_file(file->fileName());
+
+    const qint64 load_elapsed_ms = load_timer.elapsed();
+
+    ASSERT_FALSE(view_id.isNull());
+
+    const LogPageState* page_state = m_controller->get_page_state(view_id);
+
+    ASSERT_NE(page_state, nullptr);
+
+    EXPECT_EQ(page_state->get_total_entries(), entry_count);
+
+    EXPECT_EQ(page_state->get_page_size(), page_size);
+
+    EXPECT_EQ(page_state->get_current_page(), 1);
+
+    EXPECT_EQ(page_state->get_total_pages(), last_page);
+
+    LogModel* model = m_controller->get_log_model(view_id);
+
+    ASSERT_NE(model, nullptr);
+
+    ASSERT_EQ(model->rowCount(), page_size);
+
+    EXPECT_EQ(model->get_entry(0).get_message(), QStringLiteral("ControllerRecord100001"));
+
+    EXPECT_EQ(model->get_entry(page_size - 1).get_message(),
+              QStringLiteral("ControllerRecord99977"));
+
+    QElapsedTimer middle_page_timer;
+    middle_page_timer.start();
+
+    ASSERT_TRUE(m_controller->set_current_page(view_id, middle_page));
+
+    const qint64 middle_page_elapsed_ms = middle_page_timer.elapsed();
+
+    page_state = m_controller->get_page_state(view_id);
+
+    ASSERT_NE(page_state, nullptr);
+
+    EXPECT_EQ(page_state->get_current_page(), middle_page);
+
+    ASSERT_EQ(model->rowCount(), page_size);
+
+    EXPECT_EQ(model->get_entry(0).get_message(), QStringLiteral("ControllerRecord50001"));
+
+    EXPECT_EQ(model->get_entry(page_size - 1).get_message(),
+              QStringLiteral("ControllerRecord49977"));
+
+    QElapsedTimer last_page_timer;
+    last_page_timer.start();
+
+    ASSERT_TRUE(m_controller->set_current_page(view_id, last_page));
+
+    const qint64 last_page_elapsed_ms = last_page_timer.elapsed();
+
+    page_state = m_controller->get_page_state(view_id);
+
+    ASSERT_NE(page_state, nullptr);
+
+    EXPECT_EQ(page_state->get_current_page(), last_page);
+
+    EXPECT_EQ(page_state->get_total_entries(), entry_count);
+
+    ASSERT_EQ(model->rowCount(), 1);
+
+    EXPECT_EQ(model->get_entry(0).get_message(), QStringLiteral("ControllerRecord1"));
+
+    std::cout << "[PERF] LogViewerController 100001 entries:"
+              << " file=" << file_elapsed_ms << " ms"
+              << ", load=" << load_elapsed_ms << " ms"
+              << ", middle-page=" << middle_page_elapsed_ms << " ms"
+              << ", last-page=" << last_page_elapsed_ms << " ms" << std::endl;
 }
