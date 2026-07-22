@@ -1,6 +1,8 @@
 #include "Qt-LogViewer/Services/LogHistoryServiceTest.h"
 
 #include <QDateTime>
+#include <QElapsedTimer>
+#include <iostream>
 
 /**
  * @brief Creates an isolated history-service instance.
@@ -41,6 +43,59 @@ auto LogHistoryServiceTest::create_entry(const QString& message, const QString& 
         QDateTime::fromString(QStringLiteral("2026-01-01T12:00:00.000Z"), Qt::ISODateWithMs), level,
         message, LogFileInfo(file_path, app_name));
     return entry;
+}
+
+/**
+ * @brief Creates a deterministic batch with one shared timestamp.
+ * @param entry_count Number of entries to create.
+ * @return Generated entries ordered by their record number.
+ */
+auto LogHistoryServiceTest::create_large_entry_batch(qsizetype entry_count) const
+    -> QVector<LogEntry>
+{
+    QVector<LogEntry> entries;
+
+    if (entry_count > 0)
+    {
+        entries.reserve(entry_count);
+
+        const QDateTime timestamp =
+            QDateTime::fromString(QStringLiteral("2026-01-01T12:00:00.000Z"), Qt::ISODateWithMs);
+
+        const LogFileInfo file_info(QStringLiteral("large-history.log"),
+                                    QStringLiteral("LargeHistoryApp"));
+
+        for (qsizetype index = 1; index <= entry_count; ++index)
+        {
+            const QString message = QStringLiteral("record_%1").arg(index, 6, 10, QLatin1Char('0'));
+
+            const QString level = index % 2 == 0 ? QStringLiteral("INFO") : QStringLiteral("ERROR");
+
+            entries.append(LogEntry(timestamp, level, message, file_info));
+        }
+    }
+
+    return entries;
+}
+
+/**
+ * @brief Verifies one exact message search against the archived view.
+ * @param message Expected unique message.
+ */
+auto LogHistoryServiceTest::expect_single_message_result(const QString& message) const -> void
+{
+    LogQuery query;
+    query.view_id = m_view_id;
+    query.search_text = message;
+    query.search_fields = {LogField::Message};
+
+    EXPECT_EQ(m_history_service->count_entries(query), 1);
+
+    const QVector<LogEntry> entries = m_history_service->load_entries_page(query, 0, 25);
+
+    ASSERT_EQ(entries.size(), 1);
+
+    EXPECT_EQ(entries.first().get_message(), message);
 }
 
 /**
@@ -898,4 +953,96 @@ TEST_F(LogHistoryServiceTest, RejectsUnsupportedDistinctValueField)
         m_history_service->get_distinct_values(m_view_id, QStringLiteral("unknown_field"));
 
     EXPECT_TRUE(values.isEmpty());
+}
+
+/**
+ * @brief Verifies counting, paging and searching beyond 100,000 archived entries.
+ */
+TEST_F(LogHistoryServiceTest, HandlesMoreThanOneHundredThousandEntries)
+{
+    constexpr qsizetype entry_count = 100001;
+    constexpr qsizetype page_size = 25;
+    constexpr qsizetype middle_offset = 50000;
+    constexpr qsizetype last_offset = 100000;
+
+    const QVector<LogEntry> entries = create_large_entry_batch(entry_count);
+
+    ASSERT_EQ(entries.size(), entry_count);
+
+    QElapsedTimer insert_timer;
+    insert_timer.start();
+
+    ASSERT_TRUE(m_history_service->add_entries(m_view_id, entries));
+
+    const qint64 insert_elapsed_ms = insert_timer.elapsed();
+
+    LogQuery query;
+    query.view_id = m_view_id;
+
+    QElapsedTimer count_timer;
+    count_timer.start();
+
+    const qsizetype stored_entry_count = m_history_service->count_entries(query);
+
+    const qint64 count_elapsed_ms = count_timer.elapsed();
+
+    ASSERT_EQ(stored_entry_count, entry_count);
+
+    QElapsedTimer first_page_timer;
+    first_page_timer.start();
+
+    const QVector<LogEntry> first_page = m_history_service->load_entries_page(query, 0, page_size);
+
+    const qint64 first_page_elapsed_ms = first_page_timer.elapsed();
+
+    ASSERT_EQ(first_page.size(), page_size);
+
+    EXPECT_EQ(first_page.first().get_message(), QStringLiteral("record_100001"));
+
+    EXPECT_EQ(first_page.last().get_message(), QStringLiteral("record_099977"));
+
+    QElapsedTimer middle_page_timer;
+    middle_page_timer.start();
+
+    const QVector<LogEntry> middle_page =
+        m_history_service->load_entries_page(query, middle_offset, page_size);
+
+    const qint64 middle_page_elapsed_ms = middle_page_timer.elapsed();
+
+    ASSERT_EQ(middle_page.size(), page_size);
+
+    EXPECT_EQ(middle_page.first().get_message(), QStringLiteral("record_050001"));
+
+    EXPECT_EQ(middle_page.last().get_message(), QStringLiteral("record_049977"));
+
+    QElapsedTimer last_page_timer;
+    last_page_timer.start();
+
+    const QVector<LogEntry> last_page =
+        m_history_service->load_entries_page(query, last_offset, page_size);
+
+    const qint64 last_page_elapsed_ms = last_page_timer.elapsed();
+
+    ASSERT_EQ(last_page.size(), 1);
+
+    EXPECT_EQ(last_page.first().get_message(), QStringLiteral("record_000001"));
+
+    QElapsedTimer search_timer;
+    search_timer.start();
+
+    expect_single_message_result(QStringLiteral("record_000001"));
+
+    expect_single_message_result(QStringLiteral("record_050001"));
+
+    expect_single_message_result(QStringLiteral("record_100001"));
+
+    const qint64 search_elapsed_ms = search_timer.elapsed();
+
+    std::cout << "[PERF] LogHistoryService 100001 entries:"
+              << " insert=" << insert_elapsed_ms << " ms"
+              << ", count=" << count_elapsed_ms << " ms"
+              << ", first-page=" << first_page_elapsed_ms << " ms"
+              << ", middle-page=" << middle_page_elapsed_ms << " ms"
+              << ", last-page=" << last_page_elapsed_ms << " ms"
+              << ", three-searches=" << search_elapsed_ms << " ms" << std::endl;
 }

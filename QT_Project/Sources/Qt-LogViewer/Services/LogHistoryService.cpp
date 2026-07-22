@@ -861,6 +861,8 @@ auto LogHistoryService::create_schema() -> bool
                        "file_path TEXT NOT NULL)"),
         QStringLiteral("CREATE INDEX IF NOT EXISTS idx_log_entries_view_id "
                        "ON log_entries(view_id, id)"),
+        QStringLiteral("CREATE INDEX IF NOT EXISTS idx_log_entries_view_timestamp "
+                       "ON log_entries(view_id, timestamp_utc, id)"),
         QStringLiteral("CREATE VIRTUAL TABLE IF NOT EXISTS log_entries_fts "
                        "USING fts5(level, message, app_name, file_path, "
                        "content='log_entries', content_rowid='id')"),

@@ -34,6 +34,20 @@ class LogHistoryServiceTest: public ::testing::Test
             const QString& level = QStringLiteral("INFO"),
             const QString& app_name = QStringLiteral("HistoryTestApp")) const -> LogEntry;
 
+        /**
+         * @brief Creates a deterministic batch with one shared timestamp.
+         * @param entry_count Number of entries to create.
+         * @return Generated entries ordered by their record number.
+         */
+        [[nodiscard]] auto create_large_entry_batch(qsizetype entry_count) const
+            -> QVector<LogEntry>;
+
+        /**
+         * @brief Verifies one exact message search against the archived view.
+         * @param message Expected unique message.
+         */
+        auto expect_single_message_result(const QString& message) const -> void;
+
     protected:
         LogHistoryService* m_history_service{nullptr};
         QUuid m_view_id;
