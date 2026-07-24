@@ -86,9 +86,9 @@ struct FilterState {
  * - id: Stable QUuid of the view.
  * - loaded_files: Files associated with this view.
  * - filters: FilterCoordinator state snapshot for this view.
- * - page_size: PagingProxyModel page size.
- * - current_page: Current page index in the paging proxy.
- * - sort_column: Column index used for sorting.
+ * - page_size: Number of entries displayed per database page.
+ * - current_page: Zero-based page index used by session persistence.
+ * - sort_column: LogModel column used for database sorting.
  * - sort_order: Sort order (ascending/descending).
  * - tab_title: Suggested title to use for the UI tab (e.g., first file name).
  */

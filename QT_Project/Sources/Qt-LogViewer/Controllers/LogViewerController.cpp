@@ -20,8 +20,6 @@
 #include "Qt-LogViewer/Controllers/ViewRegistry.h"
 #include "Qt-LogViewer/Models/LogFileTreeModel.h"
 #include "Qt-LogViewer/Models/LogModel.h"
-#include "Qt-LogViewer/Models/LogSortFilterProxyModel.h"
-#include "Qt-LogViewer/Models/PagingProxyModel.h"
 #include "Qt-LogViewer/Services/LogHistoryService.h"
 #include "Qt-LogViewer/Services/LogLoader.h"
 #include "Qt-LogViewer/Services/LogLoadingService.h"
@@ -95,6 +93,32 @@ namespace
 
     return field;
 }
+
+/**
+ * @brief Maps a stable sort-field identifier to a LogModel column.
+ * @param field Stable field identifier.
+ * @return Matching LogModel column.
+ */
+[[nodiscard]] auto get_model_sort_column(const QString& field) -> int
+{
+    int column = LogModel::Timestamp;
+
+    if (field == LogField::Level)
+    {
+        column = LogModel::Level;
+    }
+    else if (field == LogField::Message)
+    {
+        column = LogModel::Message;
+    }
+    else if (field == LogField::AppName)
+    {
+        column = LogModel::AppName;
+    }
+
+    return column;
+}
+
 }  // namespace
 
 /**
@@ -342,17 +366,6 @@ LogViewerController::LogViewerController(const QString& log_format, QObject* par
             else
             {
                 qDebug().nospace() << "[Controller] no next item started (idle or empty queue).";
-
-                // Queues are done; turn off ingestion mode mapped to any view
-                const QVector<QUuid> ids = m_views->get_all_view_ids();
-                for (const QUuid& id: ids)
-                {
-                    auto* proxy = get_sort_filter_proxy(id);
-                    if (proxy != nullptr)
-                    {
-                        proxy->set_ingestion_mode(false);
-                    }
-                }
             }
         }
     });
@@ -823,12 +836,6 @@ auto LogViewerController::load_log_files_async(const QVector<QString>& file_path
 auto LogViewerController::cancel_loading(const QUuid& view_id) -> void
 {
     m_ingest->cancel_for_view(view_id);
-
-    auto* proxy = get_sort_filter_proxy(view_id);
-    if (proxy != nullptr)
-    {
-        proxy->set_ingestion_mode(false);
-    }
 }
 
 /**
@@ -914,49 +921,6 @@ auto LogViewerController::get_log_model(const QUuid& view_id) -> LogModel*
     auto* ctx = m_views->get_context(view_id);
     LogModel* model = (ctx != nullptr) ? ctx->get_model() : nullptr;
     return model;
-}
-
-/**
- * @brief Returns the LogSortFilterProxyModel for the current view.
- * @return Pointer to the LogSortFilterProxyModel.
- */
-auto LogViewerController::get_sort_filter_proxy() const -> LogSortFilterProxyModel*
-{
-    return get_sort_filter_proxy(m_views->get_current_view());
-}
-
-/**
- * @brief Returns the LogSortFilterProxyModel for the specified view.
- * @param view_id The QUuid of the view.
- * @return Pointer to the LogSortFilterProxyModel, or nullptr if not found.
- */
-auto LogViewerController::get_sort_filter_proxy(const QUuid& view_id) const
-    -> LogSortFilterProxyModel*
-{
-    auto* ctx = m_views->get_context(view_id);
-    LogSortFilterProxyModel* proxy = (ctx != nullptr) ? ctx->get_sort_proxy() : nullptr;
-    return proxy;
-}
-
-/**
- * @brief Returns the PagingProxyModel for the current view.
- * @return Pointer to the PagingProxyModel.
- */
-auto LogViewerController::get_paging_proxy() -> PagingProxyModel*
-{
-    return get_paging_proxy(m_views->get_current_view());
-}
-
-/**
- * @brief Returns the PagingProxyModel for the specified view.
- * @param view_id The QUuid of the view.
- * @return Pointer to the PagingProxyModel, or nullptr if not found.
- */
-auto LogViewerController::get_paging_proxy(const QUuid& view_id) -> PagingProxyModel*
-{
-    auto* ctx = m_views->get_context(view_id);
-    PagingProxyModel* paging = (ctx != nullptr) ? ctx->get_paging_proxy() : nullptr;
-    return paging;
 }
 
 /**
@@ -1093,17 +1057,6 @@ auto LogViewerController::create_page_query(const QUuid& view_id) const -> LogQu
         {
             query.sort_field = page_state->get_query().sort_field;
             query.sort_order = page_state->get_query().sort_order;
-        }
-        else
-        {
-            LogSortFilterProxyModel* sort_proxy = context->get_sort_proxy();
-
-            if (sort_proxy != nullptr)
-            {
-                query.sort_field = get_query_sort_field(sort_proxy->get_sort_column());
-
-                query.sort_order = sort_proxy->get_sort_order();
-            }
         }
     }
 
@@ -1461,6 +1414,19 @@ auto LogViewerController::export_view_state(const QUuid& view_id) const -> Sessi
     {
         state = m_views->export_view_state(view_id, *m_filters);
         state.filters.live_tailing_enabled = get_live_tailing_enabled(view_id);
+
+        const LogPageState* page_state = get_page_state(view_id);
+
+        if (page_state != nullptr)
+        {
+            state.page_size = static_cast<int>(page_state->get_page_size());
+
+            state.current_page = static_cast<int>(page_state->get_current_page() - 1);
+
+            state.sort_column = get_model_sort_column(page_state->get_query().sort_field);
+
+            state.sort_order = page_state->get_query().sort_order;
+        }
     }
 
     return state;
@@ -1496,6 +1462,19 @@ auto LogViewerController::import_view_state(const SessionViewState& state) -> QU
             {
                 m_live_tailing_views.remove(result);
             }
+
+            LogQuery query = create_page_query(result);
+            query.sort_field = get_query_sort_field(state.sort_column);
+            query.sort_order = state.sort_order;
+
+            set_page_query(result, query);
+
+            if (state.page_size > 0)
+            {
+                set_page_size(result, state.page_size);
+            }
+
+            set_current_page(result, state.current_page + 1);
         }
 
         // Update explorer tree
@@ -1779,12 +1758,6 @@ auto LogViewerController::remove_log_file(const QUuid& view_id, const QString& f
  */
 auto LogViewerController::enqueue_async(const QUuid& view_id, const QString& file_path) -> void
 {
-    auto* proxy = get_sort_filter_proxy(view_id);
-    if (proxy != nullptr)
-    {
-        proxy->set_ingestion_mode(true);
-    }
-
     m_ingest->enqueue_stream(view_id, file_path);
 }
 

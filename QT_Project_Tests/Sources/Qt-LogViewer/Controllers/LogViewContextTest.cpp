@@ -3,8 +3,6 @@
 #include <QDateTime>
 
 #include "Qt-LogViewer/Models/LogModel.h"
-#include "Qt-LogViewer/Models/LogSortFilterProxyModel.h"
-#include "Qt-LogViewer/Models/PagingProxyModel.h"
 
 /**
  * @brief Constructs the test fixture.
@@ -53,23 +51,21 @@ auto LogViewContextTest::make_entries(const QString& file_path,
 }
 
 /**
- * @brief Tests model/proxy chain is created and wired.
+ * @brief Tests that the model and default filter state are initialized.
  */
-TEST_F(LogViewContextTest, ModelAndProxiesExist)
+TEST_F(LogViewContextTest, ModelAndDefaultFilterStateExist)
 {
-    ASSERT_NE(m_ctx, nullptr);
+    ASSERT_NE(m_ctx->get_model(), nullptr);
 
-    auto* model = m_ctx->get_model();
-    auto* sort_proxy = m_ctx->get_sort_proxy();
-    auto* paging_proxy = m_ctx->get_paging_proxy();
+    const FilterState state = m_ctx->get_filter_state();
 
-    ASSERT_NE(model, nullptr);
-    ASSERT_NE(sort_proxy, nullptr);
-    ASSERT_NE(paging_proxy, nullptr);
-
-    EXPECT_EQ(model->rowCount(), 0);
-    EXPECT_EQ(sort_proxy->rowCount(), 0);
-    EXPECT_EQ(paging_proxy->rowCount(), 0);
+    EXPECT_TRUE(state.app_name.isEmpty());
+    EXPECT_TRUE(state.log_levels.isEmpty());
+    EXPECT_TRUE(state.search_text.isEmpty());
+    EXPECT_EQ(state.search_field, SearchField::AllFields);
+    EXPECT_FALSE(state.use_regex);
+    EXPECT_TRUE(state.show_only_file.isEmpty());
+    EXPECT_TRUE(state.hidden_files.isEmpty());
 }
 
 /**
@@ -204,27 +200,6 @@ TEST_F(LogViewContextTest, RemoveEntriesByFilePathNonExistentNoChange)
 
     const auto stored = m_ctx->get_entries();
     EXPECT_EQ(stored.size(), entries.size());
-}
-
-/**
- * @brief Proxies reflect appended rows (rowCount mirrors model).
- */
-TEST_F(LogViewContextTest, ProxiesReflectAppendedRows)
-{
-    ASSERT_NE(m_ctx, nullptr);
-
-    auto* model = m_ctx->get_model();
-    auto* sort_proxy = m_ctx->get_sort_proxy();
-    auto* paging_proxy = m_ctx->get_paging_proxy();
-    ASSERT_NE(model, nullptr);
-    ASSERT_NE(sort_proxy, nullptr);
-    ASSERT_NE(paging_proxy, nullptr);
-
-    auto entries = make_entries("C:/logs/appA.log", "AppA");
-    m_ctx->append_entries(entries);
-
-    EXPECT_EQ(sort_proxy->rowCount(), model->rowCount());
-    EXPECT_EQ(paging_proxy->rowCount(), sort_proxy->rowCount());
 }
 
 /**

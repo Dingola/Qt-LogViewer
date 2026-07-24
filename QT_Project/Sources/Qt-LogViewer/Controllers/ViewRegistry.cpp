@@ -11,8 +11,6 @@
 // Concrete includes for forward-declared and used types
 #include "Qt-LogViewer/Controllers/FilterCoordinator.h"
 #include "Qt-LogViewer/Controllers/LogViewContext.h"
-#include "Qt-LogViewer/Models/LogSortFilterProxyModel.h"
-#include "Qt-LogViewer/Models/PagingProxyModel.h"
 
 /**
  * @brief Construct a new ViewRegistry.
@@ -277,22 +275,6 @@ auto ViewRegistry::export_view_state(const QUuid& view_id,
         const FilterState fs = filters.export_filters(view_id);
         state.filters = fs;
 
-        // Paging
-        auto* paging = ctx->get_paging_proxy();
-        if (paging != nullptr)
-        {
-            state.page_size = paging->get_page_size();
-            state.current_page = paging->get_current_page();
-        }
-
-        // Sort
-        auto* sort_proxy = ctx->get_sort_proxy();
-        if (sort_proxy != nullptr)
-        {
-            state.sort_column = sort_proxy->get_sort_column();
-            state.sort_order = sort_proxy->get_sort_order();
-        }
-
         // Tab title: first file name or composed from loaded files
         if (!state.loaded_files.isEmpty())
         {
@@ -324,38 +306,11 @@ auto ViewRegistry::export_view_state(const QUuid& view_id,
 auto ViewRegistry::import_view_state(const SessionViewState& state,
                                      FilterCoordinator& filters) -> QUuid
 {
-    QUuid view_id = state.id.isNull() ? create_view() : state.id;
+    const QUuid view_id = state.id.isNull() ? create_view() : state.id;
+
     ensure_view(view_id);
-
-    // Loaded files
     set_loaded_files(view_id, state.loaded_files);
-
-    // Filters
     filters.import_filters(view_id, state.filters);
-
-    // Paging and sort
-    auto* ctx = get_context(view_id);
-    if (ctx != nullptr)
-    {
-        auto* paging = ctx->get_paging_proxy();
-        if (paging != nullptr)
-        {
-            if (state.page_size > 0)
-            {
-                paging->set_page_size(state.page_size);
-            }
-            if (state.current_page > 0)
-            {
-                paging->set_current_page(state.current_page);
-            }
-        }
-
-        auto* sort_proxy = ctx->get_sort_proxy();
-        if (sort_proxy != nullptr)
-        {
-            sort_proxy->sort(state.sort_column, state.sort_order);
-        }
-    }
 
     return view_id;
 }

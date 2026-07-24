@@ -1,42 +1,19 @@
 /**
  * @file LogViewContext.cpp
- * @brief Implements the LogViewContext class that encapsulates per-view components and state.
- *
- * This file provides the implementation for the LogViewContext, which bundles together the
- * per-view model chain (`LogModel` -> `LogSortFilterProxyModel` -> `PagingProxyModel`) and
- * maintains the list of `LogFileInfo` objects representing files loaded for a specific view.
- * It exposes convenience methods to append/remove entries and to query the loaded file paths.
+ * @brief Implements the per-view model, loaded-file and filter-state container.
  */
 
 #include "Qt-LogViewer/Controllers/LogViewContext.h"
 
-// Concrete includes for forward-declared types
 #include "Qt-LogViewer/Models/LogModel.h"
-#include "Qt-LogViewer/Models/LogSortFilterProxyModel.h"
-#include "Qt-LogViewer/Models/PagingProxyModel.h"
 
 /**
- * @brief Constructs a LogViewContext and wires the model/proxy chain.
- *
- * The constructor creates a `LogModel`, a `LogSortFilterProxyModel`, and a `PagingProxyModel`,
- * and wires them together as:
- * - `m_sort_proxy->setSourceModel(m_model)`
- * - `m_paging_proxy->setSourceModel(m_sort_proxy)`
- *
- * @param parent The QObject parent for ownership.
+ * @brief Constructs an empty log view context.
+ * @param parent QObject parent.
  */
 LogViewContext::LogViewContext(QObject* parent)
-    : QObject(parent),
-      m_model(new LogModel(this)),
-      m_sort_proxy(new LogSortFilterProxyModel(this)),
-      m_paging_proxy(new PagingProxyModel(this)),
-      m_loaded_files(),
-      m_filter_state()
-{
-    m_sort_proxy->setSourceModel(m_model);
-    m_sort_proxy->sort(LogModel::Timestamp, Qt::DescendingOrder);
-    m_paging_proxy->setSourceModel(m_sort_proxy);
-}
+    : QObject(parent), m_model(new LogModel(this)), m_loaded_files(), m_filter_state()
+{}
 
 /**
  * @brief Default destructor.
@@ -52,26 +29,6 @@ LogViewContext::~LogViewContext() = default;
 auto LogViewContext::get_model() const -> LogModel*
 {
     auto* result = m_model;
-    return result;
-}
-
-/**
- * @brief Returns the sort/filter proxy.
- * @return Pointer to `LogSortFilterProxyModel`. Never nullptr after construction.
- */
-auto LogViewContext::get_sort_proxy() const -> LogSortFilterProxyModel*
-{
-    auto* result = m_sort_proxy;
-    return result;
-}
-
-/**
- * @brief Returns the paging proxy.
- * @return Pointer to `PagingProxyModel`. Never nullptr after construction.
- */
-auto LogViewContext::get_paging_proxy() const -> PagingProxyModel*
-{
-    auto* result = m_paging_proxy;
     return result;
 }
 

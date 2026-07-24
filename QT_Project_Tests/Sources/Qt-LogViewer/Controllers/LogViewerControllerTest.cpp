@@ -10,8 +10,6 @@
 #include "Qt-LogViewer/Models/LogModel.h"
 #include "Qt-LogViewer/Models/LogPageState.h"
 #include "Qt-LogViewer/Models/LogQuery.h"
-#include "Qt-LogViewer/Models/LogSortFilterProxyModel.h"
-#include "Qt-LogViewer/Models/PagingProxyModel.h"
 
 /**
  * @brief Constructs the test fixture.
@@ -143,24 +141,19 @@ void LogViewerControllerTest::TearDown()
 }
 
 /**
- * @brief Tests that the controller loads all log entries and models/proxies are valid.
+ * @brief Tests that all log entries are loaded into the page model after loading log files.
  */
-TEST_F(LogViewerControllerTest, LoadsAllLogEntriesAndModels)
+TEST_F(LogViewerControllerTest, LoadsAllLogEntriesIntoPageModel)
 {
-    auto* model = m_controller->get_log_model();
-    auto* proxy = m_controller->get_sort_filter_proxy();
-    auto* paging = m_controller->get_paging_proxy();
+    LogModel* model = m_controller->get_log_model();
+    const LogPageState* page_state = m_controller->get_page_state(m_view_id);
 
     ASSERT_NE(model, nullptr);
-    ASSERT_NE(proxy, nullptr);
-    ASSERT_NE(paging, nullptr);
+    ASSERT_NE(page_state, nullptr);
 
     EXPECT_EQ(model->rowCount(), 4);
-    EXPECT_EQ(proxy->rowCount(), 4);
-    EXPECT_EQ(paging->rowCount(), 4);
-
-    auto entries = m_controller->get_page_entries();
-    EXPECT_EQ(entries.size(), 4);
+    EXPECT_EQ(page_state->get_total_entries(), 4);
+    EXPECT_EQ(m_controller->get_page_entries().size(), 4);
 }
 
 /**
@@ -313,8 +306,6 @@ TEST_F(LogViewerControllerTest, ViewManagement)
 
     EXPECT_TRUE(m_controller->remove_view(new_view_id));
     EXPECT_EQ(m_controller->get_log_model(new_view_id), nullptr);
-    EXPECT_EQ(m_controller->get_sort_filter_proxy(new_view_id), nullptr);
-    EXPECT_EQ(m_controller->get_paging_proxy(new_view_id), nullptr);
 }
 
 /**
@@ -495,8 +486,6 @@ TEST_F(LogViewerControllerTest, RemoveLogFileRemovesEmptyView)
     m_controller->remove_log_file(info);
 
     EXPECT_EQ(m_controller->get_log_model(view_id), nullptr);
-    EXPECT_EQ(m_controller->get_sort_filter_proxy(view_id), nullptr);
-    EXPECT_EQ(m_controller->get_paging_proxy(view_id), nullptr);
 
     EXPECT_EQ(spy.count(), 1);
     if (spy.count() > 0)
@@ -862,12 +851,12 @@ TEST_F(LogViewerControllerTest, GetPageEntriesInvalidViewId)
 /**
  * @brief Tests that model and proxy accessors return nullptr for invalid view.
  */
-TEST_F(LogViewerControllerTest, InvalidViewReturnsNullptr)
+TEST_F(LogViewerControllerTest, InvalidViewReturnsNoModelOrPageState)
 {
-    QUuid invalid_id = QUuid::createUuid();
+    const QUuid invalid_id = QUuid::createUuid();
+
     EXPECT_EQ(m_controller->get_log_model(invalid_id), nullptr);
-    EXPECT_EQ(m_controller->get_sort_filter_proxy(invalid_id), nullptr);
-    EXPECT_EQ(m_controller->get_paging_proxy(invalid_id), nullptr);
+    EXPECT_EQ(m_controller->get_page_state(invalid_id), nullptr);
 }
 
 /**

@@ -12,8 +12,6 @@
 
 // Forward declarations (pointer members only)
 class LogModel;
-class LogSortFilterProxyModel;
-class PagingProxyModel;
 
 /**
  * @file LogViewContext.h
@@ -22,13 +20,13 @@ class PagingProxyModel;
 
 /**
  * @class LogViewContext
- * @brief Per-view container that bundles model, proxy chain, and loaded-file state.
+ * @brief Stores the model, loaded files and filter state belonging to a log view.
  *
  * Responsibilities:
- * - Own and wire the per-view model chain: LogModel -> LogSortFilterProxyModel -> PagingProxyModel.
+ * - Own the LogModel containing the currently loaded database page.
  * - Track the files loaded in this view.
- * - Provide convenience methods to append/remove entries and query file paths.
- *
+ * - Store the filter and file-visibility state.
+ * - Provide entry and loaded-file access.
  */
 class LogViewContext final: public QObject
 {
@@ -36,7 +34,7 @@ class LogViewContext final: public QObject
 
     public:
         /**
-         * @brief Constructs a LogViewContext and wires the model/proxy chain.
+         * @brief Constructs an empty log view context.
          * @param parent The QObject parent for ownership.
          */
         explicit LogViewContext(QObject* parent = nullptr);
@@ -51,18 +49,6 @@ class LogViewContext final: public QObject
          * @return Pointer to LogModel (never nullptr after construction).
          */
         [[nodiscard]] auto get_model() const -> LogModel*;
-
-        /**
-         * @brief Returns the sort/filter proxy.
-         * @return Pointer to LogSortFilterProxyModel (never nullptr after construction).
-         */
-        [[nodiscard]] auto get_sort_proxy() const -> LogSortFilterProxyModel*;
-
-        /**
-         * @brief Returns the paging proxy.
-         * @return Pointer to PagingProxyModel (never nullptr after construction).
-         */
-        [[nodiscard]] auto get_paging_proxy() const -> PagingProxyModel*;
 
         /**
          * @brief Appends log entries to the underlying model.
@@ -131,9 +117,6 @@ class LogViewContext final: public QObject
 
     private:
         LogModel* m_model;
-        LogSortFilterProxyModel* m_sort_proxy;
-        PagingProxyModel* m_paging_proxy;
-
         QList<LogFileInfo> m_loaded_files;
         FilterState m_filter_state;
 };

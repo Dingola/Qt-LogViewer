@@ -16,20 +16,14 @@ class LogViewContext;
 
 /**
  * @file FilterCoordinator.h
- * @brief Coordinates per-view filtering and file visibility using `ViewRegistry` and proxies.
+ * @brief Coordinates per-view filter and file-visibility state.
  *
  * Responsibilities:
- * - Delegate application-name, log-level, and search filters to a view's `LogSortFilterProxyModel`.
- * - Coordinate file-level visibility controls (show-only, toggle, hide).
- * - Provide query helpers for current filters and search parameters.
- * - Compute per-view log level counts based on current entries from `ViewRegistry`.
- * - Expose static available log levels identical across views.
- * - Adjust per-view visibility state when files are removed (show-only reset, hidden set updates).
- *
- * Round-trip guarantee:
- * - `export_filters()` and `import_filters()` provide a reversible snapshot of a view's filter
- *   configuration. Applying an exported `FilterState` via `import_filters()` yields the same
- *   effective filter and visibility settings on the target view.
+ * - Store application-name, log-level and search filters for each view.
+ * - Coordinate show-only and hidden-file state.
+ * - Provide query helpers for current filter settings.
+ * - Compute per-view log-level counts.
+ * - Adjust file visibility state when loaded files are removed.
  */
 class FilterCoordinator: public QObject
 {

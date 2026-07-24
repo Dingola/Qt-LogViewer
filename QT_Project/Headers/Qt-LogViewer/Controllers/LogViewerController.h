@@ -23,8 +23,6 @@ class LogIngestController;
 class LogViewContext;
 class ViewRegistry;
 class LogModel;
-class LogSortFilterProxyModel;
-class PagingProxyModel;
 class LogFileTreeModel;
 class LogHistoryService;
 class LogTailerService;
@@ -230,33 +228,6 @@ class LogViewerController: public QObject
          * @return Pointer to the LogModel, or nullptr if not found.
          */
         [[nodiscard]] auto get_log_model(const QUuid& view_id) -> LogModel*;
-
-        /**
-         * @brief Returns the LogSortFilterProxyModel for the current view.
-         * @return Pointer to the LogSortFilterProxyModel.
-         */
-        [[nodiscard]] auto get_sort_filter_proxy() const -> LogSortFilterProxyModel*;
-
-        /**
-         * @brief Returns the LogSortFilterProxyModel for the specified view.
-         * @param view_id The QUuid of the view.
-         * @return Pointer to the LogSortFilterProxyModel, or nullptr if not found.
-         */
-        [[nodiscard]] auto get_sort_filter_proxy(const QUuid& view_id) const
-            -> LogSortFilterProxyModel*;
-
-        /**
-         * @brief Returns the PagingProxyModel for the current view.
-         * @return Pointer to the PagingProxyModel.
-         */
-        [[nodiscard]] auto get_paging_proxy() -> PagingProxyModel*;
-
-        /**
-         * @brief Returns the PagingProxyModel for the specified view.
-         * @param view_id The QUuid of the view.
-         * @return Pointer to the PagingProxyModel, or nullptr if not found.
-         */
-        [[nodiscard]] auto get_paging_proxy(const QUuid& view_id) -> PagingProxyModel*;
 
         /**
          * @brief Assigns a paged log query to a view and loads its first page.

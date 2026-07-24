@@ -1,11 +1,6 @@
 /**
  * @file FilterCoordinator.cpp
- * @brief Implements `FilterCoordinator` which delegates per-view filtering and file visibility
- * operations.
- *
- * This class forwards filter and visibility requests to the `LogSortFilterProxyModel` of a given
- * view and uses `ViewRegistry` to query current entries and file paths when computing counts or
- * performing visibility updates that depend on the view's loaded files.
+ * @brief Implements per-view filter and file-visibility state management.
  */
 
 #include "Qt-LogViewer/Controllers/FilterCoordinator.h"

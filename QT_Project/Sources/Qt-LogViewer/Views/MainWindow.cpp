@@ -29,8 +29,6 @@
 #include "Qt-LogViewer/Models/LogModel.h"
 #include "Qt-LogViewer/Models/LogPageState.h"
 #include "Qt-LogViewer/Models/LogQuery.h"
-#include "Qt-LogViewer/Models/LogSortFilterProxyModel.h"
-#include "Qt-LogViewer/Models/PagingProxyModel.h"
 #include "Qt-LogViewer/Models/RecentItemsModel.h"
 #include "Qt-LogViewer/Models/RecentListSchema.h"
 #include "Qt-LogViewer/Models/SearchFields.h"
