@@ -5,12 +5,16 @@
 #include "Qt-LogViewer/Views/Shared/TableView.h"
 
 /**
+ * @file LogTableView.h
+ * @brief Declares the log table with hover and search-highlight presentation.
+ */
+
+/**
  * @class LogTableView
- * @brief Specialized TableView for displaying log entries in the LogViewer.
+ * @brief Displays database-backed log pages with sorting, hovering and search highlighting.
  *
- * This class extends TableView and provides default configuration and hooks
- * for log-specific features (selection, sorting, mouse tracking, etc.).
- * Use this class wherever a log entry table is required in the application.
+ * The table owns a HoverRowDelegate and forwards presentation-only search
+ * settings to it. Filtering and pagination are handled outside the table.
  */
 class LogTableView: public TableView
 {
@@ -44,4 +48,15 @@ class LogTableView: public TableView
          * @param model The model to set (should be a LogModel or compatible).
          */
         void setModel(QAbstractItemModel* model) override;
+
+        /**
+         * @brief Sets the search used for highlighting table cells.
+         * @param text Search text or regular expression.
+         * @param field Field whose cells are highlighted.
+         * @param use_regex Whether text is interpreted as a regular expression.
+         */
+        auto set_search_highlight(const QString& text, SearchField field, bool use_regex) -> void;
+
+    private:
+        HoverRowDelegate* m_hover_delegate{nullptr};
 };

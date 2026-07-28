@@ -237,10 +237,10 @@ class MainWindow: public QtWidgetsCommonLib::AppMainWindow
         void handle_show_settings_dialog_requested();
 
         /**
-         * @brief Handles search changes in the filter bar widget.
+         * @brief Applies the current search to the active database query and table presentation.
          *
-         * This method retrieves the search text, field, and regex status from the filter bar
-         * widget, then updates the controller's search filter accordingly.
+         * The controller reloads the matching database page while the active
+         * LogViewWidget highlights matching text inside the displayed cells.
          */
         auto handle_search_changed() -> void;
 

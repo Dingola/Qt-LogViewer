@@ -4,6 +4,11 @@
 #include <QHeaderView>
 
 /**
+ * @file LogTableView.cpp
+ * @brief Implements log-table configuration and search highlighting.
+ */
+
+/**
  * @brief Constructs a LogTableView object.
  *
  * Sets up default selection, sorting, and mouse tracking for log display.
@@ -15,16 +20,14 @@ LogTableView::LogTableView(QWidget* parent): TableView(parent)
     setSelectionBehavior(QAbstractItemView::SelectRows);
     setSelectionMode(QAbstractItemView::SingleSelection);
 
-    auto hover_delegate = new HoverRowDelegate(this);
-    setItemDelegate(hover_delegate);
+    m_hover_delegate = new HoverRowDelegate(this);
+    setItemDelegate(m_hover_delegate);
     setMouseTracking(true);
-    connect(this, &LogTableView::hover_index_changed, hover_delegate,
-            [hover_delegate](const QModelIndex& index) {
-                hover_delegate->set_hovered_row(index.isValid() ? index.row() : -1);
-                if (auto* view = qobject_cast<QAbstractItemView*>(hover_delegate->parent()))
-                {
-                    view->viewport()->update();
-                }
+    connect(this, &LogTableView::hover_index_changed, m_hover_delegate,
+            [this](const QModelIndex& index) {
+                m_hover_delegate->set_hovered_row(index.isValid() ? index.row() : -1);
+
+                viewport()->update();
             });
 
     setSortingEnabled(true);
@@ -78,5 +81,21 @@ void LogTableView::setModel(QAbstractItemModel* model)
     {
         header->setSectionResizeMode(
             i, ((i == (column_count - 1)) ? QHeaderView::Stretch : QHeaderView::Interactive));
+    }
+}
+
+/**
+ * @brief Sets the search used for highlighting table cells.
+ * @param text Search text or regular expression.
+ * @param field Field whose cells are highlighted.
+ * @param use_regex Whether text is interpreted as a regular expression.
+ */
+auto LogTableView::set_search_highlight(const QString& text, SearchField field,
+                                        bool use_regex) -> void
+{
+    if (m_hover_delegate != nullptr)
+    {
+        m_hover_delegate->set_search_highlight(text, field, use_regex);
+        viewport()->update();
     }
 }

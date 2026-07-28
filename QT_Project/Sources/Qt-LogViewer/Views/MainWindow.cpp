@@ -1040,10 +1040,10 @@ void MainWindow::handle_show_settings_dialog_requested()
 }
 
 /**
- * @brief Handles search changes in the filter bar widget.
+ * @brief Applies the current search to the active database query and table presentation.
  *
- * This method retrieves the search text, field, and regex status from the filter bar widget,
- * then updates the controller's search filter accordingly.
+ * The controller reloads the matching database page while the active
+ * LogViewWidget highlights matching text inside the displayed cells.
  */
 auto MainWindow::handle_search_changed() -> void
 {
@@ -1058,6 +1058,14 @@ auto MainWindow::handle_search_changed() -> void
     if (!view_id.isNull())
     {
         m_controller->set_search_filter(view_id, search_text, field, use_regex);
+
+        LogViewWidget* log_view_widget = ui->tabWidgetLog->current_log_view();
+
+        if (log_view_widget != nullptr)
+        {
+            log_view_widget->set_search_highlight(search_text, field, use_regex);
+        }
+
         reload_page_query(view_id);
     }
 }
@@ -1379,13 +1387,11 @@ auto MainWindow::create_log_view_widget_for_view(const QUuid& view_id,
 {
     auto* log_view_widget = new LogViewWidget(ui->tabWidgetLog);
     log_view_widget->set_view_id(view_id);
-
     LogModel* page_model = m_controller->get_log_model(view_id);
-
     log_view_widget->set_model(page_model);
-
     LogQuery query = m_controller->create_page_query(view_id);
-
+    log_view_widget->set_search_highlight(query.search_text,
+                                          m_controller->get_search_field(view_id), query.use_regex);
     QHeaderView* header = log_view_widget->get_table_view()->horizontalHeader();
 
     if (header != nullptr)

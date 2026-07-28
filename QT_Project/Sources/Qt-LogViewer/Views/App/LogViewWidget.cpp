@@ -1,19 +1,22 @@
 #include "Qt-LogViewer/Views/App/LogViewWidget.h"
 
-#include <QAbstractProxyModel>
 #include <QCheckBox>
 #include <QItemSelectionModel>
 #include <QLayout>
 #include <QMenu>
 #include <QToolButton>
 
-#include "Qt-LogViewer/Models/LogSortFilterProxyModel.h"
 #include "Qt-LogViewer/Views/App/FilesInViewMenuItemWidget.h"
 #include "Qt-LogViewer/Views/App/FilesInViewWidgetAction.h"
 #include "Qt-LogViewer/Views/App/LogFilterWidget.h"
 #include "Qt-LogViewer/Views/App/LogTableView.h"
 #include "QtWidgetsCommonLib/Utils/UiUtils.h"
 #include "ui_LogViewWidget.h"
+
+/**
+ * @file LogViewWidget.cpp
+ * @brief Implements the table, filter controls and file actions of a log view.
+ */
 
 using QtWidgetsCommonLib::UiUtils;
 
@@ -94,34 +97,19 @@ auto LogViewWidget::get_view_id() const -> QUuid
 }
 
 /**
- * @brief Sets the model on the internal log table view.
- *
- * Reconnects the selection model's currentRowChanged signal.
- *
- * @param model The model to assign.
+ * @brief Sets the model displayed by the internal log table.
+ * @param model Model containing the current database page.
  */
 auto LogViewWidget::set_model(QAbstractItemModel* model) -> void
 {
     ui->logTableView->setModel(model);
+
     QItemSelectionModel* selection_model = ui->logTableView->selectionModel();
 
     if (selection_model != nullptr)
     {
         connect(selection_model, &QItemSelectionModel::currentRowChanged, this,
                 &LogViewWidget::current_row_changed);
-    }
-
-    auto* proxy_model = qobject_cast<QAbstractProxyModel*>(ui->logTableView->model());
-    if (proxy_model != nullptr)
-    {
-        auto* sort_proxy = qobject_cast<LogSortFilterProxyModel*>(proxy_model->sourceModel());
-        if (sort_proxy != nullptr)
-        {
-            connect(sort_proxy, &LogSortFilterProxyModel::file_visibility_changed, this,
-                    [this](const QString&) { refresh_files_menu_states(); });
-            connect(sort_proxy, &LogSortFilterProxyModel::show_only_changed, this,
-                    [this](const QString&) { refresh_files_menu_states(); });
-        }
     }
 }
 
@@ -360,8 +348,7 @@ auto LogViewWidget::rebuild_files_menu() -> void
 }
 
 /**
- * @brief Refreshes the "Files in View" menu rows' visibility toggle presentation
- *        based on the current proxy state. Private by design.
+ * @brief Refreshes file-menu actions from the stored visibility state.
  */
 auto LogViewWidget::refresh_files_menu_states() -> void
 {
@@ -429,4 +416,16 @@ auto LogViewWidget::get_live_tailing_enabled() const -> bool
 {
     const bool enabled = ui->checkBoxLiveTail->isChecked();
     return enabled;
+}
+
+/**
+ * @brief Sets the search used for highlighting displayed log values.
+ * @param text Search text or regular expression.
+ * @param field Field whose cells are highlighted.
+ * @param use_regex Whether text is interpreted as a regular expression.
+ */
+auto LogViewWidget::set_search_highlight(const QString& text, SearchField field,
+                                         bool use_regex) -> void
+{
+    ui->logTableView->set_search_highlight(text, field, use_regex);
 }

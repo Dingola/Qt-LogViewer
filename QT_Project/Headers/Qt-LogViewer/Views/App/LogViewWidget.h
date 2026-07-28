@@ -11,6 +11,8 @@
 #include <QVector>
 #include <QWidget>
 
+#include "Qt-LogViewer/Models/SearchFields.h"
+
 namespace Ui
 {
 class LogViewWidget;
@@ -21,17 +23,14 @@ class LogTableView;
 
 /**
  * @class LogViewWidget
- * @brief Composite widget encapsulating a log view (table) and its per-view filters.
- *
- * This widget combines a `LogFilterWidget` (application + log level filters) with a
- * `LogTableView` that displays the filtered log entries.
+ * @brief Combines a database-backed log table with per-view controls.
  *
  * Responsibilities:
- * - Provide an API to configure and query filter state.
- * - Forward filter change signals.
- * - Manage a per-view identifier (QUuid) for controller coordination.
- * - Expose the internal table view for selection/model access.
- * - Provide a "Files in View" menu for per-file actions (show-only, hide, remove).
+ * - Display the current database page in a LogTableView.
+ * - Forward application-name and log-level filter changes.
+ * - Apply presentation-only search highlighting to displayed cells.
+ * - Manage per-file show-only, visibility and removal actions.
+ * - Manage the per-view live-tailing control.
  */
 class LogViewWidget: public QWidget
 {
@@ -71,11 +70,8 @@ class LogViewWidget: public QWidget
         [[nodiscard]] auto get_view_id() const -> QUuid;
 
         /**
-         * @brief Sets the model on the internal log table view.
-         *
-         * Call this after creating the corresponding proxies in the controller layer.
-         *
-         * @param model The model to assign (e.g. paging or sort/filter proxy).
+         * @brief Sets the model displayed by the internal log table.
+         * @param model Model containing the current database page.
          */
         auto set_model(QAbstractItemModel* model) -> void;
 
@@ -182,6 +178,14 @@ class LogViewWidget: public QWidget
          */
         [[nodiscard]] auto get_live_tailing_enabled() const -> bool;
 
+        /**
+         * @brief Sets the search used for highlighting displayed log values.
+         * @param text Search text or regular expression.
+         * @param field Field whose cells are highlighted.
+         * @param use_regex Whether text is interpreted as a regular expression.
+         */
+        auto set_search_highlight(const QString& text, SearchField field, bool use_regex) -> void;
+
     signals:
         /**
          * @brief Emitted when the application filter selection changes.
@@ -256,8 +260,7 @@ class LogViewWidget: public QWidget
         auto rebuild_files_menu() -> void;
 
         /**
-         * @brief Refreshes the "Files in View" menu rows' visibility toggle presentation
-         *        based on the current proxy state. Private by design.
+         * @brief Refreshes file-menu actions from the stored visibility state.
          */
         auto refresh_files_menu_states() -> void;
 
