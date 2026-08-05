@@ -1,20 +1,21 @@
 #pragma once
 
-#include <QPair>
 #include <QRegularExpression>
 #include <QString>
 #include <QVector>
 
 #include "Qt-LogViewer/Models/LogEntry.h"
+#include "QtRecordParser/ConverterRegistry.h"
+#include "QtRecordParser/FormatRecordParser.h"
 
 /**
  * @file LogParser.h
- * @brief This file contains the definition of the LogParser class.
+ * @brief Declares the logspecific QtRecordParser adapter.
  */
 
 /**
  * @struct LogFieldOrder
- * @brief Stores the order of fields parsed from the format string.
+ * @brief Stores fields in configured placeholder order.
  */
 struct LogFieldOrder {
         QVector<QString> fields;
@@ -22,84 +23,122 @@ struct LogFieldOrder {
 
 /**
  * @class LogParser
- * @brief Parses log files and extracts LogEntry objects from each line using a format string.
+ * @brief Adapts generic parsed records to LogEntry.
  *
- * This class provides methods to parse log files or log lines and convert them
- * into LogEntry objects for use in the LogModel. The log format is defined by a format string.
+ * The class defines the known log fields while format parsing, custom fields,
+ * converter lookup and conversion errors are handled by QtRecordParser.
  */
 class LogParser
 {
     public:
         /**
-         * @brief Constructs a LogParser object from a format string.
-         * @param format_string The format string (e.g. "{timestamp} {level} {message} {app_name}").
+         * @brief Constructs the standard parser for a log format.
+         * @param format_string User-selected format.
          */
         explicit LogParser(const QString& format_string);
 
         /**
-         * @brief Destroys the LogParser object.
+         * @brief Constructs a parser from a complete configuration.
+         * @param configuration User-, file- or AI-generated configuration.
+         * @param registry Registry containing built-in and custom converters.
+         */
+        explicit LogParser(QtRecordParser::ParserConfiguration configuration,
+                           QtRecordParser::ConverterRegistry registry =
+                               QtRecordParser::ConverterRegistry::create_default());
+
+        /**
+         * @brief Destroys the parser.
          */
         ~LogParser() = default;
 
         /**
-         * @brief Parses a log file and returns a list of LogEntry objects.
-         * @param file_path The path to the log file.
-         * @return A QVector of LogEntry objects parsed from the file.
+         * @brief Parses a complete log file.
+         * @param file_path File to parse.
+         * @return Successfully adapted log entries.
          */
         [[nodiscard]] auto parse_file(const QString& file_path) const -> QVector<LogEntry>;
 
         /**
-         * @brief Parses a single log line and returns a LogEntry object.
-         * @param line The log line to parse.
-         * @param file_path The originating file path for contextual metadata.
-         * @return The parsed LogEntry, or a default LogEntry if parsing fails.
+         * @brief Parses one line and retains all dynamic fields.
+         * @param line Input line.
+         * @param source File or stream identifier.
+         * @return Generic parser result.
+         */
+        [[nodiscard]] auto parse_record(const QString& line,
+                                        const QString& source) const -> QtRecordParser::ParseResult;
+
+        /**
+         * @brief Parses one line and adapts its log fields.
+         * @param line Input line.
+         * @param file_path Originating file path.
+         * @return Adapted entry or a default entry after failure.
          */
         [[nodiscard]] auto parse_line(const QString& line,
                                       const QString& file_path) const -> LogEntry;
 
         /**
-         * @brief Returns the regular expression pattern used for parsing.
-         * @return The QRegularExpression pattern.
+         * @brief Returns the generated parsing pattern.
+         * @return Anchored regular expression.
          */
         [[nodiscard]] auto get_pattern() const -> QRegularExpression;
 
         /**
-         * @brief Returns the field order used for parsing.
-         * @return The LogFieldOrder struct.
+         * @brief Returns fields in placeholder order.
+         * @return Ordered field identifiers.
          */
         [[nodiscard]] auto get_field_order() const -> LogFieldOrder;
 
         /**
-         * @brief Sets the list of accepted timestamp formats attempted during parsing.
-         *        ISO-8601 formats are always tried first.
-         * @param formats A list of timestamp format strings understood by QDateTime::fromString.
+         * @brief Returns the complete parser configuration.
+         * @return Current serializable configuration.
+         */
+        [[nodiscard]] auto get_configuration() const -> const QtRecordParser::ParserConfiguration&;
+
+        /**
+         * @brief Sets accepted timestamp formats.
+         * @param formats Formats tried after ISO-8601.
          */
         auto set_timestamp_formats(const QVector<QString>& formats) -> void;
 
         /**
-         * @brief Returns the list of accepted timestamp formats attempted during parsing.
-         * @return The list of timestamp formats.
+         * @brief Returns accepted timestamp formats.
+         * @return Formats tried after ISO-8601.
          */
         [[nodiscard]] auto get_timestamp_formats() const -> QVector<QString>;
 
     private:
         /**
-         * @brief Converts a format string to a regular expression and field order.
-         * @param format The format string (e.g. "{timestamp} {level} {message} {app_name}").
-         * @return A pair containing the generated QRegularExpression and the LogFieldOrder.
+         * @brief Creates the standard configuration for a log format.
+         * @param format_string User-selected format.
+         * @return Log-aware parser configuration.
          */
-        static auto format_string_to_regex(const QString& format)
-            -> QPair<QRegularExpression, LogFieldOrder>;
+        [[nodiscard]] static auto create_log_configuration(const QString& format_string)
+            -> QtRecordParser::ParserConfiguration;
 
         /**
-         * @brief Attempts to parse a timestamp value using ISO-8601 and configured formats.
-         * @param value The timestamp string as captured from the log line.
-         * @return The parsed QDateTime, or an invalid QDateTime if parsing fails.
+         * @brief Adds missing standard log field definitions.
+         * @param configuration Configuration to complete.
+         * @return Completed configuration.
          */
-        [[nodiscard]] auto parse_timestamp(const QString& value) const -> QDateTime;
+        [[nodiscard]] static auto apply_log_defaults(
+            QtRecordParser::ParserConfiguration configuration)
+            -> QtRecordParser::ParserConfiguration;
+
+        /**
+         * @brief Returns standard log field configurations.
+         * @return Known log fields and converters.
+         */
+        [[nodiscard]] static auto get_default_log_fields()
+            -> QVector<QtRecordParser::FieldConfiguration>;
+
+        /**
+         * @brief Adapts a successful generic result to LogEntry.
+         * @param result Generic parser result.
+         * @return Adapted entry or a default entry after failure.
+         */
+        [[nodiscard]] static auto create_log_entry(const QtRecordParser::ParseResult& result)
+            -> LogEntry;
 
     private:
-        QRegularExpression m_pattern;
-        LogFieldOrder m_field_order;
-        QVector<QString> m_timestamp_formats;
+        QtRecordParser::FormatRecordParser m_parser;
 };
