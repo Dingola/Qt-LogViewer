@@ -1,0 +1,13 @@
+# This file is managed by Copier. Do not edit it manually.
+_commit: 1.1.1
+_src_path: https://github.com/Dingola/QtWidgetsTemplate.git
+display_name: Qt-LogViewer
+docker_name: qt-logviewer
+macro_prefix: QT_LOGVIEWER
+organization_domain: AdrianHelbig.de
+organization_name: AdrianHelbig
+project_description: Qt-LogViewer is a Qt-based desktop application for opening, viewing,
+    searching, and filtering large log files.
+project_name: QtLogViewer
+project_type: executable
+repository_owner: Dingola

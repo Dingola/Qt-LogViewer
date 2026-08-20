@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.29.3 FATAL_ERROR)
 ### Project Configuration                ###
 ############################################
 
-project(${MAIN_PROJECT_NAME} LANGUAGES CXX VERSION "0.0.0")
+project(${MAIN_PROJECT_NAME} LANGUAGES CXX VERSION ${MAIN_PROJECT_VERSION})
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 configure_file(Config.h.in Config.h)
 

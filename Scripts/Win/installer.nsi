@@ -15,11 +15,15 @@
   !define DEPLOY_DIR "_deploy"
 !endif
 
-!define VC_REDIST_URL "https://aka.ms/vs/16/release/vc_redist.x64.exe"
+!ifndef OUTPUT_FILE
+  !define OUTPUT_FILE "${PROJECT_NAME}-${PROJECT_VERSION}-windows-x64-installer.exe"
+!endif
+
+!define VC_REDIST_URL "https://aka.ms/vs/17/release/vc_redist.x64.exe"
 !define VC_REDIST_FILE "vc_redist.x64.exe"
 
 # Name of the installer
-OutFile "${PROJECT_NAME}Installer.exe"
+OutFile "${OUTPUT_FILE}"
 
 # Name of the application
 Name "${PROJECT_NAME}"
@@ -165,15 +169,15 @@ LangString MUI_TEXT_ABORT_TITLE ${LANG_ENGLISH} "Installation Aborted"
 LangString MUI_TEXT_ABORT_SUBTITLE ${LANG_ENGLISH} "The installation was aborted."
 
 LangString MUI_INNERTEXT_COMPONENTS_DESCRIPTION_TITLE ${LANG_GERMAN} "Beschreibung"
-LangString MUI_INNERTEXT_COMPONENTS_DESCRIPTION_INFO ${LANG_GERMAN} "W‰hlen Sie die Komponenten aus, die Sie installieren mˆchten."
+LangString MUI_INNERTEXT_COMPONENTS_DESCRIPTION_INFO ${LANG_GERMAN} "W√§hlen Sie die Komponenten aus, die Sie installieren m√∂chten."
 LangString MUI_TEXT_WELCOME_INFO_TITLE ${LANG_GERMAN} "Willkommen zum ${PROJECT_NAME} Setup-Assistenten"
 LangString MUI_TEXT_WELCOME_INFO_TEXT ${LANG_GERMAN} "Dies wird ${PROJECT_NAME} Version ${PROJECT_VERSION} auf Ihrem Computer installieren. Klicken Sie auf Weiter, um fortzufahren."
-LangString MUI_TEXT_COMPONENTS_TITLE ${LANG_GERMAN} "Komponenten ausw‰hlen"
-LangString MUI_TEXT_COMPONENTS_SUBTITLE ${LANG_GERMAN} "W‰hlen Sie die Komponenten aus, die Sie installieren mˆchten."
-LangString MUI_TEXT_DIRECTORY_TITLE ${LANG_GERMAN} "Zielverzeichnis ausw‰hlen"
-LangString MUI_TEXT_DIRECTORY_SUBTITLE ${LANG_GERMAN} "W‰hlen Sie einen Ordner, um ${PROJECT_NAME} zu installieren."
+LangString MUI_TEXT_COMPONENTS_TITLE ${LANG_GERMAN} "Komponenten ausw√§hlen"
+LangString MUI_TEXT_COMPONENTS_SUBTITLE ${LANG_GERMAN} "W√§hlen Sie die Komponenten aus, die Sie installieren m√∂chten."
+LangString MUI_TEXT_DIRECTORY_TITLE ${LANG_GERMAN} "Zielverzeichnis ausw√§hlen"
+LangString MUI_TEXT_DIRECTORY_SUBTITLE ${LANG_GERMAN} "W√§hlen Sie einen Ordner, um ${PROJECT_NAME} zu installieren."
 LangString MUI_TEXT_INSTALLING_TITLE ${LANG_GERMAN} "Installation"
-LangString MUI_TEXT_INSTALLING_SUBTITLE ${LANG_GERMAN} "Bitte warten Sie, w‰hrend ${PROJECT_NAME} installiert wird."
+LangString MUI_TEXT_INSTALLING_SUBTITLE ${LANG_GERMAN} "Bitte warten Sie, w√§hrend ${PROJECT_NAME} installiert wird."
 LangString MUI_TEXT_FINISH_TITLE ${LANG_GERMAN} "Abschluss des ${PROJECT_NAME} Setup-Assistenten"
 LangString MUI_TEXT_FINISH_SUBTITLE ${LANG_GERMAN} "Die Installation von ${PROJECT_NAME} auf Ihrem Computer ist abgeschlossen."
 LangString MUI_TEXT_ABORT_TITLE ${LANG_GERMAN} "Installation abgebrochen"
@@ -184,10 +188,10 @@ LangString MUI_BUTTONTEXT_FINISH ${LANG_GERMAN} "Fertigstellen"
 LangString MUI_TEXT_FINISH_INFO_TITLE ${LANG_ENGLISH} "Completing the ${PROJECT_NAME} Setup Wizard"
 LangString MUI_TEXT_FINISH_INFO_TITLE ${LANG_GERMAN} "Abschluss des ${PROJECT_NAME} Setup-Assistenten"
 LangString MUI_TEXT_FINISH_INFO_REBOOT ${LANG_ENGLISH} "You must restart your system for the configuration changes made to ${PROJECT_NAME} to take effect. Click Finish to restart your system."
-LangString MUI_TEXT_FINISH_INFO_REBOOT ${LANG_GERMAN} "Sie m¸ssen Ihr System neu starten, damit die Konfigurations‰nderungen an ${PROJECT_NAME} wirksam werden. Klicken Sie auf Fertigstellen, um Ihr System neu zu starten."
+LangString MUI_TEXT_FINISH_INFO_REBOOT ${LANG_GERMAN} "Sie m√ºssen Ihr System neu starten, damit die Konfigurations√§nderungen an ${PROJECT_NAME} wirksam werden. Klicken Sie auf Fertigstellen, um Ihr System neu zu starten."
 LangString MUI_TEXT_FINISH_REBOOTNOW ${LANG_ENGLISH} "Restart now"
 LangString MUI_TEXT_FINISH_REBOOTNOW ${LANG_GERMAN} "Jetzt neu starten"
 LangString MUI_TEXT_FINISH_REBOOTLATER ${LANG_ENGLISH} "Restart later"
-LangString MUI_TEXT_FINISH_REBOOTLATER ${LANG_GERMAN} "Sp‰ter neu starten"
+LangString MUI_TEXT_FINISH_REBOOTLATER ${LANG_GERMAN} "Sp√§ter neu starten"
 LangString MUI_TEXT_FINISH_INFO_TEXT ${LANG_ENGLISH} "Setup has finished installing ${PROJECT_NAME} on your computer."
 LangString MUI_TEXT_FINISH_INFO_TEXT ${LANG_GERMAN} "Die Installation von ${PROJECT_NAME} auf Ihrem Computer ist abgeschlossen."

@@ -1,0 +1,458 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+-*"
+
+permissions:
+  contents: write
+
+env:
+  QT_VERSION: "6.8.0"
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  prepare_release:
+    name: Prepare Draft Release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      cmake_version: ${{ steps.version.outputs.cmake_version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+
+    steps:
+      - name: Validate and resolve version
+        id: version
+        shell: bash
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          version="${tag#v}"
+
+          if [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid release tag: ${tag}"
+            exit 1
+          fi
+
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+          echo "cmake_version=${version%%-*}" >> "${GITHUB_OUTPUT}"
+          if [[ "${version}" == *-* ]]; then
+            echo "prerelease=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "prerelease=false" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Create or reset draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IS_PRERELEASE: ${{ steps.version.outputs.prerelease }}
+        shell: bash
+        run: |
+          if gh release view "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            gh release edit "${GITHUB_REF_NAME}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --draft \
+              --title "${GITHUB_REF_NAME}"
+          else
+            arguments=(
+              "${GITHUB_REF_NAME}"
+              --repo "${GITHUB_REPOSITORY}"
+              --draft
+              --verify-tag
+              --generate-notes
+              --title "${GITHUB_REF_NAME}"
+            )
+            if [[ "${IS_PRERELEASE}" == "true" ]]; then
+              arguments+=(--prerelease)
+            fi
+            gh release create "${arguments[@]}"
+          fi
+
+  test:
+    name: Test Tagged Revision
+    needs: prepare_release
+    runs-on: ubuntu-22.04
+    env:
+      RELEASE_VERSION: ${{ needs.prepare_release.outputs.version }}
+      CMAKE_PROJECT_VERSION: ${{ needs.prepare_release.outputs.cmake_version }}
+
+    steps:
+      - name: Checkout tagged revision
+        uses: actions/checkout@v4
+
+      - name: Load project configuration
+        shell: bash
+        run: cat .github/release-config.env >> "${GITHUB_ENV}"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            libgl1-mesa-dev \
+            libpthread-stubs0-dev \
+            libx11-xcb-dev \
+            libxcb-cursor-dev \
+            libxcb-cursor0 \
+            xvfb
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          aqtversion: "==3.1.*"
+          version: ${{ env.QT_VERSION }}
+          host: linux
+          target: desktop
+          arch: linux_gcc_64
+          base-url: https://download.qt.io/official_releases/
+
+      - name: Install CMake
+        uses: jwlawson/actions-setup-cmake@v1
+        with:
+          cmake-version: "4.1.1"
+
+      - name: Configure tests
+        shell: bash
+        run: |
+          cmake \
+            -S . \
+            -B test-build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="${QT_ROOT_DIR}" \
+            -DMAIN_PROJECT_NAME="${PROJECT_NAME}" \
+            -DMAIN_PROJECT_VERSION="${CMAKE_PROJECT_VERSION}" \
+            -D"${PROJECT_NAME}_BUILD_TARGET_TYPE=static_library" \
+            -D"${PROJECT_NAME}_BUILD_TEST_PROJECT=ON" \
+            -DTHIRD_PARTY_INCLUDE_DIR="${RUNNER_TEMP}/ThirdParty"
+
+      - name: Build tests
+        run: cmake --build test-build --config Release
+
+      - name: Run tests
+        shell: bash
+        run: |
+          Xvfb :99 >/dev/null 2>&1 &
+          export DISPLAY=:99
+          sleep 3
+          "./test-build/QT_Project_Tests/${PROJECT_NAME}_Tests"
+
+  build_windows:
+    name: Build Windows x64
+    needs:
+      - prepare_release
+      - test
+    runs-on: windows-2022
+    env:
+      RELEASE_VERSION: ${{ needs.prepare_release.outputs.version }}
+      CMAKE_PROJECT_VERSION: ${{ needs.prepare_release.outputs.cmake_version }}
+
+    steps:
+      - name: Checkout tagged revision
+        uses: actions/checkout@v4
+
+      - name: Load project configuration
+        shell: pwsh
+        run: Get-Content ".github/release-config.env" | Add-Content -Path $env:GITHUB_ENV
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          aqtversion: "==3.1.*"
+          version: ${{ env.QT_VERSION }}
+          host: windows
+          target: desktop
+          arch: win64_msvc2022_64
+          base-url: https://download.qt.io/official_releases/
+
+      - name: Install CMake
+        uses: jwlawson/actions-setup-cmake@v1
+        with:
+          cmake-version: "4.1.1"
+
+      - name: Install NSIS
+        run: choco install nsis --yes --no-progress
+
+      - name: Configure release
+        shell: pwsh
+        run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64 "-DCMAKE_PREFIX_PATH=$env:QT_ROOT_DIR" "-DMAIN_PROJECT_NAME=$env:PROJECT_NAME" "-DMAIN_PROJECT_VERSION=$env:CMAKE_PROJECT_VERSION" "-D$($env:PROJECT_NAME)_BUILD_TARGET_TYPE=$env:PROJECT_TYPE" "-D$($env:PROJECT_NAME)_BUILD_TEST_PROJECT=OFF" "-DTHIRD_PARTY_INCLUDE_DIR=$env:RUNNER_TEMP\ThirdParty"
+
+      - name: Build release
+        run: cmake --build build --config Release
+
+      - name: Install release
+        shell: pwsh
+        run: cmake --install build --config Release --prefix stage
+
+      - name: Deploy Qt runtime
+        shell: pwsh
+        run: |
+          if ($env:PROJECT_TYPE -eq "executable") {
+            & "$env:QT_ROOT_DIR\bin\windeployqt.exe" --release "stage\bin\$env:PROJECT_NAME.exe"
+          }
+
+      - name: Create Windows packages
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path release -Force | Out-Null
+          if ($env:PROJECT_TYPE -eq "executable") {
+            $archive = "release\$env:PROJECT_NAME-$env:RELEASE_VERSION-windows-x64.zip"
+            Compress-Archive -Path "stage\*" -DestinationPath $archive -CompressionLevel Optimal
+            $installer = Join-Path (Resolve-Path "release").Path "$env:PROJECT_NAME-$env:RELEASE_VERSION-windows-x64-installer.exe"
+            $makensis = (Get-Command "makensis.exe" -ErrorAction SilentlyContinue).Source
+            if (-not $makensis) {
+              $makensis = "${env:ProgramFiles(x86)}\NSIS\makensis.exe"
+            }
+            if (-not (Test-Path -LiteralPath $makensis)) {
+              throw "makensis.exe was not found after installing NSIS."
+            }
+            & $makensis "-DPROJECT_NAME=$env:PROJECT_NAME" "-DPROJECT_VERSION=$env:RELEASE_VERSION" "-DPUBLISHER=$env:PROJECT_PUBLISHER" "-DDEPLOY_DIR=$((Resolve-Path 'stage').Path)" "-DOUTPUT_FILE=$installer" "Scripts\Win\installer.nsi"
+            if ($LASTEXITCODE -ne 0) {
+              throw "NSIS installer creation failed."
+            }
+          } else {
+            $archive = "release\$env:PROJECT_NAME-$env:RELEASE_VERSION-windows-x64-sdk.zip"
+            Compress-Archive -Path "stage\*" -DestinationPath $archive -CompressionLevel Optimal
+          }
+
+      - name: Upload Windows release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: Get-ChildItem "release" -File | ForEach-Object { gh release upload $env:GITHUB_REF_NAME $_.FullName --repo $env:GITHUB_REPOSITORY --clobber }
+
+  build_linux:
+    name: Build Linux x86_64
+    needs:
+      - prepare_release
+      - test
+    runs-on: ubuntu-22.04
+    env:
+      RELEASE_VERSION: ${{ needs.prepare_release.outputs.version }}
+      CMAKE_PROJECT_VERSION: ${{ needs.prepare_release.outputs.cmake_version }}
+
+    steps:
+      - name: Checkout tagged revision
+        uses: actions/checkout@v4
+
+      - name: Load project configuration
+        shell: bash
+        run: cat .github/release-config.env >> "${GITHUB_ENV}"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            desktop-file-utils \
+            file \
+            libgl1-mesa-dev \
+            libpthread-stubs0-dev \
+            libx11-xcb-dev \
+            libxcb-cursor-dev \
+            libxcb-cursor0 \
+            patchelf
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          aqtversion: "==3.1.*"
+          version: ${{ env.QT_VERSION }}
+          host: linux
+          target: desktop
+          arch: linux_gcc_64
+          base-url: https://download.qt.io/official_releases/
+
+      - name: Install CMake
+        uses: jwlawson/actions-setup-cmake@v1
+        with:
+          cmake-version: "4.1.1"
+
+      - name: Configure release
+        shell: bash
+        run: |
+          cmake \
+            -S . \
+            -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="${QT_ROOT_DIR}" \
+            -DMAIN_PROJECT_NAME="${PROJECT_NAME}" \
+            -DMAIN_PROJECT_VERSION="${CMAKE_PROJECT_VERSION}" \
+            -D"${PROJECT_NAME}_BUILD_TARGET_TYPE=${PROJECT_TYPE}" \
+            -D"${PROJECT_NAME}_BUILD_TEST_PROJECT=OFF" \
+            -DTHIRD_PARTY_INCLUDE_DIR="${RUNNER_TEMP}/ThirdParty"
+
+      - name: Build release
+        run: cmake --build build --config Release
+
+      - name: Create Linux package
+        shell: bash
+        run: |
+          mkdir -p release
+          if [[ "${PROJECT_TYPE}" == "executable" ]]; then
+            mkdir -p release/AppDir/usr/bin
+            cp "build/QT_Project/${PROJECT_NAME}" "release/AppDir/usr/bin/${PROJECT_NAME}"
+
+            cat > "release/${PROJECT_NAME}.desktop" <<EOF
+          [Desktop Entry]
+          Type=Application
+          Name=${PROJECT_DISPLAY_NAME}
+          Exec=${PROJECT_NAME}
+          Icon=${PROJECT_NAME}
+          Categories=Utility;
+          Terminal=false
+          EOF
+
+            cp "Configs/AppIcon.svg" "release/${PROJECT_NAME}.svg"
+            curl -L --fail --retry 3 \
+              -o linuxdeploy-x86_64.AppImage \
+              https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+            curl -L --fail --retry 3 \
+              -o linuxdeploy-plugin-qt-x86_64.AppImage \
+              https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
+            chmod +x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-qt-x86_64.AppImage
+            export PATH="${GITHUB_WORKSPACE}:${PATH}"
+            export QMAKE="${QT_ROOT_DIR}/bin/qmake"
+            export OUTPUT="${GITHUB_WORKSPACE}/release/${PROJECT_NAME}-${RELEASE_VERSION}-linux-x86_64.AppImage"
+            export APPIMAGE_EXTRACT_AND_RUN=1
+            ./linuxdeploy-x86_64.AppImage \
+              --appdir release/AppDir \
+              --desktop-file "release/${PROJECT_NAME}.desktop" \
+              --icon-file "release/${PROJECT_NAME}.svg" \
+              --plugin qt \
+              --output appimage
+            rm -rf release/AppDir "release/${PROJECT_NAME}.desktop" "release/${PROJECT_NAME}.svg"
+          else
+            cmake --install build --config Release --prefix stage
+            tar -czf "release/${PROJECT_NAME}-${RELEASE_VERSION}-linux-x86_64-sdk.tar.gz" -C stage .
+          fi
+
+      - name: Upload Linux release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          for asset in release/*; do
+            gh release upload "${GITHUB_REF_NAME}" "${asset}" --repo "${GITHUB_REPOSITORY}" --clobber
+          done
+
+  build_macos:
+    name: Build macOS
+    needs:
+      - prepare_release
+      - test
+    runs-on: macos-15
+    env:
+      RELEASE_VERSION: ${{ needs.prepare_release.outputs.version }}
+      CMAKE_PROJECT_VERSION: ${{ needs.prepare_release.outputs.cmake_version }}
+
+    steps:
+      - name: Checkout tagged revision
+        uses: actions/checkout@v4
+
+      - name: Load project configuration
+        shell: bash
+        run: cat .github/release-config.env >> "${GITHUB_ENV}"
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          aqtversion: "==3.1.*"
+          version: ${{ env.QT_VERSION }}
+          host: mac
+          target: desktop
+          arch: clang_64
+          base-url: https://download.qt.io/official_releases/
+
+      - name: Install CMake
+        uses: jwlawson/actions-setup-cmake@v1
+        with:
+          cmake-version: "4.1.1"
+
+      - name: Configure release
+        shell: bash
+        run: |
+          cmake \
+            -S . \
+            -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="${QT_ROOT_DIR}" \
+            -DMAIN_PROJECT_NAME="${PROJECT_NAME}" \
+            -DMAIN_PROJECT_VERSION="${CMAKE_PROJECT_VERSION}" \
+            -D"${PROJECT_NAME}_BUILD_TARGET_TYPE=${PROJECT_TYPE}" \
+            -D"${PROJECT_NAME}_BUILD_TEST_PROJECT=OFF" \
+            -DTHIRD_PARTY_INCLUDE_DIR="${RUNNER_TEMP}/ThirdParty"
+
+      - name: Build release
+        run: cmake --build build --config Release
+
+      - name: Create macOS package
+        shell: bash
+        run: |
+          mkdir -p release
+          architecture="$(uname -m)"
+          if [[ "${PROJECT_TYPE}" == "executable" ]]; then
+            "${QT_ROOT_DIR}/bin/macdeployqt" "build/QT_Project/${PROJECT_NAME}.app"
+            ditto -c -k --sequesterRsrc --keepParent \
+              "build/QT_Project/${PROJECT_NAME}.app" \
+              "release/${PROJECT_NAME}-${RELEASE_VERSION}-macos-${architecture}.zip"
+          else
+            cmake --install build --config Release --prefix stage
+            tar -czf "release/${PROJECT_NAME}-${RELEASE_VERSION}-macos-${architecture}-sdk.tar.gz" -C stage .
+          fi
+
+      - name: Upload macOS release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          for asset in release/*; do
+            gh release upload "${GITHUB_REF_NAME}" "${asset}" --repo "${GITHUB_REPOSITORY}" --clobber
+          done
+
+  publish_release:
+    name: Publish Release
+    needs:
+      - prepare_release
+      - build_windows
+      - build_linux
+      - build_macos
+    runs-on: ubuntu-latest
+    env:
+      IS_PRERELEASE: ${{ needs.prepare_release.outputs.prerelease }}
+
+    steps:
+      - name: Download release assets for checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" --dir release-assets
+
+      - name: Create and upload checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          cd release-assets
+          rm -f SHA256SUMS.txt
+          sha256sum * > SHA256SUMS.txt
+          gh release upload "${GITHUB_REF_NAME}" SHA256SUMS.txt --repo "${GITHUB_REPOSITORY}" --clobber
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          if [[ "${IS_PRERELEASE}" == "true" ]]; then
+            gh release edit "${GITHUB_REF_NAME}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --draft=false \
+              --prerelease
+          else
+            gh release edit "${GITHUB_REF_NAME}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --draft=false \
+              --latest
+          fi

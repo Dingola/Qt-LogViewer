@@ -27,6 +27,7 @@ jobs:
   build_and_test:
     name: Build and Test on Windows Latest
     runs-on: windows-2022
+
     steps:
       # Checkout the repository and submodules
       - name: Checkout repository (and submodules)

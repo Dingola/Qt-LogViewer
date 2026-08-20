@@ -23,8 +23,8 @@ env:
 #------------------------------------------------
 jobs:
   test-macos:
-    name: Test on macOS Latest
-    runs-on: macos-latest
+    name: Test on macOS 15
+    runs-on: macos-15
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
     steps:

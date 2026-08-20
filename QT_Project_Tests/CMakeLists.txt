@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.29.3 FATAL_ERROR)
 ### Setup project                        ###
 ############################################
 
-project(${MAIN_PROJECT_NAME}_Tests LANGUAGES CXX VERSION "0.0.0")
+project(${MAIN_PROJECT_NAME}_Tests LANGUAGES CXX VERSION ${MAIN_PROJECT_VERSION})
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Include CMake helper scripts

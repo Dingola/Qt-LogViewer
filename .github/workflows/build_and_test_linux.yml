@@ -27,6 +27,7 @@ jobs:
   build_and_test:
     name: Build and Test on Ubuntu Latest
     runs-on: ubuntu-latest
+
     steps:
       # Checkout the repository and submodules
       - name: Checkout repository (and submodules)
@@ -89,7 +90,7 @@ jobs:
       - name: Generate coverage report
         run: |
           cd build
-          gcovr --root ${{ github.workspace }} -r ${{ github.workspace }} --exclude '.*/QT_Project_Tests(/.*)?$' --xml-pretty -o coverage.xml
+          gcovr --root ${{ github.workspace }} -r ${{ github.workspace }} --filter '${{ github.workspace }}/QT_Project/.*' --xml-pretty -o coverage.xml
 
       # Upload coverage to Codecov
       - name: Upload coverage to Codecov
