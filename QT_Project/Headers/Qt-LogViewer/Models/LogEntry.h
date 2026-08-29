@@ -1,7 +1,9 @@
 #pragma once
 
 #include <QDateTime>
+#include <QMap>
 #include <QString>
+#include <QVariant>
 
 #include "Qt-LogViewer/Models/LogFileInfo.h"
 
@@ -12,20 +14,24 @@
 
 /**
  * @class LogEntry
- * @brief Represents a single log entry with timestamp, level, message and app name.
+ * @brief Represents a parsed log entry and its lossless source data.
  *
- * This class encapsulates the data for a single log line, including timestamp,
- * log level, message and the application name.
+ * Besides the standard fields used by the table model, the entry retains the raw
+ * record, its source line and all dynamically parsed values. These values may also
+ * be restored from persistent storage without requiring a parser result.
  */
 class LogEntry
 {
     public:
+        /** Dynamically named, converted values retained from the parser result. */
+        using ParsedFields = QMap<QString, QVariant>;
+
         /**
          * @brief Constructs a LogEntry object.
          * @param timestamp The timestamp of the log entry.
          * @param level The log level (e.g., "INFO", "ERROR").
          * @param message The log message.
-         * @param app_name The name of the application that generated the log.
+         * @param file_info Source file and application information.
          */
         LogEntry(QDateTime timestamp = QDateTime(), QString level = QString(),
                  QString message = QString(), LogFileInfo file_info = LogFileInfo());
@@ -66,6 +72,31 @@ class LogEntry
         [[nodiscard]] auto get_file_info() const -> LogFileInfo;
 
         /**
+         * @brief Returns the unmodified source record.
+         * @return Raw record supplied to the parser.
+         */
+        [[nodiscard]] auto get_raw_record() const noexcept -> const QString&;
+
+        /**
+         * @brief Returns the one-based source line.
+         * @return Source line, or -1 when unknown.
+         */
+        [[nodiscard]] auto get_source_line() const noexcept -> qsizetype;
+
+        /**
+         * @brief Returns all dynamically named, converted parser values.
+         * @return Parsed values keyed by stable field identifier.
+         */
+        [[nodiscard]] auto get_parsed_fields() const noexcept -> const ParsedFields&;
+
+        /**
+         * @brief Returns one dynamically parsed value.
+         * @param field_id Stable field identifier.
+         * @return Converted value, or an invalid QVariant when the field is absent.
+         */
+        [[nodiscard]] auto get_parsed_field(const QString& field_id) const -> QVariant;
+
+        /**
          * @brief Sets the timestamp.
          * @param timestamp The new timestamp.
          */
@@ -95,9 +126,21 @@ class LogEntry
          */
         auto set_file_info(const LogFileInfo& file_info) -> void;
 
+        /**
+         * @brief Sets the lossless metadata retained from a successful parser result.
+         * @param raw_record Unmodified source record.
+         * @param source_line One-based source line, or -1 when unknown.
+         * @param parsed_fields Converted values keyed by stable field identifier.
+         */
+        auto set_parse_metadata(QString raw_record, qsizetype source_line,
+                                ParsedFields parsed_fields) -> void;
+
     private:
         QDateTime m_timestamp;
         QString m_level;
         QString m_message;
         LogFileInfo m_file_info;
+        QString m_raw_record;
+        qsizetype m_source_line{-1};
+        ParsedFields m_parsed_fields;
 };

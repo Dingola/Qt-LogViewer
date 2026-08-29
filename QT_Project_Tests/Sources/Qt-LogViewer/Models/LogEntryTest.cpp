@@ -29,6 +29,9 @@ TEST_F(LogEntryTest, DefaultConstructor)
     EXPECT_TRUE(entry.get_level().isEmpty());
     EXPECT_TRUE(entry.get_message().isEmpty());
     EXPECT_TRUE(entry.get_app_name().isEmpty());
+    EXPECT_TRUE(entry.get_raw_record().isEmpty());
+    EXPECT_EQ(entry.get_source_line(), -1);
+    EXPECT_TRUE(entry.get_parsed_fields().isEmpty());
 }
 
 /**
@@ -109,6 +112,26 @@ TEST_F(LogEntryTest, SetAndGetFileInfo)
 }
 
 /**
+ * @brief Tests setters and getters for lossless parser metadata.
+ */
+TEST_F(LogEntryTest, SetAndGetParserMetadata)
+{
+    LogEntry entry;
+    const QString raw_record = QStringLiteral("raw log record");
+    const LogEntry::ParsedFields parsed_fields{
+        {QStringLiteral("request_id"), QStringLiteral("req-123")},
+        {QStringLiteral("duration_ms"), 17}};
+
+    entry.set_parse_metadata(raw_record, 9, parsed_fields);
+
+    EXPECT_EQ(entry.get_raw_record(), raw_record);
+    EXPECT_EQ(entry.get_source_line(), 9);
+    EXPECT_EQ(entry.get_parsed_fields(), parsed_fields);
+    EXPECT_EQ(entry.get_parsed_field(QStringLiteral("duration_ms")).toInt(), 17);
+    EXPECT_FALSE(entry.get_parsed_field(QStringLiteral("missing")).isValid());
+}
+
+/**
  * @brief Tests that LogEntry can be copied correctly.
  */
 TEST_F(LogEntryTest, CopyConstructorAndAssignment)
@@ -118,8 +141,12 @@ TEST_F(LogEntryTest, CopyConstructorAndAssignment)
     QString message = "Copy test";
     QString app_name = "CopyApp";
     LogFileInfo file_info("dummy.log", app_name);
+    const QString raw_record = QStringLiteral("raw copy test");
+    const LogEntry::ParsedFields parsed_fields{
+        {QStringLiteral("request_id"), QStringLiteral("copy-123")}};
 
     LogEntry entry1(timestamp, level, message, file_info);
+    entry1.set_parse_metadata(raw_record, 11, parsed_fields);
     LogEntry entry2(entry1);  // Copy constructor
     LogEntry entry3;
     entry3 = entry1;  // Assignment
@@ -129,10 +156,16 @@ TEST_F(LogEntryTest, CopyConstructorAndAssignment)
     EXPECT_EQ(entry2.get_message(), message);
     EXPECT_EQ(entry2.get_app_name(), app_name);
     EXPECT_EQ(entry2.get_file_info().get_file_path(), "dummy.log");
+    EXPECT_EQ(entry2.get_raw_record(), raw_record);
+    EXPECT_EQ(entry2.get_source_line(), 11);
+    EXPECT_EQ(entry2.get_parsed_fields(), parsed_fields);
 
     EXPECT_EQ(entry3.get_timestamp(), timestamp);
     EXPECT_EQ(entry3.get_level(), level);
     EXPECT_EQ(entry3.get_message(), message);
     EXPECT_EQ(entry3.get_app_name(), app_name);
     EXPECT_EQ(entry3.get_file_info().get_file_path(), "dummy.log");
+    EXPECT_EQ(entry3.get_raw_record(), raw_record);
+    EXPECT_EQ(entry3.get_source_line(), 11);
+    EXPECT_EQ(entry3.get_parsed_fields(), parsed_fields);
 }

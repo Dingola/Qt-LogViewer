@@ -66,6 +66,13 @@ TEST_F(LogParserTest, ParseValidLogLine)
     EXPECT_EQ(entry.get_level(), "Debug");
     EXPECT_EQ(entry.get_message(), "This is a debug message");
     EXPECT_EQ(entry.get_app_name(), "MyApp");
+    EXPECT_EQ(entry.get_raw_record(), line);
+    EXPECT_EQ(entry.get_source_line(), 7);
+    EXPECT_EQ(entry.get_parsed_field(QStringLiteral("file")).toString(),
+              QStringLiteral("file.cpp"));
+    EXPECT_EQ(entry.get_parsed_field(QStringLiteral("line")).toLongLong(), 42);
+    EXPECT_EQ(entry.get_parsed_field(QStringLiteral("function")).toString(),
+              QStringLiteral("func()"));
 }
 
 /**
@@ -232,6 +239,27 @@ TEST_F(LogParserTest, ParseFileKeepsValidEntriesWithoutLevel)
     ASSERT_EQ(entries.size(), 1);
     EXPECT_EQ(entries.first().get_message(), QStringLiteral("A valid message without a level"));
     EXPECT_TRUE(entries.first().get_level().isEmpty());
+}
+
+/**
+ * @test Verifies that arbitrary converted fields survive LogEntry adaptation.
+ */
+TEST_F(LogParserTest, ParseLinePreservesCustomFieldsInLogEntry)
+{
+    LogParser parser(LogParsingProfile::create_default(QStringLiteral("{message}|{request_id}")));
+    const QString line = QStringLiteral("Request completed|req-42");
+
+    const LogParseOutcome outcome = parser.parse_line(line, QStringLiteral("custom.log"), 15);
+
+    ASSERT_TRUE(outcome.succeeded());
+    ASSERT_TRUE(outcome.entry.has_value());
+    const LogEntry& entry = outcome.entry.value();
+
+    EXPECT_EQ(entry.get_raw_record(), line);
+    EXPECT_EQ(entry.get_source_line(), 15);
+    EXPECT_EQ(entry.get_parsed_field(QStringLiteral("request_id")).toString(),
+              QStringLiteral("req-42"));
+    EXPECT_EQ(entry.get_parsed_fields(), outcome.parse_result.record.values);
 }
 
 /**

@@ -119,11 +119,14 @@ class LogParser
         /**
          * @brief Adapts a successful generic record to the current LogEntry model.
          * @param result Successful generic parser result.
+         * @param raw_record Unmodified source record.
+         * @param line_number One-based source line number, or -1 when unknown.
          * @return Log entry containing the standard log fields and source information.
          * @pre result.succeeded() is true.
          */
-        [[nodiscard]] static auto create_log_entry(const QtRecordParser::ParseResult& result)
-            -> LogEntry;
+        [[nodiscard]] static auto create_log_entry(const QtRecordParser::ParseResult& result,
+                                                   const QString& raw_record,
+                                                   qsizetype line_number) -> LogEntry;
 
     private:
         LogParsingProfile m_profile;

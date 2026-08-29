@@ -5,12 +5,14 @@
 
 #include "Qt-LogViewer/Models/LogEntry.h"
 
+#include <utility>
+
 /**
  * @brief Constructs a LogEntry object.
  * @param timestamp The timestamp of the log entry.
  * @param level The log level.
  * @param message The log message.
- * @param app_name The application name.
+ * @param file_info Source file and application information.
  */
 LogEntry::LogEntry(QDateTime timestamp, QString level, QString message, LogFileInfo file_info)
     : m_timestamp{std::move(timestamp)},
@@ -65,6 +67,43 @@ auto LogEntry::get_file_info() const -> LogFileInfo
 }
 
 /**
+ * @brief Returns the unmodified source record.
+ * @return Raw record supplied to the parser.
+ */
+auto LogEntry::get_raw_record() const noexcept -> const QString&
+{
+    return m_raw_record;
+}
+
+/**
+ * @brief Returns the one-based source line.
+ * @return Source line, or -1 when unknown.
+ */
+auto LogEntry::get_source_line() const noexcept -> qsizetype
+{
+    return m_source_line;
+}
+
+/**
+ * @brief Returns all dynamically named, converted parser values.
+ * @return Parsed values keyed by stable field identifier.
+ */
+auto LogEntry::get_parsed_fields() const noexcept -> const ParsedFields&
+{
+    return m_parsed_fields;
+}
+
+/**
+ * @brief Returns one dynamically parsed value.
+ * @param field_id Stable field identifier.
+ * @return Converted value, or an invalid QVariant when the field is absent.
+ */
+auto LogEntry::get_parsed_field(const QString& field_id) const -> QVariant
+{
+    return m_parsed_fields.value(field_id);
+}
+
+/**
  * @brief Sets the timestamp.
  * @param timestamp The new timestamp.
  */
@@ -107,4 +146,18 @@ auto LogEntry::set_app_name(const QString& app_name) -> void
 auto LogEntry::set_file_info(const LogFileInfo& file_info) -> void
 {
     m_file_info = file_info;
+}
+
+/**
+ * @brief Sets the lossless metadata retained from a successful parser result.
+ * @param raw_record Unmodified source record.
+ * @param source_line One-based source line, or -1 when unknown.
+ * @param parsed_fields Converted values keyed by stable field identifier.
+ */
+auto LogEntry::set_parse_metadata(QString raw_record, qsizetype source_line,
+                                  ParsedFields parsed_fields) -> void
+{
+    m_raw_record = std::move(raw_record);
+    m_source_line = source_line;
+    m_parsed_fields = std::move(parsed_fields);
 }

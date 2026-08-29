@@ -100,7 +100,7 @@ auto LogParser::parse_line(const QString& line, const QString& file_path,
 
     if (outcome.parse_result.succeeded())
     {
-        outcome.entry = create_log_entry(outcome.parse_result);
+        outcome.entry = create_log_entry(outcome.parse_result, line, line_number);
     }
 
     return outcome;
@@ -212,15 +212,20 @@ auto LogParser::get_timestamp_formats() const -> QVector<QString>
  * adapted entry.
  *
  * @param result Successful generic parser result.
+ * @param raw_record Unmodified source record.
+ * @param line_number One-based source line number, or -1 when unknown.
  * @return Log entry containing the standard log fields and source information.
  * @pre result.succeeded() is true.
  */
-auto LogParser::create_log_entry(const QtRecordParser::ParseResult& result) -> LogEntry
+auto LogParser::create_log_entry(const QtRecordParser::ParseResult& result,
+                                 const QString& raw_record, qsizetype line_number) -> LogEntry
 {
     const QDateTime timestamp = result.record.value(LogField::Timestamp).toDateTime();
     const QString level = result.record.value(LogField::Level).toString();
     const QString message = result.record.value(LogField::Message).toString();
     const QString app_name = result.record.value(LogField::AppName).toString();
 
-    return LogEntry(timestamp, level, message, LogFileInfo(result.record.source, app_name));
+    LogEntry entry(timestamp, level, message, LogFileInfo(result.record.source, app_name));
+    entry.set_parse_metadata(raw_record, line_number, result.record.values);
+    return entry;
 }
