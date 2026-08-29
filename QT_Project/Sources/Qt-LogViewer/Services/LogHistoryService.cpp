@@ -5,6 +5,9 @@
 
 #include "Qt-LogViewer/Services/LogHistoryService.h"
 
+#include <QCborMap>
+#include <QCborParserError>
+#include <QCborValue>
 #include <QDir>
 #include <QFileInfo>
 #include <QList>
@@ -27,6 +30,52 @@ struct SqlFilter {
         QList<QPair<QString, QVariant>> bindings;
         QString error;
 };
+
+/**
+ * @brief Serializes dynamically parsed values while retaining supported QVariant types.
+ * @param parsed_fields Converted values keyed by stable field identifier.
+ * @return Compact CBOR representation suitable for SQLite BLOB storage.
+ */
+[[nodiscard]] auto serialize_parsed_fields(const LogEntry::ParsedFields& parsed_fields)
+    -> QByteArray
+{
+    QCborMap serialized_fields;
+
+    for (auto iterator = parsed_fields.cbegin(); iterator != parsed_fields.cend(); ++iterator)
+    {
+        serialized_fields.insert(iterator.key(), QCborValue::fromVariant(iterator.value()));
+    }
+
+    return QCborValue(serialized_fields).toCbor();
+}
+
+/**
+ * @brief Restores dynamically parsed values from their CBOR representation.
+ * @param serialized_fields CBOR data loaded from SQLite.
+ * @return Restored values, or an empty map when the data is invalid.
+ */
+[[nodiscard]] auto deserialize_parsed_fields(const QByteArray& serialized_fields)
+    -> LogEntry::ParsedFields
+{
+    LogEntry::ParsedFields parsed_fields;
+
+    if (!serialized_fields.isEmpty())
+    {
+        QCborParserError parser_error;
+        const QCborValue value = QCborValue::fromCbor(serialized_fields, &parser_error);
+
+        if (parser_error.error == QCborError::NoError && value.isMap())
+        {
+            parsed_fields = value.toVariant().toMap();
+        }
+        else
+        {
+            qWarning() << "Restoring parsed log fields failed:" << parser_error.error;
+        }
+    }
+
+    return parsed_fields;
+}
 
 /**
  * @brief Maps a log field identifier to an FTS5 column name.
@@ -439,14 +488,19 @@ auto LogHistoryService::add_entries(const QUuid& view_id, const QVector<LogEntry
             QSqlQuery query(database);
             query.prepare(QStringLiteral(
                 "INSERT INTO log_entries "
-                "(view_id, timestamp_utc, level, message, app_name, file_path) "
-                "VALUES (:view_id, :timestamp_utc, :level, :message, :app_name, :file_path)"));
+                "(view_id, timestamp_utc, level, message, app_name, file_path, raw_record, "
+                "source_line, parsed_fields_cbor) "
+                "VALUES (:view_id, :timestamp_utc, :level, :message, :app_name, :file_path, "
+                ":raw_record, :source_line, :parsed_fields_cbor)"));
 
             bool inserted = true;
 
             for (qsizetype index = 0; index < entries.size() && inserted; ++index)
             {
                 const LogEntry& entry = entries.at(index);
+                const QString raw_record =
+                    entry.get_raw_record().isNull() ? QStringLiteral("") : entry.get_raw_record();
+
                 query.bindValue(QStringLiteral(":view_id"), view_id.toString(QUuid::WithoutBraces));
                 query.bindValue(QStringLiteral(":timestamp_utc"),
                                 entry.get_timestamp().toUTC().toString(Qt::ISODateWithMs));
@@ -455,8 +509,18 @@ auto LogHistoryService::add_entries(const QUuid& view_id, const QVector<LogEntry
                 query.bindValue(QStringLiteral(":app_name"), entry.get_app_name());
                 query.bindValue(QStringLiteral(":file_path"),
                                 entry.get_file_info().get_file_path());
+                query.bindValue(QStringLiteral(":raw_record"), raw_record);
+                query.bindValue(QStringLiteral(":source_line"),
+                                static_cast<qlonglong>(entry.get_source_line()));
+                query.bindValue(QStringLiteral(":parsed_fields_cbor"),
+                                serialize_parsed_fields(entry.get_parsed_fields()));
 
                 inserted = query.exec();
+
+                if (!inserted)
+                {
+                    qWarning() << "Archiving log entry failed:" << query.lastError().text();
+                }
             }
 
             added = inserted && database.commit();
@@ -538,7 +602,8 @@ auto LogHistoryService::load_entries_page(const LogQuery& log_query, qsizetype o
 
             query.prepare(
                 QStringLiteral("SELECT entries.timestamp_utc, entries.level, entries.message, "
-                               "entries.app_name, entries.file_path "
+                               "entries.app_name, entries.file_path, entries.raw_record, "
+                               "entries.source_line, entries.parsed_fields_cbor "
                                "FROM %1 "
                                "WHERE %2 "
                                "ORDER BY %3 "
@@ -557,7 +622,9 @@ auto LogHistoryService::load_entries_page(const LogQuery& log_query, qsizetype o
                     entries.append(
                         create_log_entry(query.value(0).toString(), query.value(1).toString(),
                                          query.value(2).toString(), query.value(3).toString(),
-                                         query.value(4).toString()));
+                                         query.value(4).toString(), query.value(5).toString(),
+                                         static_cast<qsizetype>(query.value(6).toLongLong()),
+                                         query.value(7).toByteArray()));
                 }
             }
             else
@@ -724,7 +791,8 @@ auto LogHistoryService::search_entries(const QUuid& view_id, const QString& sear
 
         query.prepare(
             QStringLiteral("SELECT entries.timestamp_utc, entries.level, entries.message, "
-                           "entries.app_name, entries.file_path "
+                           "entries.app_name, entries.file_path, entries.raw_record, "
+                           "entries.source_line, entries.parsed_fields_cbor "
                            "FROM log_entries AS entries "
                            "INNER JOIN log_entries_fts "
                            "ON log_entries_fts.rowid = entries.id "
@@ -743,7 +811,9 @@ auto LogHistoryService::search_entries(const QUuid& view_id, const QString& sear
             {
                 entries.append(create_log_entry(
                     query.value(0).toString(), query.value(1).toString(), query.value(2).toString(),
-                    query.value(3).toString(), query.value(4).toString()));
+                    query.value(3).toString(), query.value(4).toString(), query.value(5).toString(),
+                    static_cast<qsizetype>(query.value(6).toLongLong()),
+                    query.value(7).toByteArray()));
             }
         }
         else
@@ -847,18 +917,26 @@ auto LogHistoryService::initialize_database() -> bool
  */
 auto LogHistoryService::create_schema() -> bool
 {
-    bool schema_created = true;
     QSqlQuery query(QSqlDatabase::database(m_connection_name));
+    bool schema_created =
+        query.exec(QStringLiteral("CREATE TABLE IF NOT EXISTS log_entries ("
+                                  "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                                  "view_id TEXT NOT NULL, "
+                                  "timestamp_utc TEXT NOT NULL, "
+                                  "level TEXT NOT NULL, "
+                                  "message TEXT NOT NULL, "
+                                  "app_name TEXT NOT NULL, "
+                                  "file_path TEXT NOT NULL, "
+                                  "raw_record TEXT NOT NULL DEFAULT '', "
+                                  "source_line INTEGER NOT NULL DEFAULT -1, "
+                                  "parsed_fields_cbor BLOB NOT NULL DEFAULT X'A0')"));
+
+    if (schema_created)
+    {
+        schema_created = ensure_parse_metadata_columns();
+    }
 
     const QStringList statements{
-        QStringLiteral("CREATE TABLE IF NOT EXISTS log_entries ("
-                       "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-                       "view_id TEXT NOT NULL, "
-                       "timestamp_utc TEXT NOT NULL, "
-                       "level TEXT NOT NULL, "
-                       "message TEXT NOT NULL, "
-                       "app_name TEXT NOT NULL, "
-                       "file_path TEXT NOT NULL)"),
         QStringLiteral("CREATE INDEX IF NOT EXISTS idx_log_entries_view_id "
                        "ON log_entries(view_id, id)"),
         QStringLiteral("CREATE INDEX IF NOT EXISTS idx_log_entries_view_timestamp "
@@ -892,6 +970,49 @@ auto LogHistoryService::create_schema() -> bool
 }
 
 /**
+ * @brief Adds parser-metadata columns missing from an existing history database.
+ * @return True when the table already is current or every migration statement succeeds.
+ */
+auto LogHistoryService::ensure_parse_metadata_columns() -> bool
+{
+    QSqlQuery query(QSqlDatabase::database(m_connection_name));
+    bool migrated = query.exec(QStringLiteral("PRAGMA table_info(log_entries)"));
+    QSet<QString> column_names;
+
+    while (migrated && query.next())
+    {
+        column_names.insert(query.value(1).toString());
+    }
+
+    QStringList migration_statements;
+
+    if (migrated && !column_names.contains(QStringLiteral("raw_record")))
+    {
+        migration_statements.append(QStringLiteral(
+            "ALTER TABLE log_entries ADD COLUMN raw_record TEXT NOT NULL DEFAULT ''"));
+    }
+
+    if (migrated && !column_names.contains(QStringLiteral("source_line")))
+    {
+        migration_statements.append(QStringLiteral(
+            "ALTER TABLE log_entries ADD COLUMN source_line INTEGER NOT NULL DEFAULT -1"));
+    }
+
+    if (migrated && !column_names.contains(QStringLiteral("parsed_fields_cbor")))
+    {
+        migration_statements.append(QStringLiteral(
+            "ALTER TABLE log_entries ADD COLUMN parsed_fields_cbor BLOB NOT NULL DEFAULT X'A0'"));
+    }
+
+    for (qsizetype index = 0; index < migration_statements.size() && migrated; ++index)
+    {
+        migrated = query.exec(migration_statements.at(index));
+    }
+
+    return migrated;
+}
+
+/**
  * @brief Builds an FTS5 query expression from user-entered plain text.
  * @param search_text User-entered text.
  * @return Safe FTS5 query expression.
@@ -921,14 +1042,21 @@ auto LogHistoryService::create_fts_query(const QString& search_text) -> QString
  * @param message Entry message.
  * @param app_name Entry application name.
  * @param file_path Entry source file path.
+ * @param raw_record Unmodified source record.
+ * @param source_line One-based source line, or -1 when unknown.
+ * @param parsed_fields_cbor CBOR-encoded dynamically parsed values.
  * @return Converted LogEntry.
  */
 auto LogHistoryService::create_log_entry(const QString& timestamp_text, const QString& level,
                                          const QString& message, const QString& app_name,
-                                         const QString& file_path) -> LogEntry
+                                         const QString& file_path, const QString& raw_record,
+                                         qsizetype source_line,
+                                         const QByteArray& parsed_fields_cbor) -> LogEntry
 {
     const QDateTime timestamp = QDateTime::fromString(timestamp_text, Qt::ISODateWithMs);
     const LogFileInfo file_info(file_path, app_name);
-    const LogEntry entry(timestamp, level, message, file_info);
+    LogEntry entry(timestamp, level, message, file_info);
+    entry.set_parse_metadata(raw_record, source_line,
+                             deserialize_parsed_fields(parsed_fields_cbor));
     return entry;
 }

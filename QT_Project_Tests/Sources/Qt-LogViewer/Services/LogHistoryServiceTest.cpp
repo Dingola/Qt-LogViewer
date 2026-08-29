@@ -132,6 +132,52 @@ TEST_F(LogHistoryServiceTest, StoresAndSearchesEntriesWithFts)
 }
 
 /**
+ * @brief Verifies that raw source data and typed custom fields survive SQLite roundtrips.
+ */
+TEST_F(LogHistoryServiceTest, PersistsParseMetadataAndCustomFields)
+{
+    ASSERT_TRUE(m_history_service->is_available());
+
+    LogEntry entry =
+        create_entry(QStringLiteral("request completed"), QStringLiteral("metadata.log"));
+
+    const QDateTime parsed_timestamp =
+        QDateTime::fromString(QStringLiteral("2026-01-01T12:00:00.125+02:00"), Qt::ISODateWithMs);
+
+    LogEntry::ParsedFields parsed_fields;
+    parsed_fields.insert(QStringLiteral("request_id"), QStringLiteral("req-42"));
+    parsed_fields.insert(QStringLiteral("retry_count"), QVariant::fromValue<qlonglong>(3));
+    parsed_fields.insert(QStringLiteral("duration_ms"), 17.5);
+    parsed_fields.insert(QStringLiteral("successful"), true);
+    parsed_fields.insert(QStringLiteral("parsed_timestamp"), parsed_timestamp);
+
+    const QString raw_record =
+        QStringLiteral("2026-01-01T12:00:00.125+02:00 INFO req-42 request completed");
+
+    entry.set_parse_metadata(raw_record, 27, parsed_fields);
+
+    ASSERT_TRUE(m_history_service->add_entries(m_view_id, {entry}));
+
+    LogQuery query;
+    query.view_id = m_view_id;
+
+    const QVector<LogEntry> page = m_history_service->load_entries_page(query, 0, 1);
+
+    ASSERT_EQ(page.size(), 1);
+    EXPECT_EQ(page.first().get_raw_record(), raw_record);
+    EXPECT_EQ(page.first().get_source_line(), 27);
+    EXPECT_EQ(page.first().get_parsed_fields(), parsed_fields);
+
+    const QVector<LogEntry> search_results = m_history_service->search_entries(
+        m_view_id, QStringLiteral("request"), SearchField::Message);
+
+    ASSERT_EQ(search_results.size(), 1);
+    EXPECT_EQ(search_results.first().get_raw_record(), raw_record);
+    EXPECT_EQ(search_results.first().get_source_line(), 27);
+    EXPECT_EQ(search_results.first().get_parsed_fields(), parsed_fields);
+}
+
+/**
  * @brief Verifies file-specific cleanup preserves entries belonging to other files.
  */
 TEST_F(LogHistoryServiceTest, RemovesOnlySpecifiedFileHistory)

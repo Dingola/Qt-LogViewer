@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QByteArray>
 #include <QObject>
 #include <QSet>
 #include <QString>
@@ -133,6 +134,12 @@ class LogHistoryService final: public QObject
         auto create_schema() -> bool;
 
         /**
+         * @brief Adds parser-metadata columns missing from an existing history database.
+         * @return True when the table already is current or every migration statement succeeds.
+         */
+        auto ensure_parse_metadata_columns() -> bool;
+
+        /**
          * @brief Builds an FTS5 query expression from user-entered plain text.
          * @param search_text User-entered text.
          * @return Safe FTS5 query expression.
@@ -146,12 +153,15 @@ class LogHistoryService final: public QObject
          * @param message Entry message.
          * @param app_name Entry application name.
          * @param file_path Entry source file path.
+         * @param raw_record Unmodified source record.
+         * @param source_line One-based source line, or -1 when unknown.
+         * @param parsed_fields_cbor CBOR-encoded dynamically parsed values.
          * @return Converted LogEntry.
          */
-        [[nodiscard]] static auto create_log_entry(const QString& timestamp_text,
-                                                   const QString& level, const QString& message,
-                                                   const QString& app_name,
-                                                   const QString& file_path) -> LogEntry;
+        [[nodiscard]] static auto create_log_entry(
+            const QString& timestamp_text, const QString& level, const QString& message,
+            const QString& app_name, const QString& file_path, const QString& raw_record,
+            qsizetype source_line, const QByteArray& parsed_fields_cbor) -> LogEntry;
 
     private:
         QString m_connection_name;
