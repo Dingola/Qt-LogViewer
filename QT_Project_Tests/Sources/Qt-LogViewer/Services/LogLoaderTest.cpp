@@ -13,7 +13,7 @@ void LogLoaderTest::SetUp()
 {
     // Use a format string matching the test log lines
     QString format = "{timestamp} {level} {message} {app_name} [{file}:{line} ({function})]";
-    m_loader = new LogLoader(format);
+    m_loader = new LogLoader(LogParsingProfile::create_default(format));
 }
 
 /**

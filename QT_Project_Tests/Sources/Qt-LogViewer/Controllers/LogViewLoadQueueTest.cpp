@@ -23,7 +23,7 @@ void LogViewLoadQueueTest::SetUp()
 {
     const QString format =
         QStringLiteral("{timestamp} {level} {message} {app_name} [{file}:{line} ({function})]");
-    m_loader = new LogLoadingService(format);
+    m_loader = new LogLoadingService(LogParsingProfile::create_default(format));
 
     m_view_a = QUuid::createUuid();
     m_view_b = QUuid::createUuid();
@@ -227,7 +227,8 @@ TEST_F(LogViewLoadQueueTest, CancelIfActiveKeepsAssignmentUntilIdle)
         QDir::temp().filePath(QStringLiteral("qt_lvq_nonexistent_%1.log")
                                   .arg(QUuid::createUuid().toString(QUuid::WithoutBraces)));
 
-    LogLoadingService loader(QStringLiteral("{timestamp} {level} {message} {app_name}"));
+    LogLoadingService loader(LogParsingProfile::create_default(
+        QStringLiteral("{timestamp} {level} {message} {app_name}")));
 
     m_queue.enqueue(first_view_id, active_file_path);
 

@@ -15,7 +15,7 @@ void LogParserTest::SetUp()
 {
     // Default format: timestamp level message app_name [file:line (function)]
     QString format = "{timestamp} {level} {message} {app_name} [{file}:{line} ({function})]";
-    m_parser = new LogParser(format);
+    m_parser = new LogParser(LogParsingProfile::create_default(format));
 }
 
 /**
@@ -54,8 +54,13 @@ TEST_F(LogParserTest, PatternIsGeneratedCorrectly)
 TEST_F(LogParserTest, ParseValidLogLine)
 {
     QString line = "2024-01-01 12:34:56 Debug This is a debug message MyApp [file.cpp:42 (func())]";
-    LogEntry entry = m_parser->parse_line(line, "dummy.log");
+    const LogParseOutcome outcome = m_parser->parse_line(line, "dummy.log", 7);
 
+    ASSERT_TRUE(outcome.succeeded());
+    ASSERT_TRUE(outcome.entry.has_value());
+    EXPECT_EQ(outcome.raw_record, line);
+    EXPECT_EQ(outcome.line_number, 7);
+    const LogEntry& entry = outcome.entry.value();
     EXPECT_EQ(entry.get_timestamp(),
               QDateTime::fromString("2024-01-01 12:34:56", "yyyy-MM-dd HH:mm:ss"));
     EXPECT_EQ(entry.get_level(), "Debug");
@@ -64,17 +69,18 @@ TEST_F(LogParserTest, ParseValidLogLine)
 }
 
 /**
- * @test Verifies that an invalid log line returns a default LogEntry.
+ * @test Verifies that an invalid log line returns an explicit pattern mismatch.
  */
-TEST_F(LogParserTest, ParseInvalidLogLineReturnsDefault)
+TEST_F(LogParserTest, ParseInvalidLogLineReturnsPatternMismatch)
 {
     QString line = "invalid log line";
-    LogEntry entry = m_parser->parse_line(line, "dummy.log");
+    const LogParseOutcome outcome = m_parser->parse_line(line, "dummy.log", 3);
 
-    EXPECT_FALSE(entry.get_timestamp().isValid());
-    EXPECT_TRUE(entry.get_level().isEmpty());
-    EXPECT_TRUE(entry.get_app_name().isEmpty());
-    EXPECT_TRUE(entry.get_message().isEmpty());
+    EXPECT_FALSE(outcome.succeeded());
+    EXPECT_FALSE(outcome.entry.has_value());
+    EXPECT_EQ(outcome.parse_result.error, QtRecordParser::ParseError::PatternMismatch);
+    EXPECT_EQ(outcome.raw_record, line);
+    EXPECT_EQ(outcome.line_number, 3);
 }
 
 /**
@@ -152,10 +158,12 @@ TEST_F(LogParserTest, ParseLineWithDifferentFieldOrder)
 {
     // Format: timestamp app_name level message
     QString format = "{timestamp} {app_name} {level} {message}";
-    LogParser parser(format);
+    LogParser parser(LogParsingProfile::create_default(format));
 
     QString line = "2024-01-01 12:34:56 MyApp Debug This is a debug message";
-    LogEntry entry = parser.parse_line(line, "dummy.log");
+    const LogParseOutcome outcome = parser.parse_line(line, "dummy.log");
+    ASSERT_TRUE(outcome.succeeded());
+    const LogEntry& entry = outcome.entry.value();
 
     EXPECT_EQ(entry.get_timestamp(),
               QDateTime::fromString("2024-01-01 12:34:56", "yyyy-MM-dd HH:mm:ss"));
@@ -171,10 +179,12 @@ TEST_F(LogParserTest, ParseLineWithMissingFields)
 {
     // Format: timestamp level message
     QString format = "{timestamp} {level} {message}";
-    LogParser parser(format);
+    LogParser parser(LogParsingProfile::create_default(format));
 
     QString line = "2024-01-01 12:34:56 Debug This is a debug message";
-    LogEntry entry = parser.parse_line(line, "dummy.log");
+    const LogParseOutcome outcome = parser.parse_line(line, "dummy.log");
+    ASSERT_TRUE(outcome.succeeded());
+    const LogEntry& entry = outcome.entry.value();
 
     EXPECT_EQ(entry.get_timestamp(),
               QDateTime::fromString("2024-01-01 12:34:56", "yyyy-MM-dd HH:mm:ss"));
@@ -190,15 +200,79 @@ TEST_F(LogParserTest, ParseLineWithoutTimestampField)
 {
     // Format: level message app_name
     QString format = "{level} {message} {app_name}";
-    LogParser parser(format);
+    LogParser parser(LogParsingProfile::create_default(format));
 
     QString line = "Info HelloWorld MyApp";
-    LogEntry entry = parser.parse_line(line, "dummy.log");
+    const LogParseOutcome outcome = parser.parse_line(line, "dummy.log");
+    ASSERT_TRUE(outcome.succeeded());
+    const LogEntry& entry = outcome.entry.value();
 
     EXPECT_TRUE(entry.get_timestamp().isNull() || !entry.get_timestamp().isValid());
     EXPECT_EQ(entry.get_level(), "Info");
     EXPECT_EQ(entry.get_message(), "HelloWorld");
     EXPECT_EQ(entry.get_app_name(), "MyApp");
+}
+
+/**
+ * @test Verifies that success is independent of an optional log-level field.
+ */
+TEST_F(LogParserTest, ParseFileKeepsValidEntriesWithoutLevel)
+{
+    LogParser parser(LogParsingProfile::create_default(QStringLiteral("{message}")));
+    QTemporaryFile temp_file;
+    ASSERT_TRUE(temp_file.open());
+
+    QTextStream out(&temp_file);
+    out << "A valid message without a level\n";
+    out.flush();
+    temp_file.close();
+
+    const QVector<LogEntry> entries = parser.parse_file(temp_file.fileName());
+
+    ASSERT_EQ(entries.size(), 1);
+    EXPECT_EQ(entries.first().get_message(), QStringLiteral("A valid message without a level"));
+    EXPECT_TRUE(entries.first().get_level().isEmpty());
+}
+
+/**
+ * @test Verifies stable profile identity and parser configuration access.
+ */
+TEST_F(LogParserTest, ParsingProfileRetainsIdentityAndValidatesConfiguration)
+{
+    const QUuid profile_id = QUuid::createUuid();
+    QtRecordParser::ParserConfiguration configuration;
+    configuration.format = QStringLiteral("{message}");
+
+    const LogParsingProfile profile(profile_id, QStringLiteral("Messages"), configuration);
+    const LogParser parser(profile);
+
+    EXPECT_EQ(profile.get_id(), profile_id);
+    EXPECT_EQ(profile.get_name(), QStringLiteral("Messages"));
+    EXPECT_TRUE(profile.is_valid());
+    EXPECT_TRUE(profile.get_validation_error().isEmpty());
+    EXPECT_EQ(parser.get_profile().get_id(), profile_id);
+    EXPECT_EQ(parser.get_configuration().format, QStringLiteral("{message}"));
+}
+
+/**
+ * @test Verifies that invalid profile configuration becomes an explicit parser error.
+ */
+TEST_F(LogParserTest, InvalidProfileReturnsConfigurationError)
+{
+    QtRecordParser::ParserConfiguration configuration;
+    configuration.format = QStringLiteral("{message} {message}");
+    const LogParsingProfile profile(QUuid::createUuid(), QStringLiteral("Invalid"), configuration);
+    const LogParser parser(profile);
+
+    EXPECT_FALSE(profile.is_valid());
+    EXPECT_FALSE(profile.get_validation_error().isEmpty());
+
+    const LogParseOutcome outcome =
+        parser.parse_line(QStringLiteral("one two"), QStringLiteral("dummy.log"));
+    EXPECT_FALSE(outcome.succeeded());
+    EXPECT_FALSE(outcome.entry.has_value());
+    EXPECT_EQ(outcome.parse_result.error, QtRecordParser::ParseError::InvalidConfiguration);
+    EXPECT_FALSE(outcome.parse_result.error_message.isEmpty());
 }
 
 /**
@@ -222,7 +296,7 @@ TEST_F(LogParserTest, GetFieldOrderReturnsCorrectOrder)
 TEST_F(LogParserTest, LogParserWithNoPlaceholders)
 {
     QString format = "static text only";
-    LogParser parser(format);
+    LogParser parser(LogParsingProfile::create_default(format));
 
     QRegularExpression regex = parser.get_pattern();
     LogFieldOrder order = parser.get_field_order();
@@ -254,8 +328,8 @@ TEST_F(LogParserTest, ParseLinePerformanceBaseline)
     auto start = std::chrono::steady_clock::now();
     for (int i = 0; i < iterations; ++i)
     {
-        LogEntry entry = m_parser->parse_line(line, file_path);
-        if (!entry.get_level().isEmpty())
+        const LogParseOutcome outcome = m_parser->parse_line(line, file_path);
+        if (outcome.succeeded())
         {
             ++parsed_count;
         }

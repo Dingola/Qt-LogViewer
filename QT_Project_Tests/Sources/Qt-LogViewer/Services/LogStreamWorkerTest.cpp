@@ -18,7 +18,7 @@ void LogStreamWorkerTest::SetUp()
     // Simple format: level message app_name
     // - message can contain spaces (greedy section), app_name has no spaces by design.
     m_format = "{level} {message} {app_name}";
-    m_worker = new LogStreamWorker(LogParser(m_format));
+    m_worker = new LogStreamWorker(LogParser(LogParsingProfile::create_default(m_format)));
 }
 
 /**
@@ -182,7 +182,7 @@ TEST_F(LogStreamWorkerTest, CancelHonorsRequest)
     QTemporaryFile* file = create_temp_file(lines);
 
     // Create a dedicated worker moved to a background QThread for this test.
-    auto* worker = new LogStreamWorker(LogParser(m_format));
+    auto* worker = new LogStreamWorker(LogParser(LogParsingProfile::create_default(m_format)));
     QThread thread;
 
     int total_entries = 0;
@@ -244,7 +244,7 @@ TEST_F(LogStreamWorkerTest, CancelWhileStreamingStopsSoon)
     QTemporaryFile* file = create_temp_file(lines);
 
     // Dedicated worker/thread for this test.
-    auto* worker = new LogStreamWorker(LogParser(m_format));
+    auto* worker = new LogStreamWorker(LogParser(LogParsingProfile::create_default(m_format)));
     QThread thread;
 
     int total_entries = 0;

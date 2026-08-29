@@ -47,14 +47,17 @@ auto LogStreamWorker::start(const QString& file_path, qsizetype batch_size) -> v
 
         QTextStream in(&file);
 
+        qsizetype line_number = 0;
+
         while (!in.atEnd() && !m_cancelled.load())
         {
+            ++line_number;
             const QString line = in.readLine();
-            const LogEntry entry = m_parser.parse_line(line, file_path);
+            const LogParseOutcome outcome = m_parser.parse_line(line, file_path, line_number);
 
-            if (!entry.get_level().isEmpty())
+            if (outcome.succeeded())
             {
-                batch.append(entry);
+                batch.append(outcome.entry.value());
             }
 
             if (batch.size() >= batch_size)

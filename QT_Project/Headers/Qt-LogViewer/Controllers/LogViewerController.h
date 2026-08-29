@@ -15,6 +15,7 @@
 #include "Qt-LogViewer/Models/LogQuery.h"
 #include "Qt-LogViewer/Models/SearchFields.h"
 #include "Qt-LogViewer/Models/SessionTypes.h"
+#include "Qt-LogViewer/Services/LogParsingProfile.h"
 
 // Forward declarations (pointers only)
 class FileCatalogController;
@@ -40,10 +41,11 @@ class LogViewerController: public QObject
     public:
         /**
          * @brief Constructs a LogViewerController.
-         * @param log_format The log format string for parsing.
-         * @param parent The parent QObject.
+         * @param profile The log parsing profile to use for ingest and tailing.
+         * @param
+         * parent The parent QObject.
          */
-        explicit LogViewerController(const QString& log_format, QObject* parent = nullptr);
+        explicit LogViewerController(const LogParsingProfile& profile, QObject* parent = nullptr);
 
         /**
          * @brief Destroys the LogViewerController. Cancels any ongoing streaming.

@@ -18,7 +18,8 @@ void LogTailerServiceTest::SetUp()
     file.write("2026-01-01 12:00:00 [INFO] initial\n");
     file.close();
 
-    m_tailer_service = new LogTailerService(QStringLiteral("{timestamp} [{level}] {message}"));
+    m_tailer_service = new LogTailerService(
+        LogParsingProfile::create_default(QStringLiteral("{timestamp} [{level}] {message}")));
     m_tailer_service->set_debounce_interval_ms(10);
     m_view_id = QUuid::createUuid();
 }

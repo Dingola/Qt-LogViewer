@@ -13,6 +13,7 @@
 
 #include "Qt-LogViewer/Models/LogEntry.h"
 #include "Qt-LogViewer/Services/LogLoader.h"
+#include "Qt-LogViewer/Services/LogParsingProfile.h"
 
 /**
  * @class LogLoadingService
@@ -41,10 +42,11 @@ class LogLoadingService final: public QObject
     public:
         /**
          * @brief Constructs the LogLoadingService.
-         * @param log_format The log format string used by the loader for parsing.
-         * @param parent Optional QObject parent for ownership.
+         * @param profile Parsing profile used by the loader.
+         * @param parent Optional
+         * QObject parent for ownership.
          */
-        explicit LogLoadingService(const QString& log_format, QObject* parent = nullptr);
+        explicit LogLoadingService(const LogParsingProfile& profile, QObject* parent = nullptr);
 
         /**
          * @brief Destructor. Ensures any ongoing async operation is cancelled.

@@ -1,6 +1,6 @@
 /**
  * @file LogParser.cpp
- * @brief Implements the logspecific QtRecordParser adapter.
+ * @brief Implements the log-specific QtRecordParser adapter.
  */
 
 #include "Qt-LogViewer/Services/LogParser.h"
@@ -12,31 +12,30 @@
 
 #include "Qt-LogViewer/Models/LogFieldDefinition.h"
 #include "Qt-LogViewer/Models/LogFileInfo.h"
-#include "QtRecordParser/BuiltInConverters.h"
 
 /**
- * @brief Constructs the standard parser for a log format.
- * @param format_string User-selected format.
- */
-LogParser::LogParser(const QString& format_string)
-    : m_parser(create_log_configuration(format_string),
-               QtRecordParser::ConverterRegistry::create_default())
-{}
-
-/**
- * @brief Constructs a parser from a complete configuration.
- * @param configuration User-, file- or AI-generated configuration.
+ * @brief Constructs the log-specific parser adapter for a profile.
+ * @param profile Parsing profile used by this adapter.
  * @param registry Registry containing built-in and custom converters.
+ *
+ * The profile is copied into the adapter; the supplied registry provides built-in and optional
+ * custom converters to the delegated parser.
  */
-LogParser::LogParser(QtRecordParser::ParserConfiguration configuration,
-                     QtRecordParser::ConverterRegistry registry)
-    : m_parser(apply_log_defaults(std::move(configuration)), std::move(registry))
+LogParser::LogParser(LogParsingProfile profile, QtRecordParser::ConverterRegistry registry)
+    : m_profile(std::move(profile)), m_parser(m_profile.get_configuration(), std::move(registry))
 {}
 
 /**
- * @brief Parses a complete log file.
- * @param file_path File to parse.
- * @return Successfully adapted log entries.
+ * @brief Parses a complete log file line by line.
+ *
+ * The source line number is included in every intermediate outcome. Failed records are skipped;
+ * diagnostic aggregation is handled by a later ingestion layer rather than represented by an
+ * empty LogEntry.
+ *
+ * The returned entries retain their original source order.
+ *
+ * @param file_path Path of the file to read and use as record source.
+ * @return Successfully parsed and adapted log entries in source order.
  */
 auto LogParser::parse_file(const QString& file_path) const -> QVector<LogEntry>
 {
@@ -47,14 +46,16 @@ auto LogParser::parse_file(const QString& file_path) const -> QVector<LogEntry>
     {
         QTextStream stream(&file);
         QString line;
+        qsizetype line_number = 0;
 
         while (stream.readLineInto(&line))
         {
-            const LogEntry entry = parse_line(line, file_path);
+            ++line_number;
+            const LogParseOutcome outcome = parse_line(line, file_path, line_number);
 
-            if (!entry.get_level().isEmpty())
+            if (outcome.succeeded())
             {
-                entries.append(entry);
+                entries.append(outcome.entry.value());
             }
         }
     }
@@ -63,10 +64,14 @@ auto LogParser::parse_file(const QString& file_path) const -> QVector<LogEntry>
 }
 
 /**
- * @brief Parses one line and retains all dynamic fields.
- * @param line Input line.
- * @param source File or stream identifier.
- * @return Generic parser result.
+ * @brief Delegates generic record parsing to QtRecordParser.
+ *
+ * QtRecordParser receives the raw input and its file, stream or dataset identifier unchanged and
+ * returns either dynamic parsed values or structured failure information.
+ *
+ * @param line Raw input record.
+ * @param source File, stream or dataset identifier stored in the parsed record.
+ * @return Generic QtRecordParser result containing dynamic values or a structured error.
  */
 auto LogParser::parse_record(const QString& line,
                              const QString& source) const -> QtRecordParser::ParseResult
@@ -75,21 +80,35 @@ auto LogParser::parse_record(const QString& line,
 }
 
 /**
- * @brief Parses one line and adapts its log fields.
- * @param line Input line.
+ * @brief Parses one source line and adapts a successful result to LogEntry.
+ *
+ * The raw line, originating file path and optional one-based line number remain available in the
+ * explicit outcome. LogEntry adaptation runs only after generic parsing succeeds.
+ *
+ * @param line Raw input line.
  * @param file_path Originating file path.
- * @return Adapted entry or a default entry after failure.
+ * @param line_number One-based source line number, or -1 when unknown.
+ * @return Outcome containing source context, generic parse result and an optional entry.
  */
-auto LogParser::parse_line(const QString& line, const QString& file_path) const -> LogEntry
+auto LogParser::parse_line(const QString& line, const QString& file_path,
+                           qsizetype line_number) const -> LogParseOutcome
 {
-    const QtRecordParser::ParseResult result = parse_record(line, file_path);
+    LogParseOutcome outcome;
+    outcome.raw_record = line;
+    outcome.line_number = line_number;
+    outcome.parse_result = parse_record(line, file_path);
 
-    return create_log_entry(result);
+    if (outcome.parse_result.succeeded())
+    {
+        outcome.entry = create_log_entry(outcome.parse_result);
+    }
+
+    return outcome;
 }
 
 /**
  * @brief Returns the generated parsing pattern.
- * @return Anchored regular expression.
+ * @return Anchored regular expression used by QtRecordParser.
  */
 auto LogParser::get_pattern() const -> QRegularExpression
 {
@@ -97,8 +116,8 @@ auto LogParser::get_pattern() const -> QRegularExpression
 }
 
 /**
- * @brief Returns fields in placeholder order.
- * @return Ordered field identifiers.
+ * @brief Returns fields in configured placeholder order.
+ * @return Ordered field identifiers resolved by the underlying parser.
  */
 auto LogParser::get_field_order() const -> LogFieldOrder
 {
@@ -113,8 +132,8 @@ auto LogParser::get_field_order() const -> LogFieldOrder
 }
 
 /**
- * @brief Returns the complete parser configuration.
- * @return Current serializable configuration.
+ * @brief Returns the active parser configuration.
+ * @return Configuration currently used by the underlying parser.
  */
 auto LogParser::get_configuration() const -> const QtRecordParser::ParserConfiguration&
 {
@@ -122,13 +141,25 @@ auto LogParser::get_configuration() const -> const QtRecordParser::ParserConfigu
 }
 
 /**
- * @brief Sets accepted timestamp formats.
- * @param formats Formats tried after ISO-8601.
+ * @brief Returns the active parsing profile.
+ * @return Active parsing profile including its stable identity and configuration.
+ */
+auto LogParser::get_profile() const noexcept -> const LogParsingProfile&
+{
+    return m_profile;
+}
+
+/**
+ * @brief Replaces the timestamp converter's accepted non-ISO formats.
+ *
+ * The updated configuration is written back to the owned profile so profile and parser cannot
+ * diverge. Profile identity and display name remain unchanged.
+ *
+ * @param formats QDateTime format strings tried by the converter after ISO-8601.
  */
 auto LogParser::set_timestamp_formats(const QVector<QString>& formats) -> void
 {
     QtRecordParser::ParserConfiguration configuration = m_parser.get_configuration();
-
     bool timestamp_found = false;
 
     for (QtRecordParser::FieldConfiguration& field: configuration.fields)
@@ -137,30 +168,34 @@ auto LogParser::set_timestamp_formats(const QVector<QString>& formats) -> void
         {
             field.converter_options.insert(QStringLiteral("formats"),
                                            QStringList(formats.cbegin(), formats.cend()));
-
             timestamp_found = true;
         }
     }
 
-    m_parser.set_configuration(configuration);
+    m_profile = m_profile.with_configuration(configuration);
+    m_parser.set_configuration(m_profile.get_configuration());
 }
 
 /**
- * @brief Returns accepted timestamp formats.
- * @return Formats tried after ISO-8601.
+ * @brief Returns accepted non-ISO timestamp formats.
+ *
+ * An empty vector is returned when the active configuration has no timestamp field.
+ * @return Configured QDateTime format strings tried after ISO-8601.
  */
 auto LogParser::get_timestamp_formats() const -> QVector<QString>
 {
     QVector<QString> formats;
+    bool timestamp_found = false;
 
     for (const QtRecordParser::FieldConfiguration& field: m_parser.get_configuration().fields)
     {
-        if (formats.isEmpty() && field.id == LogField::Timestamp)
+        if (!timestamp_found && field.id == LogField::Timestamp)
         {
             const QStringList configured_formats =
                 field.converter_options.value(QStringLiteral("formats")).toStringList();
 
             formats = QVector<QString>(configured_formats.cbegin(), configured_formats.cend());
+            timestamp_found = true;
         }
     }
 
@@ -168,118 +203,24 @@ auto LogParser::get_timestamp_formats() const -> QVector<QString>
 }
 
 /**
- * @brief Creates the standard configuration for a log format.
- * @param format_string User-selected format.
- * @return Log-aware parser configuration.
- */
-auto LogParser::create_log_configuration(const QString& format_string)
-    -> QtRecordParser::ParserConfiguration
-{
-    QtRecordParser::ParserConfiguration configuration;
-
-    configuration.format = format_string;
-    configuration.fields = get_default_log_fields();
-    configuration.allow_unknown_fields = true;
-
-    return configuration;
-}
-
-/**
- * @brief Adds missing standard log field definitions.
- * @param configuration Configuration to complete.
- * @return Completed configuration.
- */
-auto LogParser::apply_log_defaults(QtRecordParser::ParserConfiguration configuration)
-    -> QtRecordParser::ParserConfiguration
-{
-    const QVector<QtRecordParser::FieldConfiguration> defaults = get_default_log_fields();
-
-    for (const QtRecordParser::FieldConfiguration& default_field: defaults)
-    {
-        bool field_exists = false;
-
-        for (const QtRecordParser::FieldConfiguration& configured_field: configuration.fields)
-        {
-            if (!field_exists && configured_field.id == default_field.id)
-            {
-                field_exists = true;
-            }
-        }
-
-        if (!field_exists)
-        {
-            configuration.fields.append(default_field);
-        }
-    }
-
-    return configuration;
-}
-
-/**
- * @brief Returns standard log field configurations.
- * @return Known log fields and converters.
- */
-auto LogParser::get_default_log_fields() -> QVector<QtRecordParser::FieldConfiguration>
-{
-    const QString timestamp_pattern = QStringLiteral(
-        R"(\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+\-]\d{2}:\d{2})?|\d{2}\.\d{2}\.\d{4}\s+\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?|\d{2}/\d{2}/\d{4}\s+\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?|\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?)");
-
-    const QStringList timestamp_formats{
-        QStringLiteral("yyyy-MM-dd HH:mm:ss"), QStringLiteral("yyyy-MM-dd HH:mm:ss.zzz"),
-        QStringLiteral("yyyy-MM-ddTHH:mm:ss"), QStringLiteral("yyyy-MM-ddTHH:mm:ss.zzz"),
-        QStringLiteral("dd.MM.yyyy HH:mm:ss"), QStringLiteral("dd.MM.yyyy HH:mm:ss.zzz"),
-        QStringLiteral("MM/dd/yyyy HH:mm:ss"), QStringLiteral("MM/dd/yyyy HH:mm:ss.zzz"),
-        QStringLiteral("yyyy/MM/dd HH:mm:ss"), QStringLiteral("yyyy/MM/dd HH:mm:ss.zzz")};
-
-    QVariantMap timestamp_options;
-
-    timestamp_options.insert(QStringLiteral("accept_iso"), true);
-
-    timestamp_options.insert(QStringLiteral("formats"), timestamp_formats);
-
-    return {{LogField::Timestamp, QStringLiteral("Timestamp"), timestamp_pattern,
-             QtRecordParser::ConverterId::DateTime, timestamp_options, true},
-
-            {LogField::Level, QStringLiteral("Level"), QStringLiteral(R"(\w+)"),
-             QtRecordParser::ConverterId::Text, QVariantMap(), true},
-
-            {LogField::Message, QStringLiteral("Message"), QStringLiteral(".*?"),
-             QtRecordParser::ConverterId::Text, QVariantMap(), true},
-
-            {LogField::AppName, QStringLiteral("Application"), QStringLiteral(R"(\S+)"),
-             QtRecordParser::ConverterId::Text, QVariantMap(), true},
-
-            {QStringLiteral("file"), QStringLiteral("File"), QStringLiteral(".*?"),
-             QtRecordParser::ConverterId::Text, QVariantMap(), true},
-
-            {QStringLiteral("line"), QStringLiteral("Line"), QStringLiteral(R"([+-]?\d+)"),
-             QtRecordParser::ConverterId::Integer, QVariantMap(), true},
-
-            {QStringLiteral("function"), QStringLiteral("Function"), QStringLiteral(".*?"),
-             QtRecordParser::ConverterId::Text, QVariantMap(), true}};
-}
-
-/**
- * @brief Adapts a successful generic result to LogEntry.
- * @param result Generic parser result.
- * @return Adapted entry or a default entry after failure.
+ * @brief Adapts standard values from a successful generic record to LogEntry.
+ *
+ * Missing optional standard fields convert to their default Qt values. Custom fields remain in
+ * LogParseOutcome::parse_result and are not discarded by the parser boundary.
+ *
+ * The successful generic result supplies the standard fields and source information used by the
+ * adapted entry.
+ *
+ * @param result Successful generic parser result.
+ * @return Log entry containing the standard log fields and source information.
+ * @pre result.succeeded() is true.
  */
 auto LogParser::create_log_entry(const QtRecordParser::ParseResult& result) -> LogEntry
 {
-    LogEntry entry;
+    const QDateTime timestamp = result.record.value(LogField::Timestamp).toDateTime();
+    const QString level = result.record.value(LogField::Level).toString();
+    const QString message = result.record.value(LogField::Message).toString();
+    const QString app_name = result.record.value(LogField::AppName).toString();
 
-    if (result.succeeded())
-    {
-        const QDateTime timestamp = result.record.value(LogField::Timestamp).toDateTime();
-
-        const QString level = result.record.value(LogField::Level).toString();
-
-        const QString message = result.record.value(LogField::Message).toString();
-
-        const QString app_name = result.record.value(LogField::AppName).toString();
-
-        entry = LogEntry(timestamp, level, message, LogFileInfo(result.record.source, app_name));
-    }
-
-    return entry;
+    return LogEntry(timestamp, level, message, LogFileInfo(result.record.source, app_name));
 }

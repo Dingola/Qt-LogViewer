@@ -10,15 +10,14 @@
 
 /**
  * @brief Constructs the live-tail service.
- * @param log_format Log format used to parse appended lines.
+ * @param profile Parsing profile used for appended lines.
  * @param parent Optional QObject parent.
+ *
+ * Appended lines use the supplied parsing profile. QObject ownership follows the optional parent
+ * supplied by the caller.
  */
-LogTailerService::LogTailerService(const QString& log_format, QObject* parent)
-    : QObject(parent),
-      m_watcher(this),
-      m_debounce_timer(this),
-      m_parser(log_format),
-      m_registrations()
+LogTailerService::LogTailerService(const LogParsingProfile& profile, QObject* parent)
+    : QObject(parent), m_watcher(this), m_debounce_timer(this), m_parser(profile), m_registrations()
 {
     m_debounce_timer.setSingleShot(false);
     m_debounce_timer.setInterval(150);
@@ -263,12 +262,12 @@ auto LogTailerService::process_registration(TailRegistration& registration) -> v
             continue;
         }
 
-        const LogEntry entry =
+        const LogParseOutcome outcome =
             m_parser.parse_line(QString::fromUtf8(line).trimmed(), registration.file_path);
 
-        if (!entry.get_level().isEmpty())
+        if (outcome.succeeded())
         {
-            entries.append(entry);
+            entries.append(outcome.entry.value());
         }
     }
 

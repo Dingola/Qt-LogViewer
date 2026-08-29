@@ -7,6 +7,7 @@
 
 #include "Qt-LogViewer/Models/LogEntry.h"
 #include "Qt-LogViewer/Services/LogParser.h"
+#include "Qt-LogViewer/Services/LogParsingProfile.h"
 
 /**
  * @file LogLoader.h
@@ -30,10 +31,10 @@ class LogLoader: public QObject
     public:
         /**
          * @brief Constructs a LogLoader object.
-         * @param format_string The log format string for parsing.
+         * @param profile Parsing profile used for all loaded records.
          * @param parent Optional QObject parent.
          */
-        explicit LogLoader(const QString& format_string, QObject* parent = nullptr);
+        explicit LogLoader(const LogParsingProfile& profile, QObject* parent = nullptr);
 
         /**
          * @brief Destroys the LogLoader object.

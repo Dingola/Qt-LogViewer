@@ -8,6 +8,7 @@
 #include "Qt-LogViewer/Controllers/LogViewLoadQueue.h"
 #include "Qt-LogViewer/Models/LogEntry.h"
 #include "Qt-LogViewer/Services/LogLoadingService.h"
+#include "Qt-LogViewer/Services/LogParsingProfile.h"
 
 /**
  * @file LogIngestController.h
@@ -23,10 +24,10 @@ class LogIngestController: public QObject
     public:
         /**
          * @brief Constructs the LogIngestController.
-         * @param log_format Format string passed to the underlying loader for parsing.
+         * @param profile Parsing profile passed to the underlying loader.
          * @param parent Optional QObject parent for ownership.
          */
-        explicit LogIngestController(const QString& log_format, QObject* parent = nullptr);
+        explicit LogIngestController(const LogParsingProfile& profile, QObject* parent = nullptr);
 
         /**
          * @brief Destroys the LogIngestController. Cancels any ongoing async ingestion and

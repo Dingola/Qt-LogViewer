@@ -103,7 +103,7 @@ auto LogViewerControllerTest::create_large_temp_file(qsizetype entry_count) -> Q
 void LogViewerControllerTest::SetUp()
 {
     QString format = "{timestamp} {level} {message} {app_name}";
-    m_controller = new LogViewerController(format);
+    m_controller = new LogViewerController(LogParsingProfile::create_default(format));
 
     // Create two log files with different app names and levels
     QTemporaryFile* temp_file1 = create_temp_file(

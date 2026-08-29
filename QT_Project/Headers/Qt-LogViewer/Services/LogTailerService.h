@@ -10,6 +10,7 @@
 
 #include "Qt-LogViewer/Models/LogEntry.h"
 #include "Qt-LogViewer/Services/LogParser.h"
+#include "Qt-LogViewer/Services/LogParsingProfile.h"
 
 /**
  * @file LogTailerService.h
@@ -34,10 +35,10 @@ class LogTailerService final: public QObject
     public:
         /**
          * @brief Constructs the live-tail service.
-         * @param log_format Log format used to parse appended lines.
+         * @param profile Parsing profile used for appended lines.
          * @param parent Optional QObject parent.
          */
-        explicit LogTailerService(const QString& log_format, QObject* parent = nullptr);
+        explicit LogTailerService(const LogParsingProfile& profile, QObject* parent = nullptr);
 
         /**
          * @brief Starts tailing a file for one view from the current file end.

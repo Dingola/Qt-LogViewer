@@ -15,12 +15,18 @@
 
 /**
  * @brief Constructs the LogLoadingService and wires loader signals.
- * @param log_format The log format string used by the loader for parsing.
+ * @param profile Parsing
+ * profile used by the loader.
  * @param parent Optional QObject parent.
+ *
+ * The loader receives
+ * the supplied parsing profile and becomes a child of this service. QObject
+ * ownership of the
+ * service follows the optional parent supplied by the caller.
  */
-LogLoadingService::LogLoadingService(const QString& log_format, QObject* parent)
+LogLoadingService::LogLoadingService(const LogParsingProfile& profile, QObject* parent)
     : QObject(parent),
-      m_loader(log_format, this),
+      m_loader(profile, this),
       m_max_retries(0),
       m_retry_delay_ms(250),
       m_last_stream_file(),

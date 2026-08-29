@@ -27,7 +27,7 @@ void LogLoadingServiceTest::SetUp()
     // Use the same format as in LogLoaderTest
     const QString format =
         QStringLiteral("{timestamp} {level} {message} {app_name} [{file}:{line} ({function})]");
-    m_service = new LogLoadingService(format);
+    m_service = new LogLoadingService(LogParsingProfile::create_default(format));
 }
 
 /**

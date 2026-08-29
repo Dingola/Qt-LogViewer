@@ -123,13 +123,19 @@ namespace
 
 /**
  * @brief Constructs a LogViewerController.
- * @param log_format The log format string for parsing.
- * @param parent The parent QObject.
+ * @param profile Parsing profile used for ingest
+ * and live tailing.
+ * @param parent Optional parent QObject.
+ *
+ * Ingest and live-tailing
+ * services share the supplied parsing profile. QObject ownership follows
+ * the optional parent
+ * supplied by the caller.
  */
-LogViewerController::LogViewerController(const QString& log_format, QObject* parent)
+LogViewerController::LogViewerController(const LogParsingProfile& profile, QObject* parent)
     : QObject(parent),
       m_is_shutting_down(false),
-      m_ingest(new LogIngestController(log_format, this)),
+      m_ingest(new LogIngestController(profile, this)),
       m_catalog(new FileCatalogController(m_ingest, this)),
       m_views(new ViewRegistry(this)),
       m_filters(new FilterCoordinator(m_views, this))
@@ -137,7 +143,7 @@ LogViewerController::LogViewerController(const QString& log_format, QObject* par
     // Initialize services
     m_history_service = new LogHistoryService(this);
     m_page_coordinator = new LogPageCoordinator(m_history_service, m_views, this);
-    m_tailer_service = new LogTailerService(log_format, this);
+    m_tailer_service = new LogTailerService(profile, this);
 
     m_tail_refresh_timer = new QTimer(this);
     m_tail_refresh_timer->setSingleShot(true);

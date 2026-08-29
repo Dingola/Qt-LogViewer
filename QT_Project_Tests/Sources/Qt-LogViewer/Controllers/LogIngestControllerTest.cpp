@@ -27,8 +27,8 @@ LogIngestControllerTest::~LogIngestControllerTest() = default;
  */
 void LogIngestControllerTest::SetUp()
 {
-    m_ctrl = new LogIngestController(
-        QStringLiteral("{timestamp} {level} {message} {app_name} [{file}:{line} ({function})]"));
+    m_ctrl = new LogIngestController(LogParsingProfile::create_default(
+        QStringLiteral("{timestamp} {level} {message} {app_name} [{file}:{line} ({function})]")));
     m_temp_log_path = make_temp_log_file();
 }
 

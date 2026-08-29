@@ -32,6 +32,7 @@
 #include "Qt-LogViewer/Models/RecentItemsModel.h"
 #include "Qt-LogViewer/Models/RecentListSchema.h"
 #include "Qt-LogViewer/Models/SearchFields.h"
+#include "Qt-LogViewer/Services/LogParsingProfile.h"
 #include "Qt-LogViewer/Services/LogViewerSettings.h"
 #include "Qt-LogViewer/Services/SessionManager.h"
 #include "Qt-LogViewer/Services/SessionRepository.h"
@@ -104,7 +105,11 @@ using QtWidgetsCommonLib::AppMainWindow;
 MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
     : AppMainWindow(settings, parent),
       m_log_viewer_settings(settings),
-      m_controller(new LogViewerController("{timestamp} {level} {message} {app_name}", this)),
+      m_controller(
+          new LogViewerController(LogParsingProfile::create_default(
+                                      QStringLiteral("{timestamp} {level} {message} {app_name}"),
+                                      QStringLiteral("Qt-LogViewer default")),
+                                  this)),
       m_log_level_pie_chart_widget(new LogLevelPieChartWidget(this)),
       ui(new Ui::MainWindow)
 {

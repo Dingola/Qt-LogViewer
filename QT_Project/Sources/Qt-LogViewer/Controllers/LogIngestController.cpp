@@ -12,11 +12,14 @@
 
 /**
  * @brief Constructs the LogIngestController.
- * @param log_format Format string passed to the underlying loader for parsing.
+ * @param profile Parsing profile passed to the underlying loader.
  * @param parent Optional QObject parent for ownership.
+ *
+ * The parsing profile is passed to the underlying loader. QObject ownership follows the optional
+ * parent supplied by the caller.
  */
-LogIngestController::LogIngestController(const QString& log_format, QObject* parent)
-    : QObject(parent), m_loader(log_format, this), m_queue(), m_is_shutting_down(false)
+LogIngestController::LogIngestController(const LogParsingProfile& profile, QObject* parent)
+    : QObject(parent), m_loader(profile, this), m_queue(), m_is_shutting_down(false)
 {
     wire_service_signals();
 }

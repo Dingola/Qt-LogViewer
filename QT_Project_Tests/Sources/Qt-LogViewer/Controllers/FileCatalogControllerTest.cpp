@@ -15,8 +15,8 @@ FileCatalogControllerTest::~FileCatalogControllerTest() = default;
 
 void FileCatalogControllerTest::SetUp()
 {
-    m_ingest = new LogIngestController(
-        QStringLiteral("{timestamp} {level} {message} {app_name} [{file}:{line} ({function})]"));
+    m_ingest = new LogIngestController(LogParsingProfile::create_default(
+        QStringLiteral("{timestamp} {level} {message} {app_name} [{file}:{line} ({function})]")));
     m_ctrl = new FileCatalogController(m_ingest);
 
     m_temp1 = make_temp_log_file(QStringLiteral("one"));

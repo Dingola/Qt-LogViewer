@@ -14,10 +14,16 @@
 
 /**
  * @brief Constructs a LogLoader object.
- * @param format_string The log format string for parsing.
+ * @param profile Parsing profile used for all loaded
+ * records.
+ * @param parent Optional QObject parent.
+ *
+ * All records use the supplied parsing
+ * profile. QObject ownership follows the optional parent
+ * supplied by the caller.
  */
-LogLoader::LogLoader(const QString& format_string, QObject* parent)
-    : QObject(parent), m_parser(format_string), m_worker(nullptr), m_worker_thread(nullptr)
+LogLoader::LogLoader(const LogParsingProfile& profile, QObject* parent)
+    : QObject(parent), m_parser(profile), m_worker(nullptr), m_worker_thread(nullptr)
 {}
 
 /**
@@ -85,11 +91,11 @@ auto LogLoader::read_first_log_entry(const QString& file_path) const -> LogEntry
 
             if (!line.isEmpty())
             {
-                const LogEntry entry = m_parser.parse_line(line, file_path);
+                const LogParseOutcome outcome = m_parser.parse_line(line, file_path);
 
-                if (!entry.get_app_name().isEmpty())
+                if (outcome.succeeded())
                 {
-                    first_entry = entry;
+                    first_entry = outcome.entry.value();
                 }
             }
         }
