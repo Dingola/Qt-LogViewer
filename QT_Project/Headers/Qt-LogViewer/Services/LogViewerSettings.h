@@ -1,7 +1,9 @@
 #pragma once
 
 #include <QString>
+#include <QVector>
 
+#include "Qt-LogViewer/Services/LogParsingProfile.h"
 #include "Qt-LogViewer/Services/Settings.h"
 #include "QtWidgetsCommonLib/Services/Preferences/IUiPreferences.h"
 
@@ -93,6 +95,22 @@ class LogViewerSettings: public Settings, public QtWidgetsCommonLib::IUiPreferen
          * Qt::WindowMinimized, etc.).
          */
         auto set_mainwindow_windowstate(int state) -> void override;
+
+        /**
+         * @brief Loads the globally available log parsing profiles.
+         * @param error_message Optional destination for stored-data decoding errors.
+         * @return Stored profiles, or an empty vector when none exist or decoding fails.
+         */
+        [[nodiscard]] auto get_log_parsing_profiles(QString* error_message = nullptr)
+            -> QVector<LogParsingProfile>;
+
+        /**
+         * @brief Replaces the globally stored log parsing profiles.
+         * @param profiles Complete profile collection to persist in the application settings.
+         * @return True when QSettings synchronized the collection successfully.
+         */
+        [[nodiscard]] auto set_log_parsing_profiles(const QVector<LogParsingProfile>& profiles)
+            -> bool;
 
     signals:
         /**

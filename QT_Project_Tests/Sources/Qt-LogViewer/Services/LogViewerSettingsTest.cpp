@@ -130,3 +130,63 @@ TEST_F(LogViewerSettingsTest, MainWindowWindowState)
     m_app_settings->set_mainwindow_windowstate(0);
     EXPECT_EQ(m_app_settings->get_mainwindow_windowstate(), 0);
 }
+
+/**
+ * @brief Tests that parsing profiles preserve identity, names and parser configurations.
+ */
+TEST_F(LogViewerSettingsTest, LogParsingProfiles)
+{
+    const LogParsingProfile first = LogParsingProfile::create_default(
+        QStringLiteral("{timestamp} [{level}] {message}"), QStringLiteral("Application log"));
+    const LogParsingProfile second = LogParsingProfile::create_default(
+        QStringLiteral("{level}|{message}|{request_id}"), QStringLiteral("Pipe log"));
+
+    ASSERT_TRUE(m_app_settings->set_log_parsing_profiles({first, second}));
+
+    QString error;
+    const QVector<LogParsingProfile> loaded = m_app_settings->get_log_parsing_profiles(&error);
+
+    ASSERT_TRUE(error.isEmpty()) << qPrintable(error);
+    ASSERT_EQ(loaded.size(), 2);
+
+    EXPECT_EQ(loaded.at(0).get_id(), first.get_id());
+    EXPECT_EQ(loaded.at(0).get_name(), first.get_name());
+    EXPECT_EQ(loaded.at(0).get_configuration().to_json(), first.get_configuration().to_json());
+
+    EXPECT_EQ(loaded.at(1).get_id(), second.get_id());
+    EXPECT_EQ(loaded.at(1).get_name(), second.get_name());
+    EXPECT_EQ(loaded.at(1).get_configuration().to_json(), second.get_configuration().to_json());
+}
+
+/**
+ * @brief Tests that an empty profile collection replaces previously stored profiles.
+ */
+TEST_F(LogViewerSettingsTest, EmptyLogParsingProfiles)
+{
+    const LogParsingProfile profile =
+        LogParsingProfile::create_default(QStringLiteral("{message}"));
+
+    ASSERT_TRUE(m_app_settings->set_log_parsing_profiles({profile}));
+    ASSERT_TRUE(m_app_settings->set_log_parsing_profiles({}));
+
+    QString error;
+    const QVector<LogParsingProfile> loaded = m_app_settings->get_log_parsing_profiles(&error);
+
+    EXPECT_TRUE(error.isEmpty());
+    EXPECT_TRUE(loaded.isEmpty());
+}
+
+/**
+ * @brief Tests that malformed parsing-profile settings are reported without partial results.
+ */
+TEST_F(LogViewerSettingsTest, InvalidLogParsingProfiles)
+{
+    m_app_settings->set_value(QStringLiteral("ParsingProfiles"), QStringLiteral("profiles"),
+                              QByteArray("{invalid"));
+
+    QString error;
+    const QVector<LogParsingProfile> loaded = m_app_settings->get_log_parsing_profiles(&error);
+
+    EXPECT_TRUE(loaded.isEmpty());
+    EXPECT_FALSE(error.isEmpty());
+}

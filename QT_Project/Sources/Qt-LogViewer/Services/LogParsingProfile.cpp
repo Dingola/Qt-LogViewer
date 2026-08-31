@@ -29,6 +29,66 @@ auto LogParsingProfile::create_default(const QString& format_string,
 }
 
 /**
+ * @brief Restores a parsing profile from its versioned JSON representation.
+ *
+ * The stable identifier is required because silently generating a replacement identifier would
+ * invalidate references held by sessions or imported files. Parser configuration decoding is
+ * delegated to QtRecordParser so persistence follows the library's canonical JSON schema.
+ *
+ * @param object Serialized profile containing schema, identity, name and configuration.
+ * @param error_message Optional destination for a decoding error.
+ * @return Decoded profile, or std::nullopt when the representation is invalid.
+ */
+auto LogParsingProfile::from_json(const QJsonObject& object,
+                                  QString* error_message) -> std::optional<LogParsingProfile>
+{
+    QString error;
+
+    if (object.value(QStringLiteral("schema_version")).toInt(-1) != SchemaVersion)
+    {
+        error = QStringLiteral("Unsupported parsing profile schema version.");
+    }
+
+    const QUuid id(object.value(QStringLiteral("id")).toString());
+    if (error.isEmpty() && id.isNull())
+    {
+        error = QStringLiteral("The parsing profile requires a valid identifier.");
+    }
+
+    const QJsonValue name_value = object.value(QStringLiteral("name"));
+    if (error.isEmpty() && !name_value.isString())
+    {
+        error = QStringLiteral("The parsing profile requires a name.");
+    }
+
+    const QJsonValue configuration_value = object.value(QStringLiteral("configuration"));
+    if (error.isEmpty() && !configuration_value.isObject())
+    {
+        error = QStringLiteral("The parsing profile requires a configuration object.");
+    }
+
+    QtRecordParser::ParserConfiguration configuration;
+    if (error.isEmpty())
+    {
+        configuration =
+            QtRecordParser::ParserConfiguration::from_json(configuration_value.toObject(), &error);
+    }
+
+    if (error_message != nullptr)
+    {
+        *error_message = error;
+    }
+
+    std::optional<LogParsingProfile> profile;
+    if (error.isEmpty())
+    {
+        profile.emplace(id, name_value.toString(), std::move(configuration));
+    }
+
+    return profile;
+}
+
+/**
  * @brief Constructs a profile from a complete parser configuration.
  *
  * A null identifier is replaced with a generated UUID. Missing built-in log fields are added
@@ -72,6 +132,24 @@ auto LogParsingProfile::get_configuration() const noexcept
     -> const QtRecordParser::ParserConfiguration&
 {
     return m_configuration;
+}
+
+/**
+ * @brief Converts this profile to its versioned JSON representation.
+ *
+ * Parser configuration serialization is delegated to QtRecordParser so the persisted format
+ * stays aligned with the parser library.
+ *
+ * @return Serializable object containing schema, identity, name and configuration.
+ */
+auto LogParsingProfile::to_json() const -> QJsonObject
+{
+    QJsonObject object;
+    object.insert(QStringLiteral("schema_version"), SchemaVersion);
+    object.insert(QStringLiteral("id"), m_id.toString(QUuid::WithoutBraces));
+    object.insert(QStringLiteral("name"), m_name);
+    object.insert(QStringLiteral("configuration"), m_configuration.to_json());
+    return object;
 }
 
 /**

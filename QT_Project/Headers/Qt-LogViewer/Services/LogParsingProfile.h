@@ -1,8 +1,10 @@
 #pragma once
 
+#include <QJsonObject>
 #include <QString>
 #include <QUuid>
 #include <QVector>
+#include <optional>
 
 #include "QtRecordParser/ConverterRegistry.h"
 #include "QtRecordParser/ParserConfiguration.h"
@@ -36,6 +38,16 @@ class LogParsingProfile final
             -> LogParsingProfile;
 
         /**
+         * @brief Restores a parsing profile from its JSON representation.
+         * @param object Serialized profile containing schema, identity, name and configuration.
+         * @param error_message Optional destination for a decoding error.
+         * @return Decoded profile, or std::nullopt when the representation is invalid.
+         */
+        [[nodiscard]] static auto from_json(const QJsonObject& object,
+                                            QString* error_message = nullptr)
+            -> std::optional<LogParsingProfile>;
+
+        /**
          * @brief Creates a profile from a complete parser configuration.
          *
          * Missing built-in log field definitions are added without replacing explicitly
@@ -67,6 +79,12 @@ class LogParsingProfile final
          */
         [[nodiscard]] auto get_configuration() const noexcept
             -> const QtRecordParser::ParserConfiguration&;
+
+        /**
+         * @brief Converts this profile to its versioned JSON representation.
+         * @return Serializable object containing schema, identity, name and configuration.
+         */
+        [[nodiscard]] auto to_json() const -> QJsonObject;
 
         /**
          * @brief Creates a copy with a replacement configuration and the same identity.
