@@ -36,6 +36,18 @@ LogTailerService::LogTailerService(const LogParsingProfile& profile, QObject* pa
  */
 auto LogTailerService::start_tailing(const QUuid& view_id, const QString& file_path) -> void
 {
+    start_tailing(view_id, file_path, m_parser.get_profile());
+}
+
+/**
+ * @brief Starts tailing a file with the parsing profile used for its import.
+ * @param view_id Target view identifier.
+ * @param file_path Absolute or relative log-file path.
+ * @param profile Parsing profile retained for appended records.
+ */
+auto LogTailerService::start_tailing(const QUuid& view_id, const QString& file_path,
+                                     const LogParsingProfile& profile) -> void
+{
     const QFileInfo file_info(file_path);
     const QString absolute_file_path = file_info.absoluteFilePath();
 
@@ -44,11 +56,12 @@ auto LogTailerService::start_tailing(const QUuid& view_id, const QString& file_p
 
     if (valid_request)
     {
-        TailRegistration registration;
-        registration.view_id = view_id;
-        registration.file_path = absolute_file_path;
-        registration.offset = file_info.size();
-        registration.initial_prefix_fingerprint = get_prefix_fingerprint(absolute_file_path);
+        TailRegistration registration{view_id,
+                                      absolute_file_path,
+                                      file_info.size(),
+                                      QByteArray(),
+                                      get_prefix_fingerprint(absolute_file_path),
+                                      profile};
 
         m_registrations.append(registration);
         ensure_watches(absolute_file_path);
@@ -254,6 +267,7 @@ auto LogTailerService::process_registration(TailRegistration& registration) -> v
     }
 
     QVector<LogEntry> entries;
+    const LogParser parser(registration.profile);
 
     for (const QByteArray& line: lines)
     {
@@ -263,7 +277,7 @@ auto LogTailerService::process_registration(TailRegistration& registration) -> v
         }
 
         const LogParseOutcome outcome =
-            m_parser.parse_line(QString::fromUtf8(line).trimmed(), registration.file_path);
+            parser.parse_line(QString::fromUtf8(line).trimmed(), registration.file_path);
 
         if (outcome.succeeded())
         {

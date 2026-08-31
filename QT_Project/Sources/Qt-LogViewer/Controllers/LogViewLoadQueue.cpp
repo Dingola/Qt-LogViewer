@@ -9,6 +9,7 @@
 
 #include <QDebug>
 #include <QList>
+#include <utility>
 
 // Concrete include for forward-declared type
 #include "Qt-LogViewer/Services/LogLoadingService.h"
@@ -20,15 +21,43 @@
  */
 auto LogViewLoadQueue::enqueue(const QUuid& view_id, const QString& file_path) -> void
 {
+    enqueue_request(view_id, file_path, std::nullopt);
+}
+
+/**
+ * @brief Enqueues a file together with the parsing profile selected for its import.
+ * @param
+ * view_id Target view identifier.
+ * @param file_path Absolute file path.
+ * @param profile Parsing
+ * profile used for this request.
+ */
+auto LogViewLoadQueue::enqueue(const QUuid& view_id, const QString& file_path,
+                               const LogParsingProfile& profile) -> void
+{
+    enqueue_request(view_id, file_path, profile);
+}
+
+/**
+ * @brief Enqueues one request after applying duplicate suppression.
+ * @param view_id Target
+ * view identifier.
+ * @param file_path Absolute file path.
+ * @param profile Optional profile
+ * overriding the loader default.
+ */
+auto LogViewLoadQueue::enqueue_request(const QUuid& view_id, const QString& file_path,
+                                       std::optional<LogParsingProfile> profile) -> void
+{
     bool already_pending = false;
     const bool already_active = (m_active_view_id == view_id) && (m_active_file_path == file_path);
 
     if (!already_active)
     {
-        for (const auto& item: m_queue)
+        for (const LoadRequest& item: m_queue)
         {
-            const bool same_view = (item.first == view_id);
-            const bool same_path = (item.second == file_path);
+            const bool same_view = (item.view_id == view_id);
+            const bool same_path = (item.file_path == file_path);
             if (same_view && same_path)
             {
                 already_pending = true;
@@ -40,7 +69,7 @@ auto LogViewLoadQueue::enqueue(const QUuid& view_id, const QString& file_path) -
 
     if (should_enqueue)
     {
-        m_queue.append(qMakePair(view_id, file_path));
+        m_queue.append({view_id, file_path, std::move(profile)});
         qDebug().nospace() << "[Queue] enqueue view=" << view_id.toString() << " file=\""
                            << file_path << "\" size=" << m_queue.size();
     }
@@ -68,18 +97,27 @@ auto LogViewLoadQueue::try_start_next(LogLoadingService* loader, qsizetype batch
 
     if (has_loader && is_idle && has_pending)
     {
-        const QPair<QUuid, QString> next_item = m_queue.front();
+        const LoadRequest next_item = m_queue.front();
         m_queue.pop_front();
 
-        m_active_view_id = next_item.first;
-        m_active_file_path = next_item.second;
+        m_active_view_id = next_item.view_id;
+        m_active_file_path = next_item.file_path;
+        m_active_profile = next_item.profile;
         m_active_batch_size = batch_size;
 
         qDebug().nospace() << "[Queue] start_next view=" << m_active_view_id.toString()
                            << " file=\"" << m_active_file_path << "\" batch=" << m_active_batch_size
                            << " pending_left=" << m_queue.size();
 
-        loader->load_log_file_async(m_active_file_path, m_active_batch_size);
+        if (m_active_profile.has_value())
+        {
+            loader->load_log_file_async(m_active_file_path, m_active_batch_size,
+                                        m_active_profile.value());
+        }
+        else
+        {
+            loader->load_log_file_async(m_active_file_path, m_active_batch_size);
+        }
         started = true;
     }
     else
@@ -100,11 +138,11 @@ auto LogViewLoadQueue::try_start_next(LogLoadingService* loader, qsizetype batch
  */
 auto LogViewLoadQueue::clear_pending_for_view(const QUuid& view_id) -> void
 {
-    QList<QPair<QUuid, QString>> kept;
+    QList<LoadRequest> kept;
 
-    for (const auto& item: m_queue)
+    for (const LoadRequest& item: m_queue)
     {
-        const bool keep_item = (item.first != view_id);
+        const bool keep_item = (item.view_id != view_id);
         if (keep_item)
         {
             kept.append(item);
@@ -155,6 +193,7 @@ auto LogViewLoadQueue::clear_active_if(const QString& file_path) -> void
         qDebug().nospace() << "[Queue] clear_active_if match file=\"" << file_path << "\"";
         m_active_view_id = QUuid();
         m_active_file_path = QString();
+        m_active_profile.reset();
         m_active_batch_size = 1000;
     }
     else
@@ -173,6 +212,7 @@ auto LogViewLoadQueue::clear_active() -> void
                        << m_active_view_id.toString() << " file=\"" << m_active_file_path << "\")";
     m_active_view_id = QUuid();
     m_active_file_path = QString();
+    m_active_profile.reset();
     m_active_batch_size = 1000;
 }
 
@@ -214,4 +254,14 @@ auto LogViewLoadQueue::get_active_batch_size() const -> qsizetype
 {
     auto result = m_active_batch_size;
     return result;
+}
+
+/**
+ * @brief Returns the parsing profile assigned to the active stream.
+ * @return Active profile,
+ * or no value when idle or using the loader default.
+ */
+auto LogViewLoadQueue::get_active_profile() const -> std::optional<LogParsingProfile>
+{
+    return m_active_profile;
 }

@@ -10,6 +10,7 @@
 #include <QFileInfo>
 #include <QTimer>
 #include <algorithm>
+#include <optional>
 
 // Concrete includes for forward-declared types used in implementation
 #include "Qt-LogViewer/Controllers/FileCatalogController.h"
@@ -135,6 +136,7 @@ namespace
 LogViewerController::LogViewerController(const LogParsingProfile& profile, QObject* parent)
     : QObject(parent),
       m_is_shutting_down(false),
+      m_default_profile(profile),
       m_ingest(new LogIngestController(profile, this)),
       m_catalog(new FileCatalogController(m_ingest, this)),
       m_views(new ViewRegistry(this)),
@@ -302,50 +304,59 @@ LogViewerController::LogViewerController(const LogParsingProfile& profile, QObje
             });
 
     // Finished pass-through.
-    connect(m_ingest, &LogIngestController::finished, this,
-            [this](const QUuid& view_id, const QString& file_path) {
-                const QString absolute_file_path = QFileInfo(file_path).absoluteFilePath();
+    connect(
+        m_ingest, &LogIngestController::finished, this,
+        [this](const QUuid& view_id, const QString& file_path) {
+            const QString absolute_file_path = QFileInfo(file_path).absoluteFilePath();
+            const std::optional<LogParsingProfile> active_profile = m_ingest->get_active_profile();
 
-                const bool ingest_failed =
-                    m_failed_ingest_files.value(view_id).contains(absolute_file_path);
+            const bool ingest_failed =
+                m_failed_ingest_files.value(view_id).contains(absolute_file_path);
 
-                const bool view_exists =
-                    !view_id.isNull() && m_views->get_context(view_id) != nullptr;
+            const bool view_exists = !view_id.isNull() && m_views->get_context(view_id) != nullptr;
 
-                if (!m_is_shutting_down)
+            if (!m_is_shutting_down)
+            {
+                qDebug().nospace()
+                    << "[Controller] finished view=" << view_id.toString() << " file=\""
+                    << absolute_file_path << "\" success=" << !ingest_failed;
+
+                if (ingest_failed)
                 {
-                    qDebug().nospace()
-                        << "[Controller] finished view=" << view_id.toString() << " file=\""
-                        << absolute_file_path << "\" success=" << !ingest_failed;
+                    m_failed_ingest_files[view_id].remove(absolute_file_path);
 
-                    if (ingest_failed)
+                    if (m_failed_ingest_files.value(view_id).isEmpty())
                     {
-                        m_failed_ingest_files[view_id].remove(absolute_file_path);
-
-                        if (m_failed_ingest_files.value(view_id).isEmpty())
-                        {
-                            m_failed_ingest_files.remove(view_id);
-                        }
-
-                        const bool file_is_registered =
-                            view_exists && is_file_loaded(view_id, absolute_file_path);
-
-                        if (file_is_registered)
-                        {
-                            remove_log_file(view_id, absolute_file_path);
-                        }
+                        m_failed_ingest_files.remove(view_id);
                     }
-                    else if (view_exists)
-                    {
-                        emit loading_finished(view_id, absolute_file_path);
 
-                        if (m_live_tailing_views.contains(view_id))
+                    const bool file_is_registered =
+                        view_exists && is_file_loaded(view_id, absolute_file_path);
+
+                    if (file_is_registered)
+                    {
+                        remove_log_file(view_id, absolute_file_path);
+                    }
+                }
+                else if (view_exists)
+                {
+                    emit loading_finished(view_id, absolute_file_path);
+
+                    if (m_live_tailing_views.contains(view_id))
+                    {
+                        if (active_profile.has_value())
+                        {
+                            m_tailer_service->start_tailing(view_id, absolute_file_path,
+                                                            active_profile.value());
+                        }
+                        else
                         {
                             m_tailer_service->start_tailing(view_id, absolute_file_path);
                         }
                     }
                 }
-            });
+            }
+        });
 
     // Advance queue only after thread cleanup (safe to start next).
     connect(m_ingest, &LogIngestController::idle, this, [this]() {
@@ -476,6 +487,7 @@ auto LogViewerController::remove_view(const QUuid& view_id) -> bool
         m_live_tailing_views.remove(view_id);
         m_pending_tail_refresh_views.remove(view_id);
         m_failed_ingest_files.remove(view_id);
+        m_file_parsing_profiles.remove(view_id);
         removed = m_views->remove_view(view_id);
     }
 
@@ -557,6 +569,20 @@ auto LogViewerController::add_log_files_to_session(const QString& session_id,
  */
 auto LogViewerController::load_log_file(const QString& file_path) -> QUuid
 {
+    return load_log_file(file_path, m_default_profile);
+}
+
+/**
+ * @brief Loads a single log file into a new view with a selected parsing profile.
+ * @param
+ * file_path Path of the log file.
+ * @param profile Parsing profile selected for this import.
+ *
+ * @return Identifier of the created view, or a null identifier when loading fails.
+ */
+auto LogViewerController::load_log_file(const QString& file_path,
+                                        const LogParsingProfile& profile) -> QUuid
+{
     QUuid view_id;
 
     const QFileInfo file_info(file_path);
@@ -565,7 +591,7 @@ auto LogViewerController::load_log_file(const QString& file_path) -> QUuid
 
     if (can_load)
     {
-        const QVector<LogEntry> entries = m_ingest->load_file_sync(file_path);
+        const QVector<LogEntry> entries = m_ingest->load_file_sync(file_path, profile);
 
         const QString app_name = !entries.isEmpty() ? entries.first().get_app_name()
                                                     : LogLoader::identify_app(file_path);
@@ -577,6 +603,7 @@ auto LogViewerController::load_log_file(const QString& file_path) -> QUuid
 
         if (entries_stored)
         {
+            remember_file_profile(candidate_view_id, file_path, profile);
             m_views->set_loaded_files(candidate_view_id,
                                       QList<LogFileInfo>{LogFileInfo(file_path, app_name)});
 
@@ -584,7 +611,8 @@ auto LogViewerController::load_log_file(const QString& file_path) -> QUuid
 
             m_page_coordinator->set_query(candidate_view_id, query);
 
-            set_live_tailing_enabled(candidate_view_id, true);
+            m_live_tailing_views.insert(candidate_view_id);
+            m_tailer_service->start_tailing(candidate_view_id, file_path, profile);
 
             view_id = candidate_view_id;
         }
@@ -614,6 +642,22 @@ auto LogViewerController::load_log_file(const QString& file_path) -> QUuid
  */
 auto LogViewerController::load_log_file(const QUuid& view_id, const QString& file_path) -> bool
 {
+    return load_log_file(view_id, file_path, m_default_profile);
+}
+
+/**
+ * @brief Loads a log file into an existing view with a selected parsing profile.
+ * @param
+ * view_id Target view identifier.
+ * @param file_path Path of the log file.
+ * @param profile
+ * Parsing profile selected for this import.
+ * @return True when the file was loaded and registered
+ * successfully.
+ */
+auto LogViewerController::load_log_file(const QUuid& view_id, const QString& file_path,
+                                        const LogParsingProfile& profile) -> bool
+{
     bool loaded = false;
 
     ensure_view_models(view_id);
@@ -627,7 +671,7 @@ auto LogViewerController::load_log_file(const QUuid& view_id, const QString& fil
 
     if (can_load)
     {
-        const QVector<LogEntry> entries = m_ingest->load_file_sync(file_path);
+        const QVector<LogEntry> entries = m_ingest->load_file_sync(file_path, profile);
 
         const QString app_name = !entries.isEmpty() ? entries.first().get_app_name()
                                                     : LogLoader::identify_app(file_path);
@@ -637,6 +681,7 @@ auto LogViewerController::load_log_file(const QUuid& view_id, const QString& fil
 
         if (entries_stored)
         {
+            remember_file_profile(view_id, file_path, profile);
             m_views->add_loaded_file(view_id, LogFileInfo(file_path, app_name));
 
             const LogPageState* page_state = m_page_coordinator->get_page_state(view_id);
@@ -654,7 +699,7 @@ auto LogViewerController::load_log_file(const QUuid& view_id, const QString& fil
 
             if (get_live_tailing_enabled(view_id))
             {
-                m_tailer_service->start_tailing(view_id, file_path);
+                m_tailer_service->start_tailing(view_id, file_path, profile);
             }
 
             loaded = true;
@@ -676,6 +721,20 @@ auto LogViewerController::load_log_file(const QUuid& view_id, const QString& fil
  * @return Identifier of the created view, or a null identifier for an empty request.
  */
 auto LogViewerController::load_log_files(const QVector<QString>& file_paths) -> QUuid
+{
+    return load_log_files(file_paths, m_default_profile);
+}
+
+/**
+ * @brief Loads multiple log files into a new view with one selected profile.
+ * @param
+ * file_paths Paths of the log files.
+ * @param profile Parsing profile selected for these imports.
+
+ * * @return Identifier of the created view, or a null identifier when loading fails.
+ */
+auto LogViewerController::load_log_files(const QVector<QString>& file_paths,
+                                         const LogParsingProfile& profile) -> QUuid
 {
     QUuid view_id;
     bool valid_files = !file_paths.isEmpty();
@@ -706,7 +765,7 @@ auto LogViewerController::load_log_files(const QVector<QString>& file_paths) -> 
         {
             const QString& file_path = file_paths.at(index);
 
-            const QVector<LogEntry> entries = m_ingest->load_file_sync(file_path);
+            const QVector<LogEntry> entries = m_ingest->load_file_sync(file_path, profile);
 
             const QString app_name = !entries.isEmpty() ? entries.first().get_app_name()
                                                         : LogLoader::identify_app(file_path);
@@ -716,6 +775,7 @@ auto LogViewerController::load_log_files(const QVector<QString>& file_paths) -> 
 
             if (entries_stored)
             {
+                remember_file_profile(candidate_view_id, file_path, profile);
                 loaded_files.append(LogFileInfo(file_path, app_name));
             }
             else
@@ -734,7 +794,12 @@ auto LogViewerController::load_log_files(const QVector<QString>& file_paths) -> 
 
             m_page_coordinator->set_query(candidate_view_id, query);
 
-            set_live_tailing_enabled(candidate_view_id, true);
+            m_live_tailing_views.insert(candidate_view_id);
+
+            for (const QString& file_path: file_paths)
+            {
+                m_tailer_service->start_tailing(candidate_view_id, file_path, profile);
+            }
 
             view_id = candidate_view_id;
         }
@@ -748,12 +813,46 @@ auto LogViewerController::load_log_files(const QVector<QString>& file_paths) -> 
 }
 
 /**
+ * @brief Parses a bounded file sample without importing or registering the file.
+ * @param
+ * file_path Path of the file to preview.
+ * @param profile Parsing profile to evaluate.
+ * @param
+ * maximum_record_count Maximum number of non-empty records returned.
+ * @return Parse outcomes in
+ * source order, including structured failures.
+ */
+auto LogViewerController::preview_log_file(
+    const QString& file_path, const LogParsingProfile& profile,
+    qsizetype maximum_record_count) const -> QVector<LogParseOutcome>
+{
+    return m_ingest->preview_file(file_path, profile, maximum_record_count);
+}
+
+/**
  * @brief Starts streaming load of a single log file and creates a new view (model/proxy).
  * @param file_path The path to the log file to stream.
  * @param batch_size Number of entries per batch appended to the model.
  * @return QUuid of the created view.
  */
 auto LogViewerController::load_log_file_async(const QString& file_path,
+                                              qsizetype batch_size) -> QUuid
+{
+    return load_log_file_async(file_path, m_default_profile, batch_size);
+}
+
+/**
+ * @brief Streams a log file into a new view with a selected parsing profile.
+ * @param
+ * file_path Path of the log file.
+ * @param profile Parsing profile selected for this import and
+ * subsequent live tailing.
+ * @param batch_size Number of entries per emitted batch.
+ * @return
+ * Identifier of the created view.
+ */
+auto LogViewerController::load_log_file_async(const QString& file_path,
+                                              const LogParsingProfile& profile,
                                               qsizetype batch_size) -> QUuid
 {
     QUuid view_id = m_views->create_view();
@@ -768,7 +867,7 @@ auto LogViewerController::load_log_file_async(const QString& file_path,
         m_views->set_loaded_files(view_id, QList<LogFileInfo>{loaded_log_file});
     }
 
-    enqueue_async(view_id, file_path);
+    enqueue_async(view_id, file_path, profile);
     try_start_next_async(batch_size);
 
     return view_id;
@@ -784,6 +883,24 @@ auto LogViewerController::load_log_file_async(const QString& file_path,
 auto LogViewerController::load_log_file_async(const QUuid& view_id, const QString& file_path,
                                               qsizetype batch_size) -> bool
 {
+    return load_log_file_async(view_id, file_path, m_default_profile, batch_size);
+}
+
+/**
+ * @brief Streams a log file into an existing view with a selected parsing profile.
+ * @param
+ * view_id Target view identifier.
+ * @param file_path Path of the log file.
+ * @param profile
+ * Parsing profile selected for this import and subsequent live tailing.
+ * @param batch_size Number
+ * of entries per emitted batch.
+ * @return True when the file was enqueued successfully.
+ */
+auto LogViewerController::load_log_file_async(const QUuid& view_id, const QString& file_path,
+                                              const LogParsingProfile& profile,
+                                              qsizetype batch_size) -> bool
+{
     bool success = false;
 
     ensure_view_models(view_id);
@@ -795,7 +912,7 @@ auto LogViewerController::load_log_file_async(const QUuid& view_id, const QStrin
 
         m_views->add_loaded_file(view_id, info);
 
-        enqueue_async(view_id, file_path);
+        enqueue_async(view_id, file_path, profile);
         try_start_next_async(batch_size);
 
         success = true;
@@ -813,6 +930,23 @@ auto LogViewerController::load_log_file_async(const QUuid& view_id, const QStrin
 auto LogViewerController::load_log_files_async(const QVector<QString>& file_paths,
                                                qsizetype batch_size) -> QUuid
 {
+    return load_log_files_async(file_paths, m_default_profile, batch_size);
+}
+
+/**
+ * @brief Streams multiple files into a new view with one selected parsing profile.
+ * @param
+ * file_paths Paths of the log files.
+ * @param profile Parsing profile selected for these imports
+ * and live tailing.
+ * @param batch_size Number of entries per emitted batch.
+ * @return Identifier
+ * of the created view, or a null identifier for an empty request.
+ */
+auto LogViewerController::load_log_files_async(const QVector<QString>& file_paths,
+                                               const LogParsingProfile& profile,
+                                               qsizetype batch_size) -> QUuid
+{
     QUuid view_id;
 
     if (!file_paths.isEmpty())
@@ -825,7 +959,7 @@ auto LogViewerController::load_log_files_async(const QVector<QString>& file_path
         {
             const QString app_name = LogLoader::identify_app(file_path);
             files_info.append(LogFileInfo(file_path, app_name));
-            enqueue_async(view_id, file_path);
+            enqueue_async(view_id, file_path, profile);
         }
 
         m_views->set_loaded_files(view_id, files_info);
@@ -1607,7 +1741,8 @@ auto LogViewerController::set_live_tailing_enabled(const QUuid& view_id, bool en
 
         for (const QString& file_path: file_paths)
         {
-            m_tailer_service->start_tailing(view_id, file_path);
+            m_tailer_service->start_tailing(view_id, file_path,
+                                            get_file_profile(view_id, file_path));
         }
     }
     else
@@ -1688,6 +1823,8 @@ auto LogViewerController::remove_log_file(const LogFileInfo& file) -> void
 
             m_filters->adjust_visibility_on_file_removed(view_id, file_path);
 
+            forget_file_profile(view_id, file_path);
+
             const bool view_became_empty = files.isEmpty();
 
             if (view_became_empty)
@@ -1741,6 +1878,8 @@ auto LogViewerController::remove_log_file(const QUuid& view_id, const QString& f
 
         m_filters->adjust_visibility_on_file_removed(view_id, file_path);
 
+        forget_file_profile(view_id, file_path);
+
         view_became_empty = get_view_file_paths(view_id).isEmpty();
 
         if (!view_became_empty && m_page_coordinator->get_page_state(view_id) != nullptr)
@@ -1764,7 +1903,90 @@ auto LogViewerController::remove_log_file(const QUuid& view_id, const QString& f
  */
 auto LogViewerController::enqueue_async(const QUuid& view_id, const QString& file_path) -> void
 {
-    m_ingest->enqueue_stream(view_id, file_path);
+    enqueue_async(view_id, file_path, m_default_profile);
+}
+
+/**
+ * @brief Enqueues an asynchronous load with an explicitly selected profile.
+ * @param view_id
+ * Target view identifier.
+ * @param file_path Path of the log file.
+ * @param profile Parsing
+ * profile used by this request.
+ */
+auto LogViewerController::enqueue_async(const QUuid& view_id, const QString& file_path,
+                                        const LogParsingProfile& profile) -> void
+{
+    remember_file_profile(view_id, file_path, profile);
+    m_ingest->enqueue_stream(view_id, file_path, profile);
+}
+
+/**
+ * @brief Retains the selected parsing profile for later live-tailing restarts.
+ * @param
+ * view_id View containing the imported file.
+ * @param file_path Imported file path.
+ * @param
+ * profile Parsing profile selected for the file.
+ */
+auto LogViewerController::remember_file_profile(const QUuid& view_id, const QString& file_path,
+                                                const LogParsingProfile& profile) -> void
+{
+    if (!view_id.isNull() && !file_path.isEmpty())
+    {
+        const QString absolute_file_path = QFileInfo(file_path).absoluteFilePath();
+        m_file_parsing_profiles[view_id].insert(absolute_file_path, profile);
+    }
+}
+
+/**
+ * @brief Removes a retained profile when its file registration is removed.
+ * @param view_id
+ * View that contained the file.
+ * @param file_path Removed file path.
+ */
+auto LogViewerController::forget_file_profile(const QUuid& view_id,
+                                              const QString& file_path) -> void
+{
+    auto view_iterator = m_file_parsing_profiles.find(view_id);
+
+    if (view_iterator != m_file_parsing_profiles.end())
+    {
+        view_iterator->remove(QFileInfo(file_path).absoluteFilePath());
+
+        if (view_iterator->isEmpty())
+        {
+            m_file_parsing_profiles.erase(view_iterator);
+        }
+    }
+}
+
+/**
+ * @brief Returns the profile retained for a view/file registration.
+ * @param view_id View
+ * containing the file.
+ * @param file_path Registered file path.
+ * @return Retained profile, or
+ * the controller default when none was recorded.
+ */
+auto LogViewerController::get_file_profile(const QUuid& view_id,
+                                           const QString& file_path) const -> LogParsingProfile
+{
+    LogParsingProfile profile = m_default_profile;
+    const auto view_iterator = m_file_parsing_profiles.constFind(view_id);
+
+    if (view_iterator != m_file_parsing_profiles.cend())
+    {
+        const QString absolute_file_path = QFileInfo(file_path).absoluteFilePath();
+        const auto profile_iterator = view_iterator->constFind(absolute_file_path);
+
+        if (profile_iterator != view_iterator->cend())
+        {
+            profile = profile_iterator.value();
+        }
+    }
+
+    return profile;
 }
 
 /**

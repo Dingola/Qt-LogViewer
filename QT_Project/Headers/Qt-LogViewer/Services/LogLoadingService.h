@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QString>
 #include <QVector>
+#include <optional>
 
 /**
  * @file LogLoadingService.h
@@ -13,6 +14,7 @@
 
 #include "Qt-LogViewer/Models/LogEntry.h"
 #include "Qt-LogViewer/Services/LogLoader.h"
+#include "Qt-LogViewer/Services/LogParseOutcome.h"
 #include "Qt-LogViewer/Services/LogParsingProfile.h"
 
 /**
@@ -62,6 +64,18 @@ class LogLoadingService final: public QObject
         [[nodiscard]] auto load_log_file(const QString& file_path) -> QVector<LogEntry>;
 
         /**
+         * @brief Loads a log file synchronously with an explicitly selected profile.
+
+         * * @param file_path Absolute path of the log file.
+         * @param profile Parsing
+         * profile selected for this import.
+         * @return Parsed entries, or an empty vector
+         * when validation fails.
+         */
+        [[nodiscard]] auto load_log_file(const QString& file_path,
+                                         const LogParsingProfile& profile) -> QVector<LogEntry>;
+
+        /**
          * @brief Reads only the first log entry from the given file (lightweight peek).
          *        Performs pre-flight validation; returns default entry if invalid/unreadable.
          * @param file_path Absolute file path to the log file.
@@ -70,12 +84,39 @@ class LogLoadingService final: public QObject
         [[nodiscard]] auto read_first_log_entry(const QString& file_path) const -> LogEntry;
 
         /**
+         * @brief Parses a bounded file sample without changing loader state.
+         *
+         * @param file_path Absolute path of the file to preview.
+         * @param profile Parsing
+         * profile to evaluate.
+         * @param maximum_record_count Maximum number of non-empty
+         * records returned.
+         * @return Parse outcomes in source order, or an empty vector
+         * for an unreadable file.
+         */
+        [[nodiscard]] auto preview_log_file(
+            const QString& file_path, const LogParsingProfile& profile,
+            qsizetype maximum_record_count) const -> QVector<LogParseOutcome>;
+
+        /**
          * @brief Starts streaming load of a log file asynchronously.
          *        Performs pre-flight validation, initializes retry state and instrumentation.
          * @param file_path Absolute file path to the log file.
          * @param batch_size Number of entries per emitted batch.
          */
         auto load_log_file_async(const QString& file_path, qsizetype batch_size = 1000) -> void;
+
+        /**
+         * @brief Starts asynchronous loading with an explicitly selected profile.
+
+         * * @param file_path Absolute path of the log file.
+         * @param batch_size Number of
+         * entries per emitted batch.
+         * @param profile Parsing profile selected for this
+         * import.
+         */
+        auto load_log_file_async(const QString& file_path, qsizetype batch_size,
+                                 const LogParsingProfile& profile) -> void;
 
         /**
          * @brief Cancels any ongoing asynchronous streaming operation.
@@ -186,6 +227,9 @@ class LogLoadingService final: public QObject
 
         // Retry/backoff state
         QString m_last_stream_file;
+
+        /** Profile retained when a profile-specific stream needs to be retried. */
+        std::optional<LogParsingProfile> m_last_stream_profile;
         int m_retry_count{0};
         qsizetype m_last_batch_size{1000};
 

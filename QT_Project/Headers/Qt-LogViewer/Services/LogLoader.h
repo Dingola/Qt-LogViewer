@@ -6,6 +6,7 @@
 #include <QVector>
 
 #include "Qt-LogViewer/Models/LogEntry.h"
+#include "Qt-LogViewer/Services/LogParseOutcome.h"
 #include "Qt-LogViewer/Services/LogParser.h"
 #include "Qt-LogViewer/Services/LogParsingProfile.h"
 
@@ -49,6 +50,15 @@ class LogLoader: public QObject
         [[nodiscard]] auto load_log_file(const QString& file_path) const -> QVector<LogEntry>;
 
         /**
+         * @brief Loads and parses a single log file with an explicitly selected profile.
+         * @param file_path Path of the log file.
+         * @param profile Parsing profile selected for this import.
+         * @return Parsed log entries.
+         */
+        [[nodiscard]] auto load_log_file(
+            const QString& file_path, const LogParsingProfile& profile) const -> QVector<LogEntry>;
+
+        /**
          * @brief Loads and parses multiple log files.
          * @param file_paths A list of log file paths.
          * @return A map from application name to a vector of LogEntry objects.
@@ -64,6 +74,17 @@ class LogLoader: public QObject
         [[nodiscard]] auto read_first_log_entry(const QString& file_path) const -> LogEntry;
 
         /**
+         * @brief Parses the first records of a file without starting an import.
+         * @param file_path Path of the file to preview.
+         * @param profile Parsing profile to evaluate.
+         * @param maximum_record_count Maximum number of non-empty records to return.
+         * @return Parse outcomes in source order, including structured failures.
+         */
+        [[nodiscard]] auto preview_log_file(
+            const QString& file_path, const LogParsingProfile& profile,
+            qsizetype maximum_record_count) const -> QVector<LogParseOutcome>;
+
+        /**
          * @brief Identifies the application name for a given log file path.
          * @param file_path The path to the log file.
          * @return The application name, or an empty string if not identifiable.
@@ -77,6 +98,15 @@ class LogLoader: public QObject
          * @param batch_size The number of entries per emitted batch (default 1000).
          */
         auto load_log_file_async(const QString& file_path, qsizetype batch_size = 1000) -> void;
+
+        /**
+         * @brief Starts asynchronous loading with an explicitly selected parsing profile.
+         * @param file_path Path of the log file.
+         * @param batch_size Number of entries per emitted batch.
+         * @param profile Parsing profile selected for this import.
+         */
+        auto load_log_file_async(const QString& file_path, qsizetype batch_size,
+                                 const LogParsingProfile& profile) -> void;
 
         /**
          * @brief Requests cancellation of the current asynchronous load (if any).

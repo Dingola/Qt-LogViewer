@@ -234,3 +234,40 @@ TEST_F(LogLoaderTest, ReadFirstLogEntry_FileDoesNotExist)
     EXPECT_TRUE(entry.get_level().isEmpty());
     EXPECT_FALSE(entry.get_timestamp().isValid());
 }
+
+/**
+ * @brief Verifies bounded previews retain source lines, successes, and parser failures.
+ */
+TEST_F(LogLoaderTest, PreviewLogFileWithSelectedProfile)
+{
+    QTemporaryFile temp_file;
+    ASSERT_TRUE(temp_file.open());
+
+    QTextStream output(&temp_file);
+    output << "\n";
+    output << "INFO|request started|req-1\n";
+    output << "invalid record\n";
+    output << "ERROR|request failed|req-2\n";
+    output.flush();
+    temp_file.close();
+
+    const LogParsingProfile profile = LogParsingProfile::create_default(
+        QStringLiteral("{level}|{message}|{request_id}"), QStringLiteral("Pipe separated"));
+
+    const QVector<LogParseOutcome> outcomes =
+        m_loader->preview_log_file(temp_file.fileName(), profile, 2);
+
+    ASSERT_EQ(outcomes.size(), 2);
+
+    EXPECT_TRUE(outcomes.at(0).succeeded());
+    EXPECT_EQ(outcomes.at(0).line_number, 2);
+    EXPECT_EQ(outcomes.at(0).raw_record, QStringLiteral("INFO|request started|req-1"));
+    EXPECT_EQ(outcomes.at(0).entry->get_level(), QStringLiteral("INFO"));
+    EXPECT_EQ(outcomes.at(0).entry->get_message(), QStringLiteral("request started"));
+    EXPECT_EQ(outcomes.at(0).entry->get_parsed_field(QStringLiteral("request_id")).toString(),
+              QStringLiteral("req-1"));
+
+    EXPECT_FALSE(outcomes.at(1).succeeded());
+    EXPECT_EQ(outcomes.at(1).line_number, 3);
+    EXPECT_EQ(outcomes.at(1).raw_record, QStringLiteral("invalid record"));
+}

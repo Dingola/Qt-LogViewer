@@ -178,6 +178,33 @@ TEST_F(LogHistoryServiceTest, PersistsParseMetadataAndCustomFields)
 }
 
 /**
+ * @brief Verifies profiles may omit standard fields constrained by the history schema.
+ */
+TEST_F(LogHistoryServiceTest, PersistsMissingOptionalStandardFields)
+{
+    LogEntry entry;
+    entry.set_file_info(LogFileInfo(QStringLiteral("optional-fields.log"), QString()));
+    entry.set_parse_metadata(QStringLiteral("record without standard fields"), 1,
+                             {{QStringLiteral("custom"), QStringLiteral("value")}});
+
+    ASSERT_TRUE(m_history_service->add_entries(m_view_id, {entry}));
+
+    LogQuery query;
+    query.view_id = m_view_id;
+
+    const QVector<LogEntry> entries = m_history_service->load_entries_page(query, 0, 1);
+
+    ASSERT_EQ(entries.size(), 1);
+    EXPECT_FALSE(entries.first().get_timestamp().isValid());
+    EXPECT_TRUE(entries.first().get_level().isEmpty());
+    EXPECT_TRUE(entries.first().get_message().isEmpty());
+    EXPECT_TRUE(entries.first().get_app_name().isEmpty());
+    EXPECT_EQ(entries.first().get_raw_record(), QStringLiteral("record without standard fields"));
+    EXPECT_EQ(entries.first().get_parsed_field(QStringLiteral("custom")).toString(),
+              QStringLiteral("value"));
+}
+
+/**
  * @brief Verifies file-specific cleanup preserves entries belonging to other files.
  */
 TEST_F(LogHistoryServiceTest, RemovesOnlySpecifiedFileHistory)

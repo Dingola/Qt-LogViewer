@@ -48,6 +48,15 @@ class LogTailerService final: public QObject
         auto start_tailing(const QUuid& view_id, const QString& file_path) -> void;
 
         /**
+         * @brief Starts tailing a file with the parsing profile used for its import.
+         * @param view_id Target view identifier.
+         * @param file_path Absolute or relative log-file path.
+         * @param profile Parsing profile retained for appended records.
+         */
+        auto start_tailing(const QUuid& view_id, const QString& file_path,
+                           const LogParsingProfile& profile) -> void;
+
+        /**
          * @brief Stops tailing one file for one view.
          * @param view_id Target view identifier.
          * @param file_path Absolute or relative log-file path.
@@ -112,6 +121,9 @@ class LogTailerService final: public QObject
                 qint64 offset{0};
                 QByteArray incomplete_line;
                 QByteArray initial_prefix_fingerprint;
+
+                /** Profile originally selected for importing this file. */
+                LogParsingProfile profile;
         };
 
         /**

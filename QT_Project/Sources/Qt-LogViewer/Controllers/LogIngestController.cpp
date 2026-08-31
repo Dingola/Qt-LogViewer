@@ -19,7 +19,11 @@
  * parent supplied by the caller.
  */
 LogIngestController::LogIngestController(const LogParsingProfile& profile, QObject* parent)
-    : QObject(parent), m_loader(profile, this), m_queue(), m_is_shutting_down(false)
+    : QObject(parent),
+      m_default_profile(profile),
+      m_loader(profile, this),
+      m_queue(),
+      m_is_shutting_down(false)
 {
     wire_service_signals();
 }
@@ -48,6 +52,18 @@ auto LogIngestController::load_file_sync(const QString& file_path) -> QVector<Lo
 }
 
 /**
+ * @brief Loads a file synchronously with an explicitly selected profile.
+ * @param file_path Absolute path of the log file.
+ * @param profile Parsing profile selected for this import.
+ * @return Parsed entries, or an empty vector when loading fails.
+ */
+auto LogIngestController::load_file_sync(const QString& file_path,
+                                         const LogParsingProfile& profile) -> QVector<LogEntry>
+{
+    return m_loader.load_log_file(file_path, profile);
+}
+
+/**
  * @brief Reads only the first log entry from the given file (lightweight peek).
  *
  * @param file_path Absolute path to the log file.
@@ -60,6 +76,20 @@ auto LogIngestController::read_first_log_entry(const QString& file_path) const -
 }
 
 /**
+ * @brief Parses a bounded file sample without enqueuing or importing it.
+ * @param file_path Absolute path of the file to preview.
+ * @param profile Parsing profile to evaluate.
+ * @param maximum_record_count Maximum number of non-empty records returned.
+ * @return Parse outcomes in source order, including structured failures.
+ */
+auto LogIngestController::preview_file(const QString& file_path, const LogParsingProfile& profile,
+                                       qsizetype maximum_record_count) const
+    -> QVector<LogParseOutcome>
+{
+    return m_loader.preview_log_file(file_path, profile, maximum_record_count);
+}
+
+/**
  * @brief Enqueues a file to be streamed for a specific view.
  *        Idempotent per `(view_id, file_path)`.
  * @param view_id Target view id.
@@ -67,7 +97,19 @@ auto LogIngestController::read_first_log_entry(const QString& file_path) const -
  */
 auto LogIngestController::enqueue_stream(const QUuid& view_id, const QString& file_path) -> void
 {
-    m_queue.enqueue(view_id, file_path);
+    m_queue.enqueue(view_id, file_path, m_default_profile);
+}
+
+/**
+ * @brief Enqueues a file with the parsing profile selected for this import.
+ * @param view_id Target view identifier.
+ * @param file_path Absolute file path to stream.
+ * @param profile Parsing profile used by the queued request.
+ */
+auto LogIngestController::enqueue_stream(const QUuid& view_id, const QString& file_path,
+                                         const LogParsingProfile& profile) -> void
+{
+    m_queue.enqueue(view_id, file_path, profile);
 }
 
 /**
@@ -132,6 +174,15 @@ auto LogIngestController::get_active_batch_size() const -> qsizetype
 {
     qsizetype size = m_queue.get_active_batch_size();
     return size;
+}
+
+/**
+ * @brief Returns the parsing profile assigned to the active stream.
+ * @return Active profile, or no value while idle.
+ */
+auto LogIngestController::get_active_profile() const -> std::optional<LogParsingProfile>
+{
+    return m_queue.get_active_profile();
 }
 
 /**

@@ -141,6 +141,47 @@ void LogViewerControllerTest::TearDown()
 }
 
 /**
+ * @brief Verifies that a custom profile can preview and import a non-default log format.
+ */
+TEST_F(LogViewerControllerTest, PreviewsAndImportsWithSelectedProfile)
+{
+    QTemporaryFile* custom_file =
+        create_temp_file({QStringLiteral("INFO|custom message|CustomApp|req-42"),
+                          QStringLiteral("invalid custom record")});
+
+    ASSERT_NE(custom_file, nullptr);
+
+    const LogParsingProfile profile = LogParsingProfile::create_default(
+        QStringLiteral("{level}|{message}|{app_name}|{request_id}"),
+        QStringLiteral("Pipe separated"));
+
+    const QVector<QUuid> view_ids_before_preview = m_controller->get_all_view_ids();
+    const QVector<LogParseOutcome> preview =
+        m_controller->preview_log_file(custom_file->fileName(), profile, 10);
+
+    ASSERT_EQ(preview.size(), 2);
+    EXPECT_TRUE(preview.at(0).succeeded());
+    EXPECT_EQ(preview.at(0).entry->get_message(), QStringLiteral("custom message"));
+    EXPECT_EQ(preview.at(0).entry->get_parsed_field(QStringLiteral("request_id")).toString(),
+              QStringLiteral("req-42"));
+    EXPECT_FALSE(preview.at(1).succeeded());
+    EXPECT_EQ(m_controller->get_all_view_ids(), view_ids_before_preview);
+
+    const QUuid imported_view_id = m_controller->load_log_file(custom_file->fileName(), profile);
+
+    ASSERT_FALSE(imported_view_id.isNull());
+
+    const QVector<LogEntry> imported_entries = m_controller->get_page_entries(imported_view_id);
+
+    ASSERT_EQ(imported_entries.size(), 1);
+    EXPECT_EQ(imported_entries.first().get_level(), QStringLiteral("INFO"));
+    EXPECT_EQ(imported_entries.first().get_message(), QStringLiteral("custom message"));
+    EXPECT_EQ(imported_entries.first().get_app_name(), QStringLiteral("CustomApp"));
+    EXPECT_EQ(imported_entries.first().get_parsed_field(QStringLiteral("request_id")).toString(),
+              QStringLiteral("req-42"));
+}
+
+/**
  * @brief Tests that all log entries are loaded into the page model after loading log files.
  */
 TEST_F(LogViewerControllerTest, LoadsAllLogEntriesIntoPageModel)
@@ -1517,6 +1558,50 @@ TEST_F(LogViewerControllerTest, CompletesSuccessfulAsynchronousImport)
     EXPECT_NE(m_controller->get_log_model(view_id), nullptr);
 
     EXPECT_TRUE(m_controller->is_file_loaded(view_id, file->fileName()));
+}
+
+/**
+ * @brief Verifies selected profiles remain effective for async import and live tailing.
+ */
+TEST_F(LogViewerControllerTest, StreamsAndTailsWithSelectedProfile)
+{
+    QTemporaryFile* file =
+        create_temp_file({QStringLiteral("INFO|initial custom message|CustomApp")});
+
+    ASSERT_NE(file, nullptr);
+
+    const LogParsingProfile profile = LogParsingProfile::create_default(
+        QStringLiteral("{level}|{message}|{app_name}"), QStringLiteral("Pipe separated"));
+
+    QSignalSpy loading_finished_spy(m_controller, &LogViewerController::loading_finished);
+
+    const QUuid view_id = m_controller->load_log_file_async(file->fileName(), profile, 1);
+
+    ASSERT_FALSE(view_id.isNull());
+    QTRY_COMPARE(loading_finished_spy.count(), 1);
+    QTRY_VERIFY(m_controller->get_page_state(view_id) != nullptr);
+    QTRY_COMPARE(m_controller->get_page_state(view_id)->get_total_entries(),
+                 static_cast<qsizetype>(1));
+
+    m_controller->set_live_tailing_enabled(view_id, false);
+    m_controller->set_live_tailing_enabled(view_id, true);
+
+    QFile append_file(file->fileName());
+    ASSERT_TRUE(append_file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text));
+
+    QTextStream output(&append_file);
+    output << "ERROR|tailed custom message|CustomApp\n";
+    output.flush();
+    append_file.close();
+
+    QTRY_COMPARE(m_controller->get_page_state(view_id)->get_total_entries(),
+                 static_cast<qsizetype>(2));
+
+    const QVector<LogEntry> entries = m_controller->get_page_entries(view_id);
+
+    ASSERT_EQ(entries.size(), 2);
+    EXPECT_EQ(entries.first().get_message(), QStringLiteral("tailed custom message"));
+    EXPECT_EQ(entries.last().get_message(), QStringLiteral("initial custom message"));
 }
 
 /**

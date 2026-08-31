@@ -1,9 +1,11 @@
 #pragma once
 
 #include <QList>
-#include <QPair>
 #include <QString>
 #include <QUuid>
+#include <optional>
+
+#include "Qt-LogViewer/Services/LogParsingProfile.h"
 
 // Forward declaration (owned/used by pointer in API)
 class LogLoadingService;
@@ -44,6 +46,17 @@ class LogViewLoadQueue
          * @param file_path Absolute file path.
          */
         auto enqueue(const QUuid& view_id, const QString& file_path) -> void;
+
+        /**
+         * @brief Enqueues a file together with the parsing profile selected for its
+         * import.
+         * @param view_id Target view identifier.
+         * @param file_path
+         * Absolute file path.
+         * @param profile Parsing profile used for this request.
+ */
+        auto enqueue(const QUuid& view_id, const QString& file_path,
+                     const LogParsingProfile& profile) -> void;
 
         /**
          * @brief Attempts to start the next async stream if none is active.
@@ -108,9 +121,44 @@ class LogViewLoadQueue
          */
         [[nodiscard]] auto get_active_batch_size() const -> qsizetype;
 
+        /**
+         * @brief Returns the parsing profile assigned to the active stream.
+         *
+         * @return Active profile, or no value when idle or using the loader default.
+         */
+        [[nodiscard]] auto get_active_profile() const -> std::optional<LogParsingProfile>;
+
     private:
-        QList<QPair<QUuid, QString>> m_queue;
+        /**
+         * @brief Enqueues one request after applying duplicate suppression.
+         *
+         * @param view_id Target view identifier.
+         * @param file_path Absolute file path.
+
+         * * @param profile Optional profile overriding the loader default.
+         */
+        auto enqueue_request(const QUuid& view_id, const QString& file_path,
+                             std::optional<LogParsingProfile> profile) -> void;
+
+        /**
+         * @struct LoadRequest
+         * @brief Retains the target, source and optional
+         * profile of one queued import.
+         */
+        struct LoadRequest {
+                /** View that receives parsed entries. */
+                QUuid view_id;
+
+                /** Source file passed to the loading service. */
+                QString file_path;
+
+                /** Per-import profile, or no value when the loader default is used. */
+                std::optional<LogParsingProfile> profile;
+        };
+
+        QList<LoadRequest> m_queue;
         QUuid m_active_view_id;
         QString m_active_file_path;
+        std::optional<LogParsingProfile> m_active_profile;
         qsizetype m_active_batch_size{1000};
 };

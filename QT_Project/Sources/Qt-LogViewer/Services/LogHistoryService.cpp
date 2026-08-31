@@ -32,6 +32,16 @@ struct SqlFilter {
 };
 
 /**
+ * @brief Converts a possibly null Qt string to non-null text accepted by SQLite constraints.
+ * @param value String supplied by an optional parsed field.
+ * @return Original value, or a non-null empty string when the input is null.
+ */
+[[nodiscard]] auto to_required_sql_text(const QString& value) -> QString
+{
+    return value.isNull() ? QStringLiteral("") : value;
+}
+
+/**
  * @brief Serializes dynamically parsed values while retaining supported QVariant types.
  * @param parsed_fields Converted values keyed by stable field identifier.
  * @return Compact CBOR representation suitable for SQLite BLOB storage.
@@ -498,18 +508,22 @@ auto LogHistoryService::add_entries(const QUuid& view_id, const QVector<LogEntry
             for (qsizetype index = 0; index < entries.size() && inserted; ++index)
             {
                 const LogEntry& entry = entries.at(index);
-                const QString raw_record =
-                    entry.get_raw_record().isNull() ? QStringLiteral("") : entry.get_raw_record();
+                const QString timestamp_text =
+                    entry.get_timestamp().isValid()
+                        ? entry.get_timestamp().toUTC().toString(Qt::ISODateWithMs)
+                        : QStringLiteral("");
 
                 query.bindValue(QStringLiteral(":view_id"), view_id.toString(QUuid::WithoutBraces));
-                query.bindValue(QStringLiteral(":timestamp_utc"),
-                                entry.get_timestamp().toUTC().toString(Qt::ISODateWithMs));
-                query.bindValue(QStringLiteral(":level"), entry.get_level());
-                query.bindValue(QStringLiteral(":message"), entry.get_message());
-                query.bindValue(QStringLiteral(":app_name"), entry.get_app_name());
+                query.bindValue(QStringLiteral(":timestamp_utc"), timestamp_text);
+                query.bindValue(QStringLiteral(":level"), to_required_sql_text(entry.get_level()));
+                query.bindValue(QStringLiteral(":message"),
+                                to_required_sql_text(entry.get_message()));
+                query.bindValue(QStringLiteral(":app_name"),
+                                to_required_sql_text(entry.get_app_name()));
                 query.bindValue(QStringLiteral(":file_path"),
-                                entry.get_file_info().get_file_path());
-                query.bindValue(QStringLiteral(":raw_record"), raw_record);
+                                to_required_sql_text(entry.get_file_info().get_file_path()));
+                query.bindValue(QStringLiteral(":raw_record"),
+                                to_required_sql_text(entry.get_raw_record()));
                 query.bindValue(QStringLiteral(":source_line"),
                                 static_cast<qlonglong>(entry.get_source_line()));
                 query.bindValue(QStringLiteral(":parsed_fields_cbor"),

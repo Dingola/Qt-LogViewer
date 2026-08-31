@@ -9,6 +9,7 @@
 #include <QFileInfo>
 #include <QTextStream>
 #include <QThread>
+#include <limits>
 
 #include "Qt-LogViewer/Services/LogStreamWorker.h"
 
@@ -33,9 +34,22 @@ LogLoader::LogLoader(const LogParsingProfile& profile, QObject* parent)
  */
 auto LogLoader::load_log_file(const QString& file_path) const -> QVector<LogEntry>
 {
-    QVector<LogEntry> result;
-    result = m_parser.parse_file(file_path);
-    return result;
+    return load_log_file(file_path, m_parser.get_profile());
+}
+
+/**
+ * @brief Loads and parses a single log file with an explicitly selected profile.
+ * @param
+ * file_path Path of the log file.
+ * @param profile Parsing profile selected for this import.
+ *
+ * @return Parsed log entries.
+ */
+auto LogLoader::load_log_file(const QString& file_path,
+                              const LogParsingProfile& profile) const -> QVector<LogEntry>
+{
+    const LogParser parser(profile);
+    return parser.parse_file(file_path);
 }
 
 /**
@@ -105,6 +119,47 @@ auto LogLoader::read_first_log_entry(const QString& file_path) const -> LogEntry
 }
 
 /**
+ * @brief Parses the first records of a file without starting an import.
+ * @param file_path
+ * Path of the file to preview.
+ * @param profile Parsing profile to evaluate.
+ * @param
+ * maximum_record_count Maximum number of non-empty records to return.
+ * @return Parse outcomes in
+ * source order, including structured failures.
+ */
+auto LogLoader::preview_log_file(const QString& file_path, const LogParsingProfile& profile,
+                                 qsizetype maximum_record_count) const -> QVector<LogParseOutcome>
+{
+    QVector<LogParseOutcome> outcomes;
+    QFile file(file_path);
+
+    const bool can_preview =
+        maximum_record_count > 0 && file.open(QIODevice::ReadOnly | QIODevice::Text);
+
+    if (can_preview)
+    {
+        const LogParser parser(profile);
+        QTextStream input(&file);
+        qsizetype line_number = 0;
+
+        while (!input.atEnd() && outcomes.size() < maximum_record_count &&
+               line_number < std::numeric_limits<qsizetype>::max())
+        {
+            const QString record = input.readLine();
+            ++line_number;
+
+            if (!record.trimmed().isEmpty())
+            {
+                outcomes.append(parser.parse_line(record, file_path, line_number));
+            }
+        }
+    }
+
+    return outcomes;
+}
+
+/**
  * @brief Identifies the application name for a given log file path.
  *        This implementation uses the base file name (without extension) as the app name.
  * @param file_path The path to the log file.
@@ -127,10 +182,24 @@ auto LogLoader::identify_app(const QString& file_path) -> QString
  */
 auto LogLoader::load_log_file_async(const QString& file_path, qsizetype batch_size) -> void
 {
+    load_log_file_async(file_path, batch_size, m_parser.get_profile());
+}
+
+/**
+ * @brief Starts asynchronous loading with an explicitly selected parsing profile.
+ * @param
+ * file_path Path of the log file.
+ * @param batch_size Number of entries per emitted batch.
+ *
+ * @param profile Parsing profile selected for this import.
+ */
+auto LogLoader::load_log_file_async(const QString& file_path, qsizetype batch_size,
+                                    const LogParsingProfile& profile) -> void
+{
     if (m_worker_thread == nullptr)
     {
         m_worker_thread = new QThread(this);
-        m_worker = new LogStreamWorker(m_parser);
+        m_worker = new LogStreamWorker(LogParser(profile));
         m_worker->moveToThread(m_worker_thread);
 
         // Forward worker signals.

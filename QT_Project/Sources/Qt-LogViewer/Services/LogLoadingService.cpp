@@ -10,7 +10,6 @@
 #include <QEventLoop>
 #include <QFile>
 #include <QIODevice>
-#include <QList>
 #include <QTimer>
 
 /**
@@ -30,6 +29,7 @@ LogLoadingService::LogLoadingService(const LogParsingProfile& profile, QObject* 
       m_max_retries(0),
       m_retry_delay_ms(250),
       m_last_stream_file(),
+      m_last_stream_profile(),
       m_retry_count(0),
       m_last_batch_size(1000),
       m_timer()
@@ -107,23 +107,49 @@ auto LogLoadingService::validate_file(const QString& file_path) const -> bool
 
 /**
  * @brief Loads a log file synchronously and returns parsed entries.
- *        Emits an error and returns an empty list if validation fails.
- * @param file_path Absolute file path to the log file.
- * @return QList<LogEntry> (empty on validation failure).
+ *        Emits an error and returns an empty vector if validation fails.
+ * @param file_path
+ * Absolute file path to the log file.
+ * @return Parsed entries, or an empty vector on validation failure.
  */
-auto LogLoadingService::load_log_file(const QString& file_path) -> QList<LogEntry>
+auto LogLoadingService::load_log_file(const QString& file_path) -> QVector<LogEntry>
 {
     QVector<LogEntry> result;
 
     if (validate_file(file_path))
     {
         m_timer.start();
-        const QVector<LogEntry> entries_vec = m_loader.load_log_file(file_path);
+        result = m_loader.load_log_file(file_path);
 
-        for (const auto& e: entries_vec)
-        {
-            result.append(e);
-        }
+        qDebug().nospace() << "Eager load finished: " << file_path << ", entries=" << result.size()
+                           << ", elapsed=" << m_timer.elapsed() << " ms";
+    }
+    else
+    {
+        qWarning().nospace() << "Eager load validation failed for file: " << file_path;
+        emit error(file_path, QStringLiteral("File not found or unreadable."));
+    }
+
+    return result;
+}
+
+/**
+ * @brief Loads a log file synchronously with an explicitly selected profile.
+ * @param
+ * file_path Absolute path of the log file.
+ * @param profile Parsing profile selected for this
+ * import.
+ * @return Parsed entries, or an empty vector when validation fails.
+ */
+auto LogLoadingService::load_log_file(const QString& file_path,
+                                      const LogParsingProfile& profile) -> QVector<LogEntry>
+{
+    QVector<LogEntry> result;
+
+    if (validate_file(file_path))
+    {
+        m_timer.start();
+        result = m_loader.load_log_file(file_path, profile);
 
         qDebug().nospace() << "Eager load finished: " << file_path << ", entries=" << result.size()
                            << ", elapsed=" << m_timer.elapsed() << " ms";
@@ -160,6 +186,30 @@ auto LogLoadingService::read_first_log_entry(const QString& file_path) const -> 
 }
 
 /**
+ * @brief Parses a bounded file sample without changing loader state.
+ * @param file_path
+ * Absolute path of the file to preview.
+ * @param profile Parsing profile to evaluate.
+ * @param
+ * maximum_record_count Maximum number of non-empty records returned.
+ * @return Parse outcomes in
+ * source order, or an empty vector for an unreadable file.
+ */
+auto LogLoadingService::preview_log_file(const QString& file_path, const LogParsingProfile& profile,
+                                         qsizetype maximum_record_count) const
+    -> QVector<LogParseOutcome>
+{
+    QVector<LogParseOutcome> outcomes;
+
+    if (validate_file(file_path))
+    {
+        outcomes = m_loader.preview_log_file(file_path, profile, maximum_record_count);
+    }
+
+    return outcomes;
+}
+
+/**
  * @brief Starts streaming load of a log file asynchronously.
  *        Emits an error and `streaming_idle` if validation fails.
  * @param file_path Absolute file path to the log file.
@@ -170,6 +220,7 @@ auto LogLoadingService::load_log_file_async(const QString& file_path, qsizetype 
     if (validate_file(file_path))
     {
         m_last_stream_file = file_path;
+        m_last_stream_profile.reset();
         m_retry_count = 0;
         m_last_batch_size = batch_size;
         m_timer.start();
@@ -177,6 +228,38 @@ auto LogLoadingService::load_log_file_async(const QString& file_path, qsizetype 
         qDebug().nospace() << "Streaming started: " << file_path << " (batch=" << batch_size << ")";
 
         m_loader.load_log_file_async(file_path, batch_size);
+    }
+    else
+    {
+        qWarning().nospace() << "Streaming validation failed for file: " << file_path;
+        emit error(file_path, QStringLiteral("File not found or unreadable."));
+        // No loader active in this branch, so we emit idle ourselves.
+        emit streaming_idle();
+    }
+}
+
+/**
+ * @brief Starts asynchronous loading with an explicitly selected profile.
+ * @param file_path
+ * Absolute path of the log file.
+ * @param batch_size Number of entries per emitted batch.
+ *
+ * @param profile Parsing profile selected for this import.
+ */
+auto LogLoadingService::load_log_file_async(const QString& file_path, qsizetype batch_size,
+                                            const LogParsingProfile& profile) -> void
+{
+    if (validate_file(file_path))
+    {
+        m_last_stream_file = file_path;
+        m_last_stream_profile = profile;
+        m_retry_count = 0;
+        m_last_batch_size = batch_size;
+        m_timer.start();
+
+        qDebug().nospace() << "Streaming started: " << file_path << " (batch=" << batch_size << ")";
+
+        m_loader.load_log_file_async(file_path, batch_size, profile);
     }
     else
     {
@@ -255,7 +338,15 @@ auto LogLoadingService::handle_error_and_maybe_retry(const QString& file_path,
         QTimer::singleShot(m_retry_delay_ms, this, [this, file_path]() {
             qDebug().nospace() << "[Service] retry " << m_retry_count << " file=\"" << file_path
                                << "\" (batch=" << m_last_batch_size << ")";
-            m_loader.load_log_file_async(file_path, m_last_batch_size);
+            if (m_last_stream_profile.has_value())
+            {
+                m_loader.load_log_file_async(file_path, m_last_batch_size,
+                                             m_last_stream_profile.value());
+            }
+            else
+            {
+                m_loader.load_log_file_async(file_path, m_last_batch_size);
+            }
         });
     }
     else
@@ -276,6 +367,7 @@ auto LogLoadingService::reset_retry_state(const QString& file_path) -> void
     if (same)
     {
         m_last_stream_file.clear();
+        m_last_stream_profile.reset();
         m_retry_count = 0;
         m_last_batch_size = 1000;
         qDebug().nospace() << "[Service] reset_retry_state for \"" << file_path << '"';

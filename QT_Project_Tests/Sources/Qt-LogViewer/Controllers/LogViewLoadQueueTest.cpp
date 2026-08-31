@@ -82,6 +82,27 @@ TEST_F(LogViewLoadQueueTest, InitialStateIsIdleAndDefaults)
     EXPECT_TRUE(m_queue.get_active_file_path().isEmpty());
     EXPECT_EQ(m_queue.get_pending_count(), 0);
     EXPECT_EQ(m_queue.get_active_batch_size(), 1000);
+    EXPECT_FALSE(m_queue.get_active_profile().has_value());
+}
+
+/**
+ * @brief Verifies that a selected profile remains attached to the active queue request.
+ */
+TEST_F(LogViewLoadQueueTest, KeepsSelectedProfileWithQueuedRequest)
+{
+    const QString file_path = make_nonexistent_path();
+    const LogParsingProfile profile = LogParsingProfile::create_default(
+        QStringLiteral("{level}|{message}"), QStringLiteral("Pipe separated"));
+
+    m_queue.enqueue(m_view_a, file_path, profile);
+
+    ASSERT_TRUE(m_queue.try_start_next(m_loader, 25));
+
+    const std::optional<LogParsingProfile> active_profile = m_queue.get_active_profile();
+
+    ASSERT_TRUE(active_profile.has_value());
+    EXPECT_EQ(active_profile->get_id(), profile.get_id());
+    EXPECT_EQ(active_profile->get_name(), profile.get_name());
 }
 
 /**

@@ -15,6 +15,7 @@
 #include "Qt-LogViewer/Models/LogQuery.h"
 #include "Qt-LogViewer/Models/SearchFields.h"
 #include "Qt-LogViewer/Models/SessionTypes.h"
+#include "Qt-LogViewer/Services/LogParseOutcome.h"
 #include "Qt-LogViewer/Services/LogParsingProfile.h"
 
 // Forward declarations (pointers only)
@@ -121,6 +122,17 @@ class LogViewerController: public QObject
         auto load_log_file(const QString& file_path) -> QUuid;
 
         /**
+         * @brief Loads a single log file into a new view with a selected parsing
+         * profile.
+         * @param file_path Path of the log file.
+         * @param profile
+         * Parsing profile selected for this import.
+         * @return Identifier of the created
+         * view, or a null identifier when loading fails.
+         */
+        auto load_log_file(const QString& file_path, const LogParsingProfile& profile) -> QUuid;
+
+        /**
          * @brief Loads a single log file into an existing view (model/proxy).
          * @param view_id The target view to load the file into.
          * @param file_path The path to the log file.
@@ -128,6 +140,19 @@ class LogViewerController: public QObject
          * present or the view does not exist.
          */
         auto load_log_file(const QUuid& view_id, const QString& file_path) -> bool;
+
+        /**
+         * @brief Loads a log file into an existing view with a selected parsing
+         * profile.
+         * @param view_id Target view identifier.
+         * @param file_path
+         * Path of the log file.
+         * @param profile Parsing profile selected for this
+         * import.
+         * @return True when the file was loaded and registered successfully.
+         */
+        auto load_log_file(const QUuid& view_id, const QString& file_path,
+                           const LogParsingProfile& profile) -> bool;
 
         /**
          * @brief Loads log files from the specified file paths and creates a new view (model/proxy)
@@ -138,12 +163,51 @@ class LogViewerController: public QObject
         auto load_log_files(const QVector<QString>& file_paths) -> QUuid;
 
         /**
+         * @brief Loads multiple log files into a new view with one selected profile.
+         * @param file_paths Paths of the log files.
+         * @param profile Parsing profile
+         * selected for these imports.
+         * @return Identifier of the created view, or a null
+         * identifier when loading fails.
+         */
+        auto load_log_files(const QVector<QString>& file_paths,
+                            const LogParsingProfile& profile) -> QUuid;
+
+        /**
+         * @brief Parses a bounded file sample without importing or registering the
+         * file.
+         * @param file_path Path of the file to preview.
+         * @param profile
+         * Parsing profile to evaluate.
+         * @param maximum_record_count Maximum number of
+         * non-empty records returned.
+         * @return Parse outcomes in source order, including
+         * structured failures.
+         */
+        [[nodiscard]] auto preview_log_file(
+            const QString& file_path, const LogParsingProfile& profile,
+            qsizetype maximum_record_count = 25) const -> QVector<LogParseOutcome>;
+
+        /**
          * @brief Starts streaming load of a single log file and creates a new view (model/proxy).
          * @param file_path The path to the log file to stream.
          * @param batch_size Number of entries per batch appended to the model.
          * @return QUuid of the created view.
          */
         auto load_log_file_async(const QString& file_path, qsizetype batch_size = 1000) -> QUuid;
+
+        /**
+         * @brief Streams a log file into a new view with a selected parsing profile.
+ *
+         * @param file_path Path of the log file.
+         * @param profile Parsing profile
+         * selected for this import and subsequent live tailing.
+         * @param batch_size Number
+         * of entries per emitted batch.
+         * @return Identifier of the created view.
+ */
+        auto load_log_file_async(const QString& file_path, const LogParsingProfile& profile,
+                                 qsizetype batch_size = 1000) -> QUuid;
 
         /**
          * @brief Starts streaming load of a single log file into an existing view (model/proxy).
@@ -158,6 +222,21 @@ class LogViewerController: public QObject
                                  qsizetype batch_size) -> bool;
 
         /**
+         * @brief Streams a log file into an existing view with a selected parsing
+         * profile.
+         * @param view_id Target view identifier.
+         * @param file_path
+         * Path of the log file.
+         * @param profile Parsing profile selected for this import
+         * and subsequent live tailing.
+         * @param batch_size Number of entries per emitted
+         * batch.
+         * @return True when the file was enqueued successfully.
+         */
+        auto load_log_file_async(const QUuid& view_id, const QString& file_path,
+                                 const LogParsingProfile& profile, qsizetype batch_size) -> bool;
+
+        /**
          * @brief Starts streaming load of multiple log files into a single new view (model/proxy).
          *        Files are streamed sequentially in the background.
          * @param file_paths Paths to stream.
@@ -165,6 +244,21 @@ class LogViewerController: public QObject
          * @return QUuid of the created view.
          */
         auto load_log_files_async(const QVector<QString>& file_paths,
+                                  qsizetype batch_size = 1000) -> QUuid;
+
+        /**
+         * @brief Streams multiple files into a new view with one selected parsing
+         * profile.
+         * @param file_paths Paths of the log files.
+         * @param profile
+         * Parsing profile selected for these imports and live tailing.
+         * @param batch_size
+         * Number of entries per emitted batch.
+         * @return Identifier of the created view,
+         * or a null identifier for an empty request.
+         */
+        auto load_log_files_async(const QVector<QString>& file_paths,
+                                  const LogParsingProfile& profile,
                                   qsizetype batch_size = 1000) -> QUuid;
 
         /**
@@ -623,6 +717,48 @@ class LogViewerController: public QObject
         auto enqueue_async(const QUuid& view_id, const QString& file_path) -> void;
 
         /**
+         * @brief Enqueues an asynchronous load with an explicitly selected profile.
+         *
+         * @param view_id Target view identifier.
+         * @param file_path Path of the log file.
+         * @param profile Parsing profile used by this request.
+         */
+        auto enqueue_async(const QUuid& view_id, const QString& file_path,
+                           const LogParsingProfile& profile) -> void;
+
+        /**
+         * @brief Retains the selected parsing profile for later live-tailing restarts.
+         *
+         * @param view_id View containing the imported file.
+         * @param file_path Imported
+         * file path.
+         * @param profile Parsing profile selected for the file.
+         */
+        auto remember_file_profile(const QUuid& view_id, const QString& file_path,
+                                   const LogParsingProfile& profile) -> void;
+
+        /**
+         * @brief Removes a retained profile when its file registration is removed.
+ *
+         * @param view_id View that contained the file.
+         * @param file_path Removed file
+         * path.
+         */
+        auto forget_file_profile(const QUuid& view_id, const QString& file_path) -> void;
+
+        /**
+         * @brief Returns the profile retained for a view/file registration.
+         *
+         * @param view_id View containing the file.
+         * @param file_path Registered file
+         * path.
+         * @return Retained profile, or the controller default when none was
+         * recorded.
+         */
+        [[nodiscard]] auto get_file_profile(const QUuid& view_id,
+                                            const QString& file_path) const -> LogParsingProfile;
+
+        /**
          * @brief Attempts to start the next asynchronous load if none is active.
          * @param batch_size Number of entries per batch.
          */
@@ -648,6 +784,7 @@ class LogViewerController: public QObject
 
     private:
         bool m_is_shutting_down{false};
+        LogParsingProfile m_default_profile;
         LogIngestController* m_ingest{nullptr};
         FileCatalogController* m_catalog{nullptr};
         ViewRegistry* m_views{nullptr};
@@ -659,4 +796,5 @@ class LogViewerController: public QObject
         QSet<QUuid> m_pending_tail_refresh_views;
         QSet<QUuid> m_live_tailing_views;
         QHash<QUuid, QSet<QString>> m_failed_ingest_files;
+        QHash<QUuid, QHash<QString, LogParsingProfile>> m_file_parsing_profiles;
 };
