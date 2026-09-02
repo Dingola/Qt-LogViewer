@@ -1,6 +1,6 @@
 #include "Qt-LogViewer/Views/MainWindow.h"
 
-#include <QAction>
+#include <QApplication>
 #include <QCoreApplication>
 #include <QDragEnterEvent>
 #include <QDropEvent>
@@ -10,7 +10,6 @@
 #include <QIcon>
 #include <QJsonArray>
 #include <QJsonObject>
-#include <QMenu>
 #include <QMessageBox>
 #include <QMimeData>
 #include <QPlainTextEdit>
@@ -23,6 +22,7 @@
 #include <QUrl>
 
 #include "Qt-LogViewer/Controllers/LogViewerController.h"
+#include "Qt-LogViewer/Controllers/MainMenuController.h"
 #include "Qt-LogViewer/Controllers/SessionController.h"
 #include "Qt-LogViewer/Models/LogEntry.h"
 #include "Qt-LogViewer/Models/LogFileTreeModel.h"
@@ -50,19 +50,7 @@
 namespace
 {
 constexpr auto k_open_log_files_text = QT_TRANSLATE_NOOP("MainWindow", "Open Log Files");
-constexpr auto k_open_log_file_text = QT_TRANSLATE_NOOP("MainWindow", "Open Log File...");
-constexpr auto k_file_menu_text = QT_TRANSLATE_NOOP("MainWindow", "&File");
-constexpr auto k_recent_files_text = QT_TRANSLATE_NOOP("MainWindow", "Recent Files");
-constexpr auto k_recent_sessions_text = QT_TRANSLATE_NOOP("MainWindow", "Recent Sessions");
-constexpr auto k_save_session_text = QT_TRANSLATE_NOOP("MainWindow", "Save Session...");
-constexpr auto k_open_session_text = QT_TRANSLATE_NOOP("MainWindow", "Open Session...");
-constexpr auto k_reopen_last_session_text = QT_TRANSLATE_NOOP("MainWindow", "Reopen Last Session");
 constexpr auto k_loaded_log_files_status = QT_TRANSLATE_NOOP("MainWindow", "Loaded %1 log file(s)");
-constexpr auto k_quit_text = QT_TRANSLATE_NOOP("MainWindow", "&Quit");
-constexpr auto k_views_menu_text = QT_TRANSLATE_NOOP("MainWindow", "&Views");
-constexpr auto k_show_log_file_explorer_text =
-    QT_TRANSLATE_NOOP("MainWindow", "Show Log File Explorer");
-constexpr auto k_show_log_details_text = QT_TRANSLATE_NOOP("MainWindow", "Show Log Details");
 constexpr auto k_untitled_session_text = QT_TRANSLATE_NOOP("MainWindow", "Untitled Session");
 
 /**
@@ -174,7 +162,10 @@ MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
                     rows.push_back(RecentListSchemas::build_recent_file_row(rf));
                 }
                 m_recent_files_model->set_rows(std::move(rows));
-                rebuild_recent_menus();
+                if (m_menu_controller != nullptr)
+                {
+                    m_menu_controller->rebuild_recent_menus();
+                }
             });
     connect(m_session_manager, &SessionManager::recent_sessions_changed, this,
             [this](const QVector<RecentSessionRecord>& items) {
@@ -185,7 +176,10 @@ MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
                     rows.push_back(RecentListSchemas::build_recent_session_row(rs));
                 }
                 m_recent_sessions_model->set_rows(std::move(rows));
-                rebuild_recent_menus();
+                if (m_menu_controller != nullptr)
+                {
+                    m_menu_controller->rebuild_recent_menus();
+                }
             });
 
     setup_log_file_explorer();
@@ -206,9 +200,9 @@ MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
     connect(m_session_controller, &SessionController::current_session_changed, this,
             [this](const QString&) { show_start_page_if_needed(); });
     connect(m_session_controller, &SessionController::session_renamed, this,
-            [this](const QString&, const QString&) { rebuild_recent_menus(); });
+            [this](const QString&, const QString&) { m_menu_controller->rebuild_recent_menus(); });
     connect(m_session_controller, &SessionController::session_deleted, this,
-            [this](const QString&) { rebuild_recent_menus(); });
+            [this](const QString&) { m_menu_controller->rebuild_recent_menus(); });
 
     // Start page widget (stack page 1)
     auto* start_page = new StartPageWidget(central_stack);
@@ -275,7 +269,7 @@ MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
     connect(m_controller, &LogViewerController::page_state_updated, this, update_page_state);
 
     initialize_menu();
-    rebuild_recent_menus();
+    m_menu_controller->rebuild_recent_menus();
 
     QTimer::singleShot(0, this, [this] { this->resizeEvent(nullptr); });
     qDebug() << "MainWindow constructor finished";
@@ -468,76 +462,31 @@ auto MainWindow::setup_tab_widget() -> void
 }
 
 /**
- * @brief Initializes the main menu bar and its actions.
- *
- * Adds File menu entries and views menu. Also creates Recent Files / Recent Sessions
- * submenus and session-related actions (Save/Open/Reopen Last Session).
+ * @brief Initializes the main menu controller and its connections.
  */
 auto MainWindow::initialize_menu() -> void
 {
-    // File menu
-    m_file_menu = new QMenu(tr(k_file_menu_text), this);
+    m_menu_controller =
+        new MainMenuController(ui->menubar, m_recent_files_model, m_recent_sessions_model, this);
 
-    // Action to open log files
-    m_action_open_log_file = new QAction(tr(k_open_log_file_text), this);
-    m_action_open_log_file->setShortcut(QKeySequence::Open);
-    m_file_menu->addAction(m_action_open_log_file);
-    ui->menubar->addMenu(m_file_menu);
-
-    connect(m_action_open_log_file, &QAction::triggered, this,
+    connect(m_menu_controller, &MainMenuController::open_log_file_requested, this,
             &MainWindow::handle_open_log_file_dialog_requested);
-
-    // Recent submenus
-    m_recent_files_menu = new QMenu(tr(k_recent_files_text), this);
-    m_recent_sessions_menu = new QMenu(tr(k_recent_sessions_text), this);
-    m_file_menu->addMenu(m_recent_files_menu);
-    m_file_menu->addMenu(m_recent_sessions_menu);
-
-    // Session actions
-    m_action_save_session = new QAction(tr(k_save_session_text), this);
-    m_action_open_session = new QAction(tr(k_open_session_text), this);
-    m_action_reopen_last_session = new QAction(tr(k_reopen_last_session_text), this);
-    m_file_menu->addSeparator();
-    m_file_menu->addAction(m_action_save_session);
-    m_file_menu->addAction(m_action_open_session);
-    m_file_menu->addAction(m_action_reopen_last_session);
-
-    connect(m_action_save_session, &QAction::triggered, this, [this]() { handle_save_session(); });
-    connect(m_action_open_session, &QAction::triggered, this,
-            [this]() { handle_open_session_dialog(); });
-    connect(m_action_reopen_last_session, &QAction::triggered, this,
-            [this]() { handle_reopen_last_session(); });
-
-    // Separator before the quit action
-    m_file_menu->addSeparator();
-    // Action to quit the application
-    m_action_quit = new QAction(tr(k_quit_text), this);
-#ifdef Q_OS_WIN
-    m_action_quit->setShortcut(QKeySequence(QStringLiteral("Ctrl+Q")));
-#else
-    m_action_quit->setShortcut(QKeySequence::Quit);
-#endif
-    m_file_menu->addAction(m_action_quit);
-    ui->menubar->addMenu(m_file_menu);
-
-    connect(m_action_quit, &QAction::triggered, this, &QApplication::closeAllWindows);
-
-    // Views menu
-    auto views_menu = new QMenu(tr(k_views_menu_text), this);
-
-    m_action_show_log_file_explorer = new QAction(tr(k_show_log_file_explorer_text), this);
-    m_action_show_log_file_explorer->setCheckable(true);
-    views_menu->addAction(m_action_show_log_file_explorer);
-
-    m_action_show_log_details = new QAction(tr(k_show_log_details_text), this);
-    m_action_show_log_details->setCheckable(true);
-    views_menu->addAction(m_action_show_log_details);
-
-    m_action_show_log_level_pie_chart = new QAction(tr("Show Log Level Pie Chart"), this);
-    m_action_show_log_level_pie_chart->setCheckable(true);
-    views_menu->addAction(m_action_show_log_level_pie_chart);
-
-    ui->menubar->addMenu(views_menu);
+    connect(m_menu_controller, &MainMenuController::open_recent_file_requested, this,
+            &MainWindow::handle_open_recent_file);
+    connect(m_menu_controller, &MainMenuController::clear_recent_files_requested, this,
+            &MainWindow::handle_clear_recent_files);
+    connect(m_menu_controller, &MainMenuController::save_session_requested, this,
+            &MainWindow::handle_save_session);
+    connect(m_menu_controller, &MainMenuController::open_session_requested, this,
+            &MainWindow::handle_open_session_dialog);
+    connect(m_menu_controller, &MainMenuController::open_recent_session_requested, this,
+            &MainWindow::handle_open_session);
+    connect(m_menu_controller, &MainMenuController::reopen_last_session_requested, this,
+            &MainWindow::handle_reopen_last_session);
+    connect(m_menu_controller, &MainMenuController::settings_requested, this,
+            &MainWindow::handle_show_settings_dialog_requested);
+    connect(m_menu_controller, &MainMenuController::quit_requested, this,
+            &QApplication::closeAllWindows);
 
     // Update docks on toggle and, if a session is active, cache the new dock layout
     auto cache_dock_state_if_session = [this]() -> void {
@@ -547,63 +496,61 @@ auto MainWindow::initialize_menu() -> void
         }
     };
 
-    connect(m_action_show_log_file_explorer, &QAction::toggled, this,
+    connect(m_menu_controller, &MainMenuController::show_log_file_explorer_toggled, this,
             [this, cache_dock_state_if_session](bool checked) {
                 m_log_file_explorer_dock_widget->setVisible(checked);
                 cache_dock_state_if_session();
             });
     connect(m_log_file_explorer_dock_widget, &DockWidget::closed, this, [this]() {
-        m_action_show_log_file_explorer->setChecked(false);
+        bool has_current_session = false;
         if (m_session_controller != nullptr && m_session_controller->has_current_session())
         {
+            has_current_session = true;
             m_last_session_dock_state = saveState();
         }
+
+        m_menu_controller->set_view_actions_state(has_current_session, false,
+                                                  m_log_details_dock_widget->isVisible(),
+                                                  m_log_level_pie_chart_dock_widget->isVisible());
     });
 
-    connect(m_action_show_log_details, &QAction::toggled, this,
+    connect(m_menu_controller, &MainMenuController::show_log_details_toggled, this,
             [this, cache_dock_state_if_session](bool checked) {
                 m_log_details_dock_widget->setVisible(checked);
                 cache_dock_state_if_session();
             });
     connect(m_log_details_dock_widget, &DockWidget::closed, this, [this]() {
-        m_action_show_log_details->setChecked(false);
+        bool has_current_session = false;
         if (m_session_controller != nullptr && m_session_controller->has_current_session())
         {
+            has_current_session = true;
             m_last_session_dock_state = saveState();
         }
+
+        m_menu_controller->set_view_actions_state(
+            has_current_session, m_log_file_explorer_dock_widget->isVisible(), false,
+            m_log_level_pie_chart_dock_widget->isVisible());
     });
 
-    connect(m_action_show_log_level_pie_chart, &QAction::toggled, this,
+    connect(m_menu_controller, &MainMenuController::show_log_level_pie_chart_toggled, this,
             [this, cache_dock_state_if_session](bool checked) {
                 m_log_level_pie_chart_dock_widget->setVisible(checked);
                 cache_dock_state_if_session();
             });
     connect(m_log_level_pie_chart_dock_widget, &DockWidget::closed, this, [this]() {
-        m_action_show_log_level_pie_chart->setChecked(false);
+        bool has_current_session = false;
         if (m_session_controller != nullptr && m_session_controller->has_current_session())
         {
+            has_current_session = true;
             m_last_session_dock_state = saveState();
         }
+
+        m_menu_controller->set_view_actions_state(has_current_session,
+                                                  m_log_file_explorer_dock_widget->isVisible(),
+                                                  m_log_details_dock_widget->isVisible(), false);
     });
 
-    // Settings menu
-    auto settings_menu = new QMenu(tr("&Settings"), this);
-    m_action_settings = new QAction(tr("Settings..."), this);
-    m_action_settings->setShortcut(QKeySequence(QStringLiteral("Ctrl+,")));
-    settings_menu->addAction(m_action_settings);
-    ui->menubar->addMenu(settings_menu);
-    connect(m_action_settings, &QAction::triggered, this,
-            &MainWindow::handle_show_settings_dialog_requested);
-
-    // Help menu
-    auto help_menu = new QMenu(tr("&Help"), this);
-    auto about_action = new QAction(tr("About %1").arg(QCoreApplication::applicationName()), this);
-    auto about_qt_action = new QAction(tr("About Qt"), this);
-    help_menu->addAction(about_action);
-    help_menu->addAction(about_qt_action);
-    ui->menubar->addMenu(help_menu);
-
-    connect(about_action, &QAction::triggered, this, [this] {
+    connect(m_menu_controller, &MainMenuController::about_requested, this, [this] {
         QMessageBox::about(this, tr("About %1").arg(QCoreApplication::applicationName()),
                            tr("<b>%1</b><br>"
                               "Version 1.0<br>"
@@ -612,72 +559,14 @@ auto MainWindow::initialize_menu() -> void
                               "<a href=\"https://AdrianHelbig.de\">AdrianHelbig.de</a>")
                                .arg(QCoreApplication::applicationName(), QT_VERSION_STR));
     });
-    connect(about_qt_action, &QAction::triggered, this, [this] { QMessageBox::aboutQt(this); });
+    connect(m_menu_controller, &MainMenuController::about_qt_requested, this,
+            [this] { QMessageBox::aboutQt(this); });
 
     // Sync action checkmarks with current dock visibility
     // (these may be overridden later by show_start_page_if_needed based on session presence)
-    if (m_log_file_explorer_dock_widget != nullptr && m_action_show_log_file_explorer != nullptr)
-    {
-        const bool prev = m_action_show_log_file_explorer->blockSignals(true);
-        m_action_show_log_file_explorer->setChecked(m_log_file_explorer_dock_widget->isVisible());
-        m_action_show_log_file_explorer->blockSignals(prev);
-    }
-    if (m_log_details_dock_widget != nullptr && m_action_show_log_details != nullptr)
-    {
-        const bool prev = m_action_show_log_details->blockSignals(true);
-        m_action_show_log_details->setChecked(m_log_details_dock_widget->isVisible());
-        m_action_show_log_details->blockSignals(prev);
-    }
-    if (m_log_level_pie_chart_dock_widget != nullptr &&
-        m_action_show_log_level_pie_chart != nullptr)
-    {
-        const bool prev = m_action_show_log_level_pie_chart->blockSignals(true);
-        m_action_show_log_level_pie_chart->setChecked(
-            m_log_level_pie_chart_dock_widget->isVisible());
-        m_action_show_log_level_pie_chart->blockSignals(prev);
-    }
-}
-
-/**
- * @brief Rebuilds the Recent Files and Recent Sessions submenus from models.
- *
- * Idempotent; clears and repopulates actions on each call.
- */
-auto MainWindow::rebuild_recent_menus() -> void
-{
-    if (m_recent_files_menu != nullptr && m_recent_files_model != nullptr)
-    {
-        m_recent_files_menu->clear();
-        for (int row = 0; row < m_recent_files_model->rowCount(); ++row)
-        {
-            const QModelIndex idx = m_recent_files_model->index(row, 0);
-            const QString title =
-                m_recent_files_model->data(idx, to_role_id(RecentFileRole::FileName)).toString();
-            const QString path =
-                m_recent_files_model->data(idx, to_role_id(RecentFileRole::FilePath)).toString();
-            QAction* act = m_recent_files_menu->addAction(title);
-            connect(act, &QAction::triggered, this,
-                    [this, path]() { handle_open_recent_file(path); });
-        }
-        m_recent_files_menu->addSeparator();
-        QAction* clear_act = m_recent_files_menu->addAction(tr("Clear Recent Files"));
-        connect(clear_act, &QAction::triggered, this, [this]() { handle_clear_recent_files(); });
-    }
-
-    if (m_recent_sessions_menu != nullptr && m_recent_sessions_model != nullptr)
-    {
-        m_recent_sessions_menu->clear();
-        for (int row = 0; row < m_recent_sessions_model->rowCount(); ++row)
-        {
-            const QModelIndex idx = m_recent_sessions_model->index(row, 0);
-            const QString title =
-                m_recent_sessions_model->data(idx, to_role_id(RecentSessionRole::Name)).toString();
-            const QString id =
-                m_recent_sessions_model->data(idx, to_role_id(RecentSessionRole::Id)).toString();
-            QAction* act = m_recent_sessions_menu->addAction(title);
-            connect(act, &QAction::triggered, this, [this, id]() { handle_open_session(id); });
-        }
-    }
+    m_menu_controller->set_view_actions_state(true, m_log_file_explorer_dock_widget->isVisible(),
+                                              m_log_details_dock_widget->isVisible(),
+                                              m_log_level_pie_chart_dock_widget->isVisible());
 }
 
 /**
@@ -716,27 +605,7 @@ auto MainWindow::show_start_page_if_needed() -> void
             m_log_level_pie_chart_dock_widget->setVisible(false);
         }
 
-        if (m_action_show_log_file_explorer != nullptr)
-        {
-            const bool prev = m_action_show_log_file_explorer->blockSignals(true);
-            m_action_show_log_file_explorer->setChecked(false);
-            m_action_show_log_file_explorer->blockSignals(prev);
-            m_action_show_log_file_explorer->setEnabled(false);
-        }
-        if (m_action_show_log_details != nullptr)
-        {
-            const bool prev = m_action_show_log_details->blockSignals(true);
-            m_action_show_log_details->setChecked(false);
-            m_action_show_log_details->blockSignals(prev);
-            m_action_show_log_details->setEnabled(false);
-        }
-        if (m_action_show_log_level_pie_chart != nullptr)
-        {
-            const bool prev = m_action_show_log_level_pie_chart->blockSignals(true);
-            m_action_show_log_level_pie_chart->setChecked(false);
-            m_action_show_log_level_pie_chart->blockSignals(prev);
-            m_action_show_log_level_pie_chart->setEnabled(false);
-        }
+        m_menu_controller->set_view_actions_state(false, false, false, false);
     }
     else
     {
@@ -746,42 +615,10 @@ auto MainWindow::show_start_page_if_needed() -> void
             restoreState(m_last_session_dock_state);
         }
 
-        if (m_action_show_log_file_explorer != nullptr)
-        {
-            m_action_show_log_file_explorer->setEnabled(true);
-        }
-        if (m_action_show_log_details != nullptr)
-        {
-            m_action_show_log_details->setEnabled(true);
-        }
-        if (m_action_show_log_level_pie_chart != nullptr)
-        {
-            m_action_show_log_level_pie_chart->setEnabled(true);
-        }
-
         // Sync action checkmarks with the restored dock visibility without emitting toggles.
-        if (m_log_file_explorer_dock_widget != nullptr &&
-            m_action_show_log_file_explorer != nullptr)
-        {
-            const bool prev = m_action_show_log_file_explorer->blockSignals(true);
-            m_action_show_log_file_explorer->setChecked(
-                m_log_file_explorer_dock_widget->isVisible());
-            m_action_show_log_file_explorer->blockSignals(prev);
-        }
-        if (m_log_details_dock_widget != nullptr && m_action_show_log_details != nullptr)
-        {
-            const bool prev = m_action_show_log_details->blockSignals(true);
-            m_action_show_log_details->setChecked(m_log_details_dock_widget->isVisible());
-            m_action_show_log_details->blockSignals(prev);
-        }
-        if (m_log_level_pie_chart_dock_widget != nullptr &&
-            m_action_show_log_level_pie_chart != nullptr)
-        {
-            const bool prev = m_action_show_log_level_pie_chart->blockSignals(true);
-            m_action_show_log_level_pie_chart->setChecked(
-                m_log_level_pie_chart_dock_widget->isVisible());
-            m_action_show_log_level_pie_chart->blockSignals(prev);
-        }
+        m_menu_controller->set_view_actions_state(
+            true, m_log_file_explorer_dock_widget->isVisible(),
+            m_log_details_dock_widget->isVisible(), m_log_level_pie_chart_dock_widget->isVisible());
     }
 }
 
@@ -914,9 +751,11 @@ auto MainWindow::changeEvent(QEvent* event) -> void
     if (event != nullptr && event->type() == QEvent::LanguageChange)
     {
         ui->retranslateUi(this);
-        ui->menubar->clear();
-        initialize_menu();
-        rebuild_recent_menus();
+        if (m_menu_controller != nullptr)
+        {
+            m_menu_controller->retranslate();
+            m_menu_controller->rebuild_recent_menus();
+        }
         m_log_file_explorer_dock_widget->setWindowTitle(tr("Log File Explorer"));
         m_log_details_dock_widget->setWindowTitle(tr("Log Details"));
         ui->logFilterBarWidget->set_app_names(m_controller->get_app_names());
@@ -988,7 +827,7 @@ void MainWindow::handle_open_log_file_dialog_requested()
 
             m_session_controller->request_expand_session(session_id);
             m_session_controller->save_current_session();
-            rebuild_recent_menus();
+            m_menu_controller->rebuild_recent_menus();
         }
 
         show_start_page_if_needed();
@@ -1179,7 +1018,7 @@ auto MainWindow::handle_clear_recent_files() -> void
 auto MainWindow::handle_save_session() -> void
 {
     m_session_controller->save_current_session();
-    rebuild_recent_menus();
+    m_menu_controller->rebuild_recent_menus();
 }
 
 /**
@@ -1282,7 +1121,7 @@ auto MainWindow::restore_session_from_json(const QString& session_id,
         }
 
         m_session_controller->request_expand_session(session_id);
-        rebuild_recent_menus();
+        m_menu_controller->rebuild_recent_menus();
         update_pagination_widget();
         show_start_page_if_needed();
     }
@@ -1510,7 +1349,7 @@ auto MainWindow::handle_open_recent_file(const QString& file_path) -> void
         m_session_controller->request_expand_session(session_id);
         m_session_controller->save_current_session();
 
-        rebuild_recent_menus();
+        m_menu_controller->rebuild_recent_menus();
         show_start_page_if_needed();
     }
 }

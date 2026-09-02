@@ -13,10 +13,8 @@
 #include "QtWidgetsCommonLib/Widgets/AppMainWindow.h"
 
 // Forward declarations for Qt types used as pointers/references
-class QAction;
 class QDockWidget;
 class QPlainTextEdit;
-class QMenu;
 class QResizeEvent;
 class QDragEnterEvent;
 class QDropEvent;
@@ -31,6 +29,7 @@ class MainWindow;
 
 class LogViewerSettings;
 class LogViewerController;
+class MainMenuController;
 class SessionController;
 class LogFileInfo;
 class RecentItemsModel;
@@ -103,19 +102,11 @@ class MainWindow: public QtWidgetsCommonLib::AppMainWindow
         auto setup_tab_widget() -> void;
 
         /**
-         * @brief Initializes the main menu bar and its actions.
+         * @brief Initializes the main menu controller and its connections.
          *
-         * Adds File menu entries and views menu. Also creates Recent Files / Recent Sessions
-         * submenus and session-related actions (Save/Open/Reopen Last Session).
+         * Connects menu requests to the existing window handlers and dock layout logic.
          */
         auto initialize_menu() -> void;
-
-        /**
-         * @brief Rebuilds the Recent Files and Recent Sessions submenus from models.
-         *
-         * Idempotent; clears and repopulates actions on each call.
-         */
-        auto rebuild_recent_menus() -> void;
 
         /**
          * @brief Shows the start page if there is no current session.
@@ -368,13 +359,7 @@ class MainWindow: public QtWidgetsCommonLib::AppMainWindow
         Ui::MainWindow* ui;
         LogViewerSettings* m_log_viewer_settings = nullptr;
         LogViewerController* m_controller = nullptr;
-
-        QAction* m_action_open_log_file = nullptr;
-        QAction* m_action_quit = nullptr;
-        QAction* m_action_show_log_file_explorer = nullptr;
-        QAction* m_action_show_log_details = nullptr;
-        QAction* m_action_show_log_level_pie_chart = nullptr;
-        QAction* m_action_settings = nullptr;
+        MainMenuController* m_menu_controller = nullptr;
 
         // Session-related
         SessionManager* m_session_manager = nullptr;
@@ -384,14 +369,6 @@ class MainWindow: public QtWidgetsCommonLib::AppMainWindow
         RecentItemsModel* m_recent_sessions_model = nullptr;
 
         SessionController* m_session_controller{nullptr};
-
-        // File menu submenus
-        QMenu* m_file_menu = nullptr;
-        QMenu* m_recent_files_menu = nullptr;
-        QMenu* m_recent_sessions_menu = nullptr;
-        QAction* m_action_save_session = nullptr;
-        QAction* m_action_open_session = nullptr;
-        QAction* m_action_reopen_last_session = nullptr;
 
         // Docks
         DockWidget* m_log_details_dock_widget = nullptr;
