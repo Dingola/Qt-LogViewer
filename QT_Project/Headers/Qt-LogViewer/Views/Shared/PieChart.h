@@ -82,6 +82,11 @@ class PieChart: public QWidget
          *
          * Note: Gaps are only drawn when there are at least two non-zero slices.
          * If only a single slice is present (i.e., 100%), gaps are suppressed.
+         * The angle
+         * determines a uniform gap width at the inner radius (outer radius for a full pie) It is
+         * limited to 25% of the smallest positive slice angle.
+         * Gaps scale with the chart
+         * radius and leave the widget background visible.
          */
         auto set_segment_gap_angle(int degrees) -> void;
 
@@ -130,37 +135,22 @@ class PieChart: public QWidget
                            double inner_radius, int total_value) -> void;
 
         /**
-         * @brief Draws a single slice polygon.
-         * @param painter The QPainter to draw with.
+         * @brief Draws a single slice using outer and inner arcs.
+         * @param painter The
+         * QPainter to draw with.
          * @param center The center point of the chart.
          * @param outer_radius The outer radius of the chart.
          * @param inner_radius The inner radius of the chart.
          * @param start_angle_deg The starting angle (in degrees) of the slice.
          * @param sweep_angle_deg The sweep angle (in degrees) of the slice.
-         * @param segment The segment name for color selection.
+         * @param
+         * gap_width The uniform distance between adjacent slice edges.
+         * @param segment
+         * The segment name for color selection.
          */
         auto draw_slice(QPainter& painter, const QPointF& center, double outer_radius,
                         double inner_radius, double start_angle_deg, double sweep_angle_deg,
-                        const QString& segment) -> void;
-
-        /**
-         * @brief Draws straight gaps between slices.
-         * @param painter The QPainter to draw with.
-         * @param center The center point of the chart.
-         * @param outer_radius The outer radius of the chart.
-         * @param inner_radius The inner radius of the chart.
-         * @param boundary_angles_deg The angles (in degrees) where gaps should be drawn.
-         */
-        auto draw_gaps(QPainter& painter, const QPointF& center, double outer_radius,
-                       double inner_radius, const QVector<double>& boundary_angles_deg) -> void;
-
-        /**
-         * @brief Draws the inner hole of the donut.
-         * @param painter The QPainter to draw with.
-         * @param center The center point of the chart.
-         * @param inner_radius The inner radius of the hole.
-         */
-        auto draw_inner_hole(QPainter& painter, const QPointF& center, double inner_radius) -> void;
+                        double gap_width, const QString& segment) -> void;
 
         /**
          * @brief Finds the value for a given segment (case-insensitive).
@@ -172,9 +162,6 @@ class PieChart: public QWidget
     private:
         static constexpr int k_default_inner_radius_percent = 60;
         static constexpr int k_default_segment_gap_angle = 4;
-        static constexpr int k_min_slice_steps = 4;
-        static constexpr int k_max_slice_steps = 720;
-        static constexpr double k_gap_width = 6.0;
         static constexpr double k_inner_radius_threshold = 0.5;
         static constexpr const char* k_default_bg_color = "#e0e0e0";
 

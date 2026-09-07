@@ -170,15 +170,15 @@ void PieChart::paintEvent(QPaintEvent* /*event*/)
 auto PieChart::draw_empty_ring(QPainter& painter, const QPointF& center, double outer_radius,
                                double inner_radius) -> void
 {
-    QColor bg_color = palette().window().color();
-    painter.setBrush(m_empty_ring_color);
-    painter.drawEllipse(center, outer_radius, outer_radius);
-
+    QPainterPath ring;
+    ring.addEllipse(center, outer_radius, outer_radius);
     if (inner_radius > k_inner_radius_threshold)
     {
-        painter.setBrush(bg_color);
-        painter.drawEllipse(center, inner_radius, inner_radius);
+        ring.addEllipse(center, inner_radius, inner_radius);
     }
+
+    painter.setBrush(m_empty_ring_color);
+    painter.drawPath(ring);
 }
 
 /**
@@ -201,11 +201,24 @@ auto PieChart::draw_segments(QPainter& painter, const QPointF& center, double ou
         values_ordered.append(find_segment_value(segment));
     }
 
-    QVector<double> boundary_angles;
-    boundary_angles.reserve(values_ordered.size());
-
-    double current_angle = 0.0;
+    double smallest_slice_angle = 360.0;
     int non_zero_slices = 0;
+    for (double value: values_ordered)
+    {
+        if (value > 0.0)
+        {
+            smallest_slice_angle = qMin(smallest_slice_angle, 360.0 * value / total_value);
+            non_zero_slices += 1;
+        }
+    }
+
+    // Scale gaps with the chart and preserve at least 75% of the smallest slice.
+    const double gap_angle = non_zero_slices > 1 ? qMin(static_cast<double>(m_segment_gap_angle),
+                                                        smallest_slice_angle * 0.25)
+                                                 : 0.0;
+    const double reference_radius = inner_radius > 0.0 ? inner_radius : outer_radius;
+    const double gap_width = 2.0 * reference_radius * std::sin(qDegreesToRadians(gap_angle * 0.5));
+    double current_angle = 0.0;
 
     for (int i = 0; i < values_ordered.size(); ++i)
     {
@@ -216,128 +229,65 @@ auto PieChart::draw_segments(QPainter& painter, const QPointF& center, double ou
         if (slice_angle > std::numeric_limits<double>::epsilon())
         {
             draw_slice(painter, center, outer_radius, inner_radius, current_angle, slice_angle,
-                       ordered_segments.at(i));
-            boundary_angles.append(current_angle);
-            non_zero_slices += 1;
+                       gap_width, ordered_segments.at(i));
         }
 
         current_angle += slice_angle;
     }
-
-    // Draw gaps only when there are at least two non-zero slices and gap angle is enabled
-    if (non_zero_slices > 1 && m_segment_gap_angle > 0)
-    {
-        draw_gaps(painter, center, outer_radius, inner_radius, boundary_angles);
-    }
-
-    draw_inner_hole(painter, center, inner_radius);
 }
 
 /**
- * @brief Draws a single slice polygon.
- * @param painter The QPainter to draw with.
+ * @brief Draws a single slice using outer and inner arcs.
+ * @param painter The QPainter to draw
+ * with.
  * @param center The center point of the chart.
  * @param outer_radius The outer radius of the chart.
  * @param inner_radius The inner radius of the chart.
  * @param start_angle_deg The starting angle (in degrees) of the slice.
  * @param sweep_angle_deg The sweep angle (in degrees) of the slice.
+ * @param gap_width The uniform
+ * distance between adjacent slice edges.
  * @param segment The segment name for color selection.
  */
 auto PieChart::draw_slice(QPainter& painter, const QPointF& center, double outer_radius,
                           double inner_radius, double start_angle_deg, double sweep_angle_deg,
-                          const QString& segment) -> void
+                          double gap_width, const QString& segment) -> void
 {
-    const int min_steps = k_min_slice_steps;
-    int steps = qMax<int>(min_steps, static_cast<int>(std::ceil(std::abs(sweep_angle_deg))));
-    steps = qMin(steps, k_max_slice_steps);
-
-    QPolygonF poly;
-    poly.reserve((steps + 1) * 2);
-
-    // outer arc
-    for (int s = 0; s <= steps; ++s)
-    {
-        double t = static_cast<double>(s) / steps;
-        double angle = start_angle_deg + t * sweep_angle_deg;
-        double rad = qDegreesToRadians(angle);
-        poly << QPointF(center.x() + outer_radius * std::cos(rad),
-                        center.y() - outer_radius * std::sin(rad));
-    }
-
-    // inner arc (reverse)
-    for (int s = 0; s <= steps; ++s)
-    {
-        double t = static_cast<double>(s) / steps;
-        double angle = start_angle_deg + sweep_angle_deg - t * sweep_angle_deg;
-        double rad = qDegreesToRadians(angle);
-        poly << QPointF(center.x() + inner_radius * std::cos(rad),
-                        center.y() - inner_radius * std::sin(rad));
-    }
-
     QPainterPath path;
-    path.addPolygon(poly);
+    const QRectF outer_rect(center.x() - outer_radius, center.y() - outer_radius,
+                            outer_radius * 2.0, outer_radius * 2.0);
+    const QRectF inner_rect(center.x() - inner_radius, center.y() - inner_radius,
+                            inner_radius * 2.0, inner_radius * 2.0);
+
+    // Intersect parallel, offset slice edges with the original concentric circles.
+    const double half_gap = gap_width * 0.5;
+    const double outer_inset =
+        outer_radius > 0.0 ? qRadiansToDegrees(std::asin(qBound(0.0, half_gap / outer_radius, 1.0)))
+                           : 0.0;
+    path.arcMoveTo(outer_rect, start_angle_deg + outer_inset);
+    path.arcTo(outer_rect, start_angle_deg + outer_inset, sweep_angle_deg - 2.0 * outer_inset);
+
+    // Inner arc (reverse); leave the hole and gaps unpainted.
+    if (inner_radius > 0.0)
+    {
+        const double inner_inset =
+            qRadiansToDegrees(std::asin(qBound(0.0, half_gap / inner_radius, 1.0)));
+        path.arcTo(inner_rect, start_angle_deg + sweep_angle_deg - inner_inset,
+                   -sweep_angle_deg + 2.0 * inner_inset);
+    }
+    else
+    {
+        // For a full pie, the offset edges meet on the slice bisector.
+        const double half_sweep = qDegreesToRadians(sweep_angle_deg * 0.5);
+        const double distance = half_gap > 0.0 ? half_gap / std::sin(half_sweep) : 0.0;
+        const double bisector = qDegreesToRadians(start_angle_deg) + half_sweep;
+        path.lineTo(center +
+                    QPointF(distance * std::cos(bisector), -distance * std::sin(bisector)));
+    }
+    path.closeSubpath();
 
     painter.setBrush(get_segment_color(segment));
     painter.drawPath(path);
-}
-
-/**
- * @brief Draws straight gaps between slices.
- * @param painter The QPainter to draw with.
- * @param center The center point of the chart.
- * @param outer_radius The outer radius of the chart.
- * @param inner_radius The inner radius of the chart.
- * @param boundary_angles_deg The angles (in degrees) where gaps should be drawn.
- */
-auto PieChart::draw_gaps(QPainter& painter, const QPointF& center, double outer_radius,
-                         double inner_radius, const QVector<double>& boundary_angles_deg) -> void
-{
-    const double gap_width = k_gap_width;
-    double half_gap = gap_width * 0.5;
-    QColor bg_color = palette().window().color();
-    painter.setBrush(bg_color);
-
-    for (double angle_deg: boundary_angles_deg)
-    {
-        double rad = qDegreesToRadians(angle_deg);
-        QPointF dir(std::cos(rad), -std::sin(rad));
-        QPointF normal(-dir.y(), dir.x());
-
-        QPolygonF gap;
-
-        if (inner_radius > 1e-6)
-        {
-            gap << (center + dir * inner_radius + normal * half_gap)
-                << (center + dir * outer_radius + normal * half_gap)
-                << (center + dir * outer_radius - normal * half_gap)
-                << (center + dir * inner_radius - normal * half_gap);
-        }
-        else
-        {
-            gap << (center + normal * half_gap) << (center + dir * outer_radius + normal * half_gap)
-                << (center + dir * outer_radius - normal * half_gap)
-                << (center - normal * half_gap);
-        }
-
-        painter.drawPolygon(gap);
-    }
-}
-
-/**
- * @brief Draws the inner hole of the donut.
- * @param painter The QPainter to draw with.
- * @param center The center point of the chart.
- * @param inner_radius The inner radius of the hole.
- */
-auto PieChart::draw_inner_hole(QPainter& painter, const QPointF& center,
-                               double inner_radius) -> void
-{
-    if (inner_radius > k_inner_radius_threshold)
-    {
-        QColor bg_color = palette().window().color();
-        painter.setBrush(bg_color);
-        painter.drawEllipse(center, inner_radius, inner_radius);
-    }
 }
 
 /**
