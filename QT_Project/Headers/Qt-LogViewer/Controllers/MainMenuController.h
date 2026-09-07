@@ -15,7 +15,7 @@ class RecentItemsModel;
  * Responsibilities:
  * - Create and translate the main menu bar.
  * - Rebuild the Recent Files and Recent Sessions submenus from models.
- * - Keep view action state synchronized with dock visibility.
+ * - Add native dock toggle actions to the Views menu.
  * - Emit user intent without depending on MainWindow or LogViewerController.
  */
 class MainMenuController: public QObject
@@ -47,15 +47,12 @@ class MainMenuController: public QObject
         auto retranslate() -> void;
 
         /**
-         * @brief Updates the enabled and checked state of all view actions without emitting
-         * toggled signals.
-         * @param enabled Whether view actions are enabled.
-         * @param show_log_file_explorer Whether the log file explorer action is checked.
-         * @param show_log_details Whether the log details action is checked.
-         * @param show_log_level_pie_chart Whether the log level pie chart action is checked.
+         * @brief Adds a dock toggle action to the Views menu.
+         * @param action Action supplied by QDockWidget::toggleViewAction().
+         *
+         * Null actions and actions that are already present are ignored.
          */
-        auto set_view_actions_state(bool enabled, bool show_log_file_explorer,
-                                    bool show_log_details, bool show_log_level_pie_chart) -> void;
+        auto add_view_action(QAction* action) -> void;
 
     signals:
         /** @brief Emitted when opening log files is requested. */
@@ -84,24 +81,6 @@ class MainMenuController: public QObject
 
         /** @brief Emitted when reopening the last session is requested. */
         void reopen_last_session_requested();
-
-        /**
-         * @brief Emitted when log file explorer visibility is toggled.
-         * @param visible Requested visibility.
-         */
-        void show_log_file_explorer_toggled(bool visible);
-
-        /**
-         * @brief Emitted when log details visibility is toggled.
-         * @param visible Requested visibility.
-         */
-        void show_log_details_toggled(bool visible);
-
-        /**
-         * @brief Emitted when log level pie chart visibility is toggled.
-         * @param visible Requested visibility.
-         */
-        void show_log_level_pie_chart_toggled(bool visible);
 
         /** @brief Emitted when opening the settings dialog is requested. */
         void settings_requested();
@@ -138,9 +117,6 @@ class MainMenuController: public QObject
         QAction* m_action_open_session = nullptr;
         QAction* m_action_reopen_last_session = nullptr;
         QAction* m_action_quit = nullptr;
-        QAction* m_action_show_log_file_explorer = nullptr;
-        QAction* m_action_show_log_details = nullptr;
-        QAction* m_action_show_log_level_pie_chart = nullptr;
         QAction* m_action_settings = nullptr;
         QAction* m_action_about = nullptr;
         QAction* m_action_about_qt = nullptr;

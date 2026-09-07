@@ -1,6 +1,5 @@
 #pragma once
 
-#include <QByteArray>
 #include <QJsonObject>
 #include <QMainWindow>
 #include <QMap>
@@ -29,6 +28,7 @@ class MainWindow;
 
 class LogViewerSettings;
 class LogViewerController;
+class DockController;
 class MainMenuController;
 class SessionController;
 class LogFileInfo;
@@ -102,16 +102,21 @@ class MainWindow: public QtWidgetsCommonLib::AppMainWindow
         auto setup_tab_widget() -> void;
 
         /**
+         * @brief Initializes the dock controller and registers the application docks.
+         */
+        auto initialize_dock_controller() -> void;
+
+        /**
          * @brief Initializes the main menu controller and its connections.
          *
-         * Connects menu requests to the existing window handlers and dock layout logic.
+         * Connects menu requests to the existing window handlers and adds registered dock actions.
          */
         auto initialize_menu() -> void;
 
         /**
          * @brief Shows the start page if there is no current session.
          *
-         * Hides certain dock widgets and disables related actions when no session is active.
+         * Delegates temporary dock suspension to DockController.
          */
         auto show_start_page_if_needed() -> void;
 
@@ -359,6 +364,7 @@ class MainWindow: public QtWidgetsCommonLib::AppMainWindow
         Ui::MainWindow* ui;
         LogViewerSettings* m_log_viewer_settings = nullptr;
         LogViewerController* m_controller = nullptr;
+        DockController* m_dock_controller = nullptr;
         MainMenuController* m_menu_controller = nullptr;
 
         // Session-related
@@ -382,7 +388,4 @@ class MainWindow: public QtWidgetsCommonLib::AppMainWindow
 
         // Start page (tab area filler)
         StartPageWidget* m_start_page_widget = nullptr;
-
-        // Stores the last known dock layout/state while a session is active.
-        QByteArray m_last_session_dock_state;
 };

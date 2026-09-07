@@ -21,6 +21,7 @@
 #include <QTimer>
 #include <QUrl>
 
+#include "Qt-LogViewer/Controllers/DockController.h"
 #include "Qt-LogViewer/Controllers/LogViewerController.h"
 #include "Qt-LogViewer/Controllers/MainMenuController.h"
 #include "Qt-LogViewer/Controllers/SessionController.h"
@@ -268,6 +269,7 @@ MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
     connect(m_controller, &LogViewerController::page_loaded, this, update_page_state);
     connect(m_controller, &LogViewerController::page_state_updated, this, update_page_state);
 
+    initialize_dock_controller();
     initialize_menu();
     m_menu_controller->rebuild_recent_menus();
 
@@ -462,12 +464,29 @@ auto MainWindow::setup_tab_widget() -> void
 }
 
 /**
+ * @brief Initializes the dock controller and registers the application docks.
+ */
+auto MainWindow::initialize_dock_controller() -> void
+{
+    m_dock_controller = new DockController(this, this);
+    m_dock_controller->register_dock(m_log_file_explorer_dock_widget);
+    m_dock_controller->register_dock(m_log_details_dock_widget);
+    m_dock_controller->register_dock(m_log_level_pie_chart_dock_widget);
+}
+
+/**
  * @brief Initializes the main menu controller and its connections.
  */
 auto MainWindow::initialize_menu() -> void
 {
     m_menu_controller =
         new MainMenuController(ui->menubar, m_recent_files_model, m_recent_sessions_model, this);
+
+    // Add the native toggle action of each registered dock to the Views menu
+    for (QAction* toggle_action: m_dock_controller->get_toggle_actions())
+    {
+        m_menu_controller->add_view_action(toggle_action);
+    }
 
     connect(m_menu_controller, &MainMenuController::open_log_file_requested, this,
             &MainWindow::handle_open_log_file_dialog_requested);
@@ -488,68 +507,6 @@ auto MainWindow::initialize_menu() -> void
     connect(m_menu_controller, &MainMenuController::quit_requested, this,
             &QApplication::closeAllWindows);
 
-    // Update docks on toggle and, if a session is active, cache the new dock layout
-    auto cache_dock_state_if_session = [this]() -> void {
-        if (m_session_controller != nullptr && m_session_controller->has_current_session())
-        {
-            m_last_session_dock_state = saveState();
-        }
-    };
-
-    connect(m_menu_controller, &MainMenuController::show_log_file_explorer_toggled, this,
-            [this, cache_dock_state_if_session](bool checked) {
-                m_log_file_explorer_dock_widget->setVisible(checked);
-                cache_dock_state_if_session();
-            });
-    connect(m_log_file_explorer_dock_widget, &DockWidget::closed, this, [this]() {
-        bool has_current_session = false;
-        if (m_session_controller != nullptr && m_session_controller->has_current_session())
-        {
-            has_current_session = true;
-            m_last_session_dock_state = saveState();
-        }
-
-        m_menu_controller->set_view_actions_state(has_current_session, false,
-                                                  m_log_details_dock_widget->isVisible(),
-                                                  m_log_level_pie_chart_dock_widget->isVisible());
-    });
-
-    connect(m_menu_controller, &MainMenuController::show_log_details_toggled, this,
-            [this, cache_dock_state_if_session](bool checked) {
-                m_log_details_dock_widget->setVisible(checked);
-                cache_dock_state_if_session();
-            });
-    connect(m_log_details_dock_widget, &DockWidget::closed, this, [this]() {
-        bool has_current_session = false;
-        if (m_session_controller != nullptr && m_session_controller->has_current_session())
-        {
-            has_current_session = true;
-            m_last_session_dock_state = saveState();
-        }
-
-        m_menu_controller->set_view_actions_state(
-            has_current_session, m_log_file_explorer_dock_widget->isVisible(), false,
-            m_log_level_pie_chart_dock_widget->isVisible());
-    });
-
-    connect(m_menu_controller, &MainMenuController::show_log_level_pie_chart_toggled, this,
-            [this, cache_dock_state_if_session](bool checked) {
-                m_log_level_pie_chart_dock_widget->setVisible(checked);
-                cache_dock_state_if_session();
-            });
-    connect(m_log_level_pie_chart_dock_widget, &DockWidget::closed, this, [this]() {
-        bool has_current_session = false;
-        if (m_session_controller != nullptr && m_session_controller->has_current_session())
-        {
-            has_current_session = true;
-            m_last_session_dock_state = saveState();
-        }
-
-        m_menu_controller->set_view_actions_state(has_current_session,
-                                                  m_log_file_explorer_dock_widget->isVisible(),
-                                                  m_log_details_dock_widget->isVisible(), false);
-    });
-
     connect(m_menu_controller, &MainMenuController::about_requested, this, [this] {
         QMessageBox::about(this, tr("About %1").arg(QCoreApplication::applicationName()),
                            tr("<b>%1</b><br>"
@@ -561,16 +518,10 @@ auto MainWindow::initialize_menu() -> void
     });
     connect(m_menu_controller, &MainMenuController::about_qt_requested, this,
             [this] { QMessageBox::aboutQt(this); });
-
-    // Sync action checkmarks with current dock visibility
-    // (these may be overridden later by show_start_page_if_needed based on session presence)
-    m_menu_controller->set_view_actions_state(true, m_log_file_explorer_dock_widget->isVisible(),
-                                              m_log_details_dock_widget->isVisible(),
-                                              m_log_level_pie_chart_dock_widget->isVisible());
 }
 
 /**
- * @brief Shows the start page if there is no current session.
+ * @brief Shows the start page and suspends docks if there is no current session.
  */
 auto MainWindow::show_start_page_if_needed() -> void
 {
@@ -582,44 +533,7 @@ auto MainWindow::show_start_page_if_needed() -> void
         central_stack->setCurrentIndex(has_session ? 0 : 1);
     }
 
-    if (!has_session)
-    {
-        // Capture current (restored) dock state ONCE when transitioning to StartPage,
-        // so we can later restore it and also persist it if the app closes while on StartPage.
-        if (m_last_session_dock_state.isEmpty())
-        {
-            m_last_session_dock_state = saveState();
-        }
-
-        // Transient UI for StartPage: hide docks and present actions as unchecked and disabled.
-        if (m_log_file_explorer_dock_widget != nullptr)
-        {
-            m_log_file_explorer_dock_widget->setVisible(false);
-        }
-        if (m_log_details_dock_widget != nullptr)
-        {
-            m_log_details_dock_widget->setVisible(false);
-        }
-        if (m_log_level_pie_chart_dock_widget != nullptr)
-        {
-            m_log_level_pie_chart_dock_widget->setVisible(false);
-        }
-
-        m_menu_controller->set_view_actions_state(false, false, false, false);
-    }
-    else
-    {
-        // Back to a session: re-enable actions and restore the last-session dock layout.
-        if (!m_last_session_dock_state.isEmpty())
-        {
-            restoreState(m_last_session_dock_state);
-        }
-
-        // Sync action checkmarks with the restored dock visibility without emitting toggles.
-        m_menu_controller->set_view_actions_state(
-            true, m_log_file_explorer_dock_widget->isVisible(),
-            m_log_details_dock_widget->isVisible(), m_log_level_pie_chart_dock_widget->isVisible());
-    }
+    m_dock_controller->set_docks_suspended(!has_session);
 }
 
 /**
@@ -787,13 +701,8 @@ auto MainWindow::closeEvent(QCloseEvent* event) -> void
     }
     else
     {
-        // If we are on StartPage, restore the last-session dock state just before saving window
-        // settings, so AppMainWindow persists the session layout instead of the StartPage-off
-        // layout.
-        if (!m_last_session_dock_state.isEmpty())
-        {
-            restoreState(m_last_session_dock_state);
-        }
+        // Restore suspended docks before AppMainWindow persists the window layout.
+        m_dock_controller->set_docks_suspended(false);
     }
 
     AppMainWindow::closeEvent(event);

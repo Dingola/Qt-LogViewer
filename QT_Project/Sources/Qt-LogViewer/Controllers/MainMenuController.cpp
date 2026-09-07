@@ -11,7 +11,6 @@
 #include <QMenu>
 #include <QMenuBar>
 #include <QModelIndex>
-#include <QSignalBlocker>
 #include <QVariant>
 
 #include "Qt-LogViewer/Models/RecentItemsModel.h"
@@ -30,12 +29,6 @@ constexpr auto k_reopen_last_session_text =
     QT_TRANSLATE_NOOP("MainMenuController", "Reopen Last Session");
 constexpr auto k_quit_text = QT_TRANSLATE_NOOP("MainMenuController", "&Quit");
 constexpr auto k_views_menu_text = QT_TRANSLATE_NOOP("MainMenuController", "&Views");
-constexpr auto k_show_log_file_explorer_text =
-    QT_TRANSLATE_NOOP("MainMenuController", "Show Log File Explorer");
-constexpr auto k_show_log_details_text =
-    QT_TRANSLATE_NOOP("MainMenuController", "Show Log Details");
-constexpr auto k_show_log_level_pie_chart_text =
-    QT_TRANSLATE_NOOP("MainMenuController", "Show Log Level Pie Chart");
 constexpr auto k_settings_menu_text = QT_TRANSLATE_NOOP("MainMenuController", "&Settings");
 constexpr auto k_settings_text = QT_TRANSLATE_NOOP("MainMenuController", "Settings...");
 constexpr auto k_help_menu_text = QT_TRANSLATE_NOOP("MainMenuController", "&Help");
@@ -113,18 +106,7 @@ auto MainMenuController::initialize_menu() -> void
         m_file_menu->addSeparator();
         m_file_menu->addAction(m_action_quit);
 
-        // Views menu
-        m_action_show_log_file_explorer = new QAction(this);
-        m_action_show_log_file_explorer->setCheckable(true);
-        m_views_menu->addAction(m_action_show_log_file_explorer);
-
-        m_action_show_log_details = new QAction(this);
-        m_action_show_log_details->setCheckable(true);
-        m_views_menu->addAction(m_action_show_log_details);
-
-        m_action_show_log_level_pie_chart = new QAction(this);
-        m_action_show_log_level_pie_chart->setCheckable(true);
-        m_views_menu->addAction(m_action_show_log_level_pie_chart);
+        // Views menu actions are added from registered dock widgets
 
         // Settings menu
         m_action_settings = new QAction(this);
@@ -153,12 +135,6 @@ auto MainMenuController::initialize_menu() -> void
         connect(m_action_reopen_last_session, &QAction::triggered, this,
                 &MainMenuController::reopen_last_session_requested);
         connect(m_action_quit, &QAction::triggered, this, &MainMenuController::quit_requested);
-        connect(m_action_show_log_file_explorer, &QAction::toggled, this,
-                &MainMenuController::show_log_file_explorer_toggled);
-        connect(m_action_show_log_details, &QAction::toggled, this,
-                &MainMenuController::show_log_details_toggled);
-        connect(m_action_show_log_level_pie_chart, &QAction::toggled, this,
-                &MainMenuController::show_log_level_pie_chart_toggled);
         connect(m_action_settings, &QAction::triggered, this,
                 &MainMenuController::settings_requested);
         connect(m_action_about, &QAction::triggered, this, &MainMenuController::about_requested);
@@ -235,9 +211,6 @@ auto MainMenuController::retranslate() -> void
         m_action_open_session->setText(translate(k_open_session_text));
         m_action_reopen_last_session->setText(translate(k_reopen_last_session_text));
         m_action_quit->setText(translate(k_quit_text));
-        m_action_show_log_file_explorer->setText(translate(k_show_log_file_explorer_text));
-        m_action_show_log_details->setText(translate(k_show_log_details_text));
-        m_action_show_log_level_pie_chart->setText(translate(k_show_log_level_pie_chart_text));
         m_action_settings->setText(translate(k_settings_text));
         m_action_about->setText(translate(k_about_text).arg(QCoreApplication::applicationName()));
         m_action_about_qt->setText(translate(k_about_qt_text));
@@ -245,29 +218,13 @@ auto MainMenuController::retranslate() -> void
 }
 
 /**
- * @brief Updates the enabled and checked state of all view actions without emitting toggled
- * signals.
- * @param enabled Whether view actions are enabled.
- * @param show_log_file_explorer Whether the log file explorer action is checked.
- * @param show_log_details Whether the log details action is checked.
- * @param show_log_level_pie_chart Whether the log level pie chart action is checked.
+ * @brief Adds a dock toggle action to the Views menu.
+ * @param action Action supplied by QDockWidget::toggleViewAction().
  */
-auto MainMenuController::set_view_actions_state(bool enabled, bool show_log_file_explorer,
-                                                bool show_log_details,
-                                                bool show_log_level_pie_chart) -> void
+auto MainMenuController::add_view_action(QAction* action) -> void
 {
-    if (m_action_show_log_file_explorer != nullptr)
+    if (m_views_menu != nullptr && action != nullptr && !m_views_menu->actions().contains(action))
     {
-        const QSignalBlocker explorer_blocker(m_action_show_log_file_explorer);
-        const QSignalBlocker details_blocker(m_action_show_log_details);
-        const QSignalBlocker pie_chart_blocker(m_action_show_log_level_pie_chart);
-
-        m_action_show_log_file_explorer->setChecked(show_log_file_explorer);
-        m_action_show_log_details->setChecked(show_log_details);
-        m_action_show_log_level_pie_chart->setChecked(show_log_level_pie_chart);
-
-        m_action_show_log_file_explorer->setEnabled(enabled);
-        m_action_show_log_details->setEnabled(enabled);
-        m_action_show_log_level_pie_chart->setEnabled(enabled);
+        m_views_menu->addAction(action);
     }
 }
