@@ -194,6 +194,14 @@ class MainWindow: public QtWidgetsCommonLib::AppMainWindow
          */
         auto close_all_tabs() -> void;
 
+        /**
+         * @brief Opens a temporary profile-selection tab before importing a log file.
+         * @param log_file_info File selected for import.
+         * @param target_view Existing target view, or a null identifier to create a new view.
+         */
+        auto show_log_import_tab(const LogFileInfo& log_file_info,
+                                 const QUuid& target_view = QUuid()) -> void;
+
     protected:
         /**
          * @brief Handles change events to update the UI.

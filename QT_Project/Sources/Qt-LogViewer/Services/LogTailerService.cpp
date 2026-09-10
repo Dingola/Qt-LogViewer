@@ -133,8 +133,18 @@ auto LogTailerService::stop_all_tailing() -> void
 {
     m_debounce_timer.stop();
     m_registrations.clear();
-    m_watcher.removePaths(m_watcher.files());
-    m_watcher.removePaths(m_watcher.directories());
+    const QStringList watched_files = m_watcher.files();
+    const QStringList watched_directories = m_watcher.directories();
+
+    if (!watched_files.isEmpty())
+    {
+        m_watcher.removePaths(watched_files);
+    }
+
+    if (!watched_directories.isEmpty())
+    {
+        m_watcher.removePaths(watched_directories);
+    }
 }
 
 /**

@@ -180,6 +180,39 @@ TEST_F(LogParserTest, ParseLineWithDifferentFieldOrder)
 }
 
 /**
+ * @test Verifies parsing of the complete SimpleQtLogger text format used by Qt-LogViewer.
+ */
+TEST_F(LogParserTest, ParseQtLogViewerRecordWithSourceMetadata)
+{
+    const QString format = QStringLiteral(
+        "{timestamp} {level} {message} - [{category}] {file}:{line}, {function} {app_name}");
+    LogParser parser(LogParsingProfile::create_default(format));
+    const QString line = QStringLiteral(
+        R"(2026-07-16 04:10:06.642 Info Application log file: "C:/Users/Adrian/AppData/Local/AdrianHelbig/Qt-LogViewer/logs/Qt-LogViewer.log" - [default] D:\Projects\VS_Projects\Qt-LogViewer\QT_Project\main.cpp:95, int __cdecl main(int,char *[]) Qt-LogViewer)");
+
+    const LogParseOutcome outcome = parser.parse_line(line, QStringLiteral("Qt-LogViewer.log"), 1);
+
+    ASSERT_TRUE(outcome.succeeded()) << outcome.parse_result.error_message.toStdString();
+    ASSERT_TRUE(outcome.entry.has_value());
+    const LogEntry& entry = outcome.entry.value();
+    EXPECT_EQ(entry.get_timestamp(),
+              QDateTime::fromString(QStringLiteral("2026-07-16 04:10:06.642"),
+                                    QStringLiteral("yyyy-MM-dd HH:mm:ss.zzz")));
+    EXPECT_EQ(entry.get_level(), QStringLiteral("Info"));
+    EXPECT_EQ(entry.get_message(),
+              QStringLiteral("Application log file: \"C:/Users/Adrian/AppData/Local/"
+                             "AdrianHelbig/Qt-LogViewer/logs/Qt-LogViewer.log\""));
+    EXPECT_EQ(entry.get_app_name(), QStringLiteral("Qt-LogViewer"));
+    EXPECT_EQ(entry.get_parsed_field(QStringLiteral("category")).toString(),
+              QStringLiteral("default"));
+    EXPECT_EQ(entry.get_parsed_field(QStringLiteral("file")).toString(),
+              QStringLiteral("D:\\Projects\\VS_Projects\\Qt-LogViewer\\QT_Project\\main.cpp"));
+    EXPECT_EQ(entry.get_parsed_field(QStringLiteral("line")).toLongLong(), 95);
+    EXPECT_EQ(entry.get_parsed_field(QStringLiteral("function")).toString(),
+              QStringLiteral("int __cdecl main(int,char *[])"));
+}
+
+/**
  * @test Verifies parsing when some fields are missing in the format string.
  */
 TEST_F(LogParserTest, ParseLineWithMissingFields)

@@ -39,6 +39,7 @@
 #include "Qt-LogViewer/Services/SessionRepository.h"
 #include "Qt-LogViewer/Views/App/Dialogs/SettingsDialog.h"
 #include "Qt-LogViewer/Views/App/LogFileExplorer.h"
+#include "Qt-LogViewer/Views/App/LogImportWidget.h"
 #include "Qt-LogViewer/Views/App/LogLevelPieChartWidget.h"
 #include "Qt-LogViewer/Views/App/LogTableView.h"
 #include "Qt-LogViewer/Views/App/LogViewWidget.h"
@@ -433,6 +434,8 @@ auto MainWindow::setup_tab_widget() -> void
         Q_UNUSED(index);
 
         LogViewWidget* log_view_widget = ui->tabWidgetLog->current_log_view();
+        ui->paginationWidget->setVisible(log_view_widget != nullptr);
+
         if (log_view_widget != nullptr)
         {
             QUuid view_id = log_view_widget->get_view_id();
@@ -1243,6 +1246,95 @@ auto MainWindow::close_all_tabs() -> void
 }
 
 /**
+ * @brief Opens a temporary profile-selection tab before importing a log file.
+ * @param log_file_info File selected for import.
+ * @param target_view Existing target view, or a null identifier to create a new view.
+ */
+auto MainWindow::show_log_import_tab(const LogFileInfo& log_file_info,
+                                     const QUuid& target_view) -> void
+{
+    auto* import_widget = new LogImportWidget(log_file_info.get_file_path(), *m_log_viewer_settings,
+                                              *m_controller, ui->tabWidgetLog);
+    const QString import_title = tr("Import %1").arg(log_file_info.get_file_name());
+    const int import_tab_index = ui->tabWidgetLog->addTab(import_widget, import_title);
+    ui->tabWidgetLog->setCurrentIndex(import_tab_index);
+
+    connect(import_widget, &LogImportWidget::cancel_requested, this, [this, import_widget]() {
+        const int tab_index = ui->tabWidgetLog->indexOf(import_widget);
+
+        if (tab_index >= 0)
+        {
+            ui->tabWidgetLog->removeTab(tab_index);
+            import_widget->deleteLater();
+        }
+    });
+
+    connect(
+        import_widget, &LogImportWidget::import_requested, this,
+        [this, import_widget, log_file_info, target_view]() {
+            const auto selected_profile = import_widget->get_selected_profile();
+            const int import_tab_index = ui->tabWidgetLog->indexOf(import_widget);
+
+            if (selected_profile.has_value() && import_tab_index >= 0 && target_view.isNull())
+            {
+                const QString session_id =
+                    m_session_controller->ensure_current_session(tr(k_untitled_session_text));
+                const QUuid view_id = m_controller->load_log_file_async(
+                    log_file_info.get_file_path(), selected_profile.value(), 1000);
+                m_controller->set_current_view(view_id);
+
+                SessionViewState empty_state;
+                LogViewWidget* log_view_widget =
+                    create_log_view_widget_for_view(view_id, empty_state);
+                log_view_widget->set_view_file_paths(m_controller->get_view_file_paths(view_id));
+
+                ui->tabWidgetLog->removeTab(import_tab_index);
+                const int log_tab_index = ui->tabWidgetLog->insertTab(
+                    import_tab_index, log_view_widget, log_file_info.get_file_name());
+                ui->tabWidgetLog->setCurrentIndex(log_tab_index);
+                log_view_widget->auto_resize_columns();
+                import_widget->deleteLater();
+
+                m_session_controller->request_expand_session(session_id);
+                update_pagination_widget();
+                show_start_page_if_needed();
+            }
+            else if (selected_profile.has_value() && import_tab_index >= 0)
+            {
+                const int target_tab_index = ui->tabWidgetLog->find_view_index(target_view);
+
+                if (target_tab_index >= 0)
+                {
+                    ui->tabWidgetLog->removeTab(import_tab_index);
+                    import_widget->deleteLater();
+                    ui->tabWidgetLog->setCurrentIndex(
+                        ui->tabWidgetLog->find_view_index(target_view));
+
+                    const bool enqueued = m_controller->load_log_file_async(
+                        target_view, log_file_info.get_file_path(), selected_profile.value(), 1000);
+
+                    if (enqueued)
+                    {
+                        statusBar()->showMessage(tr("Queued file for current view: %1")
+                                                     .arg(log_file_info.get_file_name()),
+                                                 3000);
+                    }
+                    else
+                    {
+                        statusBar()->showMessage(tr("File already present in current view: %1")
+                                                     .arg(log_file_info.get_file_name()),
+                                                 3000);
+                    }
+                }
+                else
+                {
+                    statusBar()->showMessage(tr("The target view is no longer available."), 3000);
+                }
+            }
+        });
+}
+
+/**
  * @brief Open selected recent file from menu or start page.
  * @param file_path Absolute file path.
  */
@@ -1269,30 +1361,7 @@ auto MainWindow::handle_open_recent_file(const QString& file_path) -> void
  */
 auto MainWindow::handle_log_file_open_requested(const LogFileInfo& log_file_info) -> void
 {
-    const QString session_id =
-        m_session_controller->ensure_current_session(tr(k_untitled_session_text));
-
-    auto view_id = m_controller->load_log_file_async(log_file_info.get_file_path(), 1000);
-    m_controller->set_current_view(view_id);
-
-    SessionViewState empty_state;
-    LogViewWidget* log_view_widget = create_log_view_widget_for_view(view_id, empty_state);
-
-    QVector<QString> file_paths = m_controller->get_view_file_paths(view_id);
-    log_view_widget->set_view_file_paths(file_paths);
-
-    QString tab_title = log_file_info.get_file_name();
-    const int tab_index = ui->tabWidgetLog->add_log_view_tab(log_view_widget, tab_title, true);
-
-    if (tab_index < 0)
-    {
-        qWarning() << "Failed to add log view tab for file:" << log_file_info.get_file_path();
-    }
-
-    m_session_controller->request_expand_session(session_id);
-
-    update_pagination_widget();
-    show_start_page_if_needed();
+    show_log_import_tab(log_file_info);
 }
 
 /**
@@ -1306,20 +1375,7 @@ auto MainWindow::handle_add_log_file_to_current_view_requested(const LogFileInfo
 
     if (!current_view.isNull())
     {
-        const bool enqueued =
-            m_controller->load_log_file_async(current_view, log_file_info.get_file_path(), 1000);
-
-        if (enqueued)
-        {
-            statusBar()->showMessage(
-                tr("Queued file for current view: %1").arg(log_file_info.get_file_name()), 3000);
-        }
-        else
-        {
-            statusBar()->showMessage(
-                tr("File already present in current view: %1").arg(log_file_info.get_file_name()),
-                3000);
-        }
+        show_log_import_tab(log_file_info, current_view);
     }
     else
     {
