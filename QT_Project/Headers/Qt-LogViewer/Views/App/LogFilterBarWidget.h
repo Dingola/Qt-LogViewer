@@ -110,6 +110,13 @@ class LogFilterBarWidget: public QWidget
         auto set_search_bar_visible(bool visible) -> void;
 
         /**
+         * @brief Enables or disables interaction with the search bar area.
+         *
+         * @param enabled True to enable search controls, false to disable them.
+         */
+        auto set_search_bar_enabled(bool enabled) -> void;
+
+        /**
          * @brief Returns the currently selected application name.
          *
          * @return The selected application name.

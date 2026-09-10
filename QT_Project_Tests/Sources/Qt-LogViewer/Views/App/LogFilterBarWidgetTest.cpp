@@ -275,6 +275,22 @@ TEST_F(LogFilterBarWidgetTest, SetSearchPlaceholder)
 }
 
 /**
+ * @brief Tests enabling and disabling only the contained search bar.
+ */
+TEST_F(LogFilterBarWidgetTest, SetSearchBarEnabled)
+{
+    SearchBarWidget* search_bar = get_search_bar_widget();
+    ASSERT_NE(search_bar, nullptr);
+
+    m_widget->set_search_bar_enabled(false);
+    EXPECT_FALSE(search_bar->isEnabled());
+    EXPECT_TRUE(m_widget->isEnabled());
+
+    m_widget->set_search_bar_enabled(true);
+    EXPECT_TRUE(search_bar->isEnabled());
+}
+
+/**
  * @brief Tests setting and getting search text.
  */
 TEST_F(LogFilterBarWidgetTest, SetAndGetSearchText)

@@ -99,7 +99,6 @@
     @checkbox-indicator-width: 14;
     @checkbox-indicator-height: 14;
     @checkbox-indicator-border-width: 2;
-    @checkbox-indicator-border-width-disabled: 1;
     @checkbox-indicator-border-radius: 2;
 
     /* QPushButton */
@@ -1058,7 +1057,7 @@ QCheckBox::indicator:hover {
 }
 
 QCheckBox::indicator:disabled {
-    border: @checkbox-indicator-border-width-disabled solid @border-color-disabled;
+    border: @checkbox-indicator-border-width solid @border-color-disabled;
     background-color: @checkbox-indicator-bg-color-disabled;
 }
 

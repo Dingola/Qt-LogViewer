@@ -378,6 +378,7 @@ auto MainWindow::setup_filter_bar() -> void
     QVector<QString> available_log_levels = m_controller->get_available_log_levels({});
     ui->logFilterBarWidget->setContentsMargins(0, 0, 0, 0);
     ui->logFilterBarWidget->set_filter_widget_visible(false);
+    ui->logFilterBarWidget->set_search_bar_enabled(false);
     ui->logFilterBarWidget->set_available_log_levels(available_log_levels);
     connect(ui->logFilterBarWidget, &LogFilterBarWidget::app_filter_changed, this,
             [this](const QString& app_name) {
@@ -420,6 +421,7 @@ auto MainWindow::setup_tab_widget() -> void
         Q_UNUSED(index);
 
         LogViewWidget* log_view_widget = ui->tabWidgetLog->current_log_view();
+        ui->logFilterBarWidget->set_search_bar_enabled(log_view_widget != nullptr);
         ui->paginationWidget->setVisible(log_view_widget != nullptr);
 
         if (log_view_widget != nullptr)
