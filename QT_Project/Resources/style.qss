@@ -205,6 +205,28 @@
     @start-page-item-font-size: 12pt;
     @start-page-item-font-weight: 500;
 
+    /* LogImportWidget */
+    @log-import-group-box-margin-top: 10px;
+    @log-import-group-box-padding: 12px;
+    @log-import-group-box-border-width: 1px;
+    @log-import-group-box-border-radius: 8px;
+    @log-import-group-box-title-left: 10px;
+    @log-import-group-box-title-padding: 0px 4px;
+    @log-import-field-button-min-height: 18px;
+    @log-import-field-button-max-height: 22px;
+    @log-import-field-button-padding: 2px 7px;
+    @log-import-field-button-border-radius: 11px;
+    @log-import-field-button-font-size: 10pt;
+    @log-import-field-button-font-weight: 700;
+    @log-import-hint-padding: 6px 8px;
+    @log-import-hint-border-radius: 6px;
+    @log-import-action-button-min-width: 72px;
+    @log-import-action-button-min-height: 22px;
+    @log-import-action-button-padding: 4px 12px;
+    @log-import-action-button-font-size: 12pt;
+    @log-import-action-button-font-weight: 600;
+    @log-import-preview-splitter-spacing: 6px;
+
     /* LogViewWidget */
     @log-view-tool-button-min-width: 80;
     @log-view-tool-button-max-width: 160;
@@ -233,6 +255,7 @@
     /* PieChart */
     @pie-chart-bg-color: @Neutral-3;
     @pie-chart-empty-ring-color: @Neutral-5;
+    @pie-chart-max-height: 200px;
 
     /* LogLevelRowsWidget */
     @log-level-rows-border-radius: 8;
@@ -246,11 +269,11 @@
     @log-level-color-square-border-radius: 3;
 
     /* LogFilterBarWidget */
-    @log-filter-bar-border-width: 1;
+    @log-filter-bar-border-width: 1px;
     @log-filter-bar-border-radius: 8;
 
     /* LogFilterWidget */
-    @log-filter-level-bar-border-width: 1;
+    @log-filter-level-bar-border-width: 1px;
     @log-filter-level-bar-border-radius: 8;
 
     /* LogLevelFilterItemWidget */
@@ -259,7 +282,7 @@
     @log-level-filter-item-padding: 4px 4px;
     @log-level-filter-item-font-size: 11pt;
     @log-level-filter-item-font-weight: bold;
-    @log-level-filter-label-border-width: 1;
+    @log-level-filter-label-border-width: 1px;
     @log-level-filter-label-border-radius: 6;
     @log-level-filter-label-padding: 0px 6px;
     @log-level-filter-label-font-size: 8pt;
@@ -272,7 +295,7 @@
 
     /* Pagination Widget */
     @pagination-border-radius-bottom: 8;
-    @pagination-current-border-width: 2;
+    @pagination-current-border-width: 2px;
     @pagination-current-font-weight: bold;
     @pagination-line-edit-border-radius: 10;
     @pagination-controls-height: 26px;
@@ -476,6 +499,20 @@
     @start-page-item-bg-color-selected: @Brand-Accent-700;
     @start-page-item-border-color-hover: @Brand-Accent-500;
     @start-page-item-border-color-selected: @Brand-Accent-500;
+
+    /* LogImportWidget */
+    @log-import-bg-color: @dialog-bg-color;
+    @log-import-group-box-bg-color: @Neutral-3;
+    @log-import-group-box-border-color: @Neutral-12;
+    @log-import-field-button-bg-color: @Severity-WarningHover;
+    @log-import-field-button-bg-color-hover: @Severity-Warning;
+    @log-import-field-button-bg-color-pressed: @Severity-Warning;
+    @log-import-field-button-text-color: @Neutral-7;
+    @log-import-secondary-button-bg-color: @Neutral-5;
+    @log-import-secondary-button-bg-color-hover: @Neutral-12;
+    @log-import-secondary-button-bg-color-pressed: @Neutral-3;
+    @log-import-secondary-button-border-color: @Neutral-12;
+    @log-import-validation-bg-color: @Brand-Accent-900;
 
     /* LogViewWidget */
     @log-view-bg-color: @Neutral-3;
@@ -718,6 +755,20 @@
     @start-page-item-border-color-hover: @Brand-Accent-200;
     @start-page-item-border-color-selected: @Brand-Accent-300;
 
+    /* LogImportWidget */
+    @log-import-bg-color: @dialog-bg-color;
+    @log-import-group-box-bg-color: @Neutral-6;
+    @log-import-group-box-border-color: @Neutral-21;
+    @log-import-field-button-bg-color: @Severity-WarningHover;
+    @log-import-field-button-bg-color-hover: @Severity-Warning;
+    @log-import-field-button-bg-color-pressed: @Severity-Warning;
+    @log-import-field-button-text-color: @Neutral-7;
+    @log-import-secondary-button-bg-color: @Neutral-17;
+    @log-import-secondary-button-bg-color-hover: @Neutral-19;
+    @log-import-secondary-button-bg-color-pressed: @Neutral-21;
+    @log-import-secondary-button-border-color: @Neutral-21;
+    @log-import-validation-bg-color: @Brand-Accent-100;
+
     /* LogViewWidget */
     @log-view-bg-color: @Neutral-19;
     @log-view-tool-button-bg-color: @tool-button-bg-color;
@@ -819,11 +870,11 @@ QWidget {
     max-height: 24px;
     padding: 2px;
     border-radius: 6px;
-    background: @ColorButtonBackground;
+    background: @button-bg-color;
 }
 
 #DialogHeaderCloseButton:hover {
-    background: @ColorButtonBackgroundHover;
+    background: @button-bg-color-hover;
 }
 
 #DialogContent {
@@ -1088,7 +1139,9 @@ QTableView {
     color: @table-text-color;
     selection-background-color: @table-selection-bg-color;
     selection-color: @table-text-color;
+}
 
+TableView {
     qproperty-hover_row_color: @table-hover-row-color;
 }
 
@@ -1519,6 +1572,116 @@ StartPageWidget QListView::item:!selected:focus {
     color: @start-page-item-text-color;
 }
 
+/* --- LogImportWidget ------------------------------------------------------ */
+LogImportWidget {
+    background-color: @log-import-bg-color;
+}
+
+LogImportWidget QScrollArea#importScrollArea,
+LogImportWidget QWidget#importScrollContent {
+    background-color: @log-import-bg-color;
+}
+
+LogImportWidget QGroupBox {
+    margin-top: @log-import-group-box-margin-top;
+    padding: @log-import-group-box-padding;
+    border: @log-import-group-box-border-width solid @log-import-group-box-border-color;
+    border-radius: @log-import-group-box-border-radius;
+    background-color: @log-import-group-box-bg-color;
+}
+
+LogImportWidget QGroupBox::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top left;
+    left: @log-import-group-box-title-left;
+    padding: @log-import-group-box-title-padding;
+    background-color: @log-import-group-box-bg-color;
+    color: @text-color-primary;
+    font-weight: bold;
+}
+
+LogImportWidget QLabel[variant="profile-mode"] {
+    background-color: transparent;
+    color: @Severity-Info;
+    font-weight: 600;
+}
+
+LogImportWidget QLabel#labelFieldHelp,
+LogImportWidget QLabel#labelPreviewSummary {
+    padding: @log-import-hint-padding;
+    border-radius: @log-import-hint-border-radius;
+    background-color: @button-bg-color-disabled;
+}
+
+LogImportWidget QLabel#labelValidation {
+    padding: @log-import-hint-padding;
+    border-radius: @log-import-hint-border-radius;
+    background-color: @log-import-validation-bg-color;
+}
+
+LogImportWidget QPushButton[variant="field-token"] {
+    min-height: @log-import-field-button-min-height;
+    max-height: @log-import-field-button-max-height;
+    padding: @log-import-field-button-padding;
+    border: none;
+    border-radius: @log-import-field-button-border-radius;
+    background-color: @log-import-field-button-bg-color;
+    color: @log-import-field-button-text-color;
+    font-size: @log-import-field-button-font-size;
+    font-weight: @log-import-field-button-font-weight;
+}
+
+LogImportWidget QPushButton[variant="field-token"]:hover {
+    background-color: @log-import-field-button-bg-color-hover;
+}
+
+LogImportWidget QPushButton[variant="field-token"]:pressed {
+    background-color: @log-import-field-button-bg-color-pressed;
+}
+
+LogImportWidget QPushButton[variant="field-token"]:disabled {
+    background-color: @button-bg-color-disabled;
+    color: @button-text-color-disabled;
+}
+
+LogImportWidget QPushButton[variant="dialog-action"] {
+    min-width: @log-import-action-button-min-width;
+    min-height: @log-import-action-button-min-height;
+    padding: @log-import-action-button-padding;
+    font-size: @log-import-action-button-font-size;
+    font-weight: @log-import-action-button-font-weight;
+}
+
+LogImportWidget QPushButton[actionRole="secondary"] {
+    border: 1px solid @log-import-secondary-button-border-color;
+    background-color: @log-import-secondary-button-bg-color;
+}
+
+LogImportWidget QPushButton[actionRole="secondary"]:hover {
+    background-color: @log-import-secondary-button-bg-color-hover;
+}
+
+LogImportWidget QPushButton[actionRole="secondary"]:pressed {
+    background-color: @log-import-secondary-button-bg-color-pressed;
+}
+
+LogImportWidget QPushButton[actionRole="primary"]:enabled {
+    border: 1px solid @Severity-DebugHover;
+    background-color: @Severity-Debug;
+    color: @Neutral-7;
+}
+
+LogImportWidget QPushButton[actionRole="primary"]:enabled:hover,
+LogImportWidget QPushButton[actionRole="primary"]:enabled:pressed {
+    background-color: @Severity-DebugHover;
+    color: @Neutral-6;
+}
+
+LogImportWidget QSplitter::handle:horizontal {
+    width: @log-import-preview-splitter-spacing;
+    background-color: @log-import-group-box-bg-color;
+}
+
 /* --- LogViewWidget -------------------------------------------------------- */
 LogViewWidget {
     background-color: @log-view-bg-color;
@@ -1648,14 +1811,14 @@ LogLevelPieChartWidget {
 /* --- LogFilterBarWidget --------------------------------------------------- */
 LogFilterBarWidget {
     background-color: @log-filter-bar-bg-color;
-    border: @log-filter-bar-border-widthpx solid transparent;
+    border: @log-filter-bar-border-width solid transparent;
     border-radius: @log-filter-bar-border-radius;
 }
 
 /* --- LogFilterWidget ------------------------------------------------------ */
 LogFilterWidget QWidget#logLevelBar {
     background-color: transparent;
-    border: @log-filter-level-bar-border-widthpx solid transparent;
+    border: @log-filter-level-bar-border-width solid transparent;
     border-radius: @log-filter-level-bar-border-radius;
 }
 
@@ -1675,7 +1838,7 @@ LogLevelFilterItemWidget QCheckBox:hover {
 
 LogLevelFilterItemWidget QLabel {
     background-color: @log-level-filter-bar-hover-bg-color;
-    border: @log-level-filter-label-border-widthpx solid @border-color-primary;
+    border: @log-level-filter-label-border-width solid @border-color-primary;
     border-radius: @log-level-filter-label-border-radius;
     padding: @log-level-filter-label-padding;
     font-weight: @log-level-filter-label-font-weight;
@@ -1719,13 +1882,13 @@ LogLevelFilterItemWidget QLabel {
 /* Active (current) page button */
 QToolButton[isCurrentPage="true"] {
     background-color: @pagination-current-bg-color;
-    border: @pagination-current-border-widthpx solid @pagination-current-border-color;
+    border: @pagination-current-border-width solid @pagination-current-border-color;
     color: @pagination-current-text-color;
     font-weight: @pagination-current-font-weight;
 }
 QToolButton[isCurrentPage="true"]:hover {
     background-color: @pagination-current-hover-bg-color;
-    border: @pagination-current-border-widthpx solid @pagination-current-border-color;
+    border: @pagination-current-border-width solid @pagination-current-border-color;
     color: @pagination-current-text-color;
 }
 
