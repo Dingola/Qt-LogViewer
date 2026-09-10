@@ -35,6 +35,7 @@
 */Docs/*
 
 # Directories
+**/_*/*
 **/_build*/*
 **/_deploy*/*
 **/install*/*
