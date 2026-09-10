@@ -1,13 +1,16 @@
 #pragma once
 
 #include <QByteArray>
+#include <QHash>
 #include <QList>
 #include <QObject>
 #include <QPointer>
+#include <QSize>
 
 class QAction;
 class QDockWidget;
 class QMainWindow;
+class QEvent;
 
 /**
  * @file DockController.h
@@ -59,9 +62,44 @@ class DockController: public QObject
          */
         auto set_docks_suspended(bool suspended) -> void;
 
+        /**
+         * @brief Restores preferred dock extents after QMainWindow handled a resize event.
+         * @param old_size Previous QMainWindow size.
+         * @param new_size New QMainWindow size.
+         */
+        auto handle_main_window_resize(const QSize& old_size, const QSize& new_size) -> void;
+
+        /**
+         * @brief Captures the currently visible dock layout as the preferred layout.
+         */
+        auto capture_current_sizes() -> void;
+
+    protected:
+        /**
+         * @brief Tracks user-selected dock sizes.
+         * @param watched Object receiving the event.
+         * @param event Event being delivered.
+         * @return The base QObject event-filter result.
+         */
+        bool eventFilter(QObject* watched, QEvent* event) override;
+
+    private:
+        /**
+         * @brief Applies remembered dock extents during the current layout pass.
+         * @param restore_width True to restore the preferred width of each dock.
+         * @param restore_height True to restore the preferred height of each dock.
+         * @return True if any dock extents were applied; false if no docks were visible or all
+         */
+        auto restore_preferred_sizes(bool restore_width, bool restore_height) -> bool;
+
     private:
         QMainWindow* m_main_window = nullptr;
         QList<QPointer<QDockWidget>> m_docks;
+        QHash<QDockWidget*, QSize> m_preferred_sizes;
+        QSize m_observed_main_window_size;
         QByteArray m_suspended_layout_state;
         bool m_docks_suspended = false;
+        bool m_applying_sizes = false;
+        bool m_main_window_resize_active = false;
+        quint64 m_resize_generation = 0;
 };

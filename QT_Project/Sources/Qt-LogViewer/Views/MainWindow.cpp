@@ -653,6 +653,11 @@ void MainWindow::resizeEvent(QResizeEvent* event)
 {
     QMainWindow::resizeEvent(event);
 
+    if (m_dock_controller != nullptr && event != nullptr)
+    {
+        m_dock_controller->handle_main_window_resize(event->oldSize(), event->size());
+    }
+
     if (ui != nullptr && ui->tabWidgetLog != nullptr)
     {
         ui->tabWidgetLog->auto_resize_current_columns();
@@ -689,6 +694,7 @@ auto MainWindow::changeEvent(QEvent* event) -> void
 void MainWindow::showEvent(QShowEvent* event)
 {
     AppMainWindow::showEvent(event);
+    m_dock_controller->capture_current_sizes();
     show_start_page_if_needed();
 }
 
