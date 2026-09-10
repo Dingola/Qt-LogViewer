@@ -140,6 +140,53 @@ TEST_F(LogModelTest, HeaderDataReturnsCorrectNames)
 }
 
 /**
+ * @brief Tests that a profile-specific schema limits and orders displayed columns.
+ */
+TEST_F(LogModelTest, DynamicColumnsDisplayOnlyConfiguredFields)
+{
+    const QVector<LogFieldDefinition> columns{
+        {LogField::Timestamp, "Timestamp", LogFieldValueType::Timestamp, false, false, true, true},
+        {LogField::Message, "Message", LogFieldValueType::Text, true, false, true, true}};
+    m_model.set_columns(columns);
+
+    const QDateTime timestamp = QDateTime::currentDateTime();
+    LogEntry entry(timestamp, "INFO", "Visible message", LogFileInfo("dummy.log", "HiddenApp"));
+    entry.set_parse_metadata(
+        "record", 1,
+        {{LogField::Timestamp, timestamp}, {LogField::Message, QStringLiteral("Visible message")}});
+    m_model.add_entry(entry);
+
+    EXPECT_EQ(m_model.columnCount(), 2);
+    EXPECT_EQ(m_model.get_column_field_id(0), LogField::Timestamp);
+    EXPECT_EQ(m_model.get_column_field_id(1), LogField::Message);
+    EXPECT_EQ(m_model.data(m_model.index(0, 1), Qt::DisplayRole).toString(), "Visible message");
+    EXPECT_EQ(m_model.find_column(LogField::Level), -1);
+}
+
+/**
+ * @brief Tests that custom parser fields can be appended and displayed.
+ */
+TEST_F(LogModelTest, AppendedCustomColumnDisplaysParsedValue)
+{
+    m_model.set_columns(
+        {{LogField::Message, "Message", LogFieldValueType::Text, true, false, true, true}});
+    m_model.append_columns(
+        {{"category", "Category", LogFieldValueType::Text, false, false, false, true},
+         {LogField::Message, "Message", LogFieldValueType::Text, true, false, true, true}});
+
+    LogEntry entry(QDateTime(), QString(), "Message", LogFileInfo("dummy.log", QString()));
+    entry.set_parse_metadata("record", 1,
+                             {{LogField::Message, QStringLiteral("Message")},
+                              {QStringLiteral("category"), QStringLiteral("network")}});
+    m_model.add_entry(entry);
+
+    ASSERT_EQ(m_model.columnCount(), 2);
+    EXPECT_EQ(m_model.headerData(1, Qt::Horizontal, Qt::DisplayRole).toString(), "Category");
+    EXPECT_EQ(m_model.data(m_model.index(0, 1), Qt::DisplayRole).toString(), "network");
+    EXPECT_FALSE(m_model.is_column_sortable(1));
+}
+
+/**
  * @brief Tests flags returns correct item flags.
  */
 TEST_F(LogModelTest, FlagsReturnsSelectableAndEnabled)

@@ -179,6 +179,37 @@ TEST_F(LogViewerControllerTest, PreviewsAndImportsWithSelectedProfile)
     EXPECT_EQ(imported_entries.first().get_app_name(), QStringLiteral("CustomApp"));
     EXPECT_EQ(imported_entries.first().get_parsed_field(QStringLiteral("request_id")).toString(),
               QStringLiteral("req-42"));
+
+    LogModel* imported_model = m_controller->get_log_model(imported_view_id);
+    ASSERT_NE(imported_model, nullptr);
+    ASSERT_EQ(imported_model->columnCount(), 4);
+    EXPECT_EQ(imported_model->get_column_field_id(0), LogField::Level);
+    EXPECT_EQ(imported_model->get_column_field_id(1), LogField::Message);
+    EXPECT_EQ(imported_model->get_column_field_id(2), LogField::AppName);
+    EXPECT_EQ(imported_model->get_column_field_id(3), QStringLiteral("request_id"));
+}
+
+/**
+ * @brief Verifies that a two-field profile creates a two-column view model.
+ */
+TEST_F(LogViewerControllerTest, UsesProfileFieldsAsViewColumns)
+{
+    QTemporaryFile* custom_file =
+        create_temp_file({QStringLiteral("2024-01-01 10:00:00|A timestamp and message only")});
+    ASSERT_NE(custom_file, nullptr);
+
+    const LogParsingProfile profile = LogParsingProfile::create_default(
+        QStringLiteral("{timestamp}|{message}"), QStringLiteral("Minimal"));
+    const QUuid imported_view_id = m_controller->load_log_file(custom_file->fileName(), profile);
+
+    ASSERT_FALSE(imported_view_id.isNull());
+    LogModel* imported_model = m_controller->get_log_model(imported_view_id);
+    ASSERT_NE(imported_model, nullptr);
+    ASSERT_EQ(imported_model->columnCount(), 2);
+    EXPECT_EQ(imported_model->get_column_field_id(0), LogField::Timestamp);
+    EXPECT_EQ(imported_model->get_column_field_id(1), LogField::Message);
+    EXPECT_EQ(imported_model->find_column(LogField::Level), -1);
+    EXPECT_EQ(imported_model->find_column(LogField::AppName), -1);
 }
 
 /**

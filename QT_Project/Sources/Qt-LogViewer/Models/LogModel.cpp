@@ -14,7 +14,18 @@
  *
  * Initializes an empty log model for use in Qt's model/view framework.
  */
-LogModel::LogModel(QObject* parent): QAbstractTableModel(parent) {}
+LogModel::LogModel(QObject* parent): QAbstractTableModel(parent)
+{
+    m_columns = {
+        {LogField::Timestamp, QStringLiteral("Timestamp"), LogFieldValueType::Timestamp, false,
+         false, true, true},
+        {LogField::Level, QStringLiteral("Level"), LogFieldValueType::Text, true, true, true, true},
+        {LogField::Message, QStringLiteral("Message"), LogFieldValueType::Text, true, false, true,
+         true},
+        {LogField::AppName, QStringLiteral("App Name"), LogFieldValueType::Text, true, true, true,
+         true},
+        {QString(), QString(), LogFieldValueType::Text, false, false, false, true}};
+}
 
 /**
  * @brief Returns the number of rows in the model.
@@ -49,7 +60,7 @@ auto LogModel::rowCount(const QModelIndex& parent) const -> int
 auto LogModel::columnCount(const QModelIndex& parent) const -> int
 {
     Q_UNUSED(parent);
-    return ColumnCount;
+    return m_columns.size();
 }
 
 /**
@@ -72,7 +83,9 @@ auto LogModel::data(const QModelIndex& index, int role) const -> QVariant
 
     const LogEntry& entry = m_entries.at(index.row());
 
-    if (role == Qt::ForegroundRole && index.column() == Level)
+    const QString field_id = get_column_field_id(index.column());
+
+    if (role == Qt::ForegroundRole && field_id == LogField::Level)
     {
         switch (map_log_level(entry.get_level()))
         {
@@ -102,21 +115,26 @@ auto LogModel::data(const QModelIndex& index, int role) const -> QVariant
 
     if (role == Qt::DisplayRole || role == Qt::EditRole)
     {
-        switch (index.column())
+        QVariant value = entry.get_parsed_field(field_id);
+
+        if (!value.isValid() && field_id == LogField::Timestamp)
         {
-        case Timestamp:
-            return entry.get_timestamp();
-        case Level:
-            return entry.get_level();
-        case Message:
-            return entry.get_message();
-        case AppName:
-            return entry.get_app_name();
-        case Spacer:
-            return {};
-        default:
-            return {};
+            value = entry.get_timestamp();
         }
+        else if (!value.isValid() && field_id == LogField::Level)
+        {
+            value = entry.get_level();
+        }
+        else if (!value.isValid() && field_id == LogField::Message)
+        {
+            value = entry.get_message();
+        }
+        else if (!value.isValid() && field_id == LogField::AppName)
+        {
+            value = entry.get_app_name();
+        }
+
+        return value;
     }
 
     switch (role)
@@ -151,21 +169,106 @@ auto LogModel::headerData(int section, Qt::Orientation orientation, int role) co
         return {};
     }
 
-    switch (section)
+    QVariant header;
+
+    if (section >= 0 && section < m_columns.size())
     {
-    case Timestamp:
-        return QStringLiteral("Timestamp");
-    case Level:
-        return QStringLiteral("Level");
-    case Message:
-        return QStringLiteral("Message");
-    case AppName:
-        return QStringLiteral("App Name");
-    case Spacer:
-        return {};
-    default:
-        return {};
+        header = m_columns.at(section).display_name;
     }
+
+    return header;
+}
+
+/**
+ * @brief Replaces the ordered table-column schema.
+ * @param columns Field definitions used for
+ * table data and headers.
+ */
+auto LogModel::set_columns(const QVector<LogFieldDefinition>& columns) -> void
+{
+    if (!columns.isEmpty())
+    {
+        beginResetModel();
+        m_columns = columns;
+        endResetModel();
+    }
+}
+
+/**
+ * @brief Adds fields not yet represented by the table schema.
+ * @param columns Ordered field
+ * definitions to merge.
+ */
+auto LogModel::append_columns(const QVector<LogFieldDefinition>& columns) -> void
+{
+    QVector<LogFieldDefinition> missing_columns;
+
+    for (const LogFieldDefinition& column: columns)
+    {
+        if (find_column(column.id) < 0)
+        {
+            missing_columns.append(column);
+        }
+    }
+
+    if (!missing_columns.isEmpty())
+    {
+        const int first_column = m_columns.size();
+        const int last_column = first_column + missing_columns.size() - 1;
+        beginInsertColumns(QModelIndex(), first_column, last_column);
+        m_columns += missing_columns;
+        endInsertColumns();
+    }
+}
+
+/**
+ * @brief Returns the stable field identifier for a table column.
+ * @param column Zero-based
+ * model column.
+ * @return Field identifier, or an empty string when the column is invalid.
+ */
+auto LogModel::get_column_field_id(int column) const -> QString
+{
+    QString field_id;
+
+    if (column >= 0 && column < m_columns.size())
+    {
+        field_id = m_columns.at(column).id;
+    }
+
+    return field_id;
+}
+
+/**
+ * @brief Finds the table column for a stable field identifier.
+ * @param field_id Stable parser
+ * or built-in field identifier.
+ * @return Zero-based column, or -1 when absent.
+ */
+auto LogModel::find_column(const QString& field_id) const -> int
+{
+    int result = -1;
+
+    for (int index = 0; index < m_columns.size() && result < 0; ++index)
+    {
+        if (!field_id.isEmpty() && m_columns.at(index).id == field_id)
+        {
+            result = index;
+        }
+    }
+
+    return result;
+}
+
+/**
+ * @brief Returns whether a column supports database sorting.
+ * @param column Zero-based model
+ * column.
+ * @return True when the field is sortable.
+ */
+auto LogModel::is_column_sortable(int column) const -> bool
+{
+    return column >= 0 && column < m_columns.size() && m_columns.at(column).sortable;
 }
 
 /**

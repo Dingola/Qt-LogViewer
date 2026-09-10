@@ -24,13 +24,81 @@
 #include "Qt-LogViewer/Services/LogHistoryService.h"
 #include "Qt-LogViewer/Services/LogLoader.h"
 #include "Qt-LogViewer/Services/LogLoadingService.h"
+#include "Qt-LogViewer/Services/LogParser.h"
 #include "Qt-LogViewer/Services/LogTailerService.h"
 
 namespace
 {
 /**
+ * @brief Creates display columns from the placeholders actually used by a profile.
+ * @param
+ * profile Parsing profile whose resolved field order is used.
+ * @return Ordered display
+ * definitions with database capabilities for built-in fields.
+ */
+[[nodiscard]] auto get_profile_columns(const LogParsingProfile& profile)
+    -> QVector<LogFieldDefinition>
+{
+    const LogParser parser(profile);
+    const QVector<QString> field_order = parser.get_field_order().fields;
+    const auto& configuration = parser.get_configuration();
+    const QVector<LogFieldDefinition>& builtins = get_builtin_log_field_definitions();
+    QVector<LogFieldDefinition> columns;
+
+    for (const QString& field_id: field_order)
+    {
+        LogFieldDefinition definition;
+        definition.id = field_id;
+        definition.display_name = field_id;
+
+        for (const LogFieldDefinition& builtin: builtins)
+        {
+            if (builtin.id == field_id)
+            {
+                definition = builtin;
+            }
+        }
+
+        for (const QtRecordParser::FieldConfiguration& configured_field: configuration.fields)
+        {
+            if (configured_field.id == field_id && !configured_field.display_name.isEmpty())
+            {
+                definition.display_name = configured_field.display_name;
+            }
+        }
+
+        if (definition.display_name == field_id)
+        {
+            definition.display_name.replace(QLatin1Char('_'), QLatin1Char(' '));
+
+            if (!definition.display_name.isEmpty())
+            {
+                definition.display_name[0] = definition.display_name.at(0).toUpper();
+            }
+        }
+
+        bool already_added = false;
+        for (const LogFieldDefinition& column: columns)
+        {
+            if (column.id == definition.id)
+            {
+                already_added = true;
+            }
+        }
+
+        if (!already_added)
+        {
+            columns.append(definition);
+        }
+    }
+
+    return columns;
+}
+
+/**
  * @brief Maps the current search-field selection to log field identifiers.
- * @param search_field Current search-field selection.
+ * @param
+ * search_field Current search-field selection.
  * @return Fields included in text searching.
  */
 [[nodiscard]] auto get_query_search_fields(SearchField search_field) -> QSet<QString>
@@ -1127,11 +1195,18 @@ auto LogViewerController::set_page_size(const QUuid& view_id, qsizetype page_siz
 auto LogViewerController::set_page_sort(const QUuid& view_id, int column,
                                         Qt::SortOrder order) -> bool
 {
+    bool sorted = false;
     LogQuery query = create_page_query(view_id);
-    query.sort_field = get_query_sort_field(column);
-    query.sort_order = order;
+    LogModel* model = get_log_model(view_id);
 
-    return set_page_query(view_id, query);
+    if (model != nullptr && model->is_column_sortable(column))
+    {
+        query.sort_field = model->get_column_field_id(column);
+        query.sort_order = order;
+        sorted = set_page_query(view_id, query);
+    }
+
+    return sorted;
 }
 
 /**
@@ -1935,7 +2010,24 @@ auto LogViewerController::remember_file_profile(const QUuid& view_id, const QStr
     if (!view_id.isNull() && !file_path.isEmpty())
     {
         const QString absolute_file_path = QFileInfo(file_path).absoluteFilePath();
+        const bool first_profile = !m_file_parsing_profiles.contains(view_id) ||
+                                   m_file_parsing_profiles.value(view_id).isEmpty();
         m_file_parsing_profiles[view_id].insert(absolute_file_path, profile);
+
+        LogModel* model = get_log_model(view_id);
+        if (model != nullptr)
+        {
+            const QVector<LogFieldDefinition> columns = get_profile_columns(profile);
+
+            if (first_profile)
+            {
+                model->set_columns(columns);
+            }
+            else
+            {
+                model->append_columns(columns);
+            }
+        }
     }
 }
 
@@ -1958,6 +2050,40 @@ auto LogViewerController::forget_file_profile(const QUuid& view_id,
         {
             m_file_parsing_profiles.erase(view_iterator);
         }
+    }
+
+    LogViewContext* context = get_view_context(view_id);
+    LogModel* model = get_log_model(view_id);
+
+    if (context != nullptr && model != nullptr && !context->get_loaded_files().isEmpty())
+    {
+        QVector<LogFieldDefinition> columns;
+
+        for (const LogFileInfo& file_info: context->get_loaded_files())
+        {
+            const QVector<LogFieldDefinition> file_columns =
+                get_profile_columns(get_file_profile(view_id, file_info.get_file_path()));
+
+            for (const LogFieldDefinition& file_column: file_columns)
+            {
+                bool already_added = false;
+
+                for (const LogFieldDefinition& column: columns)
+                {
+                    if (column.id == file_column.id)
+                    {
+                        already_added = true;
+                    }
+                }
+
+                if (!already_added)
+                {
+                    columns.append(file_column);
+                }
+            }
+        }
+
+        model->set_columns(columns);
     }
 }
 

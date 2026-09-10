@@ -41,28 +41,53 @@ LogTableView::LogTableView(QWidget* parent): TableView(parent)
  */
 auto LogTableView::auto_resize_columns() -> void
 {
-    bool valid_model = model() && model()->columnCount() >= 4;
+    const auto* log_model = qobject_cast<const LogModel*>(model());
+    const bool valid_model = log_model != nullptr && log_model->columnCount() > 0;
 
     if (valid_model)
     {
-        int total_width = viewport()->width();
-        int col_0_width = static_cast<int>(total_width * 0.15);
-        int col_1_width = static_cast<int>(total_width * 0.10);
-        int col_2_width = static_cast<int>(total_width * 0.50);
-        int col_3_width = static_cast<int>(total_width * 0.15);
+        const int total_width = viewport()->width();
+        QVector<double> weights;
+        double total_weight = 0.0;
 
-        setColumnWidth(LogModel::Timestamp, col_0_width);
-        setColumnWidth(LogModel::Level, col_1_width);
-        setColumnWidth(LogModel::Message, col_2_width);
-        setColumnWidth(LogModel::AppName, col_3_width);
+        for (int column = 0; column < log_model->columnCount(); ++column)
+        {
+            const QString field_id = log_model->get_column_field_id(column);
+            double weight = 1.5;
+
+            if (field_id == LogField::Timestamp)
+            {
+                weight = 2.0;
+            }
+            else if (field_id == LogField::Level)
+            {
+                weight = 1.0;
+            }
+            else if (field_id == LogField::Message)
+            {
+                weight = 5.0;
+            }
+            else if (field_id == LogField::AppName)
+            {
+                weight = 1.5;
+            }
+
+            weights.append(weight);
+            total_weight += weight;
+        }
+
+        for (int column = 0; column < weights.size(); ++column)
+        {
+            setColumnWidth(column,
+                           static_cast<int>(total_width * weights.at(column) / total_weight));
+        }
 #ifdef QT_DEBUG_VERBOSE
-        qDebug() << "Resizing columns to widths:" << col_0_width << col_1_width << col_2_width
-                 << col_3_width;
+        qDebug() << "Resized" << weights.size() << "dynamic log columns";
 #endif
     }
     else
     {
-        qWarning() << "Table model invalid or has too few columns!";
+        qWarning() << "Table model invalid or has no columns!";
     }
 }
 
@@ -72,15 +97,32 @@ auto LogTableView::auto_resize_columns() -> void
  */
 void LogTableView::setModel(QAbstractItemModel* model)
 {
+    if (this->model() != nullptr)
+    {
+        disconnect(this->model(), nullptr, this, nullptr);
+    }
+
     TableView::setModel(model);
 
-    auto* header = horizontalHeader();
-    int column_count = this->model()->columnCount();
+    const auto configure_header = [this]() {
+        auto* header = horizontalHeader();
+        const int column_count = this->model() != nullptr ? this->model()->columnCount() : 0;
 
-    for (int i = 0; i < column_count; ++i)
+        for (int i = 0; i < column_count; ++i)
+        {
+            header->setSectionResizeMode(
+                i, ((i == (column_count - 1)) ? QHeaderView::Stretch : QHeaderView::Interactive));
+        }
+    };
+
+    configure_header();
+
+    if (model != nullptr)
     {
-        header->setSectionResizeMode(
-            i, ((i == (column_count - 1)) ? QHeaderView::Stretch : QHeaderView::Interactive));
+        connect(model, &QAbstractItemModel::columnsInserted, this,
+                [configure_header]() { configure_header(); });
+        connect(model, &QAbstractItemModel::modelReset, this,
+                [configure_header]() { configure_header(); });
     }
 }
 

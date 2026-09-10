@@ -57,27 +57,13 @@ constexpr auto k_untitled_session_text = QT_TRANSLATE_NOOP("MainWindow", "Untitl
 
 /**
  * @brief Maps a stable log field identifier to a table column.
+ * @param model Model containing the view-specific column schema.
  * @param field Stable field identifier.
- * @return LogModel column.
+ * @return Matching model column, or -1 when the field is not displayed.
  */
-[[nodiscard]] auto get_log_model_column(const QString& field) -> int
+[[nodiscard]] auto get_log_model_column(const LogModel* model, const QString& field) -> int
 {
-    int column = LogModel::Timestamp;
-
-    if (field == LogField::Level)
-    {
-        column = LogModel::Level;
-    }
-    else if (field == LogField::Message)
-    {
-        column = LogModel::Message;
-    }
-    else if (field == LogField::AppName)
-    {
-        column = LogModel::AppName;
-    }
-
-    return column;
+    return model != nullptr ? model->find_column(field) : -1;
 }
 }  // namespace
 
@@ -1160,7 +1146,13 @@ auto MainWindow::create_log_view_widget_for_view(const QUuid& view_id,
     {
         const bool blocked = header->blockSignals(true);
 
-        header->setSortIndicator(get_log_model_column(query.sort_field), query.sort_order);
+        const int sort_column = get_log_model_column(page_model, query.sort_field);
+        header->setSortIndicatorShown(sort_column >= 0);
+
+        if (sort_column >= 0)
+        {
+            header->setSortIndicator(sort_column, query.sort_order);
+        }
 
         header->blockSignals(blocked);
     }
@@ -1181,8 +1173,22 @@ auto MainWindow::create_log_view_widget_for_view(const QUuid& view_id,
     if (header != nullptr)
     {
         connect(header, &QHeaderView::sortIndicatorChanged, this,
-                [this, view_id](int column, Qt::SortOrder order) {
-                    m_controller->set_page_sort(view_id, column, order);
+                [this, view_id, page_model, header](int column, Qt::SortOrder order) {
+                    if (!m_controller->set_page_sort(view_id, column, order))
+                    {
+                        const LogQuery current_query = m_controller->create_page_query(view_id);
+                        const int current_column =
+                            get_log_model_column(page_model, current_query.sort_field);
+                        const bool blocked = header->blockSignals(true);
+                        header->setSortIndicatorShown(current_column >= 0);
+
+                        if (current_column >= 0)
+                        {
+                            header->setSortIndicator(current_column, current_query.sort_order);
+                        }
+
+                        header->blockSignals(blocked);
+                    }
                 });
     }
 

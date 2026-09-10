@@ -75,6 +75,38 @@ auto HoverRowDelegate::get_highlight_ranges(const QString& text,
 {
     QVector<QPair<int, int>> ranges;
     bool search_column = false;
+    QString field_id;
+    const auto* table_view = qobject_cast<const TableView*>(parent());
+
+    if (table_view != nullptr)
+    {
+        const auto* log_model = qobject_cast<const LogModel*>(table_view->model());
+
+        if (log_model != nullptr)
+        {
+            field_id = log_model->get_column_field_id(column);
+        }
+    }
+
+    if (field_id.isEmpty())
+    {
+        if (column == LogModel::Timestamp)
+        {
+            field_id = LogField::Timestamp;
+        }
+        else if (column == LogModel::Level)
+        {
+            field_id = LogField::Level;
+        }
+        else if (column == LogModel::Message)
+        {
+            field_id = LogField::Message;
+        }
+        else if (column == LogModel::AppName)
+        {
+            field_id = LogField::AppName;
+        }
+    }
 
     switch (m_search_field)
     {
@@ -83,15 +115,15 @@ auto HoverRowDelegate::get_highlight_ranges(const QString& text,
         break;
 
     case SearchField::Message:
-        search_column = column == LogModel::Message;
+        search_column = field_id == LogField::Message;
         break;
 
     case SearchField::Level:
-        search_column = column == LogModel::Level;
+        search_column = field_id == LogField::Level;
         break;
 
     case SearchField::AppName:
-        search_column = column == LogModel::AppName;
+        search_column = field_id == LogField::AppName;
         break;
 
     case SearchField::Count:
