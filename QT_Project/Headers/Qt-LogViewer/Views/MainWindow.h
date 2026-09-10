@@ -28,6 +28,7 @@ class MainWindow;
 
 class LogViewerSettings;
 class LogViewerController;
+class LogParsingProfile;
 class DockController;
 class MainMenuController;
 class SessionController;
@@ -169,8 +170,10 @@ class MainWindow: public QtWidgetsCommonLib::AppMainWindow
          * @brief Restores a single view from JSON.
          * @param session_id The session identifier.
          * @param view_obj The view JSON object.
+         * @param available_profiles Profiles loaded from the application settings.
          */
-        auto restore_view_from_json(const QString& session_id, const QJsonObject& view_obj) -> void;
+        auto restore_view_from_json(const QString& session_id, const QJsonObject& view_obj,
+                                    const QVector<LogParsingProfile>& available_profiles) -> void;
 
         /**
          * @brief Parses a SessionViewState from a JSON object.

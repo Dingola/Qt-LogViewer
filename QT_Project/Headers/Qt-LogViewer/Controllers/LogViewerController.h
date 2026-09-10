@@ -596,12 +596,17 @@ class LogViewerController: public QObject
 
         /**
          * @brief Imports a single view state for a specific session.
-         * @param session_id The session identifier for the tree model.
-         * @param state The view state to apply.
+         * @param session_id
+         * The session identifier for the tree model.
+         * @param state The view state to
+         * apply.
+         * @param available_profiles Profiles loaded from the application
+         * settings.
          * @return QUuid of the imported/ensured view.
          */
-        auto import_view_state_for_session(const QString& session_id,
-                                           const SessionViewState& state) -> QUuid;
+        auto import_view_state_for_session(
+            const QString& session_id, const SessionViewState& state,
+            const QVector<LogParsingProfile>& available_profiles = {}) -> QUuid;
 
         /**
          * @brief Enables or disables live tailing for a view.

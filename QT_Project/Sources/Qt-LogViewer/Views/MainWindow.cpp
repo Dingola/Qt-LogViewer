@@ -1019,11 +1019,21 @@ auto MainWindow::restore_session_from_json(const QString& session_id,
         }
 
         // Then restore views (tabs)
+        QString profile_error;
+        const QVector<LogParsingProfile> available_profiles =
+            m_log_viewer_settings->get_log_parsing_profiles(&profile_error);
+
+        if (!profile_error.isEmpty())
+        {
+            qWarning() << "Could not load parsing profiles while restoring session:"
+                       << profile_error;
+        }
+
         const QJsonArray views_array = obj.value(QStringLiteral("views")).toArray();
         for (const auto& v: views_array)
         {
             const QJsonObject view_obj = v.toObject();
-            restore_view_from_json(session_id, view_obj);
+            restore_view_from_json(session_id, view_obj, available_profiles);
         }
 
         m_session_controller->request_expand_session(session_id);
@@ -1041,13 +1051,16 @@ auto MainWindow::restore_session_from_json(const QString& session_id,
  * @brief Restores a single view from JSON.
  * @param session_id The session identifier.
  * @param view_obj The view JSON object.
+ * @param available_profiles Profiles loaded from the application settings.
  */
-auto MainWindow::restore_view_from_json(const QString& session_id,
-                                        const QJsonObject& view_obj) -> void
+auto MainWindow::restore_view_from_json(const QString& session_id, const QJsonObject& view_obj,
+                                        const QVector<LogParsingProfile>& available_profiles)
+    -> void
 {
     SessionViewState state = parse_view_state_from_json(view_obj);
 
-    const QUuid view_id = m_controller->import_view_state_for_session(session_id, state);
+    const QUuid view_id =
+        m_controller->import_view_state_for_session(session_id, state, available_profiles);
 
     LogViewWidget* log_view_widget = create_log_view_widget_for_view(view_id, state);
 
@@ -1088,6 +1101,13 @@ auto MainWindow::parse_view_state_from_json(const QJsonObject& view_obj) -> Sess
         if (!fp.isEmpty())
         {
             state.loaded_files.append(LogFileInfo(fp, an));
+
+            const QUuid profile_id(fobj.value(QStringLiteral("parsing_profile_id")).toString());
+
+            if (!profile_id.isNull())
+            {
+                state.file_parsing_profile_ids.insert(QFileInfo(fp).absoluteFilePath(), profile_id);
+            }
         }
     }
 

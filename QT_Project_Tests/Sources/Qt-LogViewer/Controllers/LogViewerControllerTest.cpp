@@ -1902,6 +1902,49 @@ TEST_F(LogViewerControllerTest, RestoresSessionViewWithoutDuplicatingEntries)
 }
 
 /**
+ * @brief Verifies that session restoration reapplies the parsing profile and its column schema.
+ */
+TEST_F(LogViewerControllerTest, RestoresSessionViewParsingProfile)
+{
+    QTemporaryFile* session_file =
+        create_temp_file({QStringLiteral("2024-01-01 12:00:00|Session message")});
+
+    ASSERT_NE(session_file, nullptr);
+
+    const LogParsingProfile profile = LogParsingProfile::create_default(
+        QStringLiteral("{timestamp}|{message}"), QStringLiteral("Minimal"));
+    const QString file_path = QFileInfo(session_file->fileName()).absoluteFilePath();
+
+    SessionViewState state;
+    state.id = QUuid::createUuid();
+    state.loaded_files = {LogFileInfo(file_path)};
+    state.file_parsing_profile_ids.insert(file_path, profile.get_id());
+    state.filters.live_tailing_enabled = false;
+
+    QSignalSpy loading_finished_spy(m_controller, &LogViewerController::loading_finished);
+
+    const QUuid view_id = m_controller->import_view_state_for_session(
+        QStringLiteral("test-session"), state, {profile});
+
+    ASSERT_FALSE(view_id.isNull());
+
+    LogModel* model = m_controller->get_log_model(view_id);
+
+    ASSERT_NE(model, nullptr);
+    ASSERT_EQ(model->columnCount(), 2);
+    EXPECT_EQ(model->get_column_field_id(0), LogField::Timestamp);
+    EXPECT_EQ(model->get_column_field_id(1), LogField::Message);
+
+    QTRY_COMPARE(loading_finished_spy.count(), 1);
+
+    const SessionViewState exported_state = m_controller->export_view_state(view_id);
+    const auto exported_profile_id = exported_state.file_parsing_profile_ids.constFind(file_path);
+
+    ASSERT_NE(exported_profile_id, exported_state.file_parsing_profile_ids.cend());
+    EXPECT_EQ(exported_profile_id.value(), profile.get_id());
+}
+
+/**
  * @brief Verifies that restored live tailing starts after the initial import completes.
  */
 TEST_F(LogViewerControllerTest, StartsRestoredLiveTailingAfterImport)

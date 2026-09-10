@@ -99,6 +99,51 @@ namespace
 }
 
 /**
+ * @brief Resolves the persisted profile identifier for a session file.
+ * @param state Restored
+ * view state containing optional per-file profile identifiers.
+ * @param file_path File whose
+ * parsing profile is requested.
+ * @param available_profiles Profiles loaded from the application
+ * settings.
+ * @param default_profile Profile used for sessions saved before profile persistence.
+
+ * * @return Matching application profile when available; otherwise the supplied default.
+ */
+[[nodiscard]] auto get_session_file_profile(const SessionViewState& state, const QString& file_path,
+                                            const QVector<LogParsingProfile>& available_profiles,
+                                            const LogParsingProfile& default_profile)
+    -> LogParsingProfile
+{
+    const QString absolute_file_path = QFileInfo(file_path).absoluteFilePath();
+    const auto profile_id = state.file_parsing_profile_ids.constFind(absolute_file_path);
+    LogParsingProfile profile = default_profile;
+
+    if (profile_id != state.file_parsing_profile_ids.cend())
+    {
+        bool profile_found = false;
+
+        for (const LogParsingProfile& available_profile: available_profiles)
+        {
+            if (available_profile.get_id() == profile_id.value())
+            {
+                profile = available_profile;
+                profile_found = true;
+            }
+        }
+
+        if (!profile_found)
+        {
+            qWarning().nospace() << "Could not resolve parsing profile "
+                                 << profile_id->toString(QUuid::WithoutBraces) << " for file=\""
+                                 << absolute_file_path << "\"; using the default profile.";
+        }
+    }
+
+    return profile;
+}
+
+/**
  * @brief Maps the current search-field selection to log field identifiers.
  * @param
  * search_field Current search-field selection.
@@ -1582,6 +1627,22 @@ auto LogViewerController::export_view_state(const QUuid& view_id) const -> Sessi
         state = m_views->export_view_state(view_id, *m_filters);
         state.filters.live_tailing_enabled = get_live_tailing_enabled(view_id);
 
+        const auto view_profiles = m_file_parsing_profiles.constFind(view_id);
+
+        if (view_profiles != m_file_parsing_profiles.cend())
+        {
+            for (const LogFileInfo& file_info: state.loaded_files)
+            {
+                const QString file_path = QFileInfo(file_info.get_file_path()).absoluteFilePath();
+                const auto profile = view_profiles->constFind(file_path);
+
+                if (profile != view_profiles->cend())
+                {
+                    state.file_parsing_profile_ids.insert(file_path, profile->get_id());
+                }
+            }
+        }
+
         const LogPageState* page_state = get_page_state(view_id);
 
         if (page_state != nullptr)
@@ -1688,8 +1749,9 @@ auto LogViewerController::import_view_state(const SessionViewState& state) -> QU
  * @param state The view state to apply.
  * @return QUuid of the imported/ensured view.
  */
-auto LogViewerController::import_view_state_for_session(const QString& session_id,
-                                                        const SessionViewState& state) -> QUuid
+auto LogViewerController::import_view_state_for_session(
+    const QString& session_id, const SessionViewState& state,
+    const QVector<LogParsingProfile>& available_profiles) -> QUuid
 {
     QUuid result;
 
@@ -1742,8 +1804,10 @@ auto LogViewerController::import_view_state_for_session(const QString& session_i
                 const QString path = lf.get_file_path();
                 if (!path.isEmpty())
                 {
+                    const LogParsingProfile profile = get_session_file_profile(
+                        state, path, available_profiles, m_default_profile);
                     ensure_view_models(result);
-                    enqueue_async(result, path);
+                    enqueue_async(result, path, profile);
                     try_start_next_async(1000);
                 }
             }

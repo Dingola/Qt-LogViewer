@@ -5,6 +5,7 @@
 
 #include "Qt-LogViewer/Controllers/SessionController.h"
 
+#include <QFileInfo>
 #include <QJsonArray>
 #include <QUuid>
 
@@ -627,8 +628,19 @@ auto SessionController::build_view_json(const QUuid& view_id) const -> QJsonObje
         for (const auto& lf: state.loaded_files)
         {
             QJsonObject fobj;
-            fobj.insert(QStringLiteral("file_path"), lf.get_file_path());
+            const QString file_path = lf.get_file_path();
+            fobj.insert(QStringLiteral("file_path"), file_path);
             fobj.insert(QStringLiteral("app_name"), lf.get_app_name());
+
+            const QString absolute_file_path = QFileInfo(file_path).absoluteFilePath();
+            const auto profile_id = state.file_parsing_profile_ids.constFind(absolute_file_path);
+
+            if (profile_id != state.file_parsing_profile_ids.cend())
+            {
+                fobj.insert(QStringLiteral("parsing_profile_id"),
+                            profile_id->toString(QUuid::WithoutBraces));
+            }
+
             files_arr.append(fobj);
         }
         view_obj.insert(QStringLiteral("loaded_files"), files_arr);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QDateTime>
+#include <QHash>
 #include <QList>
 #include <QObject>
 #include <QSet>
@@ -85,6 +86,8 @@ struct FilterState {
  * Fields:
  * - id: Stable QUuid of the view.
  * - loaded_files: Files associated with this view.
+ * - file_parsing_profile_ids: Parsing-profile identifier used for each file, keyed by absolute
+ *   path.
  * - filters: FilterCoordinator state snapshot for this view.
  * - page_size: Number of entries displayed per database page.
  * - current_page: Zero-based page index used by session persistence.
@@ -95,6 +98,7 @@ struct FilterState {
 struct SessionViewState {
         QUuid id;
         QList<LogFileInfo> loaded_files;
+        QHash<QString, QUuid> file_parsing_profile_ids;
         FilterState filters;
         int page_size{0};
         int current_page{0};
