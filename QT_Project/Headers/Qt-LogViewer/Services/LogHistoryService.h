@@ -35,6 +35,18 @@ class LogHistoryService final: public QObject
         explicit LogHistoryService(QObject* parent = nullptr);
 
         /**
+         * @brief Constructs the history service for a specific SQLite database.
+         *
+         * The connection is created and must be destroyed in the calling thread. Multiple
+         * service instances may use the same database path because each instance owns a uniquely
+         * named SQLite connection.
+         *
+         * @param database_path Absolute or relative path of the SQLite database file.
+         * @param parent Optional QObject parent.
+         */
+        explicit LogHistoryService(const QString& database_path, QObject* parent = nullptr);
+
+        /**
          * @brief Closes the SQLite database connection.
          */
         ~LogHistoryService() override;
@@ -120,9 +132,15 @@ class LogHistoryService final: public QObject
          */
         [[nodiscard]] auto get_database_path() const -> QString;
 
+        /**
+         * @brief Returns the standard application path for the history database.
+         * @return Absolute path of the default SQLite database file.
+         */
+        [[nodiscard]] static auto get_default_database_path() -> QString;
+
     private:
         /**
-         * @brief Opens the SQLite database and creates its schema.
+         * @brief Opens and configures the SQLite database and creates its schema.
          * @return True when initialization succeeds.
          */
         auto initialize_database() -> bool;

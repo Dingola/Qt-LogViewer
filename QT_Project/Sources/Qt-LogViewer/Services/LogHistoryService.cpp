@@ -449,14 +449,29 @@ auto bind_filter_values(QSqlQuery& query, const QList<QPair<QString, QVariant>>&
 }  // namespace
 
 /**
- * @brief Constructs the history service and initializes the SQLite database.
+ * @brief Constructs the history service for the standard application database.
  * @param parent Optional QObject parent.
  */
 LogHistoryService::LogHistoryService(QObject* parent)
+    : LogHistoryService(get_default_database_path(), parent)
+{}
+
+/**
+ * @brief Constructs the history service for a specific SQLite database.
+ *
+ * The connection is created and must be destroyed in the calling thread. Multiple service
+ * instances may use the same database path because every instance owns a uniquely named SQLite
+ * connection.
+ *
+ * @param database_path Absolute or relative path of the SQLite database file.
+ * @param parent Optional QObject parent.
+ */
+LogHistoryService::LogHistoryService(const QString& database_path, QObject* parent)
     : QObject(parent),
       m_connection_name(QStringLiteral("qt_log_viewer_history_%1")
                             .arg(QUuid::createUuid().toString(QUuid::WithoutBraces))),
-      m_database_path(),
+      m_database_path(database_path.isEmpty() ? QString()
+                                              : QFileInfo(database_path).absoluteFilePath()),
       m_is_available(false)
 {
     m_is_available = initialize_database();
@@ -891,34 +906,48 @@ auto LogHistoryService::get_database_path() const -> QString
 }
 
 /**
- * @brief Opens the SQLite database and creates its schema.
+ * @brief Returns the standard application path for the history database.
+ * @return Absolute path of the default SQLite database file.
+ */
+auto LogHistoryService::get_default_database_path() -> QString
+{
+    const QString config_path = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
+    const QString history_path = QDir(config_path).filePath(QStringLiteral("history"));
+    return QFileInfo(QDir(history_path).filePath(QStringLiteral("log_history.sqlite")))
+        .absoluteFilePath();
+}
+
+/**
+ * @brief Opens and configures the SQLite database and creates its schema.
  * @return True when initialization succeeds.
  */
 auto LogHistoryService::initialize_database() -> bool
 {
     bool initialized = false;
+    const QFileInfo database_info(m_database_path);
 
-    const QString config_path = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
-    const QString history_path = QDir(config_path).filePath(QStringLiteral("history"));
-
-    if (QDir().mkpath(history_path))
+    if (!m_database_path.isEmpty() && QDir().mkpath(database_info.absolutePath()))
     {
-        m_database_path = QDir(history_path).filePath(QStringLiteral("log_history.sqlite"));
-
         QSqlDatabase database =
             QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), m_connection_name);
 
         database.setDatabaseName(m_database_path);
-        database.setConnectOptions(QStringLiteral("QSQLITE_ENABLE_REGEXP"));
+        database.setConnectOptions(
+            QStringLiteral("QSQLITE_ENABLE_REGEXP;QSQLITE_BUSY_TIMEOUT=5000"));
 
         if (database.open())
         {
-            initialized = create_schema();
-        }
+            QSqlQuery configuration_query(database);
+            const bool busy_timeout_configured =
+                configuration_query.exec(QStringLiteral("PRAGMA busy_timeout = 5000"));
+            const bool write_ahead_log_enabled =
+                busy_timeout_configured &&
+                configuration_query.exec(QStringLiteral("PRAGMA journal_mode = WAL"));
 
-        if (database.open())
-        {
-            initialized = create_schema();
+            if (write_ahead_log_enabled)
+            {
+                initialized = create_schema();
+            }
         }
     }
 

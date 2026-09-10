@@ -28,6 +28,26 @@ void LogHistoryServiceTest::TearDown()
 }
 
 /**
+ * @brief Verifies that separate service connections can share one history database.
+ */
+TEST_F(LogHistoryServiceTest, SharesDatabaseAcrossServiceConnections)
+{
+    LogHistoryService second_connection(m_history_service->get_database_path());
+    ASSERT_TRUE(second_connection.is_available());
+
+    ASSERT_TRUE(m_history_service->add_entries(
+        m_view_id, {create_entry(QStringLiteral("first"), QStringLiteral("first.log"))}));
+
+    LogQuery query;
+    query.view_id = m_view_id;
+    EXPECT_EQ(second_connection.count_entries(query), 1);
+
+    ASSERT_TRUE(second_connection.add_entries(
+        m_view_id, {create_entry(QStringLiteral("second"), QStringLiteral("second.log"))}));
+    EXPECT_EQ(m_history_service->count_entries(query), 2);
+}
+
+/**
  * @brief Creates one deterministic test entry.
  * @param message Entry message.
  * @param file_path Source file path.
