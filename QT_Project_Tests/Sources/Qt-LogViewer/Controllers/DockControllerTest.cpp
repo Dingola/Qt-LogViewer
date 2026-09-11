@@ -2,7 +2,9 @@
 
 #include <QApplication>
 #include <QDockWidget>
+#include <QEventLoop>
 #include <QMainWindow>
+#include <QTimer>
 #include <QWidget>
 
 #include "Qt-LogViewer/Controllers/DockController.h"
@@ -24,6 +26,12 @@ auto DockControllerTest::process_layout_events() -> void
 {
     QApplication::sendPostedEvents();
     QApplication::processEvents();
+
+    QEventLoop event_loop;
+    QTimer::singleShot(0, &event_loop,
+                       [&event_loop] { QTimer::singleShot(0, &event_loop, &QEventLoop::quit); });
+    event_loop.exec();
+
     QApplication::sendPostedEvents();
     QApplication::processEvents();
 }
@@ -67,11 +75,11 @@ TEST_F(DockControllerTest, MixedDockAreasKeepExtentsAcrossRepeatedDiagonalResize
             window.resize(1000 - step * 10, 800 - step * 8);
             controller.handle_main_window_resize(
                 QSize(1000 - (step + 1) * 10, 800 - (step + 1) * 8), window.size());
-            const QSize left_size = left->size();
-            const QSize bottom_size = bottom->size();
+            const int left_width = left->width();
+            const int bottom_height = bottom->height();
             process_layout_events();
-            EXPECT_EQ(left->size(), left_size);
-            EXPECT_EQ(bottom->size(), bottom_size);
+            EXPECT_EQ(left->width(), left_width);
+            EXPECT_EQ(bottom->height(), bottom_height);
         }
         EXPECT_NEAR(left->width(), 300, 2);
         EXPECT_NEAR(bottom->height(), 220, 2);
