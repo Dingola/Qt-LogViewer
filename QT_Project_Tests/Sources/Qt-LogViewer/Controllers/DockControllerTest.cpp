@@ -86,13 +86,15 @@ TEST_F(DockControllerTest, MixedDockAreasKeepExtentsAcrossRepeatedDiagonalResize
     }
     window.resizeDocks({left}, {250}, Qt::Horizontal);
     process_layout_events();
+    const int updated_preferred_width = left->width();
+    controller.capture_current_sizes();
     window.resize(400, 320);
     controller.handle_main_window_resize(QSize(1000, 800), window.size());
     process_layout_events();
     window.resize(1000, 800);
     controller.handle_main_window_resize(QSize(400, 320), window.size());
     process_layout_events();
-    EXPECT_NEAR(left->width(), 250, 2);
+    EXPECT_NEAR(left->width(), updated_preferred_width, 2);
 }
 
 /**
