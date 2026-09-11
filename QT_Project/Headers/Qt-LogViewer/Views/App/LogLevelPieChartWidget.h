@@ -81,8 +81,7 @@ class LogLevelPieChartWidget: public QWidget
         [[nodiscard]] auto get_segment_gap_angle() const -> int;
 
         /**
-         * @brief Sets the gap angle (in degrees) between segments.
-         *        0 = no gap, 2-8 = small gap.
+         * @brief Sets the gap angle (in degrees) between segments. 0 = no gap, 2-8 = small gap.
          */
         auto set_segment_gap_angle(int degrees) -> void;
 

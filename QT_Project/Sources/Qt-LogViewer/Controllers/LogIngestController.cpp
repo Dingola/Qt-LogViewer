@@ -90,8 +90,7 @@ auto LogIngestController::preview_file(const QString& file_path, const LogParsin
 }
 
 /**
- * @brief Enqueues a file to be streamed for a specific view.
- *        Idempotent per `(view_id, file_path)`.
+ * @brief Enqueues a file to be streamed for a specific view. Idempotent per `(view_id, file_path)`.
  * @param view_id Target view id.
  * @param file_path Absolute file path to stream.
  */

@@ -793,8 +793,7 @@ auto PaginationWidget::onJumpToPage() -> void
 }
 
 /**
- * @brief Slot: Items per page changed.
- * Emits the items_per_page_changed signal with the new value.
+ * @brief Slot: Items per page changed. Emits the items_per_page_changed signal with the new value.
  */
 auto PaginationWidget::onItemsPerPageChanged(int index) -> void
 {

@@ -43,15 +43,13 @@ struct RecentListSchema {
 namespace RecentListSchemas
 {
 /**
- * @brief Create a schema for recent log files.
- *        Roles: file_path, file_name, app_name, last_opened.
+ * @brief Create a schema for recent log files. Roles: file_path, file_name, app_name, last_opened.
  * @return The recent files schema.
  */
 [[nodiscard]] auto make_recent_files_schema() -> RecentListSchema;
 
 /**
- * @brief Create a schema for recent sessions.
- *        Roles: name, last_opened, id.
+ * @brief Create a schema for recent sessions. Roles: name, last_opened, id.
  * @return The recent sessions schema.
  */
 [[nodiscard]] auto make_recent_sessions_schema() -> RecentListSchema;

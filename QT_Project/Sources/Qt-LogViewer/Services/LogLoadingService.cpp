@@ -14,8 +14,7 @@
 
 /**
  * @brief Constructs the LogLoadingService and wires loader signals.
- * @param profile Parsing
- * profile used by the loader.
+ * @param profile Parsing profile used by the loader.
  * @param parent Optional QObject parent.
  *
  * The loader receives
@@ -108,8 +107,7 @@ auto LogLoadingService::validate_file(const QString& file_path) const -> bool
 /**
  * @brief Loads a log file synchronously and returns parsed entries.
  *        Emits an error and returns an empty vector if validation fails.
- * @param file_path
- * Absolute file path to the log file.
+ * @param file_path Absolute file path to the log file.
  * @return Parsed entries, or an empty vector on validation failure.
  */
 auto LogLoadingService::load_log_file(const QString& file_path) -> QVector<LogEntry>
@@ -135,10 +133,8 @@ auto LogLoadingService::load_log_file(const QString& file_path) -> QVector<LogEn
 
 /**
  * @brief Loads a log file synchronously with an explicitly selected profile.
- * @param
- * file_path Absolute path of the log file.
- * @param profile Parsing profile selected for this
- * import.
+ * @param file_path Absolute path of the log file.
+ * @param profile Parsing profile selected for this import.
  * @return Parsed entries, or an empty vector when validation fails.
  */
 auto LogLoadingService::load_log_file(const QString& file_path,
@@ -187,13 +183,10 @@ auto LogLoadingService::read_first_log_entry(const QString& file_path) const -> 
 
 /**
  * @brief Parses a bounded file sample without changing loader state.
- * @param file_path
- * Absolute path of the file to preview.
+ * @param file_path Absolute path of the file to preview.
  * @param profile Parsing profile to evaluate.
- * @param
- * maximum_record_count Maximum number of non-empty records returned.
- * @return Parse outcomes in
- * source order, or an empty vector for an unreadable file.
+ * @param maximum_record_count Maximum number of non-empty records returned.
+ * @return Parse outcomes in source order, or an empty vector for an unreadable file.
  */
 auto LogLoadingService::preview_log_file(const QString& file_path, const LogParsingProfile& profile,
                                          qsizetype maximum_record_count) const
@@ -240,8 +233,7 @@ auto LogLoadingService::load_log_file_async(const QString& file_path, qsizetype 
 
 /**
  * @brief Starts asynchronous loading with an explicitly selected profile.
- * @param file_path
- * Absolute path of the log file.
+ * @param file_path Absolute path of the log file.
  * @param batch_size Number of entries per emitted batch.
  *
  * @param profile Parsing profile selected for this import.

@@ -77,8 +77,7 @@ class PieChart: public QWidget
         [[nodiscard]] auto get_segment_gap_angle() const -> int;
 
         /**
-         * @brief Sets the gap angle (in degrees) between segments.
-         *        0 = no gap, 2-8 = small gap.
+         * @brief Sets the gap angle (in degrees) between segments. 0 = no gap, 2-8 = small gap.
          *
          * Note: Gaps are only drawn when there are at least two non-zero slices.
          * If only a single slice is present (i.e., 100%), gaps are suppressed.
@@ -136,17 +135,14 @@ class PieChart: public QWidget
 
         /**
          * @brief Draws a single slice using outer and inner arcs.
-         * @param painter The
-         * QPainter to draw with.
+         * @param painter The QPainter to draw with.
          * @param center The center point of the chart.
          * @param outer_radius The outer radius of the chart.
          * @param inner_radius The inner radius of the chart.
          * @param start_angle_deg The starting angle (in degrees) of the slice.
          * @param sweep_angle_deg The sweep angle (in degrees) of the slice.
-         * @param
-         * gap_width The uniform distance between adjacent slice edges.
-         * @param segment
-         * The segment name for color selection.
+         * @param gap_width The uniform distance between adjacent slice edges.
+         * @param segment The segment name for color selection.
          */
         auto draw_slice(QPainter& painter, const QPointF& center, double outer_radius,
                         double inner_radius, double start_angle_deg, double sweep_angle_deg,

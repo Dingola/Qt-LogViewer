@@ -181,8 +181,7 @@ auto LogModel::headerData(int section, Qt::Orientation orientation, int role) co
 
 /**
  * @brief Replaces the ordered table-column schema.
- * @param columns Field definitions used for
- * table data and headers.
+ * @param columns Field definitions used for table data and headers.
  */
 auto LogModel::set_columns(const QVector<LogFieldDefinition>& columns) -> void
 {
@@ -196,8 +195,7 @@ auto LogModel::set_columns(const QVector<LogFieldDefinition>& columns) -> void
 
 /**
  * @brief Adds fields not yet represented by the table schema.
- * @param columns Ordered field
- * definitions to merge.
+ * @param columns Ordered field definitions to merge.
  */
 auto LogModel::append_columns(const QVector<LogFieldDefinition>& columns) -> void
 {
@@ -223,8 +221,7 @@ auto LogModel::append_columns(const QVector<LogFieldDefinition>& columns) -> voi
 
 /**
  * @brief Returns the stable field identifier for a table column.
- * @param column Zero-based
- * model column.
+ * @param column Zero-based model column.
  * @return Field identifier, or an empty string when the column is invalid.
  */
 auto LogModel::get_column_field_id(int column) const -> QString
@@ -241,8 +238,7 @@ auto LogModel::get_column_field_id(int column) const -> QString
 
 /**
  * @brief Finds the table column for a stable field identifier.
- * @param field_id Stable parser
- * or built-in field identifier.
+ * @param field_id Stable parser or built-in field identifier.
  * @return Zero-based column, or -1 when absent.
  */
 auto LogModel::find_column(const QString& field_id) const -> int
@@ -262,8 +258,7 @@ auto LogModel::find_column(const QString& field_id) const -> int
 
 /**
  * @brief Returns whether a column supports database sorting.
- * @param column Zero-based model
- * column.
+ * @param column Zero-based model column.
  * @return True when the field is sortable.
  */
 auto LogModel::is_column_sortable(int column) const -> bool

@@ -15,8 +15,7 @@
 
 /**
  * @brief Constructs a LogLoader object.
- * @param profile Parsing profile used for all loaded
- * records.
+ * @param profile Parsing profile used for all loaded records.
  * @param parent Optional QObject parent.
  *
  * All records use the supplied parsing
@@ -39,10 +38,8 @@ auto LogLoader::load_log_file(const QString& file_path) const -> QVector<LogEntr
 
 /**
  * @brief Loads and parses a single log file with an explicitly selected profile.
- * @param
- * file_path Path of the log file.
+ * @param file_path Path of the log file.
  * @param profile Parsing profile selected for this import.
- *
  * @return Parsed log entries.
  */
 auto LogLoader::load_log_file(const QString& file_path,
@@ -120,13 +117,10 @@ auto LogLoader::read_first_log_entry(const QString& file_path) const -> LogEntry
 
 /**
  * @brief Parses the first records of a file without starting an import.
- * @param file_path
- * Path of the file to preview.
+ * @param file_path Path of the file to preview.
  * @param profile Parsing profile to evaluate.
- * @param
- * maximum_record_count Maximum number of non-empty records to return.
- * @return Parse outcomes in
- * source order, including structured failures.
+ * @param maximum_record_count Maximum number of non-empty records to return.
+ * @return Parse outcomes in source order, including structured failures.
  */
 auto LogLoader::preview_log_file(const QString& file_path, const LogParsingProfile& profile,
                                  qsizetype maximum_record_count) const -> QVector<LogParseOutcome>
@@ -187,10 +181,8 @@ auto LogLoader::load_log_file_async(const QString& file_path, qsizetype batch_si
 
 /**
  * @brief Starts asynchronous loading with an explicitly selected parsing profile.
- * @param
- * file_path Path of the log file.
+ * @param file_path Path of the log file.
  * @param batch_size Number of entries per emitted batch.
- *
  * @param profile Parsing profile selected for this import.
  */
 auto LogLoader::load_log_file_async(const QString& file_path, qsizetype batch_size,

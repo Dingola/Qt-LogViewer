@@ -151,8 +151,7 @@ auto LogFilterBarWidget::set_search_bar_visible(bool visible) -> void
 
 /**
  * @brief Enables or disables interaction with the search bar area.
- * @param enabled True to
- * enable search controls, false to disable them.
+ * @param enabled True to enable search controls, false to disable them.
  */
 auto LogFilterBarWidget::set_search_bar_enabled(bool enabled) -> void
 {

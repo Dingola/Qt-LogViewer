@@ -273,8 +273,7 @@ TEST_F(FilesInViewMenuItemWidgetTest, IconColorSettersUpdateValues)
 }
 
 /**
- * @brief eventFilter returns false on hover/leave/press/release without
- * consuming.
+ * @brief eventFilter returns false on hover/leave/press/release without consuming.
  */
 TEST_F(FilesInViewMenuItemWidgetTest, EventFilterHoverPressReleaseReturnsFalse)
 {

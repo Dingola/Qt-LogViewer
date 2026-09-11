@@ -63,8 +63,7 @@ class LogHistoryService final: public QObject
          * @brief Counts archived entries matching a log query.
          *
          * @param log_query Query describing the requested result set.
-         * @return Number of matching entries, or zero when the query cannot be
-         * executed.
+         * @return Number of matching entries, or zero when the query cannot be executed.
          */
         [[nodiscard]] auto count_entries(const LogQuery& log_query) const -> qsizetype;
 

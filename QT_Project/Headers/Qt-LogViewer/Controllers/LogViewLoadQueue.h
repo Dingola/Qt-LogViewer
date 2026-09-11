@@ -48,13 +48,11 @@ class LogViewLoadQueue
         auto enqueue(const QUuid& view_id, const QString& file_path) -> void;
 
         /**
-         * @brief Enqueues a file together with the parsing profile selected for its
-         * import.
+         * @brief Enqueues a file together with the parsing profile selected for its import.
          * @param view_id Target view identifier.
-         * @param file_path
-         * Absolute file path.
+         * @param file_path Absolute file path.
          * @param profile Parsing profile used for this request.
- */
+         */
         auto enqueue(const QUuid& view_id, const QString& file_path,
                      const LogParsingProfile& profile) -> void;
 
@@ -134,16 +132,14 @@ class LogViewLoadQueue
          *
          * @param view_id Target view identifier.
          * @param file_path Absolute file path.
-
-         * * @param profile Optional profile overriding the loader default.
+         * @param profile Optional profile overriding the loader default.
          */
         auto enqueue_request(const QUuid& view_id, const QString& file_path,
                              std::optional<LogParsingProfile> profile) -> void;
 
         /**
          * @struct LoadRequest
-         * @brief Retains the target, source and optional
-         * profile of one queued import.
+         * @brief Retains the target, source and optional profile of one queued import.
          */
         struct LoadRequest {
                 /** View that receives parsed entries. */

@@ -207,8 +207,7 @@ class LogSortFilterProxyModel: public QSortFilterProxyModel
                                     const QModelIndex& source_right) const -> bool override;
 
         /**
-         * @brief Intercept data() calls to provide highlight ranges via
-         *        `HighlightRangesRole`.
+         * @brief Intercept data() calls to provide highlight ranges via `HighlightRangesRole`.
          *
          * Delegates should request `HighlightRangesRole` on the proxy index to obtain a
          * QVariantList of QVariantMap entries with keys "start" and "length".

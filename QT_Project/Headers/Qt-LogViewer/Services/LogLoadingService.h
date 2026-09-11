@@ -45,8 +45,7 @@ class LogLoadingService final: public QObject
         /**
          * @brief Constructs the LogLoadingService.
          * @param profile Parsing profile used by the loader.
-         * @param parent Optional
-         * QObject parent for ownership.
+         * @param parent Optional QObject parent for ownership.
          */
         explicit LogLoadingService(const LogParsingProfile& profile, QObject* parent = nullptr);
 
@@ -65,12 +64,9 @@ class LogLoadingService final: public QObject
 
         /**
          * @brief Loads a log file synchronously with an explicitly selected profile.
-
-         * * @param file_path Absolute path of the log file.
-         * @param profile Parsing
-         * profile selected for this import.
-         * @return Parsed entries, or an empty vector
-         * when validation fails.
+         * @param file_path Absolute path of the log file.
+         * @param profile Parsing profile selected for this import.
+         * @return Parsed entries, or an empty vector when validation fails.
          */
         [[nodiscard]] auto load_log_file(const QString& file_path,
                                          const LogParsingProfile& profile) -> QVector<LogEntry>;
@@ -87,12 +83,9 @@ class LogLoadingService final: public QObject
          * @brief Parses a bounded file sample without changing loader state.
          *
          * @param file_path Absolute path of the file to preview.
-         * @param profile Parsing
-         * profile to evaluate.
-         * @param maximum_record_count Maximum number of non-empty
-         * records returned.
-         * @return Parse outcomes in source order, or an empty vector
-         * for an unreadable file.
+         * @param profile Parsing profile to evaluate.
+         * @param maximum_record_count Maximum number of non-empty records returned.
+         * @return Parse outcomes in source order, or an empty vector for an unreadable file.
          */
         [[nodiscard]] auto preview_log_file(
             const QString& file_path, const LogParsingProfile& profile,
@@ -108,12 +101,9 @@ class LogLoadingService final: public QObject
 
         /**
          * @brief Starts asynchronous loading with an explicitly selected profile.
-
-         * * @param file_path Absolute path of the log file.
-         * @param batch_size Number of
-         * entries per emitted batch.
-         * @param profile Parsing profile selected for this
-         * import.
+         * @param file_path Absolute path of the log file.
+         * @param batch_size Number of entries per emitted batch.
+         * @param profile Parsing profile selected for this import.
          */
         auto load_log_file_async(const QString& file_path, qsizetype batch_size,
                                  const LogParsingProfile& profile) -> void;

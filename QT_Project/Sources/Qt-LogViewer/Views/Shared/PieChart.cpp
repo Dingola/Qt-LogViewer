@@ -238,15 +238,13 @@ auto PieChart::draw_segments(QPainter& painter, const QPointF& center, double ou
 
 /**
  * @brief Draws a single slice using outer and inner arcs.
- * @param painter The QPainter to draw
- * with.
+ * @param painter The QPainter to draw with.
  * @param center The center point of the chart.
  * @param outer_radius The outer radius of the chart.
  * @param inner_radius The inner radius of the chart.
  * @param start_angle_deg The starting angle (in degrees) of the slice.
  * @param sweep_angle_deg The sweep angle (in degrees) of the slice.
- * @param gap_width The uniform
- * distance between adjacent slice edges.
+ * @param gap_width The uniform distance between adjacent slice edges.
  * @param segment The segment name for color selection.
  */
 auto PieChart::draw_slice(QPainter& painter, const QPointF& center, double outer_radius,

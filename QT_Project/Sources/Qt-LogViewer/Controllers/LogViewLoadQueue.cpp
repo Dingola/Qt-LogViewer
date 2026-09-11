@@ -26,11 +26,9 @@ auto LogViewLoadQueue::enqueue(const QUuid& view_id, const QString& file_path) -
 
 /**
  * @brief Enqueues a file together with the parsing profile selected for its import.
- * @param
- * view_id Target view identifier.
+ * @param view_id Target view identifier.
  * @param file_path Absolute file path.
- * @param profile Parsing
- * profile used for this request.
+ * @param profile Parsing profile used for this request.
  */
 auto LogViewLoadQueue::enqueue(const QUuid& view_id, const QString& file_path,
                                const LogParsingProfile& profile) -> void
@@ -40,11 +38,9 @@ auto LogViewLoadQueue::enqueue(const QUuid& view_id, const QString& file_path,
 
 /**
  * @brief Enqueues one request after applying duplicate suppression.
- * @param view_id Target
- * view identifier.
+ * @param view_id Target view identifier.
  * @param file_path Absolute file path.
- * @param profile Optional profile
- * overriding the loader default.
+ * @param profile Optional profile overriding the loader default.
  */
 auto LogViewLoadQueue::enqueue_request(const QUuid& view_id, const QString& file_path,
                                        std::optional<LogParsingProfile> profile) -> void
@@ -258,8 +254,7 @@ auto LogViewLoadQueue::get_active_batch_size() const -> qsizetype
 
 /**
  * @brief Returns the parsing profile assigned to the active stream.
- * @return Active profile,
- * or no value when idle or using the loader default.
+ * @return Active profile, or no value when idle or using the loader default.
  */
 auto LogViewLoadQueue::get_active_profile() const -> std::optional<LogParsingProfile>
 {

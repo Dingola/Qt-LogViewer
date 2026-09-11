@@ -34,10 +34,8 @@ namespace
 {
 /**
  * @brief Creates display columns from the placeholders actually used by a profile.
- * @param
- * profile Parsing profile whose resolved field order is used.
- * @return Ordered display
- * definitions with database capabilities for built-in fields.
+ * @param profile Parsing profile whose resolved field order is used.
+ * @return Ordered display definitions with database capabilities for built-in fields.
  */
 [[nodiscard]] auto get_profile_columns(const LogParsingProfile& profile)
     -> QVector<LogFieldDefinition>
@@ -100,15 +98,11 @@ namespace
 
 /**
  * @brief Resolves the persisted profile identifier for a session file.
- * @param state Restored
- * view state containing optional per-file profile identifiers.
- * @param file_path File whose
- * parsing profile is requested.
- * @param available_profiles Profiles loaded from the application
- * settings.
+ * @param state Restored view state containing optional per-file profile identifiers.
+ * @param file_path File whose parsing profile is requested.
+ * @param available_profiles Profiles loaded from the application settings.
  * @param default_profile Profile used for sessions saved before profile persistence.
-
- * * @return Matching application profile when available; otherwise the supplied default.
+ * @return Matching application profile when available; otherwise the supplied default.
  */
 [[nodiscard]] auto get_session_file_profile(const SessionViewState& state, const QString& file_path,
                                             const QVector<LogParsingProfile>& available_profiles,
@@ -145,8 +139,7 @@ namespace
 
 /**
  * @brief Maps the current search-field selection to log field identifiers.
- * @param
- * search_field Current search-field selection.
+ * @param search_field Current search-field selection.
  * @return Fields included in text searching.
  */
 [[nodiscard]] auto get_query_search_fields(SearchField search_field) -> QSet<QString>
@@ -240,8 +233,7 @@ namespace
 
 /**
  * @brief Constructs a LogViewerController.
- * @param profile Parsing profile used for ingest
- * and live tailing.
+ * @param profile Parsing profile used for ingest and live tailing.
  * @param parent Optional parent QObject.
  *
  * Ingest and live-tailing
@@ -639,10 +631,8 @@ auto LogViewerController::load_log_file(const QString& file_path) -> QUuid
 
 /**
  * @brief Loads a single log file into a new view with a selected parsing profile.
- * @param
- * file_path Path of the log file.
+ * @param file_path Path of the log file.
  * @param profile Parsing profile selected for this import.
- *
  * @return Identifier of the created view, or a null identifier when loading fails.
  */
 auto LogViewerController::load_log_file(const QString& file_path,
@@ -712,13 +702,10 @@ auto LogViewerController::load_log_file(const QUuid& view_id, const QString& fil
 
 /**
  * @brief Loads a log file into an existing view with a selected parsing profile.
- * @param
- * view_id Target view identifier.
+ * @param view_id Target view identifier.
  * @param file_path Path of the log file.
- * @param profile
- * Parsing profile selected for this import.
- * @return True when the file was loaded and registered
- * successfully.
+ * @param profile Parsing profile selected for this import.
+ * @return True when the file was loaded and registered successfully.
  */
 auto LogViewerController::load_log_file(const QUuid& view_id, const QString& file_path,
                                         const LogParsingProfile& profile) -> bool
@@ -792,11 +779,9 @@ auto LogViewerController::load_log_files(const QVector<QString>& file_paths) -> 
 
 /**
  * @brief Loads multiple log files into a new view with one selected profile.
- * @param
- * file_paths Paths of the log files.
+ * @param file_paths Paths of the log files.
  * @param profile Parsing profile selected for these imports.
-
- * * @return Identifier of the created view, or a null identifier when loading fails.
+ * @return Identifier of the created view, or a null identifier when loading fails.
  */
 auto LogViewerController::load_log_files(const QVector<QString>& file_paths,
                                          const LogParsingProfile& profile) -> QUuid
@@ -879,13 +864,10 @@ auto LogViewerController::load_log_files(const QVector<QString>& file_paths,
 
 /**
  * @brief Parses a bounded file sample without importing or registering the file.
- * @param
- * file_path Path of the file to preview.
+ * @param file_path Path of the file to preview.
  * @param profile Parsing profile to evaluate.
- * @param
- * maximum_record_count Maximum number of non-empty records returned.
- * @return Parse outcomes in
- * source order, including structured failures.
+ * @param maximum_record_count Maximum number of non-empty records returned.
+ * @return Parse outcomes in source order, including structured failures.
  */
 auto LogViewerController::preview_log_file(
     const QString& file_path, const LogParsingProfile& profile,
@@ -908,13 +890,10 @@ auto LogViewerController::load_log_file_async(const QString& file_path,
 
 /**
  * @brief Streams a log file into a new view with a selected parsing profile.
- * @param
- * file_path Path of the log file.
- * @param profile Parsing profile selected for this import and
- * subsequent live tailing.
+ * @param file_path Path of the log file.
+ * @param profile Parsing profile selected for this import and subsequent live tailing.
  * @param batch_size Number of entries per emitted batch.
- * @return
- * Identifier of the created view.
+ * @return Identifier of the created view.
  */
 auto LogViewerController::load_log_file_async(const QString& file_path,
                                               const LogParsingProfile& profile,
@@ -953,13 +932,10 @@ auto LogViewerController::load_log_file_async(const QUuid& view_id, const QStrin
 
 /**
  * @brief Streams a log file into an existing view with a selected parsing profile.
- * @param
- * view_id Target view identifier.
+ * @param view_id Target view identifier.
  * @param file_path Path of the log file.
- * @param profile
- * Parsing profile selected for this import and subsequent live tailing.
- * @param batch_size Number
- * of entries per emitted batch.
+ * @param profile Parsing profile selected for this import and subsequent live tailing.
+ * @param batch_size Number of entries per emitted batch.
  * @return True when the file was enqueued successfully.
  */
 auto LogViewerController::load_log_file_async(const QUuid& view_id, const QString& file_path,
@@ -1000,13 +976,10 @@ auto LogViewerController::load_log_files_async(const QVector<QString>& file_path
 
 /**
  * @brief Streams multiple files into a new view with one selected parsing profile.
- * @param
- * file_paths Paths of the log files.
- * @param profile Parsing profile selected for these imports
- * and live tailing.
+ * @param file_paths Paths of the log files.
+ * @param profile Parsing profile selected for these imports and live tailing.
  * @param batch_size Number of entries per emitted batch.
- * @return Identifier
- * of the created view, or a null identifier for an empty request.
+ * @return Identifier of the created view, or a null identifier for an empty request.
  */
 auto LogViewerController::load_log_files_async(const QVector<QString>& file_paths,
                                                const LogParsingProfile& profile,
@@ -1991,11 +1964,9 @@ auto LogViewerController::remove_log_file(const QUuid& view_id, const QString& f
 
 /**
  * @brief Queues one parsed batch for storage on the history writer thread.
- * @param view_id
- * View that owns the imported entries.
+ * @param view_id View that owns the imported entries.
  * @param file_path Imported source file.
- * @param entries
- * Parsed entries to store.
+ * @param entries Parsed entries to store.
  */
 auto LogViewerController::queue_history_batch(const QUuid& view_id, const QString& file_path,
                                               const QVector<LogEntry>& entries) -> void
@@ -2015,8 +1986,7 @@ auto LogViewerController::queue_history_batch(const QUuid& view_id, const QStrin
 
 /**
  * @brief Queues an import completion marker behind all preceding history batches.
- * @param
- * view_id View that owns the import.
+ * @param view_id View that owns the import.
  * @param file_path Imported source file.
  */
 auto LogViewerController::queue_history_finish(const QUuid& view_id,
@@ -2034,11 +2004,9 @@ auto LogViewerController::queue_history_finish(const QUuid& view_id,
 
 /**
  * @brief Handles completion of all queued history writes for one import.
- * @param view_id View
- * that owns the import.
+ * @param view_id View that owns the import.
  * @param file_path Imported source file.
- * @param succeeded True when
- * every history batch was committed.
+ * @param succeeded True when every history batch was committed.
  * @param error_message Storage error for a failed import.
  */
 auto LogViewerController::handle_history_write_finished(const QUuid& view_id,
@@ -2127,8 +2095,7 @@ auto LogViewerController::discard_queued_history(const QUuid& view_id,
 
 /**
  * @brief Enqueues an asynchronous load request for a log file.
- * @param view_id The QUuid of
- * the view to load into.
+ * @param view_id The QUuid of the view to load into.
  * @param file_path The path to the log file.
  */
 auto LogViewerController::enqueue_async(const QUuid& view_id, const QString& file_path) -> void
@@ -2138,11 +2105,9 @@ auto LogViewerController::enqueue_async(const QUuid& view_id, const QString& fil
 
 /**
  * @brief Enqueues an asynchronous load with an explicitly selected profile.
- * @param view_id
- * Target view identifier.
+ * @param view_id Target view identifier.
  * @param file_path Path of the log file.
- * @param profile Parsing
- * profile used by this request.
+ * @param profile Parsing profile used by this request.
  */
 auto LogViewerController::enqueue_async(const QUuid& view_id, const QString& file_path,
                                         const LogParsingProfile& profile) -> void
@@ -2153,11 +2118,9 @@ auto LogViewerController::enqueue_async(const QUuid& view_id, const QString& fil
 
 /**
  * @brief Retains the selected parsing profile for later live-tailing restarts.
- * @param
- * view_id View containing the imported file.
+ * @param view_id View containing the imported file.
  * @param file_path Imported file path.
- * @param
- * profile Parsing profile selected for the file.
+ * @param profile Parsing profile selected for the file.
  */
 auto LogViewerController::remember_file_profile(const QUuid& view_id, const QString& file_path,
                                                 const LogParsingProfile& profile) -> void
@@ -2188,8 +2151,7 @@ auto LogViewerController::remember_file_profile(const QUuid& view_id, const QStr
 
 /**
  * @brief Removes a retained profile when its file registration is removed.
- * @param view_id
- * View that contained the file.
+ * @param view_id View that contained the file.
  * @param file_path Removed file path.
  */
 auto LogViewerController::forget_file_profile(const QUuid& view_id,
@@ -2244,11 +2206,9 @@ auto LogViewerController::forget_file_profile(const QUuid& view_id,
 
 /**
  * @brief Returns the profile retained for a view/file registration.
- * @param view_id View
- * containing the file.
+ * @param view_id View containing the file.
  * @param file_path Registered file path.
- * @return Retained profile, or
- * the controller default when none was recorded.
+ * @return Retained profile, or the controller default when none was recorded.
  */
 auto LogViewerController::get_file_profile(const QUuid& view_id,
                                            const QString& file_path) const -> LogParsingProfile
