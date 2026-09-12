@@ -1251,6 +1251,8 @@ TEST_F(LogViewerControllerTest, StoresAsynchronousBatchesWithoutGrowingVisibleMo
 
     ASSERT_TRUE(m_controller->set_page_query(m_view_id, query));
 
+    QSignalSpy page_loaded_spy(m_controller, &LogViewerController::page_loaded);
+
     LogModel* model = m_controller->get_log_model(m_view_id);
 
     ASSERT_NE(model, nullptr);
@@ -1270,7 +1272,11 @@ TEST_F(LogViewerControllerTest, StoresAsynchronousBatchesWithoutGrowingVisibleMo
 
     EXPECT_EQ(model->rowCount(), 4);
 
+    EXPECT_EQ(page_loaded_spy.count(), 0);
+
     ASSERT_TRUE(m_controller->reload_page(m_view_id));
+
+    EXPECT_EQ(page_loaded_spy.count(), 1);
 
     const LogPageState* page_state = m_controller->get_page_state(m_view_id);
 
@@ -1282,6 +1288,47 @@ TEST_F(LogViewerControllerTest, StoresAsynchronousBatchesWithoutGrowingVisibleMo
     EXPECT_EQ(model->get_entry(0).get_message(), QStringLiteral("AsyncSecond"));
 
     EXPECT_EQ(model->get_entry(1).get_message(), QStringLiteral("AsyncFirst"));
+}
+
+/**
+ * @brief Verifies that changing the selected view does not redirect an active import.
+ */
+TEST_F(LogViewerControllerTest, KeepsAsynchronousImportBoundToItsViewAfterCurrentViewChanges)
+{
+    QTemporaryFile* background_file = create_large_temp_file(100);
+
+    ASSERT_NE(background_file, nullptr);
+
+    QSignalSpy loading_finished_spy(m_controller, &LogViewerController::loading_finished);
+
+    const QUuid background_view_id =
+        m_controller->load_log_file_async(background_file->fileName(), 1);
+
+    ASSERT_FALSE(background_view_id.isNull());
+    ASSERT_NE(background_view_id, m_view_id);
+    ASSERT_EQ(m_controller->get_current_view(), background_view_id);
+    ASSERT_TRUE(m_controller->set_page_query(background_view_id,
+                                             m_controller->create_page_query(background_view_id)));
+
+    ASSERT_TRUE(m_controller->set_current_view(m_view_id));
+
+    QTRY_COMPARE(loading_finished_spy.count(), 1);
+
+    EXPECT_EQ(m_controller->get_current_view(), m_view_id);
+    EXPECT_TRUE(m_controller->is_file_loaded(background_view_id, background_file->fileName()));
+    EXPECT_FALSE(m_controller->is_file_loaded(m_view_id, background_file->fileName()));
+
+    ASSERT_TRUE(m_controller->reload_page(background_view_id));
+
+    const LogPageState* background_page_state = m_controller->get_page_state(background_view_id);
+
+    ASSERT_NE(background_page_state, nullptr);
+    EXPECT_EQ(background_page_state->get_total_entries(), 100);
+
+    const LogPageState* current_page_state = m_controller->get_page_state(m_view_id);
+
+    ASSERT_NE(current_page_state, nullptr);
+    EXPECT_EQ(current_page_state->get_total_entries(), 4);
 }
 
 /**
@@ -2230,6 +2277,67 @@ TEST_F(LogViewerControllerTest, AppliesActiveFilterToTailedEntries)
 
     ASSERT_NE(page_state, nullptr);
     EXPECT_EQ(page_state->get_total_entries(), 6);
+}
+
+/**
+ * @brief Verifies that persisted zero-based page indexes restore the matching runtime page.
+ */
+TEST_F(LogViewerControllerTest, RestoresPersistedPagesOneThroughThree)
+{
+    QTemporaryFile* session_file =
+        create_temp_file({QStringLiteral("2024-01-01 12:01:00 INFO RestorePageEntry1 SessionApp"),
+                          QStringLiteral("2024-01-01 12:02:00 INFO RestorePageEntry2 SessionApp"),
+                          QStringLiteral("2024-01-01 12:03:00 INFO RestorePageEntry3 SessionApp"),
+                          QStringLiteral("2024-01-01 12:04:00 INFO RestorePageEntry4 SessionApp"),
+                          QStringLiteral("2024-01-01 12:05:00 INFO RestorePageEntry5 SessionApp"),
+                          QStringLiteral("2024-01-01 12:06:00 INFO RestorePageEntry6 SessionApp")});
+
+    ASSERT_NE(session_file, nullptr);
+
+    QSignalSpy loading_finished_spy(m_controller, &LogViewerController::loading_finished);
+
+    for (int persisted_page = 0; persisted_page < 3; ++persisted_page)
+    {
+        SCOPED_TRACE(QStringLiteral("persisted page index: %1").arg(persisted_page).toStdString());
+
+        SessionViewState state;
+        state.id = QUuid::createUuid();
+        state.loaded_files = {LogFileInfo(session_file->fileName(), QStringLiteral("SessionApp"))};
+        state.page_size = 2;
+        state.current_page = persisted_page;
+        state.filters.live_tailing_enabled = false;
+
+        const QUuid view_id =
+            m_controller->import_view_state_for_session(QStringLiteral("test-session"), state);
+
+        ASSERT_EQ(view_id, state.id);
+
+        QTRY_COMPARE(loading_finished_spy.count(), persisted_page + 1);
+
+        const LogQuery query = m_controller->create_page_query(view_id);
+
+        ASSERT_TRUE(m_controller->set_page_query(view_id, query));
+        ASSERT_TRUE(m_controller->set_page_size(view_id, state.page_size));
+        ASSERT_TRUE(m_controller->set_current_page(view_id, state.current_page + 1));
+
+        const LogPageState* page_state = m_controller->get_page_state(view_id);
+
+        ASSERT_NE(page_state, nullptr);
+        EXPECT_EQ(page_state->get_current_page(), persisted_page + 1);
+        EXPECT_EQ(page_state->get_page_size(), 2);
+        EXPECT_EQ(page_state->get_total_pages(), 3);
+
+        const SessionViewState exported_state = m_controller->export_view_state(view_id);
+
+        EXPECT_EQ(exported_state.current_page, persisted_page);
+
+        LogModel* model = m_controller->get_log_model(view_id);
+
+        ASSERT_NE(model, nullptr);
+        ASSERT_EQ(model->rowCount(), 2);
+        EXPECT_EQ(model->get_entry(0).get_message(),
+                  QStringLiteral("RestorePageEntry%1").arg(6 - (persisted_page * 2)));
+    }
 }
 
 /**
