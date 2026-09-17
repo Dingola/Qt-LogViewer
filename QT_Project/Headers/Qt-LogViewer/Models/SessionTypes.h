@@ -90,7 +90,7 @@ struct FilterState {
  *   path.
  * - filters: FilterCoordinator state snapshot for this view.
  * - page_size: Number of entries displayed per database page.
- * - current_page: Zero-based page index used by session persistence.
+ * - current_page: One-based page number used while the application is running.
  * - sort_column: LogModel column used for database sorting.
  * - sort_order: Sort order (ascending/descending).
  * - tab_title: Suggested title to use for the UI tab (e.g., first file name).
@@ -101,10 +101,25 @@ struct SessionViewState {
         QHash<QString, QUuid> file_parsing_profile_ids;
         FilterState filters;
         int page_size{0};
-        int current_page{0};
+        int current_page{1};
         int sort_column{0};
         Qt::SortOrder sort_order{Qt::AscendingOrder};
         QString tab_title;
+};
+
+/**
+ * @struct SessionState
+ * @brief Typed state of one persisted log-viewer session.
+ *
+ * JSON conversion is deliberately handled by SessionCodec so this data contract remains
+ * independent of its storage representation.
+ */
+struct SessionState {
+        int schema_version{1};
+        QString id;
+        QString name;
+        QVector<SessionViewState> views;
+        QList<LogFileInfo> explorer_files;
 };
 
 /**

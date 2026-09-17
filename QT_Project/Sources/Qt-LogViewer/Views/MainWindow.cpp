@@ -8,8 +8,6 @@
 #include <QFileInfo>
 #include <QHeaderView>
 #include <QIcon>
-#include <QJsonArray>
-#include <QJsonObject>
 #include <QMessageBox>
 #include <QMimeData>
 #include <QPlainTextEdit>
@@ -20,6 +18,7 @@
 #include <QTabWidget>
 #include <QTimer>
 #include <QUrl>
+#include <optional>
 
 #include "Qt-LogViewer/Controllers/DockController.h"
 #include "Qt-LogViewer/Controllers/LogViewerController.h"
@@ -888,10 +887,10 @@ auto MainWindow::handle_open_session(const QString& session_id) -> void
 {
     if (!session_id.isEmpty())
     {
-        const QJsonObject obj = m_session_controller->load_session(session_id);
-        if (!obj.isEmpty())
+        const std::optional<SessionState> state = m_session_controller->load_session(session_id);
+        if (state.has_value())
         {
-            restore_session_from_json(session_id, obj);
+            restore_session(*state);
         }
         else
         {
@@ -982,14 +981,12 @@ auto MainWindow::handle_reopen_last_session() -> void
 }
 
 /**
- * @brief Restores a session from JSON data.
- * @param session_id The session identifier.
- * @param obj The JSON object containing session data.
+ * @brief Restores a session from typed state.
+ * @param state The loaded session state.
  */
-auto MainWindow::restore_session_from_json(const QString& session_id,
-                                           const QJsonObject& obj) -> void
+auto MainWindow::restore_session(const SessionState& state) -> void
 {
-    if (!session_id.isEmpty() && !obj.isEmpty())
+    if (!state.id.isEmpty())
     {
         auto* central_stack = qobject_cast<QStackedWidget*>(this->centralWidget());
         if (central_stack != nullptr)
@@ -999,22 +996,12 @@ auto MainWindow::restore_session_from_json(const QString& session_id,
 
         close_all_tabs();
 
-        // First, restore explorer files (files that were only in the tree, not in views)
-        const QJsonArray explorer_files_array =
-            obj.value(QStringLiteral("explorer_files")).toArray();
-        for (const auto& f: explorer_files_array)
+        for (const LogFileInfo& file_info: state.explorer_files)
         {
-            const QJsonObject fobj = f.toObject();
-            const QString file_path = fobj.value(QStringLiteral("file_path")).toString();
-            const QString app_name = fobj.value(QStringLiteral("app_name")).toString();
-
-            if (!file_path.isEmpty())
+            auto* tree_model = m_controller->get_log_file_tree_model();
+            if (tree_model != nullptr)
             {
-                auto* tree_model = m_controller->get_log_file_tree_model();
-                if (tree_model != nullptr)
-                {
-                    tree_model->add_log_file(session_id, LogFileInfo(file_path, app_name));
-                }
+                tree_model->add_log_file(state.id, file_info);
             }
         }
 
@@ -1029,14 +1016,12 @@ auto MainWindow::restore_session_from_json(const QString& session_id,
                        << profile_error;
         }
 
-        const QJsonArray views_array = obj.value(QStringLiteral("views")).toArray();
-        for (const auto& v: views_array)
+        for (const SessionViewState& view_state: state.views)
         {
-            const QJsonObject view_obj = v.toObject();
-            restore_view_from_json(session_id, view_obj, available_profiles);
+            restore_view_from_state(state.id, view_state, available_profiles);
         }
 
-        m_session_controller->request_expand_session(session_id);
+        m_session_controller->request_expand_session(state.id);
         m_menu_controller->rebuild_recent_menus();
         update_pagination_widget();
         show_start_page_if_needed();
@@ -1048,17 +1033,15 @@ auto MainWindow::restore_session_from_json(const QString& session_id,
 }
 
 /**
- * @brief Restores a single view from JSON.
+ * @brief Restores a single view from typed session state.
  * @param session_id The session identifier.
- * @param view_obj The view JSON object.
+ * @param state The view state.
  * @param available_profiles Profiles loaded from the application settings.
  */
-auto MainWindow::restore_view_from_json(const QString& session_id, const QJsonObject& view_obj,
-                                        const QVector<LogParsingProfile>& available_profiles)
+auto MainWindow::restore_view_from_state(const QString& session_id, const SessionViewState& state,
+                                         const QVector<LogParsingProfile>& available_profiles)
     -> void
 {
-    SessionViewState state = parse_view_state_from_json(view_obj);
-
     const QUuid view_id =
         m_controller->import_view_state_for_session(session_id, state, available_profiles);
 
@@ -1077,73 +1060,6 @@ auto MainWindow::restore_view_from_json(const QString& session_id, const QJsonOb
     {
         qWarning() << "Failed to add restored view tab:" << view_id;
     }
-}
-
-/**
- * @brief Parses a SessionViewState from a JSON object.
- * @param view_obj The view JSON object.
- * @return The parsed SessionViewState.
- */
-auto MainWindow::parse_view_state_from_json(const QJsonObject& view_obj) -> SessionViewState
-{
-    SessionViewState state;
-
-    const QString vid_str = view_obj.value(QStringLiteral("id")).toString();
-    state.id = QUuid::fromString(QLatin1String("{") + vid_str + QLatin1String("}"));
-    state.tab_title = view_obj.value(QStringLiteral("tab_title")).toString();
-
-    const QJsonArray files_arr = view_obj.value(QStringLiteral("loaded_files")).toArray();
-    for (const auto& f: files_arr)
-    {
-        const QJsonObject fobj = f.toObject();
-        const QString fp = fobj.value(QStringLiteral("file_path")).toString();
-        const QString an = fobj.value(QStringLiteral("app_name")).toString();
-        if (!fp.isEmpty())
-        {
-            state.loaded_files.append(LogFileInfo(fp, an));
-
-            const QUuid profile_id(fobj.value(QStringLiteral("parsing_profile_id")).toString());
-
-            if (!profile_id.isNull())
-            {
-                state.file_parsing_profile_ids.insert(QFileInfo(fp).absoluteFilePath(), profile_id);
-            }
-        }
-    }
-
-    const QJsonObject filters_obj = view_obj.value(QStringLiteral("filters")).toObject();
-    state.filters.app_name = filters_obj.value(QStringLiteral("app_name")).toString();
-    state.filters.search_text = filters_obj.value(QStringLiteral("search_text")).toString();
-    const QByteArray search_field_key =
-        filters_obj.value(QStringLiteral("search_field")).toString().toLatin1();
-    state.filters.search_field = from_latin1_string_view(
-        QLatin1StringView(search_field_key.constData(), search_field_key.size()));
-    state.filters.use_regex = filters_obj.value(QStringLiteral("use_regex")).toBool();
-    state.filters.show_only_file = filters_obj.value(QStringLiteral("show_only_file")).toString();
-    state.filters.live_tailing_enabled =
-        filters_obj.value(QStringLiteral("live_tailing_enabled")).toBool(true);
-
-    const QJsonArray levels_arr = filters_obj.value(QStringLiteral("log_levels")).toArray();
-    for (const auto& lv: levels_arr)
-    {
-        state.filters.log_levels.insert(lv.toString());
-    }
-    const QJsonArray hidden_arr = filters_obj.value(QStringLiteral("hidden_files")).toArray();
-    for (const auto& hf: hidden_arr)
-    {
-        state.filters.hidden_files.insert(hf.toString());
-    }
-
-    state.page_size = static_cast<qsizetype>(view_obj.value(QStringLiteral("page_size")).toInt());
-    state.current_page = static_cast<int>(view_obj.value(QStringLiteral("current_page")).toInt());
-    state.sort_column = static_cast<int>(view_obj.value(QStringLiteral("sort_column")).toInt());
-    const QString sort_order =
-        view_obj.value(QStringLiteral("sort_order")).toString(QStringLiteral("asc"));
-    state.sort_order = (sort_order.compare(QStringLiteral("desc"), Qt::CaseInsensitive) == 0)
-                           ? Qt::DescendingOrder
-                           : Qt::AscendingOrder;
-
-    return state;
 }
 
 /**

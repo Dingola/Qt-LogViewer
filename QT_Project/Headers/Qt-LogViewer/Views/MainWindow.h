@@ -1,6 +1,5 @@
 #pragma once
 
-#include <QJsonObject>
 #include <QMainWindow>
 #include <QMap>
 #include <QModelIndex>
@@ -41,6 +40,7 @@ class LogViewWidget;
 class StartPageWidget;
 class DockWidget;
 struct SessionViewState;
+struct SessionState;
 
 /**
  * @class MainWindow
@@ -167,21 +167,13 @@ class MainWindow: public QtWidgetsCommonLib::AppMainWindow
         [[nodiscard]] auto validate_file_paths(const QStringList& files) -> QVector<QString>;
 
         /**
-         * @brief Restores a single view from JSON.
+         * @brief Restores a single view from typed session state.
          * @param session_id The session identifier.
-         * @param view_obj The view JSON object.
+         * @param state The view state.
          * @param available_profiles Profiles loaded from the application settings.
          */
-        auto restore_view_from_json(const QString& session_id, const QJsonObject& view_obj,
-                                    const QVector<LogParsingProfile>& available_profiles) -> void;
-
-        /**
-         * @brief Parses a SessionViewState from a JSON object.
-         * @param view_obj The view JSON object.
-         * @return The parsed SessionViewState.
-         */
-        [[nodiscard]] auto parse_view_state_from_json(const QJsonObject& view_obj)
-            -> SessionViewState;
+        auto restore_view_from_state(const QString& session_id, const SessionViewState& state,
+                                     const QVector<LogParsingProfile>& available_profiles) -> void;
 
         /**
          * @brief Creates a LogViewWidget for a view and connects its signals.
@@ -347,11 +339,10 @@ class MainWindow: public QtWidgetsCommonLib::AppMainWindow
         auto handle_reopen_last_session() -> void;
 
         /**
-         * @brief Restores a session from JSON data.
-         * @param session_id The session identifier.
-         * @param obj The JSON object containing session data.
+         * @brief Restores a session from typed state.
+         * @param state The loaded session state.
          */
-        auto restore_session_from_json(const QString& session_id, const QJsonObject& obj) -> void;
+        auto restore_session(const SessionState& state) -> void;
 
         /**
          * @brief Handles rename session requests from the LogFileExplorer.

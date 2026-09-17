@@ -1,12 +1,13 @@
 #pragma once
 
-#include <QJsonObject>
 #include <QObject>
 #include <QString>
 #include <QUuid>
+#include <optional>
 
 // Value types used by value in API
 #include "Qt-LogViewer/Models/LogFileInfo.h"
+#include "Qt-LogViewer/Models/SessionTypes.h"
 
 // Forward declarations (pointers only)
 class LogViewerController;
@@ -21,7 +22,7 @@ class LogFileTreeModel;
  * - Ensure a current session exists before file operations.
  * - Add files to sessions via the main controller.
  * - Create, close, delete, and rename sessions.
- * - Serialize and deserialize session state to/from JSON.
+ * - Convert persisted sessions into typed state through SessionCodec.
  * - Coordinate between SessionManager, LogFileTreeModel, and LogViewerController.
  */
 class SessionController: public QObject
@@ -118,15 +119,15 @@ class SessionController: public QObject
         /**
          * @brief Loads and restores a session from storage.
          * @param session_id The session ID to load.
-         * @return The session JSON object, or empty if not found.
+         * @return Typed session state, or no value if not found.
          */
-        [[nodiscard]] auto load_session(const QString& session_id) -> QJsonObject;
+        [[nodiscard]] auto load_session(const QString& session_id) -> std::optional<SessionState>;
 
         /**
-         * @brief Exports the current session state to JSON.
-         * @return The session JSON object.
+         * @brief Exports the current session as typed state.
+         * @return The session state.
          */
-        [[nodiscard]] auto export_session_to_json() const -> QJsonObject;
+        [[nodiscard]] auto export_session_state() const -> SessionState;
 
         /**
          * @brief Gets the session count in the tree model.
@@ -217,11 +218,11 @@ class SessionController: public QObject
                                const QList<LogFileInfo>& tree_files) -> void;
 
         /**
-         * @brief Builds a JSON object from a view state.
+         * @brief Exports the runtime state of one view.
          * @param view_id The view ID.
-         * @return The view JSON object.
+         * @return The view state.
          */
-        [[nodiscard]] auto build_view_json(const QUuid& view_id) const -> QJsonObject;
+        [[nodiscard]] auto build_view_state(const QUuid& view_id) const -> SessionViewState;
 
     private:
         SessionManager* m_session_manager{nullptr};

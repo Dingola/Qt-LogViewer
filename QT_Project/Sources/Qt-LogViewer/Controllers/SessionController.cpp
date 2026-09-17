@@ -5,14 +5,13 @@
 
 #include "Qt-LogViewer/Controllers/SessionController.h"
 
-#include <QFileInfo>
-#include <QJsonArray>
 #include <QUuid>
 
 // Concrete includes for forward-declared types and value usage
 #include "Qt-LogViewer/Controllers/LogViewerController.h"
 #include "Qt-LogViewer/Models/LogFileTreeModel.h"
 #include "Qt-LogViewer/Models/SessionTypes.h"
+#include "Qt-LogViewer/Services/SessionCodec.h"
 #include "Qt-LogViewer/Services/SessionManager.h"
 
 /**
@@ -320,19 +319,20 @@ auto SessionController::rename_session(const QString& session_id, const QString&
         {
             m_session_manager->upsert_session_metadata(session_id, new_name, false);
 
-            QJsonObject session_obj = m_session_manager->load_session(session_id);
-            if (!session_obj.isEmpty())
+            std::optional<SessionState> stored_state =
+                SessionCodec::from_json(m_session_manager->load_session(session_id), session_id);
+
+            if (stored_state.has_value())
             {
-                session_obj.insert(QStringLiteral("name"), new_name);
-                m_session_manager->save_session(session_id, session_obj);
+                stored_state->name = new_name;
+                m_session_manager->save_session(session_id, SessionCodec::to_json(*stored_state));
             }
             else
             {
-                // Create new session JSON from current state
-                QJsonObject new_session_obj = export_session_to_json();
-                new_session_obj.insert(QStringLiteral("name"), new_name);
-                new_session_obj.insert(QStringLiteral("id"), session_id);
-                m_session_manager->save_session(session_id, new_session_obj);
+                SessionState new_state = export_session_state();
+                new_state.name = new_name;
+                new_state.id = session_id;
+                m_session_manager->save_session(session_id, SessionCodec::to_json(new_state));
             }
 
             renamed = true;
@@ -346,23 +346,24 @@ auto SessionController::rename_session(const QString& session_id, const QString&
 /**
  * @brief Loads and restores a session from storage.
  * @param session_id The session ID to load.
- * @return The session JSON object, or empty if not found.
+ * @return Typed session state, or no value if not found.
  */
-auto SessionController::load_session(const QString& session_id) -> QJsonObject
+auto SessionController::load_session(const QString& session_id) -> std::optional<SessionState>
 {
-    QJsonObject obj;
+    std::optional<SessionState> state;
     const bool valid_args = (m_session_manager != nullptr && !session_id.isEmpty());
 
     if (valid_args)
     {
-        obj = m_session_manager->load_session(session_id);
+        state = SessionCodec::from_json(m_session_manager->load_session(session_id), session_id);
 
-        if (!obj.isEmpty())
+        if (state.has_value())
         {
+            state->id = session_id;
             m_session_manager->set_current_session_id(session_id);
             m_session_manager->set_last_session_id(session_id);
 
-            const QString session_name = obj.value(QStringLiteral("name")).toString();
+            const QString& session_name = state->name;
             m_session_manager->upsert_session_metadata(session_id, session_name, true);
 
             // Ensure session exists in tree model
@@ -375,51 +376,37 @@ auto SessionController::load_session(const QString& session_id) -> QJsonObject
         }
     }
 
-    return obj;
+    return state;
 }
 
 /**
- * @brief Exports the current session state to JSON.
- * @return The session JSON object.
+ * @brief Exports the current session as typed state.
+ * @return The session state.
  */
-auto SessionController::export_session_to_json() const -> QJsonObject
+auto SessionController::export_session_state() const -> SessionState
 {
-    QJsonObject session_obj;
-    session_obj.insert(QStringLiteral("schema_version"), 1);
+    SessionState state;
+    state.id = get_current_session_id();
 
     if (m_controller != nullptr)
     {
-        QJsonArray views_array;
         const QVector<QUuid> view_ids = m_controller->get_all_view_ids();
 
         for (const QUuid& vid: view_ids)
         {
             if (!m_controller->get_view_file_paths(vid).isEmpty())
             {
-                views_array.append(build_view_json(vid));
+                state.views.append(build_view_state(vid));
             }
         }
-
-        session_obj.insert(QStringLiteral("views"), views_array);
     }
 
-    // Also include files from tree model
-    const QString session_id = get_current_session_id();
-    if (!session_id.isEmpty())
+    if (!state.id.isEmpty())
     {
-        QList<LogFileInfo> tree_files = collect_session_files_from_tree(session_id);
-        QJsonArray explorer_files_array;
-        for (const auto& file_info: tree_files)
-        {
-            QJsonObject file_obj;
-            file_obj.insert(QStringLiteral("file_path"), file_info.get_file_path());
-            file_obj.insert(QStringLiteral("app_name"), file_info.get_app_name());
-            explorer_files_array.append(file_obj);
-        }
-        session_obj.insert(QStringLiteral("explorer_files"), explorer_files_array);
+        state.explorer_files = collect_session_files_from_tree(state.id);
     }
 
-    return session_obj;
+    return state;
 }
 
 /**
@@ -483,17 +470,13 @@ auto SessionController::create_session(const QString& session_name) -> QString
         m_tree_model->add_session(session_id, session_name);
     }
 
-    // Persist initial empty session
-    QJsonObject session_obj;
-    session_obj.insert(QStringLiteral("schema_version"), 1);
-    session_obj.insert(QStringLiteral("name"), session_name);
-    session_obj.insert(QStringLiteral("id"), session_id);
-    session_obj.insert(QStringLiteral("views"), QJsonArray());
-    session_obj.insert(QStringLiteral("explorer_files"), QJsonArray());
+    SessionState state;
+    state.id = session_id;
+    state.name = session_name;
 
     if (m_session_manager != nullptr)
     {
-        m_session_manager->save_session(session_id, session_obj);
+        m_session_manager->save_session(session_id, SessionCodec::to_json(state));
     }
 
     emit session_created(session_id, session_name);
@@ -564,119 +547,51 @@ auto SessionController::save_session_impl(const QString& session_id,
     QString session_name = QStringLiteral("Session");
 
     // Try to get existing session name
-    const QJsonObject existing_obj = m_session_manager->load_session(session_id);
-    const QString existing_name = existing_obj.value(QStringLiteral("name")).toString();
-    if (!existing_name.isEmpty())
+    const std::optional<SessionState> existing_state =
+        SessionCodec::from_json(m_session_manager->load_session(session_id), session_id);
+    if (existing_state.has_value() && !existing_state->name.isEmpty())
     {
-        session_name = existing_name;
+        session_name = existing_state->name;
     }
 
-    QJsonArray views_array;
+    SessionState state;
+    state.id = session_id;
+    state.explorer_files = tree_files;
+
     for (const QUuid& vid: nonempty_view_ids)
     {
-        QJsonObject view_obj = build_view_json(vid);
-        views_array.append(view_obj);
+        const SessionViewState view_state = build_view_state(vid);
+        state.views.append(view_state);
 
         // Use first tab title as session name if not set
-        if (views_array.size() == 1)
+        if (state.views.size() == 1)
         {
-            const QString tab_title = view_obj.value(QStringLiteral("tab_title")).toString();
-            if (!tab_title.isEmpty() && session_name == QStringLiteral("Session"))
+            if (!view_state.tab_title.isEmpty() && session_name == QStringLiteral("Session"))
             {
-                session_name = tab_title;
+                session_name = view_state.tab_title;
             }
         }
     }
 
-    // Build explorer files array
-    QJsonArray explorer_files_array;
-    for (const auto& file_info: tree_files)
-    {
-        QJsonObject file_obj;
-        file_obj.insert(QStringLiteral("file_path"), file_info.get_file_path());
-        file_obj.insert(QStringLiteral("app_name"), file_info.get_app_name());
-        explorer_files_array.append(file_obj);
-    }
+    state.name = session_name;
 
-    QJsonObject session_obj;
-    session_obj.insert(QStringLiteral("schema_version"), 1);
-    session_obj.insert(QStringLiteral("id"), session_id);
-    session_obj.insert(QStringLiteral("name"), session_name);
-    session_obj.insert(QStringLiteral("views"), views_array);
-    session_obj.insert(QStringLiteral("explorer_files"), explorer_files_array);
-
-    m_session_manager->save_session(session_id, session_obj);
+    m_session_manager->save_session(session_id, SessionCodec::to_json(state));
     m_session_manager->upsert_session_metadata(session_id, session_name, false);
 }
 
 /**
- * @brief Builds a JSON object from a view state.
+ * @brief Exports the runtime state of one view.
  * @param view_id The view ID.
- * @return The view JSON object.
+ * @return The view state.
  */
-auto SessionController::build_view_json(const QUuid& view_id) const -> QJsonObject
+auto SessionController::build_view_state(const QUuid& view_id) const -> SessionViewState
 {
-    QJsonObject view_obj;
+    SessionViewState state;
 
     if (m_controller != nullptr)
     {
-        const SessionViewState state = m_controller->export_view_state(view_id);
-
-        view_obj.insert(QStringLiteral("id"), view_id.toString(QUuid::WithoutBraces));
-
-        QJsonArray files_arr;
-        for (const auto& lf: state.loaded_files)
-        {
-            QJsonObject fobj;
-            const QString file_path = lf.get_file_path();
-            fobj.insert(QStringLiteral("file_path"), file_path);
-            fobj.insert(QStringLiteral("app_name"), lf.get_app_name());
-
-            const QString absolute_file_path = QFileInfo(file_path).absoluteFilePath();
-            const auto profile_id = state.file_parsing_profile_ids.constFind(absolute_file_path);
-
-            if (profile_id != state.file_parsing_profile_ids.cend())
-            {
-                fobj.insert(QStringLiteral("parsing_profile_id"),
-                            profile_id->toString(QUuid::WithoutBraces));
-            }
-
-            files_arr.append(fobj);
-        }
-        view_obj.insert(QStringLiteral("loaded_files"), files_arr);
-
-        QJsonObject filters_obj;
-        filters_obj.insert(QStringLiteral("app_name"), state.filters.app_name);
-
-        QJsonArray levels_arr;
-        for (const auto& lvl: state.filters.log_levels)
-        {
-            levels_arr.append(lvl);
-        }
-        filters_obj.insert(QStringLiteral("log_levels"), levels_arr);
-        filters_obj.insert(QStringLiteral("search_text"), state.filters.search_text);
-        filters_obj.insert(QStringLiteral("search_field"), to_string(state.filters.search_field));
-        filters_obj.insert(QStringLiteral("use_regex"), state.filters.use_regex);
-        filters_obj.insert(QStringLiteral("show_only_file"), state.filters.show_only_file);
-
-        QJsonArray hidden_arr;
-        for (const auto& hf: state.filters.hidden_files)
-        {
-            hidden_arr.append(hf);
-        }
-        filters_obj.insert(QStringLiteral("hidden_files"), hidden_arr);
-        filters_obj.insert(QStringLiteral("live_tailing_enabled"),
-                           state.filters.live_tailing_enabled);
-        view_obj.insert(QStringLiteral("filters"), filters_obj);
-
-        view_obj.insert(QStringLiteral("page_size"), static_cast<int>(state.page_size));
-        view_obj.insert(QStringLiteral("current_page"), static_cast<int>(state.current_page));
-        view_obj.insert(QStringLiteral("sort_column"), static_cast<int>(state.sort_column));
-        view_obj.insert(QStringLiteral("sort_order"), state.sort_order == Qt::AscendingOrder
-                                                          ? QStringLiteral("asc")
-                                                          : QStringLiteral("desc"));
-        view_obj.insert(QStringLiteral("tab_title"), state.tab_title);
+        state = m_controller->export_view_state(view_id);
     }
 
-    return view_obj;
+    return state;
 }

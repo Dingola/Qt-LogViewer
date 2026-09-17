@@ -2280,9 +2280,9 @@ TEST_F(LogViewerControllerTest, AppliesActiveFilterToTailedEntries)
 }
 
 /**
- * @brief Verifies that persisted zero-based page indexes restore the matching runtime page.
+ * @brief Verifies that typed session state uses one-based runtime page numbers.
  */
-TEST_F(LogViewerControllerTest, RestoresPersistedPagesOneThroughThree)
+TEST_F(LogViewerControllerTest, RestoresRuntimePagesOneThroughThree)
 {
     QTemporaryFile* session_file =
         create_temp_file({QStringLiteral("2024-01-01 12:01:00 INFO RestorePageEntry1 SessionApp"),
@@ -2296,15 +2296,15 @@ TEST_F(LogViewerControllerTest, RestoresPersistedPagesOneThroughThree)
 
     QSignalSpy loading_finished_spy(m_controller, &LogViewerController::loading_finished);
 
-    for (int persisted_page = 0; persisted_page < 3; ++persisted_page)
+    for (int runtime_page = 1; runtime_page <= 3; ++runtime_page)
     {
-        SCOPED_TRACE(QStringLiteral("persisted page index: %1").arg(persisted_page).toStdString());
+        SCOPED_TRACE(QStringLiteral("runtime page: %1").arg(runtime_page).toStdString());
 
         SessionViewState state;
         state.id = QUuid::createUuid();
         state.loaded_files = {LogFileInfo(session_file->fileName(), QStringLiteral("SessionApp"))};
         state.page_size = 2;
-        state.current_page = persisted_page;
+        state.current_page = runtime_page;
         state.filters.live_tailing_enabled = false;
 
         const QUuid view_id =
@@ -2312,31 +2312,31 @@ TEST_F(LogViewerControllerTest, RestoresPersistedPagesOneThroughThree)
 
         ASSERT_EQ(view_id, state.id);
 
-        QTRY_COMPARE(loading_finished_spy.count(), persisted_page + 1);
+        QTRY_COMPARE(loading_finished_spy.count(), runtime_page);
 
         const LogQuery query = m_controller->create_page_query(view_id);
 
         ASSERT_TRUE(m_controller->set_page_query(view_id, query));
         ASSERT_TRUE(m_controller->set_page_size(view_id, state.page_size));
-        ASSERT_TRUE(m_controller->set_current_page(view_id, state.current_page + 1));
+        ASSERT_TRUE(m_controller->set_current_page(view_id, state.current_page));
 
         const LogPageState* page_state = m_controller->get_page_state(view_id);
 
         ASSERT_NE(page_state, nullptr);
-        EXPECT_EQ(page_state->get_current_page(), persisted_page + 1);
+        EXPECT_EQ(page_state->get_current_page(), runtime_page);
         EXPECT_EQ(page_state->get_page_size(), 2);
         EXPECT_EQ(page_state->get_total_pages(), 3);
 
         const SessionViewState exported_state = m_controller->export_view_state(view_id);
 
-        EXPECT_EQ(exported_state.current_page, persisted_page);
+        EXPECT_EQ(exported_state.current_page, runtime_page);
 
         LogModel* model = m_controller->get_log_model(view_id);
 
         ASSERT_NE(model, nullptr);
         ASSERT_EQ(model->rowCount(), 2);
         EXPECT_EQ(model->get_entry(0).get_message(),
-                  QStringLiteral("RestorePageEntry%1").arg(6 - (persisted_page * 2)));
+                  QStringLiteral("RestorePageEntry%1").arg(8 - (runtime_page * 2)));
     }
 }
 

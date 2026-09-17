@@ -1622,7 +1622,7 @@ auto LogViewerController::export_view_state(const QUuid& view_id) const -> Sessi
         {
             state.page_size = static_cast<int>(page_state->get_page_size());
 
-            state.current_page = static_cast<int>(page_state->get_current_page() - 1);
+            state.current_page = static_cast<int>(page_state->get_current_page());
 
             state.sort_column = get_model_sort_column(page_state->get_query().sort_field);
 
@@ -1675,7 +1675,7 @@ auto LogViewerController::import_view_state(const SessionViewState& state) -> QU
                 set_page_size(result, state.page_size);
             }
 
-            set_current_page(result, state.current_page + 1);
+            set_current_page(result, state.current_page);
         }
 
         // Update explorer tree
