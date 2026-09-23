@@ -19,6 +19,7 @@
 #include "Qt-LogViewer/Controllers/FilterCoordinator.h"
 #include "Qt-LogViewer/Controllers/LogIngestController.h"
 #include "Qt-LogViewer/Controllers/LogPageCoordinator.h"
+#include "Qt-LogViewer/Controllers/LogQueryController.h"
 #include "Qt-LogViewer/Controllers/LogViewContext.h"
 #include "Qt-LogViewer/Controllers/ViewRegistry.h"
 #include "Qt-LogViewer/Models/LogFileTreeModel.h"
@@ -138,73 +139,6 @@ namespace
 }
 
 /**
- * @brief Maps the current search-field selection to log field identifiers.
- * @param search_field Current search-field selection.
- * @return Fields included in text searching.
- */
-[[nodiscard]] auto get_query_search_fields(SearchField search_field) -> QSet<QString>
-{
-    QSet<QString> fields;
-
-    switch (search_field)
-    {
-    case SearchField::Message:
-        fields.insert(LogField::Message);
-        break;
-
-    case SearchField::Level:
-        fields.insert(LogField::Level);
-        break;
-
-    case SearchField::AppName:
-        fields.insert(LogField::AppName);
-        break;
-
-    case SearchField::AllFields:
-    case SearchField::Count:
-        break;
-    }
-
-    return fields;
-}
-
-/**
- * @brief Maps a LogModel column to a stable log field identifier.
- * @param column LogModel column index.
- * @return Stable field identifier.
- */
-[[nodiscard]] auto get_query_sort_field(int column) -> QString
-{
-    QString field = LogField::Timestamp;
-
-    switch (column)
-    {
-    case LogModel::Timestamp:
-        field = LogField::Timestamp;
-        break;
-
-    case LogModel::Level:
-        field = LogField::Level;
-        break;
-
-    case LogModel::Message:
-        field = LogField::Message;
-        break;
-
-    case LogModel::AppName:
-        field = LogField::AppName;
-        break;
-
-    case LogModel::Spacer:
-    case LogModel::ColumnCount:
-    default:
-        break;
-    }
-
-    return field;
-}
-
-/**
  * @brief Maps a stable sort-field identifier to a LogModel column.
  * @param field Stable field identifier.
  * @return Matching LogModel column.
@@ -261,6 +195,7 @@ LogViewerController::LogViewerController(const LogParsingProfile& profile, QObje
     m_history_writer_thread->start();
 
     m_page_coordinator = new LogPageCoordinator(m_history_service, m_views, this);
+    m_query_controller = new LogQueryController(m_filters, m_page_coordinator, m_views, this);
     m_tailer_service = new LogTailerService(profile, this);
 
     m_tail_refresh_timer = new QTimer(this);
@@ -1017,7 +952,7 @@ auto LogViewerController::cancel_loading(const QUuid& view_id) -> void
 }
 
 /**
- * @brief Sets the application name filter for the current view.
+ * @brief Sets the application name filter and reloads page one of the current view.
  * @param app_name The application name to filter by.
  */
 auto LogViewerController::set_app_name_filter(const QString& app_name) -> void
@@ -1026,17 +961,17 @@ auto LogViewerController::set_app_name_filter(const QString& app_name) -> void
 }
 
 /**
- * @brief Sets the application name filter for the specified view.
+ * @brief Sets the application name filter and reloads page one of the specified view.
  * @param view_id The QUuid of the view.
  * @param app_name The application name to filter by.
  */
 auto LogViewerController::set_app_name_filter(const QUuid& view_id, const QString& app_name) -> void
 {
-    m_filters->set_app_name(view_id, app_name);
+    m_query_controller->set_app_name(view_id, app_name);
 }
 
 /**
- * @brief Sets the log level filter for the current view.
+ * @brief Sets the log-level filter and reloads page one of the current view.
  * @param levels The set of log levels.
  */
 auto LogViewerController::set_log_level_filters(const QSet<QString>& levels) -> void
@@ -1045,18 +980,18 @@ auto LogViewerController::set_log_level_filters(const QSet<QString>& levels) -> 
 }
 
 /**
- * @brief Sets the log level filter for the specified view.
+ * @brief Sets the log-level filter and reloads page one of the specified view.
  * @param view_id The QUuid of the view.
  * @param levels The set of log levels.
  */
 auto LogViewerController::set_log_level_filters(const QUuid& view_id,
                                                 const QSet<QString>& levels) -> void
 {
-    m_filters->set_log_levels(view_id, levels);
+    m_query_controller->set_log_levels(view_id, levels);
 }
 
 /**
- * @brief Sets the search filter for the current view.
+ * @brief Sets the search filter and reloads page one of the current view.
  * @param search_text The search string or regex.
  * @param field The field to search in.
  * @param use_regex Whether to use regex.
@@ -1068,7 +1003,7 @@ auto LogViewerController::set_search_filter(const QString& search_text, SearchFi
 }
 
 /**
- * @brief Sets the search filter for the specified view.
+ * @brief Sets the search filter and reloads page one of the specified view.
  * @param view_id The QUuid of the view.
  * @param search_text The search string or regex.
  * @param field The field to search in.
@@ -1077,7 +1012,7 @@ auto LogViewerController::set_search_filter(const QString& search_text, SearchFi
 auto LogViewerController::set_search_filter(const QUuid& view_id, const QString& search_text,
                                             SearchField field, bool use_regex) -> void
 {
-    m_filters->set_search(view_id, search_text, field, use_regex);
+    m_query_controller->set_search(view_id, search_text, field, use_regex);
 }
 
 /**
@@ -1165,18 +1100,29 @@ auto LogViewerController::set_page_size(const QUuid& view_id, qsizetype page_siz
 auto LogViewerController::set_page_sort(const QUuid& view_id, int column,
                                         Qt::SortOrder order) -> bool
 {
-    bool sorted = false;
-    LogQuery query = create_page_query(view_id);
-    LogModel* model = get_log_model(view_id);
+    return m_query_controller != nullptr && m_query_controller->set_sort(view_id, column, order);
+}
 
-    if (model != nullptr && model->is_column_sortable(column))
-    {
-        query.sort_field = model->get_column_field_id(column);
-        query.sort_order = order;
-        sorted = set_page_query(view_id, query);
-    }
+/**
+ * @brief Rebuilds the query from current view filters and loads page one.
+ * @param view_id Target view.
+ * @return True when the query was loaded.
+ */
+auto LogViewerController::reload_page_query(const QUuid& view_id) -> bool
+{
+    return m_query_controller != nullptr && m_query_controller->reload_query(view_id);
+}
 
-    return sorted;
+/**
+ * @brief Applies saved filter, sorting, and paging state with one page reload.
+ * @param view_id Target view.
+ * @param state Saved state to apply.
+ * @return True when the complete query state was loaded.
+ */
+auto LogViewerController::apply_view_query_state(const QUuid& view_id,
+                                                 const SessionViewState& state) -> bool
+{
+    return m_query_controller != nullptr && m_query_controller->apply_view_state(view_id, state);
 }
 
 /**
@@ -1220,32 +1166,7 @@ auto LogViewerController::get_page_state(const QUuid& view_id) const -> const Lo
  */
 auto LogViewerController::create_page_query(const QUuid& view_id) const -> LogQuery
 {
-    LogQuery query;
-    LogViewContext* context = get_view_context(view_id);
-
-    if (context != nullptr && m_filters != nullptr)
-    {
-        const FilterState filters = m_filters->export_filters(view_id);
-
-        query.view_id = view_id;
-        query.app_name = filters.app_name;
-        query.log_levels = filters.log_levels;
-        query.search_text = filters.search_text;
-        query.search_fields = get_query_search_fields(filters.search_field);
-        query.use_regex = filters.use_regex;
-        query.show_only_file = filters.show_only_file;
-        query.hidden_files = filters.hidden_files;
-
-        const LogPageState* page_state = get_page_state(view_id);
-
-        if (page_state != nullptr)
-        {
-            query.sort_field = page_state->get_query().sort_field;
-            query.sort_order = page_state->get_query().sort_order;
-        }
-    }
-
-    return query;
+    return m_query_controller != nullptr ? m_query_controller->create_query(view_id) : LogQuery();
 }
 
 /**
@@ -1545,34 +1466,34 @@ auto LogViewerController::is_file_loaded(const QUuid& view_id,
 }
 
 /**
- * @brief Applies a "show only file" filter for the specified view.
+ * @brief Applies a "show only file" filter and reloads page one.
  * @param view_id Target view id.
  * @param file_path File path to show exclusively, or empty to reset.
  */
 auto LogViewerController::set_show_only_file(const QUuid& view_id, const QString& file_path) -> void
 {
-    m_filters->set_show_only(view_id, file_path);
+    m_query_controller->set_show_only_file(view_id, file_path);
 }
 
 /**
- * @brief Toggles a file's visibility (hide/show) in the specified view.
+ * @brief Toggles a file's visibility and reloads page one of the specified view.
  * @param view_id Target view id.
  * @param file_path Absolute file path to toggle.
  */
 auto LogViewerController::toggle_file_visibility(const QUuid& view_id,
                                                  const QString& file_path) -> void
 {
-    m_filters->toggle_visibility(view_id, file_path);
+    m_query_controller->toggle_file_visibility(view_id, file_path);
 }
 
 /**
- * @brief Hides (excludes) a specific file in the specified view.
+ * @brief Hides a specific file and reloads page one of the specified view.
  * @param view_id Target view id.
  * @param file_path File path to hide.
  */
 auto LogViewerController::hide_file(const QUuid& view_id, const QString& file_path) -> void
 {
-    m_filters->hide_file(view_id, file_path);
+    m_query_controller->hide_file(view_id, file_path);
 }
 
 /**
@@ -1645,7 +1566,7 @@ auto LogViewerController::import_view_state(const SessionViewState& state) -> QU
 
     if (m_views != nullptr && m_filters != nullptr)
     {
-        result = m_views->import_view_state(state, *m_filters);
+        result = m_views->import_view_state(state);
 
         if (!result.isNull())
         {
@@ -1664,18 +1585,7 @@ auto LogViewerController::import_view_state(const SessionViewState& state) -> QU
                 m_live_tailing_views.remove(result);
             }
 
-            LogQuery query = create_page_query(result);
-            query.sort_field = get_query_sort_field(state.sort_column);
-            query.sort_order = state.sort_order;
-
-            set_page_query(result, query);
-
-            if (state.page_size > 0)
-            {
-                set_page_size(result, state.page_size);
-            }
-
-            set_current_page(result, state.current_page);
+            apply_view_query_state(result, state);
         }
 
         // Update explorer tree
@@ -1730,7 +1640,7 @@ auto LogViewerController::import_view_state_for_session(
 
     if (m_views != nullptr && m_filters != nullptr)
     {
-        result = m_views->import_view_state(state, *m_filters);
+        result = m_views->import_view_state(state);
 
         if (!result.isNull())
         {
@@ -1748,6 +1658,8 @@ auto LogViewerController::import_view_state_for_session(
             {
                 m_live_tailing_views.remove(result);
             }
+
+            apply_view_query_state(result, state);
         }
 
         // Update explorer tree with session context

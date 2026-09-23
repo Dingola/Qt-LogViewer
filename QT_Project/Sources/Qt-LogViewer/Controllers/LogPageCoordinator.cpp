@@ -91,6 +91,45 @@ auto LogPageCoordinator::set_page_size(const QUuid& view_id, qsizetype page_size
 }
 
 /**
+ * @brief Applies query, page size, and requested page with one model reload.
+ * @param view_id Target view.
+ * @param query Query describing filtering and sorting.
+ * @param page_size Positive number of entries per page.
+ * @param current_page Requested one-based page number.
+ * @return True when the complete state was applied and loaded.
+ */
+auto LogPageCoordinator::apply_state(const QUuid& view_id, const LogQuery& query,
+                                     qsizetype page_size, qsizetype current_page) -> bool
+{
+    bool loaded = false;
+    LogViewContext* context = m_views != nullptr ? m_views->get_context(view_id) : nullptr;
+
+    if (m_history_service != nullptr && context != nullptr && page_size > 0 && current_page > 0)
+    {
+        LogQuery view_query = query;
+        view_query.view_id = view_id;
+
+        LogPageState& state = m_page_states[view_id];
+        state.set_query(view_query);
+        state.set_page_size(page_size);
+        state.set_total_entries(m_history_service->count_entries(state.get_query()));
+        state.set_current_page(current_page);
+
+        const QVector<LogEntry> entries = m_history_service->load_entries_page(
+            state.get_query(), state.get_offset(), state.get_page_size());
+
+        context->replace_entries(entries);
+
+        emit page_loaded(view_id, state.get_current_page(), state.get_total_pages(),
+                         state.get_total_entries());
+
+        loaded = true;
+    }
+
+    return loaded;
+}
+
+/**
  * @brief Reloads the current page for a view.
  * @param view_id Target view.
  * @return True when the view and its page state are available.

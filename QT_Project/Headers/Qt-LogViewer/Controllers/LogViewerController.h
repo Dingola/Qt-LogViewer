@@ -22,6 +22,7 @@
 class FileCatalogController;
 class FilterCoordinator;
 class LogIngestController;
+class LogQueryController;
 class LogViewContext;
 class ViewRegistry;
 class LogModel;
@@ -247,33 +248,33 @@ class LogViewerController: public QObject
         auto cancel_loading(const QUuid& view_id) -> void;
 
         /**
-         * @brief Sets the application name filter for the current view.
+         * @brief Sets the application name filter and reloads page one of the current view.
          * @param app_name The application name to filter by.
          */
         auto set_app_name_filter(const QString& app_name) -> void;
 
         /**
-         * @brief Sets the application name filter for the specified view.
+         * @brief Sets the application name filter and reloads page one of the specified view.
          * @param view_id The QUuid of the view.
          * @param app_name The application name to filter by.
          */
         auto set_app_name_filter(const QUuid& view_id, const QString& app_name) -> void;
 
         /**
-         * @brief Sets the log level filter for the current view.
+         * @brief Sets the log-level filter and reloads page one of the current view.
          * @param levels The set of log levels.
          */
         auto set_log_level_filters(const QSet<QString>& levels) -> void;
 
         /**
-         * @brief Sets the log level filter for the specified view.
+         * @brief Sets the log-level filter and reloads page one of the specified view.
          * @param view_id The QUuid of the view.
          * @param levels The set of log levels.
          */
         auto set_log_level_filters(const QUuid& view_id, const QSet<QString>& levels) -> void;
 
         /**
-         * @brief Sets the search filter for the current view.
+         * @brief Sets the search filter and reloads page one of the current view.
          * @param search_text The search string or regex.
          * @param field The field to search in.
          * @param use_regex Whether to use regex.
@@ -282,7 +283,7 @@ class LogViewerController: public QObject
                                bool use_regex) -> void;
 
         /**
-         * @brief Sets the search filter for the specified view.
+         * @brief Sets the search filter and reloads page one of the specified view.
          * @param view_id The QUuid of the view.
          * @param search_text The search string or regex.
          * @param field The field to search in.
@@ -336,6 +337,21 @@ class LogViewerController: public QObject
          * @return True when the sorted page was loaded.
          */
         auto set_page_sort(const QUuid& view_id, int column, Qt::SortOrder order) -> bool;
+
+        /**
+         * @brief Rebuilds the query from current view filters and loads page one.
+         * @param view_id Target view.
+         * @return True when the query was loaded.
+         */
+        auto reload_page_query(const QUuid& view_id) -> bool;
+
+        /**
+         * @brief Applies saved filter, sorting, and paging state with one page reload.
+         * @param view_id Target view.
+         * @param state Saved state to apply.
+         * @return True when the complete query state was loaded.
+         */
+        auto apply_view_query_state(const QUuid& view_id, const SessionViewState& state) -> bool;
 
         /**
          * @brief Reloads the current page for a view.
@@ -514,7 +530,7 @@ class LogViewerController: public QObject
                                           const QString& file_path) const -> bool;
 
         /**
-         * @brief Applies a "show only file" filter for the specified view.
+         * @brief Applies a "show only file" filter and reloads page one.
          *        Pass empty string to show all files.
          * @param view_id Target view id.
          * @param file_path File path to show exclusively, or empty to reset.
@@ -522,7 +538,7 @@ class LogViewerController: public QObject
         auto set_show_only_file(const QUuid& view_id, const QString& file_path) -> void;
 
         /**
-         * @brief Toggles a file's visibility (hide/show) in the specified view.
+         * @brief Toggles a file's visibility and reloads page one of the specified view.
          *
          * Behavior:
          * - No show-only active:
@@ -542,7 +558,7 @@ class LogViewerController: public QObject
         auto toggle_file_visibility(const QUuid& view_id, const QString& file_path) -> void;
 
         /**
-         * @brief Hides (excludes) a specific file in the specified view.
+         * @brief Hides a specific file and reloads page one of the specified view.
          * @param view_id Target view id.
          * @param file_path File path to hide.
          */
@@ -811,6 +827,7 @@ class LogViewerController: public QObject
         LogHistoryWriter* m_history_writer{nullptr};
         QThread* m_history_writer_thread{nullptr};
         LogPageCoordinator* m_page_coordinator{nullptr};
+        LogQueryController* m_query_controller{nullptr};
         LogTailerService* m_tailer_service{nullptr};
         QTimer* m_tail_refresh_timer{nullptr};
         QSet<QUuid> m_pending_tail_refresh_views;

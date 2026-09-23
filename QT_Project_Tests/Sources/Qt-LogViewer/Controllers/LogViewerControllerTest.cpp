@@ -2305,6 +2305,7 @@ TEST_F(LogViewerControllerTest, RestoresRuntimePagesOneThroughThree)
         state.loaded_files = {LogFileInfo(session_file->fileName(), QStringLiteral("SessionApp"))};
         state.page_size = 2;
         state.current_page = runtime_page;
+        state.sort_order = Qt::DescendingOrder;
         state.filters.live_tailing_enabled = false;
 
         const QUuid view_id =

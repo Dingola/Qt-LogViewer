@@ -386,7 +386,6 @@ auto MainWindow::setup_filter_bar() -> void
                 if (!view_id.isNull())
                 {
                     m_controller->set_app_name_filter(view_id, app_name);
-                    reload_page_query(view_id);
                 }
             });
     connect(ui->logFilterBarWidget, &LogFilterBarWidget::log_level_filter_changed, this,
@@ -396,7 +395,6 @@ auto MainWindow::setup_filter_bar() -> void
                 if (!view_id.isNull())
                 {
                     m_controller->set_log_level_filters(view_id, log_levels);
-                    reload_page_query(view_id);
                 }
             });
 
@@ -580,20 +578,6 @@ auto MainWindow::update_pagination_widget() -> void
     }
 
     ui->paginationWidget->set_pagination(current_page, total_pages);
-}
-
-/**
- * @brief Rebuilds and loads the database query for a view.
- * @param view_id Target view.
- */
-auto MainWindow::reload_page_query(const QUuid& view_id) -> void
-{
-    if (!view_id.isNull())
-    {
-        const LogQuery query = m_controller->create_page_query(view_id);
-
-        m_controller->set_page_query(view_id, query);
-    }
 }
 
 /**
@@ -814,8 +798,6 @@ auto MainWindow::handle_search_changed() -> void
         {
             log_view_widget->set_search_highlight(search_text, field, use_regex);
         }
-
-        reload_page_query(view_id);
     }
 }
 
@@ -855,7 +837,7 @@ auto MainWindow::handle_current_view_id_changed(const QUuid& view_id) -> void
 
     if (m_controller->get_page_state(view_id) == nullptr)
     {
-        reload_page_query(view_id);
+        m_controller->reload_page_query(view_id);
     }
 
     update_pagination_widget();
@@ -1075,6 +1057,12 @@ auto MainWindow::create_log_view_widget_for_view(const QUuid& view_id,
     log_view_widget->set_view_id(view_id);
     LogModel* page_model = m_controller->get_log_model(view_id);
     log_view_widget->set_model(page_model);
+
+    if (m_controller->get_page_state(view_id) == nullptr)
+    {
+        m_controller->apply_view_query_state(view_id, state);
+    }
+
     LogQuery query = m_controller->create_page_query(view_id);
     log_view_widget->set_search_highlight(query.search_text,
                                           m_controller->get_search_field(view_id), query.use_regex);
@@ -1095,18 +1083,7 @@ auto MainWindow::create_log_view_widget_for_view(const QUuid& view_id,
         header->blockSignals(blocked);
     }
 
-    m_controller->set_page_query(view_id, query);
-
     log_view_widget->set_file_visibility_state(query.show_only_file, query.hidden_files);
-
-    const qsizetype page_size = state.page_size > 0 ? state.page_size : 25;
-
-    m_controller->set_page_size(view_id, page_size);
-
-    if (state.current_page > 1)
-    {
-        m_controller->set_current_page(view_id, state.current_page);
-    }
 
     if (header != nullptr)
     {
@@ -1143,15 +1120,12 @@ auto MainWindow::create_log_view_widget_for_view(const QUuid& view_id,
 
     connect(log_view_widget, &LogViewWidget::current_row_changed, this,
             &MainWindow::update_log_details);
-    connect(log_view_widget, &LogViewWidget::app_filter_changed, this,
-            [this, view_id](const QString& app) {
-                m_controller->set_app_name_filter(view_id, app);
-                reload_page_query(view_id);
-            });
+    connect(
+        log_view_widget, &LogViewWidget::app_filter_changed, this,
+        [this, view_id](const QString& app) { m_controller->set_app_name_filter(view_id, app); });
     connect(log_view_widget, &LogViewWidget::log_level_filter_changed, this,
             [this, view_id](const QSet<QString>& levels) {
                 m_controller->set_log_level_filters(view_id, levels);
-                reload_page_query(view_id);
             });
     connect(log_view_widget, &LogViewWidget::toggle_visibility_requested, this,
             [this, view_id, log_view_widget](const QString& file_path) {
@@ -1161,8 +1135,6 @@ auto MainWindow::create_log_view_widget_for_view(const QUuid& view_id,
 
                 log_view_widget->set_file_visibility_state(query.show_only_file,
                                                            query.hidden_files);
-
-                reload_page_query(view_id);
             });
     connect(log_view_widget, &LogViewWidget::show_only_file_requested, this,
             [this, view_id, log_view_widget](const QString& file_path) {
@@ -1172,8 +1144,6 @@ auto MainWindow::create_log_view_widget_for_view(const QUuid& view_id,
 
                 log_view_widget->set_file_visibility_state(query.show_only_file,
                                                            query.hidden_files);
-
-                reload_page_query(view_id);
             });
     connect(log_view_widget, &LogViewWidget::remove_file_requested, this,
             [this, view_id](const QString& file_path) {
@@ -1378,7 +1348,7 @@ auto MainWindow::handle_loading_finished(const QUuid& view_id, const QString& fi
     }
     else
     {
-        reload_page_query(view_id);
+        m_controller->reload_page_query(view_id);
     }
 
     if (view_id == m_controller->get_current_view())

@@ -293,24 +293,16 @@ auto ViewRegistry::export_view_state(const QUuid& view_id,
 }
 
 /**
- * @brief Import a view state: ensure/create view, set loaded files, reapply filters, and
- * paging/sort.
+ * @brief Imports registry-owned view state by ensuring the view and restoring its files.
  * @param state Serialized view state to apply.
- * @param filters Coordinator used to apply filters.
  * @return QUuid The (ensured) view id of the imported state.
- *
- * Round-trip guarantee:
- * Applying an exported `SessionViewState` reconstructs the same logical view configuration,
- * assuming the referenced files exist and are accessible on the current machine.
  */
-auto ViewRegistry::import_view_state(const SessionViewState& state,
-                                     FilterCoordinator& filters) -> QUuid
+auto ViewRegistry::import_view_state(const SessionViewState& state) -> QUuid
 {
     const QUuid view_id = state.id.isNull() ? create_view() : state.id;
 
     ensure_view(view_id);
     set_loaded_files(view_id, state.loaded_files);
-    filters.import_filters(view_id, state.filters);
 
     return view_id;
 }

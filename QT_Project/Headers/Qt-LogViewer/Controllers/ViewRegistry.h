@@ -26,9 +26,10 @@ class LogViewContext;
  * - Emit lifecycle signals consumed by the facade (LogViewerController).
  *
  * Serialization helpers:
- * - `export_view_state()` captures a view's loaded files, filters, paging and sorting into
- *   `SessionViewState` with a tab-title suggestion. It provides round-trip safety with
- *   `import_view_state()` when applied onto a compatible environment.
+ * - `export_view_state()` captures a view's loaded files and filters into `SessionViewState`
+ *   with a tab-title suggestion.
+ * - `import_view_state()` restores registry-owned state; query state is restored separately by
+ *   `LogQueryController`.
  */
 class ViewRegistry: public QObject
 {
@@ -147,17 +148,11 @@ class ViewRegistry: public QObject
             const QUuid& view_id, const FilterCoordinator& filters) const -> SessionViewState;
 
         /**
-         * @brief Import a view state: ensure/create view, set loaded files, reapply filters,
-         *        and paging/sort.
+         * @brief Imports registry-owned view state by ensuring the view and restoring its files.
          * @param state Serialized view state to apply.
-         * @param filters Coordinator used to apply filters.
          * @return QUuid The (ensured) view id of the imported state.
-         *
-         * Round-trip guarantee:
-         * Applying an exported `SessionViewState` reconstructs the same logical view configuration,
-         * assuming the referenced files exist and are accessible on the current machine.
          */
-        auto import_view_state(const SessionViewState& state, FilterCoordinator& filters) -> QUuid;
+        auto import_view_state(const SessionViewState& state) -> QUuid;
 
     signals:
         /**
