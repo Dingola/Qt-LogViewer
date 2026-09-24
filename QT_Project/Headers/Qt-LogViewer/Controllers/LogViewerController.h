@@ -28,10 +28,9 @@ class ViewRegistry;
 class LogModel;
 class LogFileTreeModel;
 class LogHistoryService;
-class LogHistoryWriter;
+class HistoryWriteService;
 class LogTailerService;
 class LogPageCoordinator;
-class QThread;
 class QTimer;
 
 /**
@@ -764,23 +763,6 @@ class LogViewerController: public QObject
         auto clear_pending_for_view(const QUuid& view_id) -> void;
 
         /**
-         * @brief Queues one parsed batch for storage on the history writer thread.
-         *
-         * @param view_id View that owns the imported entries.
-         * @param file_path Imported source file.
-         * @param entries Parsed entries to store.
-         */
-        auto queue_history_batch(const QUuid& view_id, const QString& file_path,
-                                 const QVector<LogEntry>& entries) -> void;
-
-        /**
-         * @brief Queues an import completion marker behind all preceding history batches.
-         * @param view_id View that owns the import.
-         * @param file_path Imported source file.
-         */
-        auto queue_history_finish(const QUuid& view_id, const QString& file_path) -> void;
-
-        /**
          * @brief Handles completion of all queued history writes for one import.
          *
          * @param view_id View that owns the import.
@@ -790,19 +772,6 @@ class LogViewerController: public QObject
          */
         auto handle_history_write_finished(const QUuid& view_id, const QString& file_path,
                                            bool succeeded, const QString& error_message) -> void;
-
-        /**
-         * @brief Queues cleanup for entries that reached the writer before a view was removed.
-         * @param view_id Removed view.
-         */
-        auto discard_queued_history(const QUuid& view_id) -> void;
-
-        /**
-         * @brief Queues cleanup for entries that reached the writer before a file was removed.
-         * @param view_id View that owned the file.
-         * @param file_path Removed source file.
-         */
-        auto discard_queued_history(const QUuid& view_id, const QString& file_path) -> void;
 
         /**
          * @brief Ensures that models and proxies exist for the specified view ID.
@@ -824,8 +793,7 @@ class LogViewerController: public QObject
         ViewRegistry* m_views{nullptr};
         FilterCoordinator* m_filters{nullptr};
         LogHistoryService* m_history_service{nullptr};
-        LogHistoryWriter* m_history_writer{nullptr};
-        QThread* m_history_writer_thread{nullptr};
+        HistoryWriteService* m_history_write_service{nullptr};
         LogPageCoordinator* m_page_coordinator{nullptr};
         LogQueryController* m_query_controller{nullptr};
         LogTailerService* m_tailer_service{nullptr};

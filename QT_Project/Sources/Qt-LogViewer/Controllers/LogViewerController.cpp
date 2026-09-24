@@ -8,8 +8,6 @@
 
 #include <QDebug>
 #include <QFileInfo>
-#include <QMetaObject>
-#include <QThread>
 #include <QTimer>
 #include <algorithm>
 #include <optional>
@@ -24,8 +22,8 @@
 #include "Qt-LogViewer/Controllers/ViewRegistry.h"
 #include "Qt-LogViewer/Models/LogFileTreeModel.h"
 #include "Qt-LogViewer/Models/LogModel.h"
+#include "Qt-LogViewer/Services/HistoryWriteService.h"
 #include "Qt-LogViewer/Services/LogHistoryService.h"
-#include "Qt-LogViewer/Services/LogHistoryWriter.h"
 #include "Qt-LogViewer/Services/LogLoader.h"
 #include "Qt-LogViewer/Services/LogLoadingService.h"
 #include "Qt-LogViewer/Services/LogParser.h"
@@ -186,13 +184,9 @@ LogViewerController::LogViewerController(const LogParsingProfile& profile, QObje
 {
     // Initialize services
     m_history_service = new LogHistoryService(this);
-    m_history_writer_thread = new QThread(this);
-    m_history_writer = new LogHistoryWriter(m_history_service->get_database_path());
-    m_history_writer->moveToThread(m_history_writer_thread);
-    connect(m_history_writer_thread, &QThread::finished, m_history_writer, &QObject::deleteLater);
-    connect(m_history_writer, &LogHistoryWriter::import_write_finished, this,
+    m_history_write_service = new HistoryWriteService(m_history_service->get_database_path(), this);
+    connect(m_history_write_service, &HistoryWriteService::import_write_finished, this,
             &LogViewerController::handle_history_write_finished, Qt::QueuedConnection);
-    m_history_writer_thread->start();
 
     m_page_coordinator = new LogPageCoordinator(m_history_service, m_views, this);
     m_query_controller = new LogQueryController(m_filters, m_page_coordinator, m_views, this);
@@ -281,7 +275,7 @@ LogViewerController::LogViewerController(const LogParsingProfile& profile, QObje
                         << "[Controller] batch for view=" << view_id.toString() << " file=\""
                         << absolute_file_path << "\" count=" << batch.size();
 
-                    queue_history_batch(view_id, absolute_file_path, batch);
+                    m_history_write_service->store_batch(view_id, absolute_file_path, batch);
                 }
             });
 
@@ -333,7 +327,8 @@ LogViewerController::LogViewerController(const LogParsingProfile& profile, QObje
             [this](const QUuid& view_id, const QString& file_path) {
                 if (!m_is_shutting_down)
                 {
-                    queue_history_finish(view_id, QFileInfo(file_path).absoluteFilePath());
+                    m_history_write_service->finish_import(view_id,
+                                                           QFileInfo(file_path).absoluteFilePath());
                 }
             });
 
@@ -400,16 +395,10 @@ LogViewerController::~LogViewerController()
         }
     }
 
-    if (m_history_writer != nullptr)
+    if (m_history_write_service != nullptr)
     {
-        QObject::disconnect(m_history_writer, nullptr, this, nullptr);
-    }
-
-    if (m_history_writer_thread != nullptr)
-    {
-        m_history_writer_thread->quit();
-        m_history_writer_thread->wait();
-        m_history_writer = nullptr;
+        QObject::disconnect(m_history_write_service, nullptr, this, nullptr);
+        m_history_write_service->shutdown();
     }
 }
 
@@ -472,7 +461,7 @@ auto LogViewerController::remove_view(const QUuid& view_id) -> bool
 
         if (m_history_service != nullptr)
         {
-            discard_queued_history(view_id);
+            m_history_write_service->discard_view(view_id);
             m_history_service->remove_view_entries(view_id);
         }
 
@@ -1784,7 +1773,7 @@ auto LogViewerController::remove_log_file(const LogFileInfo& file) -> void
         {
             m_tailer_service->stop_tailing(view_id, file_path);
 
-            discard_queued_history(view_id, file_path);
+            m_history_write_service->discard_file(view_id, file_path);
             m_history_service->remove_file_entries(view_id, file_path);
 
             QList<LogFileInfo> files = context->get_loaded_files();
@@ -1849,7 +1838,7 @@ auto LogViewerController::remove_log_file(const QUuid& view_id, const QString& f
     {
         m_tailer_service->stop_tailing(view_id, file_path);
 
-        discard_queued_history(view_id, file_path);
+        m_history_write_service->discard_file(view_id, file_path);
         m_history_service->remove_file_entries(view_id, file_path);
 
         m_views->remove_entries_by_file(view_id, file_path);
@@ -1871,46 +1860,6 @@ auto LogViewerController::remove_log_file(const QUuid& view_id, const QString& f
     if (can_remove && view_became_empty)
     {
         remove_view(view_id);
-    }
-}
-
-/**
- * @brief Queues one parsed batch for storage on the history writer thread.
- * @param view_id View that owns the imported entries.
- * @param file_path Imported source file.
- * @param entries Parsed entries to store.
- */
-auto LogViewerController::queue_history_batch(const QUuid& view_id, const QString& file_path,
-                                              const QVector<LogEntry>& entries) -> void
-{
-    if (m_history_writer != nullptr && m_history_writer_thread != nullptr &&
-        m_history_writer_thread->isRunning())
-    {
-        LogHistoryWriter* writer = m_history_writer;
-        QMetaObject::invokeMethod(
-            writer,
-            [writer, view_id, file_path, entries]() {
-                writer->store_batch(view_id, file_path, entries);
-            },
-            Qt::QueuedConnection);
-    }
-}
-
-/**
- * @brief Queues an import completion marker behind all preceding history batches.
- * @param view_id View that owns the import.
- * @param file_path Imported source file.
- */
-auto LogViewerController::queue_history_finish(const QUuid& view_id,
-                                               const QString& file_path) -> void
-{
-    if (m_history_writer != nullptr && m_history_writer_thread != nullptr &&
-        m_history_writer_thread->isRunning())
-    {
-        LogHistoryWriter* writer = m_history_writer;
-        QMetaObject::invokeMethod(
-            writer, [writer, view_id, file_path]() { writer->finish_import(view_id, file_path); },
-            Qt::QueuedConnection);
     }
 }
 
@@ -1967,41 +1916,6 @@ auto LogViewerController::handle_history_write_finished(const QUuid& view_id,
                                                 get_file_profile(view_id, absolute_file_path));
             }
         }
-    }
-}
-
-/**
- * @brief Queues cleanup for entries that reached the writer before a view was removed.
- *
- * @param view_id Removed view.
- */
-auto LogViewerController::discard_queued_history(const QUuid& view_id) -> void
-{
-    if (m_history_writer != nullptr && m_history_writer_thread != nullptr &&
-        m_history_writer_thread->isRunning())
-    {
-        LogHistoryWriter* writer = m_history_writer;
-        QMetaObject::invokeMethod(
-            writer, [writer, view_id]() { writer->discard_view(view_id); }, Qt::QueuedConnection);
-    }
-}
-
-/**
- * @brief Queues cleanup for entries that reached the writer before a file was removed.
- *
- * @param view_id View that owned the file.
- * @param file_path Removed source file.
- */
-auto LogViewerController::discard_queued_history(const QUuid& view_id,
-                                                 const QString& file_path) -> void
-{
-    if (m_history_writer != nullptr && m_history_writer_thread != nullptr &&
-        m_history_writer_thread->isRunning())
-    {
-        LogHistoryWriter* writer = m_history_writer;
-        QMetaObject::invokeMethod(
-            writer, [writer, view_id, file_path]() { writer->discard_file(view_id, file_path); },
-            Qt::QueuedConnection);
     }
 }
 
