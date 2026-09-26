@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QAbstractItemModel>
+#include <QColor>
 #include <QMap>
 #include <QMenu>
 #include <QModelIndex>
@@ -35,8 +36,34 @@ class LogTableView;
 class LogViewWidget: public QWidget
 {
         Q_OBJECT
+        Q_PROPERTY(QColor files_icon_color READ files_icon_color WRITE set_files_icon_color)
+        Q_PROPERTY(QString files_icon READ files_icon WRITE set_files_icon)
 
     public:
+        /**
+         * @brief Returns the Files button icon tint.
+         * @return Current stylesheet property value.
+         */
+        [[nodiscard]] auto files_icon_color() const -> QColor;
+
+        /**
+         * @brief Sets the Files button icon tint.
+         * @param value New stylesheet property value.
+         */
+        auto set_files_icon_color(const QColor& value) -> void;
+
+        /**
+         * @brief Returns the Files button icon resource path.
+         * @return Current stylesheet property value.
+         */
+        [[nodiscard]] auto files_icon() const -> QString;
+
+        /**
+         * @brief Sets the Files button icon resource path.
+         * @param value New stylesheet property value.
+         */
+        auto set_files_icon(const QString& value) -> void;
+
         /**
          * @brief Constructs a LogViewWidget object.
          *
@@ -265,6 +292,11 @@ class LogViewWidget: public QWidget
         auto refresh_files_menu_states() -> void;
 
     private:
+        /** @brief Refreshes the Files button decoration from stylesheet properties. */
+        auto update_files_icon() -> void;
+
+        QColor m_files_icon_color;  ///< Files button icon tint.
+        QString m_files_icon;       ///< Files button icon resource path.
         Ui::LogViewWidget* ui;
         QUuid m_view_id;
         QMenu* m_files_menu = nullptr;

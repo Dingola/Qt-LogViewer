@@ -94,7 +94,11 @@ class LogModel: public QAbstractTableModel
          */
         auto remove_entries_by_file_path(const QString& file_path) -> void;
 
-    private:
+        /**
+         * @brief Resolves a level string using the model's supported severity aliases.
+         * @param level_str Log level text to classify.
+         * @return Corresponding severity, defaulting to Info for unrecognized text.
+         */
         static auto map_log_level(const QString& level_str) -> SimpleCppLogger::LogLevel;
 
     private:

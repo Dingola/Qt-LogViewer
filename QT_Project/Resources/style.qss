@@ -1,4 +1,18 @@
 @Variables {
+    @checkbox-indicator-bg-color-checked-hover: @Brand-Accent-600;
+    @icon-accent-color: #42a5f5;
+    @icon-folder-color: #66bb6a;
+    @icon-session-color: #ffa726;
+    @action-danger-color: #ef5350;
+    @action-danger-hover-color: #b71c1c;
+    @action-danger-pressed-color: #ff1744;
+    @action-warning-color: #ffb300;
+    @action-token-color: #ff8f00;
+    @status-success-color: #66bb6a;
+    @pagination-arrow-color: #ffffff;
+    @arrow-down-image: url(:/Resources/down-arrow.svg);
+    @arrow-left-image: url(:/Resources/left-arrow.svg);
+    @arrow-right-image: url(:/Resources/right-arrow.svg);
     @Brand-Primary-900: #453db5;
     @Brand-Primary-800: #5353be;
     @Brand-Primary-700: #6367c7;
@@ -84,12 +98,13 @@
     @tooltip-border-width: 1;
 
     /* QLineEdit */
-    @line-edit-border-width: 2;
-    @line-edit-border-radius: 12;
+    @line-edit-border-width: 1px;
+    @line-edit-border-radius: 4px;
+    @input-min-height: 22px;
 
     /* QComboBox */
     @combo-box-border-width: 1;
-    @combo-box-border-radius: 6;
+    @combo-box-border-radius: 4px;
     @combo-box-drop-down-width: 20;
     @combo-box-arrow-width: 10;
     @combo-box-arrow-height: 10;
@@ -98,15 +113,22 @@
     @checkbox-spacing: 6;
     @checkbox-indicator-width: 14;
     @checkbox-indicator-height: 14;
-    @checkbox-indicator-border-width: 2;
+    @checkbox-indicator-border-width: 1;
     @checkbox-indicator-border-radius: 2;
 
     /* QPushButton */
-    @button-border-radius: 6;
+    @button-border-radius: 4px;
+    @button-min-height: @input-min-height;
+    @button-padding: 4px 12px;
+    @button-font-size: @widget-font-size;
+    @button-font-weight: 400;
+    @button-border-color: @Brand-Accent-600;
+    @button-border-color-hover: @Brand-Accent-500;
+    @button-border-color-focus: @Brand-Accent-300;
 
     /* QToolButton */
-    @tool-button-border-width: 2;
-    @tool-button-border-radius: 10;
+    @tool-button-border-width: 1;
+    @tool-button-border-radius: @button-border-radius;
     @tool-button-size: 32;
     @tool-button-inline-size: 24;
 
@@ -116,6 +138,11 @@
     @table-header-padding: 2;
     @table-header-border-width: 1;
     @table-header-border-radius: 0;
+    @table-frame-color: @border-color-primary;
+    @table-grid-color: @border-color-primary;
+    @table-section-padding: 5px 8px;
+    @table-section-bg-color: @table-header-bg-color;
+    @table-section-border-color: @border-color-primary;
 
     /* QPlainTextEdit */
     @plain-text-edit-border-width: 1;
@@ -133,8 +160,9 @@
     @menu-inline-border-radius: 8;
 
     /* QScrollBar */
-    @scroll-bar-size: 10;
-    @scroll-bar-handle-radius: 5;
+    @scroll-bar-size: 14px;
+    @scroll-bar-handle-radius: 2px;
+    @scroll-bar-end-size: 16px;
 
     /* QTreeView */
     @tree-margin: 2;
@@ -172,10 +200,11 @@
 
     /* DockWidget */
     @dock-widget-title-bar-border-bottom-width: 1;
-    @dock-widget-title-bar-border-radius-top: 8;
+    @dock-widget-title-bar-border-radius-top: 4px;
     @dock-widget-title-label-padding: 2px 8px;
-    @dock-widget-title-label-font-size: 9pt;
-    @dock-widget-title-label-font-weight: 600;
+    @dock-widget-title-label-font-size: 10pt;
+    @dock-widget-title-label-font-weight: 500;
+    @dock-widget-title-bar-border-color: @border-color-primary;
     @dock-widget-close-button-padding: 3px 4px 3px 0px;
 
     /* WindowTitleBar */
@@ -186,20 +215,20 @@
     /* StartPageWidget */
     @start-page-welcome-padding: 6px;
     @start-page-welcome-font-size: 18pt;
-    @start-page-welcome-font-weight: 800;
-    @start-page-group-box-border-radius: 8;
+    @start-page-welcome-font-weight: 600;
+    @start-page-group-box-border-radius: 2px;
     @start-page-group-box-margin-top: 0;
-    @start-page-group-box-padding-top: 25;
+    @start-page-group-box-padding-top: 32;
     @start-page-group-box-title-margin-left: 10;
     @start-page-group-box-title-margin-top: 10;
     @start-page-group-box-title-padding: 0;
     @start-page-group-box-title-font-size: 12pt;
-    @start-page-group-box-title-font-weight: 700;
-    @start-page-list-border-left-width: 2;
+    @start-page-group-box-title-font-weight: 600;
+    @start-page-list-border-left-width: 0;
     @start-page-list-padding: 0;
-    @start-page-list-margin-left: 10;
+    @start-page-list-margin-left: 0;
     @start-page-item-padding: 6px;
-    @start-page-item-margin-left: 4;
+    @start-page-item-margin-left: 0;
     @start-page-item-border-width: 1;
     @start-page-item-font-size: 12pt;
     @start-page-item-font-weight: 500;
@@ -208,7 +237,7 @@
     @log-import-group-box-margin-top: 10px;
     @log-import-group-box-padding: 12px;
     @log-import-group-box-border-width: 1px;
-    @log-import-group-box-border-radius: 8px;
+    @log-import-group-box-border-radius: 2px;
     @log-import-group-box-title-left: 10px;
     @log-import-group-box-title-padding: 0px 4px;
     @log-import-field-button-min-height: 18px;
@@ -220,11 +249,15 @@
     @log-import-hint-padding: 6px 8px;
     @log-import-hint-border-radius: 6px;
     @log-import-action-button-min-width: 72px;
-    @log-import-action-button-min-height: 22px;
-    @log-import-action-button-padding: 4px 12px;
-    @log-import-action-button-font-size: 12pt;
-    @log-import-action-button-font-weight: 600;
+    @log-import-action-button-min-height: @button-min-height;
+    @log-import-action-button-padding: @button-padding;
+    @log-import-action-button-font-size: @button-font-size;
+    @log-import-action-button-font-weight: @button-font-weight;
     @log-import-preview-splitter-spacing: 6px;
+    @log-import-primary-bg: @status-success-color;
+    @log-import-primary-hover-bg: @status-success-color;
+    @log-import-primary-text: @Neutral-7;
+    @log-import-success-text: @text-color-primary;
 
     /* LogViewWidget */
     @log-view-tool-button-min-width: 80;
@@ -233,7 +266,7 @@
     @log-view-tool-button-max-height: 22;
     @log-view-tool-button-padding: 4px;
     @log-view-tool-button-border-width: 1;
-    @log-view-tool-button-border-radius: 6;
+    @log-view-tool-button-border-radius: @button-border-radius;
     @log-view-indicator-width: 10;
     @log-view-indicator-height: 10;
     @log-view-indicator-margin: 0px 4px 10px 4px;
@@ -248,8 +281,8 @@
     @search-bar-combo-box-max-height: 28;
     @search-bar-line-edit-min-height: 28;
     @search-bar-line-edit-max-height: 28;
-    @search-bar-push-button-padding: 9px 14px;
-    @search-bar-push-button-border-radius: 6;
+    @search-bar-push-button-padding: 4px 14px;
+    @search-bar-push-button-border-radius: @button-border-radius;
 
     /* PieChart */
     @pie-chart-bg-color: @Neutral-3;
@@ -289,14 +322,14 @@
     @log-level-filter-label-max-height: 24px;
 
     /* TableViewLog */
-    @table-view-log-border-radius-top: 8;
+    @table-view-log-border-radius-top: 0;
     @table-view-log-border-radius-bottom: 0;
 
     /* Pagination Widget */
-    @pagination-border-radius-bottom: 8;
-    @pagination-current-border-width: 2px;
+    @pagination-border-radius-bottom: 0;
+    @pagination-current-border-width: 1px;
     @pagination-current-font-weight: bold;
-    @pagination-line-edit-border-radius: 10;
+    @pagination-line-edit-border-radius: @line-edit-border-radius;
     @pagination-controls-height: 26px;
     @pagination-line-edit-width: 40px;
     @pagination-label-font-size: 10pt;
@@ -307,10 +340,14 @@
 }
 
 @Variables[Name="Dark"] {
+    @log-import-primary-bg: @button-bg-color;
+    @log-import-primary-hover-bg: @button-bg-color-hover;
+    @log-import-primary-text: @text-color-primary;
+    @log-import-success-text: @status-success-color;
     /* --- GLOBAL SEMANTIC TOKENS ----------------------------------------------- */
 
     /* Typography */
-    @text-color-primary: @Neutral-6;
+    @text-color-primary: #dce2e8;
     @text-color-secondary: @Neutral-10;
     @text-color-tertiary: @Neutral-10;
     @text-color-disabled: @Neutral-8;
@@ -353,9 +390,9 @@
     @line-edit-bg-color-focus: @Neutral-12;
     @line-edit-bg-color-disabled: @Neutral-14;
 
-    @line-edit-border-color: transparent;
-    @line-edit-border-color-hover: @Neutral-12;
-    @line-edit-border-color-focus: @Neutral-12;
+    @line-edit-border-color: #43505d;
+    @line-edit-border-color-hover: @Brand-Accent-600;
+    @line-edit-border-color-focus: @Brand-Accent-500;
 
     @line-edit-text-color: @text-color-primary;
     @line-edit-text-color-disabled: @text-color-disabled;
@@ -365,7 +402,7 @@
     @combo-box-bg-color: @Neutral-5;
     @combo-box-bg-color-hover: @Neutral-12;
     @combo-box-bg-color-disabled: @Neutral-14;
-    @combo-box-border-color: @border-color-primary;
+    @combo-box-border-color: #43505d;
     @combo-box-selection-bg-color: @Brand-Accent-700;
     @combo-box-text-color: @text-color-primary;
     @combo-box-text-color-disabled: @text-color-disabled;
@@ -375,13 +412,14 @@
     @checkbox-indicator-bg-color-checked: @Brand-Accent-700;
     @checkbox-indicator-bg-color-hover: @Brand-Accent-600;
     @checkbox-indicator-bg-color-disabled: @Neutral-14;
-    @checkbox-indicator-border-color: @Neutral-5;
+    @checkbox-indicator-border-color: #53606d;
+    @checkbox-check-image: url(:/Resources/Icons/check-light.svg);
     @checkbox-text-color: @text-color-primary;
     @checkbox-text-color-disabled: @text-color-disabled;
 
     /* Button */
-    @button-bg-color: @Brand-Accent-700;
-    @button-bg-color-hover: @Brand-Accent-600;
+    @button-bg-color: #315f80;
+    @button-bg-color-hover: #3c7094;
     @button-bg-color-pressed: @Brand-Accent-750;
     @button-bg-color-disabled: @Neutral-14;
     @button-text-color: @text-color-primary;
@@ -416,9 +454,14 @@
     /* Table View */
     @table-bg-color: @Neutral-3;
     @table-selection-bg-color: @Brand-Accent-900;
-    @table-hover-row-color: @Brand-Accent-800;
+    @table-hover-row-color: #343e49;
     @table-alternate-bg-color: @Neutral-15;
     @table-text-color: @text-color-primary;
+    @table-search-match-color: @Brand-Accent-500;
+    @table-frame-color: #43505d;
+    @table-grid-color: #2d343e;
+    @table-section-bg-color: #303946;
+    @table-section-border-color: #3c4653;
 
     /* Table Header */
     @table-header-bg-color: @Neutral-4;
@@ -439,16 +482,16 @@
     @menu-bar-text-color: @text-color-primary;
 
     /* Menu */
-    @menu-bg-color: @Neutral-3;
+    @menu-bg-color: @Neutral-3-1;
     @menu-item-bg-color-selected: @Brand-Accent-700;
-    @menu-border-color: @border-color-primary;
+    @menu-border-color: #53606d;
     @menu-text-color: @text-color-primary;
     @menu-text-color-disabled: @text-color-disabled;
 
     /* ScrollBars */
     @scroll-bar-track-color: @Neutral-3;
-    @scroll-bar-handle-color: @Brand-Accent-700;
-    @scroll-bar-handle-color-hover: @Brand-Accent-600;
+    @scroll-bar-handle-color: #53606d;
+    @scroll-bar-handle-color-hover: #718090;
 
     /* TreeView */
     @tree-bg-color: @Neutral-3;
@@ -459,7 +502,7 @@
 
     /* QTabWidget */
     @tab-widget-bg-color: @Neutral-3;
-    @tab-widget-pane-bg-color: @Neutral-3;
+    @tab-widget-pane-bg-color: @tab-widget-bg-color;
 
     /* QTabBar */
     @tab-bar-tab-bg-color: @Neutral-5;
@@ -470,14 +513,15 @@
 
     /* Custom TabWidget */
     @custom-tab-widget-close-icon-color: @Neutral-6;
-    @custom-tab-widget-close-icon-color-hover: @Severity-Info;
+    @custom-tab-widget-close-icon-color-hover: @icon-accent-color;
     @custom-tab-widget-tool-button-bg-color: transparent;
     @custom-tab-widget-tool-button-bg-color-hover: @Neutral-5;
     @custom-tab-widget-tool-button-bg-color-pressed: @Neutral-4;
 
     /* DockWidget */
     @dock-widget-title-bar-bg-color: @Neutral-3;
-    @dock-widget-title-label-text-color: @Neutral-10;
+    @dock-widget-title-bar-border-color: @border-color-primary;
+    @dock-widget-title-label-text-color: @text-color-secondary;
     @dock-widget-close-button-bg-color: transparent;
     @dock-widget-close-button-bg-color-hover: @Neutral-5;
     @dock-widget-close-button-bg-color-pressed: @Neutral-4;
@@ -489,23 +533,23 @@
 
     /* StartPageWidget */
     @start-page-text-color: @text-color-primary;
-    @start-page-group-box-bg-color: @Neutral-3;
-    @start-page-list-bg-color: @Neutral-3;
+    @start-page-group-box-bg-color: @log-import-group-box-bg-color;
+    @start-page-list-bg-color: @log-import-group-box-bg-color;
     @start-page-list-border-left-color: @Brand-Accent-500;
     @start-page-item-text-color: @text-color-primary;
     @start-page-item-text-color-accent: @text-color-primary;
-    @start-page-item-bg-color-hover: @Brand-Accent-600;
-    @start-page-item-bg-color-selected: @Brand-Accent-700;
+    @start-page-item-bg-color-hover: @table-hover-row-color;
+    @start-page-item-bg-color-selected: @table-selection-bg-color;
     @start-page-item-border-color-hover: @Brand-Accent-500;
     @start-page-item-border-color-selected: @Brand-Accent-500;
 
     /* LogImportWidget */
-    @log-import-bg-color: @dialog-bg-color;
-    @log-import-group-box-bg-color: @Neutral-3;
-    @log-import-group-box-border-color: @Neutral-12;
-    @log-import-field-button-bg-color: @Severity-WarningHover;
-    @log-import-field-button-bg-color-hover: @Severity-Warning;
-    @log-import-field-button-bg-color-pressed: @Severity-Warning;
+    @log-import-bg-color: @tab-widget-pane-bg-color;
+    @log-import-group-box-bg-color: @Neutral-3-1;
+    @log-import-group-box-border-color: #43505d;
+    @log-import-field-button-bg-color: @action-token-color;
+    @log-import-field-button-bg-color-hover: #ffb300;
+    @log-import-field-button-bg-color-pressed: #ffb300;
     @log-import-field-button-text-color: @Neutral-7;
     @log-import-secondary-button-bg-color: @Neutral-5;
     @log-import-secondary-button-bg-color-hover: @Neutral-12;
@@ -514,7 +558,7 @@
     @log-import-validation-bg-color: @Brand-Accent-900;
 
     /* LogViewWidget */
-    @log-view-bg-color: @Neutral-3;
+    @log-view-bg-color: @tab-widget-pane-bg-color;
     @log-view-tool-button-bg-color: @tool-button-bg-color;
     @log-view-tool-button-border-color: @border-color-primary;
     @log-view-tool-button-text-color: @text-color-primary;
@@ -522,8 +566,8 @@
     @log-view-tool-button-border-color-hover: @Neutral-12;
 
     /* SearchBarWidget */
-    @search-bar-clear-icon-color: @Severity-Info;
-    @search-bar-clear-icon-color-hover: @Severity-Error;
+    @search-bar-clear-icon-color: @icon-accent-color;
+    @search-bar-clear-icon-color-hover: @action-danger-color;
     @search-bar-clear-button-bg-color: @Neutral-3;
     @search-bar-clear-button-bg-color-hover: @Neutral-3-1;
 
@@ -575,55 +619,80 @@
 }
 
 @Variables[Name="Light"] {
+    @icon-accent-color: #246d9e;
+    @icon-folder-color: #3d8050;
+    @icon-session-color: #a56a12;
+    @action-danger-color: #bc3838;
+    @status-success-color: #27733e;
+    /* Light surfaces and glyphs share the Dark theme geometry. */
+    @log-import-primary-bg: @button-bg-color;
+    @log-import-primary-hover-bg: @button-bg-color-hover;
+    @log-import-primary-text: @button-text-color;
+    @log-import-success-text: #27733e;
+    @table-frame-color: @border-color-primary;
+    @table-grid-color: #e0e4e7;
+    @table-section-bg-color: @table-header-bg-color;
+    @table-section-border-color: #b8c2ca;
+    @dock-widget-title-bar-border-color: #dce3e9;
+    @Severity-Trace: #596d7c;
+    @Severity-Debug: #2e7d42;
+    @Severity-Info: #246d9e;
+    @Severity-Warning: #946000;
+    @Severity-Error: #bc3838;
+    @Severity-Fatal: #b51f46;
+    @pagination-arrow-color: #526777;
+    @arrow-down-image: url(:/Resources/down-arrow-light.svg);
+    @arrow-left-image: url(:/Resources/left-arrow-light.svg);
+    @arrow-right-image: url(:/Resources/right-arrow-light.svg);
     /* --- GLOBAL SEMANTIC TOKENS ----------------------------------------------- */
 
     /* Typography */
-    @text-color-primary: @Neutral-7;
-    @text-color-secondary: @Neutral-26;
-    @text-color-tertiary: @Neutral-25;
-    @text-color-disabled: @Neutral-24;
+    @text-color-primary: #263442;
+    @text-color-secondary: #526271;
+    @text-color-tertiary: #6e7e8c;
+    @text-color-disabled: #8b969f;
 
     /* Borders */
-    @border-color-primary: @Neutral-21;
-    @border-color-secondary: @Neutral-1;
-    @border-color-disabled: @Neutral-22;
+    @border-color-primary: #aeb8c1;
+    @border-color-secondary: #a8b6c2;
+    @border-color-disabled: #d5dce2;
 
     /* --- COMPONENT TOKENS ----------------------------------------------------- */
 
     /* Base Widget */
-    @widget-bg-color: @Neutral-16;
+    @widget-bg-color: #e4e6e8;
     @widget-text-color: @text-color-primary;
 
     /* Dialog */
     @dialog-bg-color: @widget-bg-color;
     @dialog-border-color: @border-color-secondary;
 
-    @dialog-group-box-bg-color: @Neutral-19;
+    @dialog-group-box-bg-color: #f3f4f5;
 
     @dialog-list-view-bg-color: transparent;
-    @dialog-list-view-item-hover-bg-color: @Neutral-5;
-    @dialog-list-view-item-selected-bg-color: @Neutral-3;
+    @dialog-list-view-item-hover-bg-color: #dde4e9;
+    @dialog-list-view-item-selected-bg-color: #c8dbe8;
 
-    @dialog-stacked-widget-border-color: @Brand-Accent-500;
+    @dialog-stacked-widget-border-color: @border-color-primary;
 
     /* Label */
     @label-bg-color: transparent;
     @label-text-color: @text-color-primary;
 
     /* ToolTip */
-    @tooltip-bg-color: @Neutral-17;
+    @tooltip-bg-color: #fafbfc;
     @tooltip-text-color: @text-color-primary;
-    @tooltip-border-color: @Neutral-21;
+    @tooltip-border-color: @border-color-secondary;
 
     /* LineEdit */
-    @line-edit-bg-color: @Neutral-6;
-    @line-edit-bg-color-hover: @Neutral-17;
-    @line-edit-bg-color-focus: @Brand-Accent-200;
-    @line-edit-bg-color-disabled: @Neutral-18;
+    @line-edit-bg-color: #ffffff;
+    @line-edit-bg-color-hover: #fafbfc;
+    @line-edit-bg-color-focus: #ffffff;
+    @line-edit-bg-color-disabled: #e8edf1;
 
     @line-edit-border-color: @border-color-primary;
-    @line-edit-border-color-hover: @Neutral-21;
-    @line-edit-border-color-focus: @Brand-Accent-200;
+    @line-edit-border-color-hover: #8ca4b7;
+    @line-edit-border-color-focus: #527f9f;
 
     @line-edit-text-color: @text-color-primary;
     @line-edit-text-color-disabled: @text-color-disabled;
@@ -631,178 +700,180 @@
 
     /* ComboBox */
     @combo-box-bg-color: @Neutral-6;
-    @combo-box-bg-color-hover: @Neutral-17;
-    @combo-box-bg-color-disabled: @Neutral-18;
+    @combo-box-bg-color-hover: #f5f8fa;
+    @combo-box-bg-color-disabled: @line-edit-bg-color-disabled;
     @combo-box-border-color: @border-color-primary;
-    @combo-box-selection-bg-color: @Brand-Accent-100;
+    @combo-box-selection-bg-color: #c8dbe8;
     @combo-box-text-color: @text-color-primary;
     @combo-box-text-color-disabled: @text-color-disabled;
 
     /* CheckBox */
     @checkbox-indicator-bg-color: @Neutral-6;
-    @checkbox-indicator-bg-color-checked: @Brand-Accent-300;
-    @checkbox-indicator-bg-color-hover: @Brand-Accent-100;
-    @checkbox-indicator-bg-color-disabled: @Neutral-18;
-    @checkbox-indicator-border-color: @Brand-Accent-100;
+    @checkbox-indicator-bg-color-checked: #315f80;
+    @checkbox-indicator-bg-color-hover: #c8dbe8;
+    @checkbox-indicator-bg-color-disabled: #e8edf1;
+    @checkbox-indicator-border-color: #8b9daa;
+    @checkbox-check-image: url(:/Resources/Icons/check-light.svg);
     @checkbox-text-color: @text-color-primary;
     @checkbox-text-color-disabled: @text-color-disabled;
 
     /* Button */
-    @button-bg-color: @Brand-Accent-700;
-    @button-bg-color-hover: @Brand-Accent-600;
+    @button-bg-color: #315f80;
+    @button-bg-color-hover: #3c7094;
     @button-bg-color-pressed: @Brand-Accent-800;
-    @button-bg-color-disabled: @Neutral-23;
-    @button-text-color: @text-color-primary;
+    @button-bg-color-disabled: #e0e6eb;
+    @button-text-color: #ffffff;
     @button-text-color-disabled: @text-color-disabled;
 
     /* ToolButton */
-    @tool-button-bg-color: @Neutral-6;
-    @tool-button-bg-color-hover: @button-bg-color-hover;
-    @tool-button-bg-color-disabled: @Neutral-18;
+    @tool-button-bg-color: #f7f9fb;
+    @tool-button-bg-color-hover: #dbe7ef;
+    @tool-button-bg-color-disabled: #e8edf1;
     @tool-button-border-color-hover: @Brand-Accent-500;
     @tool-button-text-color: @text-color-primary;
     @tool-button-text-color-disabled: @text-color-disabled;
 
     /* ToolButton Variant: Inline Menu */
-    @tool-button-inline-bg-color: @Neutral-6;
-    @tool-button-inline-bg-color-hover: @Neutral-17;
-    @tool-button-inline-bg-color-pressed: @Neutral-21;
+    @tool-button-inline-bg-color: #e9eef3;
+    @tool-button-inline-bg-color-hover: #dce6ee;
+    @tool-button-inline-bg-color-pressed: #ccdce8;
 
     /* Table View */
-    @table-bg-color: @Neutral-6;
-    @table-selection-bg-color: @Brand-Accent-100;
-    @table-hover-row-color: @Brand-Accent-5;
-    @table-alternate-bg-color: @Neutral-16;
+    @table-bg-color: #fafbfc;
+    @table-search-match-color: @Brand-Accent-600;
+    @table-selection-bg-color: #c8dbe8;
+    @table-hover-row-color: #e0e6eb;
+    @table-alternate-bg-color: #eceef0;
     @table-text-color: @text-color-primary;
 
     /* Table Header */
-    @table-header-bg-color: @Neutral-6;
-    @table-header-bg-color-hover: @Neutral-17;
-    @table-header-bg-color-pressed: @Neutral-22;
+    @table-header-bg-color: #d8dde1;
+    @table-header-bg-color-hover: #d7e1e9;
+    @table-header-bg-color-pressed: #cbd9e4;
     @table-header-text-color: @text-color-primary;
 
     /* PlainTextEdit */
-    @plain-text-edit-bg-color: @Neutral-6;
-    @plain-text-edit-bg-color-disabled: @Neutral-23;
+    @plain-text-edit-bg-color: #f3f4f5;
+    @plain-text-edit-bg-color-disabled: #e8edf1;
     @plain-text-edit-border-color: @border-color-primary;
     @plain-text-edit-text-color: @text-color-primary;
     @plain-text-edit-text-color-disabled: @text-color-disabled;
 
     /* MenuBar */
-    @menu-bar-bg-color: @Neutral-16;
+    @menu-bar-bg-color: @widget-bg-color;
     @menu-bar-item-bg-color-selected: @Brand-Accent-100;
     @menu-bar-text-color: @text-color-primary;
 
     /* Menu */
-    @menu-bg-color: @Neutral-17;
-    @menu-item-bg-color-selected: @Brand-Accent-100;
-    @menu-border-color: @border-color-primary;
+    @menu-bg-color: #f8fafc;
+    @menu-item-bg-color-selected: #c8dbe8;
+    @menu-border-color: #a8b6c2;
     @menu-text-color: @text-color-primary;
     @menu-text-color-disabled: @text-color-disabled;
 
     /* ScrollBars */
-    @scroll-bar-track-color: @Neutral-19;
-    @scroll-bar-handle-color: @Brand-Accent-100;
-    @scroll-bar-handle-color-hover: @Brand-Accent-200;
+    @scroll-bar-track-color: #edf1f4;
+    @scroll-bar-handle-color: #a5b2bd;
+    @scroll-bar-handle-color-hover: #7d909f;
 
     /* TreeView */
-    @tree-bg-color: @Neutral-6;
+    @tree-bg-color: #f3f4f5;
     @tree-text-color: @text-color-primary;
-    @tree-item-bg-color: @Neutral-4;
-    @tree-item-bg-color-hover: @Neutral-12;
-    @tree-item-bg-color-selected: @Brand-Accent-100;
+    @tree-item-bg-color: #dce1e5;
+    @tree-item-bg-color-hover: #d5e1eb;
+    @tree-item-bg-color-selected: #c4dbea;
 
     /* QTabWidget */
-    @tab-widget-bg-color: @Neutral-19;
-    @tab-widget-pane-bg-color: @Neutral-6;
+    @tab-widget-bg-color: #eceef0;
+    @tab-widget-pane-bg-color: @tab-widget-bg-color;
 
     /* QTabBar */
-    @tab-bar-tab-bg-color: @Neutral-19;
-    @tab-bar-tab-bg-color-selected: @Neutral-17;
-    @tab-bar-tab-bg-color-hover: @Neutral-17;
+    @tab-bar-tab-bg-color: #d9dfe4;
+    @tab-bar-tab-bg-color-selected: #eceef0;
+    @tab-bar-tab-bg-color-hover: #e8eef3;
     @tab-bar-tab-text-color-active: @text-color-primary;
     @tab-bar-tab-text-color-inactive: @text-color-secondary;
 
     /* Custom TabWidget */
-    @custom-tab-widget-close-icon-color: @Neutral-7;
-    @custom-tab-widget-close-icon-color-hover: @Severity-Info;
+    @custom-tab-widget-close-icon-color: @text-color-secondary;
+    @custom-tab-widget-close-icon-color-hover: @icon-accent-color;
     @custom-tab-widget-tool-button-bg-color: transparent;
     @custom-tab-widget-tool-button-bg-color-hover: @Neutral-6;
     @custom-tab-widget-tool-button-bg-color-pressed: @Neutral-21;
 
     /* DockWidget */
-    @dock-widget-title-bar-bg-color: @Neutral-19;
-    @dock-widget-title-label-text-color: @Neutral-7;
+    @dock-widget-title-bar-bg-color: #eceef0;
+    @dock-widget-title-label-text-color: @text-color-secondary;
     @dock-widget-close-button-bg-color: transparent;
-    @dock-widget-close-button-bg-color-hover: transparent;
+    @dock-widget-close-button-bg-color-hover: #dce6ee;
     @dock-widget-close-button-bg-color-pressed: @Neutral-21;
 
     /* WindowTitleBar */
-    @window-title-bar-button-color: @Neutral-7;
+    @window-title-bar-button-color: @text-color-secondary;
     @window-title-bar-button-bg-color: transparent;
-    @window-title-bar-button-bg-color-hover: @Brand-Accent-200;
+    @window-title-bar-button-bg-color-hover: #d5e1eb;
 
     /* StartPageWidget */
     @start-page-text-color: @text-color-primary;
-    @start-page-group-box-bg-color: @Neutral-6;
-    @start-page-list-bg-color: @Neutral-6;
+    @start-page-group-box-bg-color: @log-import-group-box-bg-color;
+    @start-page-list-bg-color: @log-import-group-box-bg-color;
     @start-page-list-border-left-color: @Brand-Accent-300;
     @start-page-item-text-color: @text-color-primary;
     @start-page-item-text-color-accent: @text-color-primary;
-    @start-page-item-bg-color-hover: @Brand-Accent-100;
-    @start-page-item-bg-color-selected: @Brand-Accent-200;
-    @start-page-item-border-color-hover: @Brand-Accent-200;
-    @start-page-item-border-color-selected: @Brand-Accent-300;
+    @start-page-item-bg-color-hover: @table-hover-row-color;
+    @start-page-item-bg-color-selected: @table-selection-bg-color;
+    @start-page-item-border-color-hover: #a7becf;
+    @start-page-item-border-color-selected: #799fb9;
 
     /* LogImportWidget */
-    @log-import-bg-color: @dialog-bg-color;
-    @log-import-group-box-bg-color: @Neutral-6;
-    @log-import-group-box-border-color: @Neutral-21;
-    @log-import-field-button-bg-color: @Severity-WarningHover;
-    @log-import-field-button-bg-color-hover: @Severity-Warning;
-    @log-import-field-button-bg-color-pressed: @Severity-Warning;
+    @log-import-bg-color: @tab-widget-pane-bg-color;
+    @log-import-group-box-bg-color: #f3f4f5;
+    @log-import-group-box-border-color: @border-color-primary;
+    @log-import-field-button-bg-color: @action-token-color;
+    @log-import-field-button-bg-color-hover: #ffb300;
+    @log-import-field-button-bg-color-pressed: #ffb300;
     @log-import-field-button-text-color: @Neutral-7;
-    @log-import-secondary-button-bg-color: @Neutral-17;
-    @log-import-secondary-button-bg-color-hover: @Neutral-19;
-    @log-import-secondary-button-bg-color-pressed: @Neutral-21;
-    @log-import-secondary-button-border-color: @Neutral-21;
-    @log-import-validation-bg-color: @Brand-Accent-100;
+    @log-import-secondary-button-bg-color: #f7f9fb;
+    @log-import-secondary-button-bg-color-hover: #dde4e9;
+    @log-import-secondary-button-bg-color-pressed: #d3e0ea;
+    @log-import-secondary-button-border-color: @border-color-primary;
+    @log-import-validation-bg-color: #dce9f2;
 
     /* LogViewWidget */
-    @log-view-bg-color: @Neutral-19;
+    @log-view-bg-color: @tab-widget-pane-bg-color;
     @log-view-tool-button-bg-color: @tool-button-bg-color;
     @log-view-tool-button-border-color: @border-color-primary;
     @log-view-tool-button-text-color: @text-color-primary;
-    @log-view-tool-button-bg-color-hover: @Neutral-17;
-    @log-view-tool-button-border-color-hover: @Neutral-17;
+    @log-view-tool-button-bg-color-hover: #dde4e9;
+    @log-view-tool-button-border-color-hover: #8ca4b7;
 
     /* SearchBarWidget */
-    @search-bar-clear-icon-color: @Severity-Info;
-    @search-bar-clear-icon-color-hover: @Severity-Error;
-    @search-bar-clear-button-bg-color: @Neutral-19;
-    @search-bar-clear-button-bg-color-hover: @Neutral-18;
+    @search-bar-clear-icon-color: #3e6c8d;
+    @search-bar-clear-icon-color-hover: @action-danger-color;
+    @search-bar-clear-button-bg-color: #dde4e9;
+    @search-bar-clear-button-bg-color-hover: #d5e1eb;
 
     /* PieChart */
-    @pie-chart-bg-color: @Neutral-6;
-    @pie-chart-empty-ring-color: @Neutral-16;
+    @pie-chart-bg-color: #f3f4f5;
+    @pie-chart-empty-ring-color: #dce3e9;
 
     /* LogLevelPieChartWidget */
-    @log-level-pie-chart-bg-color: @Neutral-6;
+    @log-level-pie-chart-bg-color: #f3f4f5;
 
     /* LogLevelRowsWidget */
-    @log-level-rows-bg-color: @Neutral-6;
+    @log-level-rows-bg-color: #f3f4f5;
 
     /* LogLevelPieChartRowWidget */
-    @log-level-row-bg-color: @Neutral-6;
+    @log-level-row-bg-color: #f3f4f5;
 
     /* LogLevelRowLabels */
-    @log-level-label-bg-color: @Neutral-6;
+    @log-level-label-bg-color: #f3f4f5;
 
     /* LogFilterBarWidget */
-    @log-filter-bar-bg-color: @Neutral-19;
+    @log-filter-bar-bg-color: @tab-widget-pane-bg-color;
 
     /* LogLevelFilterItemWidget */
-    @log-level-filter-bar-hover-bg-color: @Neutral-19;
+    @log-level-filter-bar-hover-bg-color: #e3eaf0;
 
     /* Severity */
     @ColorTrace: @Severity-Trace;
@@ -819,14 +890,14 @@
     @ColorFatalHover: @Severity-FatalHover;
 
     /* Pagination */
-    @pagination-bg-color: @Neutral-19;
+    @pagination-bg-color: @tab-widget-pane-bg-color;
     @pagination-current-bg-color: @Brand-Accent-700;
     @pagination-current-border-color: @Brand-Accent-500;
     @pagination-current-text-color: @Neutral-6;
     @pagination-current-hover-bg-color: @Brand-Accent-600;
 
     /* LogFileExplorer */
-    @log-file-explorer-bg-color: @Neutral-6;
+    @log-file-explorer-bg-color: #f3f4f5;
 }
 
 /* --- QWidget (Global Base) ------------------------------------------------ */
@@ -846,6 +917,7 @@ QWidget {
 }
 
 #DialogHeaderWidget {
+    qproperty-close_icon_color: @window-title-bar-button-color;
     margin: 10px;
     padding-left: 12px;
     border-top-left-radius: 0px;
@@ -863,17 +935,17 @@ QWidget {
 }
 
 #DialogHeaderCloseButton {
-    min-width: 24px;
-    min-height: 24px;
-    max-width: 24px;
-    max-height: 24px;
-    padding: 2px;
-    border-radius: 6px;
-    background: @button-bg-color;
+    min-width: 28px;
+    min-height: 28px;
+    max-width: 28px;
+    max-height: 28px;
+    padding: 0px;
+    border-radius: 0px;
+    background: @window-title-bar-button-bg-color;
 }
 
 #DialogHeaderCloseButton:hover {
-    background: @button-bg-color-hover;
+    background: @window-title-bar-button-bg-color-hover;
 }
 
 #DialogContent {
@@ -958,6 +1030,7 @@ QToolTip {
 
 /* --- LineEdits ------------------------------------------------------------ */
 QLineEdit {
+    min-height: @input-min-height;
     padding: 4px 6px;
     border: @line-edit-border-width solid @line-edit-border-color;
     border-radius: @line-edit-border-radius;
@@ -986,6 +1059,7 @@ QLineEdit[text=""] {
 
 /* --- ComboBoxes ----------------------------------------------------------- */
 QComboBox {
+    min-height: @input-min-height;
     padding: 4px;
     padding-left: 8px;
     padding-right: 8px;
@@ -997,6 +1071,10 @@ QComboBox {
 
 QComboBox:hover {
     background-color: @combo-box-bg-color-hover;
+}
+
+QComboBox:focus {
+    border-color: @line-edit-border-color-focus;
 }
 
 QComboBox:disabled {
@@ -1012,7 +1090,7 @@ QComboBox::drop-down {
 }
 
 QComboBox::down-arrow {
-    image: url(:/Resources/down-arrow.svg);
+    image: @arrow-down-image;
     margin: 0 4px;
     width: @combo-box-arrow-width;
     height: @combo-box-arrow-height;
@@ -1026,6 +1104,84 @@ QComboBox QAbstractItemView {
     background-color: @combo-box-bg-color;
     selection-background-color: @combo-box-selection-bg-color;
     selection-color: @combo-box-text-color;
+}
+
+/* --- SpinBoxes: share the standard input geometry and palette ------------- */
+QSpinBox, QDoubleSpinBox {
+    min-height: @input-min-height;
+    padding: 4px 26px 4px 8px;
+    border: @line-edit-border-width solid @line-edit-border-color;
+    border-radius: @line-edit-border-radius;
+    background-color: @line-edit-bg-color;
+    color: @line-edit-text-color;
+    selection-background-color: @combo-box-selection-bg-color;
+    selection-color: @combo-box-text-color;
+}
+
+QSpinBox:hover, QDoubleSpinBox:hover {
+    border-color: @line-edit-border-color-hover;
+}
+
+QSpinBox:focus, QDoubleSpinBox:focus {
+    border-color: @line-edit-border-color-focus;
+    background-color: @line-edit-bg-color-focus;
+}
+
+QSpinBox::up-button, QDoubleSpinBox::up-button {
+    subcontrol-origin: border;
+    subcontrol-position: top right;
+    width: 22px;
+    margin: 1px 1px 0px 0px;
+    border: none;
+    border-left: 1px solid @line-edit-border-color;
+    border-top-right-radius: @line-edit-border-radius;
+    background-color: @combo-box-bg-color;
+}
+
+QSpinBox::down-button, QDoubleSpinBox::down-button {
+    subcontrol-origin: border;
+    subcontrol-position: bottom right;
+    width: 22px;
+    margin: 0px 1px 1px 0px;
+    border: none;
+    border-left: 1px solid @line-edit-border-color;
+    border-bottom-right-radius: @line-edit-border-radius;
+    background-color: @combo-box-bg-color;
+}
+
+QSpinBox::up-button:hover, QSpinBox::down-button:hover,
+QDoubleSpinBox::up-button:hover, QDoubleSpinBox::down-button:hover {
+    background-color: @combo-box-bg-color-hover;
+}
+
+QSpinBox::up-button:pressed, QSpinBox::down-button:pressed,
+QDoubleSpinBox::up-button:pressed, QDoubleSpinBox::down-button:pressed {
+    background-color: @combo-box-selection-bg-color;
+}
+
+QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {
+    image: url(:/Resources/spin-up.svg);
+    width: 10px;
+    height: 10px;
+}
+
+QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {
+    image: url(:/Resources/spin-down.svg);
+    width: 10px;
+    height: 10px;
+}
+
+QSpinBox:disabled, QDoubleSpinBox:disabled {
+    background-color: @line-edit-bg-color-disabled;
+    color: @line-edit-text-color-disabled;
+    border-color: @border-color-disabled;
+}
+
+QSpinBox::up-button:off, QSpinBox::down-button:off,
+QSpinBox::up-button:disabled, QSpinBox::down-button:disabled,
+QDoubleSpinBox::up-button:off, QDoubleSpinBox::down-button:off,
+QDoubleSpinBox::up-button:disabled, QDoubleSpinBox::down-button:disabled {
+    background-color: @combo-box-bg-color-disabled;
 }
 
 /* --- CheckBoxes ----------------------------------------------------------- */
@@ -1050,10 +1206,20 @@ QCheckBox::indicator {
 QCheckBox::indicator:checked {
     border: @checkbox-indicator-border-width solid @checkbox-indicator-bg-color-checked;
     background-color: @checkbox-indicator-bg-color-checked;
+    image: @checkbox-check-image;
 }
 
-QCheckBox::indicator:hover {
-    background-color: @checkbox-indicator-bg-color-hover;
+QCheckBox::indicator:checked:enabled:hover {
+    background-color: @checkbox-indicator-bg-color-checked-hover;
+}
+
+QCheckBox::indicator:unchecked:hover {
+    background-color: @checkbox-indicator-bg-color;
+    border-color: @button-border-color-hover;
+}
+
+QCheckBox::indicator:focus {
+    border-color: @button-border-color-focus;
 }
 
 QCheckBox::indicator:disabled {
@@ -1061,10 +1227,17 @@ QCheckBox::indicator:disabled {
     background-color: @checkbox-indicator-bg-color-disabled;
 }
 
+QCheckBox::indicator:checked:disabled {
+    image: url(:/Resources/Icons/check-muted.svg);
+}
+
 /* --- PushButtons ---------------------------------------------------------- */
 QPushButton {
-    padding: 6px 12px;
-    border: none;
+    min-height: @button-min-height;
+    padding: @button-padding;
+    font-size: @button-font-size;
+    font-weight: @button-font-weight;
+    border: 1px solid @button-border-color;
     border-radius: @button-border-radius;
     background-color: @button-bg-color;
     color: @button-text-color;
@@ -1072,15 +1245,22 @@ QPushButton {
 
 QPushButton:hover {
     background-color: @button-bg-color-hover;
+    border-color: @button-border-color-hover;
 }
 
 QPushButton:pressed {
     background-color: @button-bg-color-pressed;
+    border-color: @button-border-color;
+}
+
+QPushButton:focus {
+    border-color: @button-border-color-focus;
 }
 
 QPushButton:disabled {
     background-color: @button-bg-color-disabled;
     color: @button-text-color-disabled;
+    border-color: @border-color-disabled;
 }
 
 /* --- ToolButtons ---------------------------------------------------------- */
@@ -1131,8 +1311,8 @@ QToolButton[variant="inline-menu"]:pressed {
 /* --- TableViews ----------------------------------------------------------- */
 QTableView {
     outline: none;
-    border: @table-border-width solid @border-color-primary;
-    gridline-color: @border-color-primary;
+    border: @table-border-width solid @table-frame-color;
+    gridline-color: @table-grid-color;
     background-color: @table-bg-color;
     alternate-background-color: @table-alternate-bg-color;
     color: @table-text-color;
@@ -1141,7 +1321,14 @@ QTableView {
 }
 
 TableView {
+    qproperty-fatal_color: @Severity-Fatal;
+    qproperty-error_color: @Severity-Error;
+    qproperty-warning_color: @Severity-Warning;
+    qproperty-info_color: @Severity-Info;
+    qproperty-debug_color: @Severity-Debug;
+    qproperty-trace_color: @Severity-Trace;
     qproperty-hover_row_color: @table-hover-row-color;
+    qproperty-search_match_color: @table-search-match-color;
 }
 
 QTableView::item {
@@ -1173,9 +1360,24 @@ QHeaderView::section:pressed {
     background-color: @table-header-bg-color-pressed;
 }
 
+/* Keep table header refinements separate from tree/explorer headers. */
+QTableView QHeaderView::section {
+    padding: @table-section-padding;
+    background-color: @table-section-bg-color;
+    border-color: @table-section-border-color;
+}
+
+QTableView QHeaderView::section:hover {
+    background-color: @table-header-bg-color-hover;
+}
+
+QTableView QHeaderView::section:pressed {
+    background-color: @table-header-bg-color-pressed;
+}
+
 QTableCornerButton::section {
     border: none;
-    background-color: @table-header-bg-color;
+    background-color: @table-section-bg-color;
 }
 
 /* --- PlainTextEdits ------------------------------------------------------- */
@@ -1209,6 +1411,7 @@ QMenuBar::item:selected {
 
 /* --- Menus ---------------------------------------------------------------- */
 QMenu {
+    padding: 4px;
     border: @menu-border-width solid @menu-border-color;
     background-color: @menu-bg-color;
 }
@@ -1228,6 +1431,40 @@ QMenu::item:disabled {
     color: @menu-text-color-disabled;
 }
 
+/* Checkable menu actions share the checkbox glyph, with their own text gutter. */
+QMenu::item:exclusive, QMenu::item:non-exclusive {
+    padding: 6px 24px 6px 32px;
+}
+
+QMenu::indicator {
+    width: 14px;
+    height: 14px;
+    margin-left: 8px;
+    border: @checkbox-indicator-border-width solid @checkbox-indicator-border-color;
+    border-radius: @checkbox-indicator-border-radius;
+    background-color: @checkbox-indicator-bg-color;
+}
+
+QMenu::indicator:checked {
+    image: @checkbox-check-image;
+    border-color: @checkbox-indicator-bg-color-checked;
+    background-color: @checkbox-indicator-bg-color-checked;
+}
+
+QMenu::indicator:checked:selected {
+    image: url(:/Resources/Icons/check-light.svg);
+    border-color: @button-border-color-focus;
+}
+
+QMenu::indicator:checked:disabled {
+    image: url(:/Resources/Icons/check-muted.svg);
+}
+
+QMenu::indicator:disabled {
+    border-color: @border-color-disabled;
+    background-color: @checkbox-indicator-bg-color-disabled;
+}
+
 /* Menu Variant: Inline Menu */
 QMenu[variant="inline-menu"] {
     margin-top: @menu-inline-margin-top;
@@ -1240,15 +1477,81 @@ QMenu[variant="inline-menu"]::item {
     padding: @menu-item-padding;
 }
 
+/* Files popup only: do not change main-menu geometry. */
+QMenu#filesInViewMenu {
+    margin: 0px;
+    padding: 6px;
+    min-width: 280px;
+    border: 1px solid @table-frame-color;
+    border-radius: 4px;
+    background-color: @menu-bg-color;
+}
+
+QMenu#filesInViewMenu::item {
+    padding: 5px 8px;
+    margin: 0px;
+    border-radius: 3px;
+}
+
+QMenu#filesInViewMenu::separator {
+    height: 1px;
+    margin: 4px 0px;
+    background-color: @table-section-border-color;
+}
+
+QMenu#filesInViewMenu FilesInViewMenuItemWidget {
+    background-color: @tool-button-inline-bg-color;
+    border-radius: 3px;
+}
+
+QMenu#filesInViewMenu FilesInViewMenuItemWidget:hover {
+    background-color: @table-hover-row-color;
+}
+
+QMenu#filesInViewMenu FilesInViewMenuItemWidget QLabel {
+    font-size: @widget-font-size;
+    background-color: transparent;
+}
+
+QMenu#filesInViewMenu QToolButton[variant="inline-menu"] {
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: 3px;
+}
+
+QMenu#filesInViewMenu QToolButton[variant="inline-menu"]:hover,
+QMenu#filesInViewMenu QToolButton[variant="inline-menu"]:focus {
+    background-color: @button-bg-color-hover;
+    border: 1px solid @button-border-color-hover;
+}
+
+QMenu#filesInViewMenu QToolButton[variant="inline-menu"]:pressed {
+    background-color: @button-bg-color-pressed;
+    border: 1px solid @button-border-color-focus;
+}
+
+QMenu#filesInViewMenu QToolButton#removeFileButton:hover,
+QMenu#filesInViewMenu QToolButton#removeFileButton:focus {
+    background-color: @action-danger-hover-color;
+    border-color: @action-danger-color;
+}
+
+QMenu#filesInViewMenu QToolButton#removeFileButton:pressed {
+    background-color: @action-danger-hover-color;
+    border-color: @action-danger-pressed-color;
+}
+
 /* --- ScrollBars ----------------------------------------------------------- */
 QScrollBar:vertical {
     width: @scroll-bar-size;
+    margin: @scroll-bar-end-size 0px;
     border: none;
     background-color: @scroll-bar-track-color;
 }
 
 QScrollBar:horizontal {
     height: @scroll-bar-size;
+    margin: 0px @scroll-bar-end-size;
     border: none;
     background-color: @scroll-bar-track-color;
 }
@@ -1263,12 +1566,75 @@ QScrollBar::handle:hover {
     background-color: @scroll-bar-handle-color-hover;
 }
 
+QScrollBar::handle:pressed {
+    background-color: @text-color-secondary;
+}
+
+QScrollBar::handle:vertical {
+    min-height: 32px;
+    margin: 0px 2px;
+}
+
+QScrollBar::handle:horizontal {
+    min-width: 32px;
+    margin: 2px 0px;
+}
+
 QScrollBar::add-line,
 QScrollBar::sub-line {
-    width: 0;
-    height: 0;
     border: none;
-    background: none;
+    background-color: @scroll-bar-track-color;
+    subcontrol-origin: margin;
+}
+
+QScrollBar::sub-line:vertical {
+    height: @scroll-bar-end-size;
+    subcontrol-position: top;
+}
+
+QScrollBar::add-line:vertical {
+    height: @scroll-bar-end-size;
+    subcontrol-position: bottom;
+}
+
+QScrollBar::sub-line:horizontal {
+    width: @scroll-bar-end-size;
+    subcontrol-position: left;
+}
+
+QScrollBar::add-line:horizontal {
+    width: @scroll-bar-end-size;
+    subcontrol-position: right;
+}
+
+QScrollBar::add-line:hover, QScrollBar::sub-line:hover {
+    background-color: @scroll-bar-handle-color;
+}
+
+QScrollBar::add-line:pressed, QScrollBar::sub-line:pressed {
+    background-color: @scroll-bar-handle-color-hover;
+}
+
+QScrollBar::up-arrow, QScrollBar::down-arrow,
+QScrollBar::left-arrow, QScrollBar::right-arrow {
+    width: 10px;
+    height: 10px;
+}
+
+QScrollBar::up-arrow {
+    image: url(:/Resources/spin-up.svg);
+}
+
+QScrollBar::down-arrow {
+    image: url(:/Resources/spin-down.svg);
+}
+
+QScrollBar::left-arrow {
+    image: @arrow-left-image;
+}
+
+QScrollBar::right-arrow {
+    image: @arrow-right-image;
 }
 
 QScrollBar::add-page,
@@ -1337,7 +1703,7 @@ QTreeView::branch:open:has-children:!has-siblings {
 TreeView {
     qproperty-tree_view_branch_icon_open: ":/Resources/Icons/branch-open.svg";
     qproperty-tree_view_branch_icon_closed: ":/Resources/Icons/branch-closed.svg";
-    qproperty-tree_view_branch_icon_color: @Severity-Info;
+    qproperty-tree_view_branch_icon_color: @icon-accent-color;
     qproperty-tree_view_branch_icon_px: @tree-branch-icon-size;
     qproperty-tree_view_branch_pen_width: @tree-branch-pen-width;
     qproperty-tree_view_branch_hlength_px: @tree-branch-hlength;
@@ -1386,12 +1752,12 @@ QTabBar::tear {
 
 QTabBar QToolButton::right-arrow {
     padding: @tab-bar-arrow-padding;
-    image: url(:/Resources/right-arrow.svg);
+    image: @arrow-right-image;
 }
 
 QTabBar QToolButton::left-arrow {
     padding: @tab-bar-arrow-padding;
-    image: url(:/Resources/left-arrow.svg);
+    image: @arrow-left-image;
 }
 
 /* --- TabWidget ------------------------------------------------------------ */
@@ -1439,7 +1805,7 @@ TabWidget#tabWidgetLog TabBar::tab {
 
 /* --- DockWidget ----------------------------------------------------------- */
 DockWidget QWidget#dock_title_bar {
-    border-bottom: @dock-widget-title-bar-border-bottom-width solid @border-color-primary;
+    border-bottom: @dock-widget-title-bar-border-bottom-width solid @dock-widget-title-bar-border-color;
     border-top-left-radius: @dock-widget-title-bar-border-radius-top;
     border-top-right-radius: @dock-widget-title-bar-border-radius-top;
     background: @dock-widget-title-bar-bg-color;
@@ -1487,6 +1853,7 @@ QWidget#windowtitlebar QLabel#windowtitlebar_title {
 }
 
 QWidget#windowtitlebar QPushButton {
+    min-height: 0px;
     border: none;
     border-radius: 0;
     background: @window-title-bar-button-bg-color;
@@ -1494,6 +1861,12 @@ QWidget#windowtitlebar QPushButton {
 
 QWidget#windowtitlebar QPushButton:hover {
     background: @window-title-bar-button-bg-color-hover;
+}
+
+QPushButton#DialogHeaderCloseButton {
+    min-height: 0px;
+    padding: 0px;
+    border: none;
 }
 
 /* --- StartPageWidget ------------------------------------------------------ */
@@ -1510,9 +1883,55 @@ StartPageWidget QLabel#welcomeLabel {
 StartPageWidget QGroupBox {
     margin-top: @start-page-group-box-margin-top;
     padding-top: @start-page-group-box-padding-top;
-    border: none;
+    border: 1px solid @log-import-group-box-border-color;
     border-radius: @start-page-group-box-border-radius;
     background: @start-page-group-box-bg-color;
+}
+
+/* Entry actions do not need an empty full-height panel. */
+StartPageWidget QGroupBox#groupBox_3 {
+    border: none;
+    background: transparent;
+    padding-top: 32px;
+}
+
+StartPageWidget QPushButton#openSessionButton:enabled,
+StartPageWidget QPushButton#reopenSessionButton:enabled,
+StartPageWidget QPushButton#clearRecentFilesButton:enabled,
+StartPageWidget QPushButton#deleteSessionButton:enabled {
+    background-color: @log-import-secondary-button-bg-color;
+    color: @text-color-primary;
+    border-color: @log-import-secondary-button-border-color;
+}
+
+StartPageWidget QPushButton#openSessionButton:enabled:hover,
+StartPageWidget QPushButton#reopenSessionButton:enabled:hover,
+StartPageWidget QPushButton#clearRecentFilesButton:enabled:hover,
+StartPageWidget QPushButton#deleteSessionButton:enabled:hover {
+    background-color: @log-import-secondary-button-bg-color-hover;
+    color: @text-color-primary;
+    border-color: @button-border-color-hover;
+}
+
+StartPageWidget QPushButton#openSessionButton:enabled:pressed,
+StartPageWidget QPushButton#reopenSessionButton:enabled:pressed,
+StartPageWidget QPushButton#clearRecentFilesButton:enabled:pressed,
+StartPageWidget QPushButton#deleteSessionButton:enabled:pressed {
+    background-color: @log-import-secondary-button-bg-color-pressed;
+    color: @text-color-primary;
+    border-color: @button-border-color;
+}
+
+StartPageWidget QPushButton#openSessionButton:enabled:focus,
+StartPageWidget QPushButton#reopenSessionButton:enabled:focus,
+StartPageWidget QPushButton#clearRecentFilesButton:enabled:focus,
+StartPageWidget QPushButton#deleteSessionButton:enabled:focus {
+    border-color: @button-border-color-focus;
+}
+
+StartPageWidget QPushButton:disabled {
+    background-color: @button-bg-color-disabled;
+    color: @button-text-color-disabled;
 }
 
 StartPageWidget QGroupBox::title {
@@ -1528,6 +1947,7 @@ StartPageWidget QGroupBox::title {
 }
 
 StartPageWidget QListView {
+    selection-color: @start-page-item-text-color;
     outline: none;
     margin-left: @start-page-list-margin-left;
     padding: @start-page-list-padding;
@@ -1572,13 +1992,22 @@ StartPageWidget QListView::item:!selected:focus {
 }
 
 /* --- LogImportWidget ------------------------------------------------------ */
+LogImportWidget QLabel#labelPreviewSummary[importReady="true"] {
+    color: @log-import-success-text;
+}
+
 LogImportWidget {
     background-color: @log-import-bg-color;
 }
 
 LogImportWidget QScrollArea#importScrollArea,
+LogImportWidget QScrollArea#importScrollArea > QWidget,
 LogImportWidget QWidget#importScrollContent {
     background-color: @log-import-bg-color;
+}
+
+LogImportWidget QWidget#widgetProfileSelection {
+    background-color: transparent;
 }
 
 LogImportWidget QGroupBox {
@@ -1594,14 +2023,14 @@ LogImportWidget QGroupBox::title {
     subcontrol-position: top left;
     left: @log-import-group-box-title-left;
     padding: @log-import-group-box-title-padding;
-    background-color: @log-import-group-box-bg-color;
+    background-color: @log-import-bg-color;
     color: @text-color-primary;
     font-weight: bold;
 }
 
 LogImportWidget QLabel[variant="profile-mode"] {
     background-color: transparent;
-    color: @Severity-Info;
+    color: @icon-accent-color;
     font-weight: 600;
 }
 
@@ -1651,29 +2080,43 @@ LogImportWidget QPushButton[variant="dialog-action"] {
     font-weight: @log-import-action-button-font-weight;
 }
 
-LogImportWidget QPushButton[actionRole="secondary"] {
+LogImportWidget QPushButton[actionRole="secondary"]:enabled {
     border: 1px solid @log-import-secondary-button-border-color;
     background-color: @log-import-secondary-button-bg-color;
+    color: @text-color-primary;
 }
 
-LogImportWidget QPushButton[actionRole="secondary"]:hover {
+LogImportWidget QPushButton[actionRole="secondary"]:enabled:hover {
     background-color: @log-import-secondary-button-bg-color-hover;
+    color: @text-color-primary;
+    border-color: @button-border-color-hover;
 }
 
-LogImportWidget QPushButton[actionRole="secondary"]:pressed {
+LogImportWidget QPushButton[actionRole="secondary"]:enabled:pressed {
     background-color: @log-import-secondary-button-bg-color-pressed;
+    color: @text-color-primary;
 }
 
 LogImportWidget QPushButton[actionRole="primary"]:enabled {
-    border: 1px solid @Severity-DebugHover;
-    background-color: @Severity-Debug;
-    color: @Neutral-7;
+    border: 1px solid @button-border-color;
+    background-color: @log-import-primary-bg;
+    color: @log-import-primary-text;
 }
 
 LogImportWidget QPushButton[actionRole="primary"]:enabled:hover,
 LogImportWidget QPushButton[actionRole="primary"]:enabled:pressed {
-    background-color: @Severity-DebugHover;
+    background-color: @log-import-primary-hover-bg;
     color: @Neutral-6;
+    border-color: @button-border-color-hover;
+}
+
+LogImportWidget QPushButton[actionRole="primary"]:enabled:pressed {
+    background-color: @button-bg-color-pressed;
+}
+
+LogImportWidget QPushButton[actionRole="primary"]:enabled:focus,
+LogImportWidget QPushButton[actionRole="secondary"]:enabled:focus {
+    border-color: @button-border-color-focus;
 }
 
 LogImportWidget QSplitter::handle:horizontal {
@@ -1710,11 +2153,26 @@ LogViewWidget QToolButton:pressed {
     color: @log-view-tool-button-text-color;
 }
 
+LogViewWidget QToolButton#filesInViewToolButton {
+    min-width: 0px;
+    padding: 4px 20px 4px 6px;
+    border-color: @combo-box-border-color;
+    background-color: @combo-box-bg-color;
+}
+
+LogViewWidget QToolButton#filesInViewToolButton:hover,
+LogViewWidget QToolButton#filesInViewToolButton:open {
+    border-color: @button-border-color-hover;
+    background-color: @combo-box-bg-color-hover;
+}
+
 LogViewWidget QToolButton#filesInViewToolButton::menu-indicator {
     width: @log-view-indicator-width;
     height: @log-view-indicator-height;
-    margin: @log-view-indicator-margin;
-    image: url(:/Resources/down-arrow.svg);
+    subcontrol-origin: padding;
+    subcontrol-position: center right;
+    margin: 0px 8px 0px 0px;
+    image: @arrow-down-image;
 }
 
 /* --- SearchBarWidget ------------------------------------------------------ */
@@ -1736,8 +2194,10 @@ QLineEdit#lineEditSearch {
 }
 
 QPushButton#pushButtonSearch {
+    min-height: @search-bar-line-edit-min-height;
+    max-height: @search-bar-line-edit-max-height;
     padding: @search-bar-push-button-padding;
-    border: none;
+    border-width: 1px;
     border-radius: @search-bar-push-button-border-radius;
 }
 
@@ -1917,15 +2377,105 @@ FilesInViewMenuItemWidget {
 
     /* Global base + hover */
     qproperty-icon_color: @Neutral-26;
-    qproperty-icon_color_hover: @Severity-Info;
+    qproperty-icon_color_hover: @Neutral-6;
 
     /* Per-icon base overrides */
-    qproperty-icon_color_eye: @Severity-Info;
-    qproperty-icon_color_eye_off: @Severity-Warning;
-    qproperty-icon_color_trash: @Severity-Error;
+    qproperty-icon_color_eye: @icon-accent-color;
+    qproperty-icon_color_eye_off: @action-warning-color;
+    qproperty-icon_color_trash: @action-danger-color;
 }
 
 /* --- LogFileExplorer ------------------------------------------------------ */
+/* Explicit disabled glyphs: QSS image resources are not automatically dimmed. */
+QComboBox::down-arrow:disabled,
+QSpinBox::down-arrow:disabled, QSpinBox::down-arrow:off,
+QDoubleSpinBox::down-arrow:disabled, QDoubleSpinBox::down-arrow:off,
+QScrollBar::down-arrow:disabled,
+LogViewWidget QToolButton#filesInViewToolButton::menu-indicator:disabled {
+    image: url(:/Resources/down-arrow-disabled.svg);
+}
+
+QSpinBox::up-arrow:disabled, QSpinBox::up-arrow:off,
+QDoubleSpinBox::up-arrow:disabled, QDoubleSpinBox::up-arrow:off,
+QScrollBar::up-arrow:disabled {
+    image: url(:/Resources/up-arrow-disabled.svg);
+}
+
+QTabBar QToolButton::left-arrow:disabled,
+QScrollBar::left-arrow:disabled {
+    image: url(:/Resources/left-arrow-disabled.svg);
+}
+
+QTabBar QToolButton::right-arrow:disabled,
+QScrollBar::right-arrow:disabled {
+    image: url(:/Resources/right-arrow-disabled.svg);
+}
+
+/* Settings-specific navigation and frames, separate from other dialogs. */
+SettingsDialog#Dialog {
+    qproperty-border_color: @table-frame-color;
+    qproperty-border_width: 1;
+}
+
+SettingsDialog QStackedWidget {
+    border-left: 1px solid @table-section-border-color;
+}
+
+SettingsDialog QListView#listWidgetCategories::item {
+    margin: 2px 0px;
+    padding: 8px 10px;
+    border: 1px solid transparent;
+    border-left: 3px solid transparent;
+    border-radius: 3px;
+    font-size: @widget-font-size;
+    background-color: @dialog-group-box-bg-color;
+}
+
+SettingsDialog QListView#listWidgetCategories::item:hover {
+    background-color: @dialog-list-view-item-hover-bg-color;
+    border-color: @table-section-border-color;
+}
+
+SettingsDialog QListView#listWidgetCategories::item:selected {
+    background-color: @table-selection-bg-color;
+    color: @text-color-primary;
+    border-color: @table-frame-color;
+    border-left: 3px solid @Brand-Accent-500;
+}
+
+SettingsDialog QGroupBox {
+    border: 1px solid @table-section-border-color;
+    border-radius: @log-import-group-box-border-radius;
+}
+
 LogFileExplorer {
     background-color: @log-file-explorer-bg-color;
+}
+
+
+PaginationWidget {
+    qproperty-previous_icon: ":/Resources/left-arrow.svg";
+    qproperty-next_icon: ":/Resources/right-arrow.svg";
+    qproperty-arrow_color: @pagination-arrow-color;
+    qproperty-arrow_disabled_color: @text-color-disabled;
+}
+
+TreeView {
+    qproperty-file_icon_color: @icon-accent-color;
+    qproperty-folder_icon_color: @icon-folder-color;
+    qproperty-session_icon_color: @icon-session-color;
+}
+DialogHeaderWidget {
+    qproperty-close_icon: ":/Resources/Icons/titlebar-close.svg";
+}
+
+LogViewWidget {
+    qproperty-files_icon: ":/Resources/Icons/file.svg";
+    qproperty-files_icon_color: @icon-accent-color;
+}
+
+TreeView {
+    qproperty-file_icon: ":/Resources/Icons/file.svg";
+    qproperty-folder_icon: ":/Resources/Icons/folder.svg";
+    qproperty-session_icon: ":/Resources/Icons/session.svg";
 }

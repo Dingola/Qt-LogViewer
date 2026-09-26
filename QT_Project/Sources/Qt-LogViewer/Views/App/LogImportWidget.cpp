@@ -31,6 +31,7 @@
 #include <QStandardItem>
 #include <QStandardItemModel>
 #include <QStringList>
+#include <QStyle>
 #include <QTableView>
 #include <QTimer>
 #include <QVariant>
@@ -985,6 +986,14 @@ auto LogImportWidget::update_import_button(const std::optional<LogParsingProfile
 
     ui->pushButtonImport->setEnabled(requirements.isEmpty());
     ui->pushButtonImport->setToolTip(requirements.join(QLatin1Char('\n')));
+    const bool import_ready = requirements.isEmpty();
+    if (ui->labelPreviewSummary->property("importReady").toBool() != import_ready)
+    {
+        ui->labelPreviewSummary->setProperty("importReady", import_ready);
+        ui->labelPreviewSummary->style()->unpolish(ui->labelPreviewSummary);
+        ui->labelPreviewSummary->style()->polish(ui->labelPreviewSummary);
+        ui->labelPreviewSummary->update();
+    }
 }
 
 /**

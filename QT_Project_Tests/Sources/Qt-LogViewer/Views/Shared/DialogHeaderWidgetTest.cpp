@@ -41,7 +41,27 @@ TEST_F(DialogHeaderWidgetTest, ConstructorWiringAndDefaults)
     auto* close_btn = m_header->findChild<QPushButton*>(QStringLiteral("DialogHeaderCloseButton"));
     ASSERT_NE(close_btn, nullptr);
     EXPECT_TRUE(close_btn->isFlat());
-    EXPECT_EQ(close_btn->size(), QSize(12, 12));
+    EXPECT_EQ(close_btn->size(), QSize(28, 28));
+    EXPECT_EQ(close_btn->iconSize(), QSize(18, 18));
+    EXPECT_TRUE(m_header->close_icon().isEmpty());
+    EXPECT_TRUE(close_btn->icon().isNull());
+}
+
+/**
+ * @test Style properties configure and recolor the close icon.
+ */
+TEST_F(DialogHeaderWidgetTest, StylePropertiesConfigureCloseIcon)
+{
+    auto* close_btn = m_header->findChild<QPushButton*>(QStringLiteral("DialogHeaderCloseButton"));
+    ASSERT_NE(close_btn, nullptr);
+
+    const QString icon_path = QStringLiteral(":/Resources/Icons/titlebar-close.svg");
+    const QColor icon_color(QStringLiteral("#345678"));
+    m_header->set_close_icon(icon_path);
+    m_header->set_close_icon_color(icon_color);
+
+    EXPECT_EQ(m_header->close_icon(), icon_path);
+    EXPECT_EQ(m_header->close_icon_color(), icon_color);
     EXPECT_FALSE(close_btn->icon().isNull());
 }
 

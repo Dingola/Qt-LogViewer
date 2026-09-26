@@ -54,8 +54,7 @@ include_directories(Headers Sources)
 
 find_package(Qt6 REQUIRED COMPONENTS Widgets Test LinguistTools Sql)
 qt_standard_project_setup()
-#qt6_add_resources(RSCS resources.qrc)
-#add_custom_target(gen_qrc DEPENDS ${RSCS})
+qt6_add_resources(TEST_RSCS ../QT_Project/resources.qrc)
 
 ############################################
 ### Clang-Format Configuration           ###
@@ -169,6 +168,7 @@ target_sources(${PROJECT_NAME}
     PRIVATE
 		${Headers}
 		${Sources}
+		${TEST_RSCS}
 )
 
 if (WIN32)

@@ -44,10 +44,11 @@ FilesInViewMenuItemWidget::FilesInViewMenuItemWidget(QWidget* parent)
  */
 auto FilesInViewMenuItemWidget::setup_ui() -> void
 {
-    setContentsMargins(6, 2, 6, 2);
+    setContentsMargins(0, 0, 0, 0);
+    setAttribute(Qt::WA_StyledBackground, true);
 
     m_layout = new QHBoxLayout(this);
-    m_layout->setContentsMargins(6, 2, 6, 2);
+    m_layout->setContentsMargins(8, 3, 8, 3);
     m_layout->setSpacing(6);
 
     m_label = new QLabel(this);
@@ -71,6 +72,7 @@ auto FilesInViewMenuItemWidget::setup_ui() -> void
     m_btn_toggle_visibility->installEventFilter(this);
 
     m_btn_remove = new QToolButton(this);
+    m_btn_remove->setObjectName(QStringLiteral("removeFileButton"));
     m_btn_remove->setProperty("variant", "inline-menu");
     m_btn_remove->setAutoRaise(true);
     m_btn_remove->setToolTip(tr("Remove this file from the current view"));
@@ -434,7 +436,9 @@ auto FilesInViewMenuItemWidget::update_button_icon(QToolButton* btn, const QStri
             }
         }
 
-        const QColor color = hovered ? m_icon_color_hover : base_color;
+        const QColor color =
+            hovered ? (btn == m_btn_remove ? base_color.lighter(135) : m_icon_color_hover)
+                    : base_color;
         btn->setIcon(make_icon(path, color));
     }
 }
@@ -496,7 +500,7 @@ bool FilesInViewMenuItemWidget::eventFilter(QObject* watched, QEvent* event)
 
         if (enter || press || release || leave)
         {
-            const bool hovered = (enter || press);
+            const bool hovered = !leave && (enter || press || button->underMouse());
 
             if (is_show_only)
             {
@@ -544,10 +548,15 @@ auto FilesInViewMenuItemWidget::update_label_elided() -> void
         display_text = info.fileName();
     }
 
-    const int reserved = qMax(0, m_label_reserved_px);
+    const QMargins margins = m_layout->contentsMargins();
+    const int controls_width = m_btn_show_only->sizeHint().width() +
+                               m_btn_toggle_visibility->sizeHint().width() +
+                               m_btn_remove->sizeHint().width();
+    const int reserved = qMax(m_label_reserved_px, controls_width + 3 * m_layout->spacing() +
+                                                       margins.left() + margins.right());
     const int max_px = qMax(60, width() - reserved);
 
-    QFontMetrics metrics(font());
+    QFontMetrics metrics(m_label->font());
     QString elided_text = metrics.elidedText(display_text, Qt::ElideMiddle, max_px);
 
     m_label->setText(elided_text);

@@ -46,6 +46,12 @@
 class TreeView: public QTreeView
 {
         Q_OBJECT
+        Q_PROPERTY(QString session_icon READ session_icon WRITE set_session_icon)
+        Q_PROPERTY(QString folder_icon READ folder_icon WRITE set_folder_icon)
+        Q_PROPERTY(QString file_icon READ file_icon WRITE set_file_icon)
+        Q_PROPERTY(QColor session_icon_color MEMBER m_session_icon_color)
+        Q_PROPERTY(QColor folder_icon_color MEMBER m_folder_icon_color)
+        Q_PROPERTY(QColor file_icon_color MEMBER m_file_icon_color)
         Q_PROPERTY(QString tree_view_branch_icon_open READ get_tree_view_branch_icon_open WRITE
                        set_tree_view_branch_icon_open)
         Q_PROPERTY(QString tree_view_branch_icon_closed READ get_tree_view_branch_icon_closed WRITE
@@ -62,6 +68,42 @@ class TreeView: public QTreeView
                        set_tree_view_branch_top_vline)
 
     public:
+        /**
+         * @brief Returns the session icon resource path.
+         * @return Current stylesheet property value.
+         */
+        [[nodiscard]] auto session_icon() const -> QString;
+
+        /**
+         * @brief Sets the session icon resource path.
+         * @param value New stylesheet property value.
+         */
+        auto set_session_icon(const QString& value) -> void;
+
+        /**
+         * @brief Returns the folder icon resource path.
+         * @return Current stylesheet property value.
+         */
+        [[nodiscard]] auto folder_icon() const -> QString;
+
+        /**
+         * @brief Sets the folder icon resource path.
+         * @param value New stylesheet property value.
+         */
+        auto set_folder_icon(const QString& value) -> void;
+
+        /**
+         * @brief Returns the file icon resource path.
+         * @return Current stylesheet property value.
+         */
+        [[nodiscard]] auto file_icon() const -> QString;
+
+        /**
+         * @brief Sets the file icon resource path.
+         * @param value New stylesheet property value.
+         */
+        auto set_file_icon(const QString& value) -> void;
+
         /**
          * @brief Constructs the TreeView with default styling and resource paths.
          * @param parent Optional parent widget.
@@ -196,6 +238,9 @@ class TreeView: public QTreeView
                           const QModelIndex& index) const override;
 
     private:
+        QColor m_session_icon_color;  ///< Stylesheet tint for session icons.
+        QColor m_folder_icon_color;   ///< Stylesheet tint for folder icons.
+        QColor m_file_icon_color;     ///< Stylesheet tint for file icons.
         /**
          * @brief Requests a repaint of the viewport after a visual property change.
          *
@@ -204,6 +249,9 @@ class TreeView: public QTreeView
         auto request_repaint() -> void;
 
     private:
+        QString m_session_icon;  ///< session icon resource path.
+        QString m_folder_icon;   ///< folder icon resource path.
+        QString m_file_icon;     ///< file icon resource path.
         // Indicator SVGs (open/closed state)
         QString m_icon_open = QStringLiteral(":/Resources/Icons/branch-open.svg");
         QString m_icon_closed = QStringLiteral(":/Resources/Icons/branch-closed.svg");

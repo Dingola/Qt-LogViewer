@@ -11,6 +11,7 @@
 #include <QStyleOption>
 #include <QToolButton>
 
+#include "QtWidgetsCommonLib/Utils/UiUtils.h"
 #include "ui_PaginationWidget.h"
 
 /**
@@ -20,6 +21,7 @@
 PaginationWidget::PaginationWidget(QWidget* parent): QWidget(parent), ui(new Ui::PaginationWidget)
 {
     ui->setupUi(this);
+    update_arrow_icons();
 
     auto* layout = new QHBoxLayout(ui->pageButtonsWidget);
     layout->setContentsMargins(0, 0, 0, 0);
@@ -65,6 +67,120 @@ PaginationWidget::PaginationWidget(QWidget* parent): QWidget(parent), ui(new Ui:
 PaginationWidget::~PaginationWidget()
 {
     delete ui;
+}
+
+/**
+ * @brief Returns the SVG resource path for backward navigation.
+ * @return Current stylesheet property value.
+ */
+auto PaginationWidget::previous_icon() const -> QString
+{
+    return m_previous_icon;
+}
+
+/**
+ * @brief Sets the SVG resource path for backward navigation and refreshes navigation icons.
+ * @param value New stylesheet property value.
+ */
+auto PaginationWidget::set_previous_icon(const QString& value) -> void
+{
+    if (m_previous_icon != value)
+    {
+        m_previous_icon = value;
+        update_arrow_icons();
+    }
+}
+
+/**
+ * @brief Returns the SVG resource path for forward navigation.
+ * @return Current stylesheet property value.
+ */
+auto PaginationWidget::next_icon() const -> QString
+{
+    return m_next_icon;
+}
+
+/**
+ * @brief Sets the SVG resource path for forward navigation and refreshes navigation icons.
+ * @param value New stylesheet property value.
+ */
+auto PaginationWidget::set_next_icon(const QString& value) -> void
+{
+    if (m_next_icon != value)
+    {
+        m_next_icon = value;
+        update_arrow_icons();
+    }
+}
+
+/**
+ * @brief Returns the enabled navigation icon color.
+ * @return Current stylesheet property value.
+ */
+auto PaginationWidget::arrow_color() const -> QColor
+{
+    return m_arrow_color;
+}
+
+/**
+ * @brief Sets the enabled navigation icon color and refreshes navigation icons.
+ * @param value New stylesheet property value.
+ */
+auto PaginationWidget::set_arrow_color(const QColor& value) -> void
+{
+    if (m_arrow_color != value)
+    {
+        m_arrow_color = value;
+        update_arrow_icons();
+    }
+}
+
+/**
+ * @brief Returns the disabled navigation icon color.
+ * @return Current stylesheet property value.
+ */
+auto PaginationWidget::arrow_disabled_color() const -> QColor
+{
+    return m_arrow_disabled_color;
+}
+
+/**
+ * @brief Sets the disabled navigation icon color and refreshes navigation icons.
+ * @param value New stylesheet property value.
+ */
+auto PaginationWidget::set_arrow_disabled_color(const QColor& value) -> void
+{
+    if (m_arrow_disabled_color != value)
+    {
+        m_arrow_disabled_color = value;
+        update_arrow_icons();
+    }
+}
+
+/** @brief Rebuilds normal and disabled icon modes from the configured SVG resources. */
+auto PaginationWidget::update_arrow_icons() -> void
+{
+    if (!(m_previous_icon.isEmpty() || m_next_icon.isEmpty()))
+    {
+        const QColor normal =
+            m_arrow_color.isValid() ? m_arrow_color : palette().color(QPalette::ButtonText);
+        const QColor disabled = m_arrow_disabled_color.isValid()
+                                    ? m_arrow_disabled_color
+                                    : palette().color(QPalette::Disabled, QPalette::ButtonText);
+        const QSize size = ui->buttonPrev->iconSize();
+        QIcon previous =
+            QtWidgetsCommonLib::UiUtils::colored_svg_icon(m_previous_icon, normal, size);
+        QIcon next = QtWidgetsCommonLib::UiUtils::colored_svg_icon(m_next_icon, normal, size);
+        previous.addPixmap(
+            QtWidgetsCommonLib::UiUtils::colored_svg_icon(m_previous_icon, disabled, size),
+            QIcon::Disabled);
+        next.addPixmap(QtWidgetsCommonLib::UiUtils::colored_svg_icon(m_next_icon, disabled, size),
+                       QIcon::Disabled);
+        ui->buttonPrev->setIcon(previous);
+        ui->buttonJumpPrev->setIcon(previous);
+        ui->buttonNext->setIcon(next);
+        ui->buttonJumpNext->setIcon(next);
+    }
 }
 
 /**

@@ -4,6 +4,7 @@
 #include <QItemSelectionModel>
 #include <QLayout>
 #include <QMenu>
+#include <QPainter>
 #include <QToolButton>
 
 #include "Qt-LogViewer/Views/App/FilesInViewMenuItemWidget.h"
@@ -266,7 +267,8 @@ auto LogViewWidget::setup_files_menu() -> void
     if (ui->filesInViewToolButton != nullptr)
     {
         ui->filesInViewToolButton->setText(tr("Files..."));
-        ui->filesInViewToolButton->setToolButtonStyle(Qt::ToolButtonTextOnly);
+        ui->filesInViewToolButton->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+        update_files_icon();
         ui->filesInViewToolButton->setPopupMode(QToolButton::InstantPopup);
         ui->filesInViewToolButton->setAutoRaise(true);
     }
@@ -428,4 +430,64 @@ auto LogViewWidget::set_search_highlight(const QString& text, SearchField field,
                                          bool use_regex) -> void
 {
     ui->logTableView->set_search_highlight(text, field, use_regex);
+}
+
+/**
+ * @brief Returns the Files button icon resource path.
+ * @return Current stylesheet property value.
+ */
+auto LogViewWidget::files_icon() const -> QString
+{
+    return m_files_icon;
+}
+
+/**
+ * @brief Sets the Files button icon resource path.
+ * @param value New stylesheet property value.
+ */
+auto LogViewWidget::set_files_icon(const QString& value) -> void
+{
+    if (m_files_icon != value)
+    {
+        m_files_icon = value;
+        update_files_icon();
+    }
+}
+/**
+ * @brief Returns the Files button icon tint.
+ * @return Current stylesheet property value.
+ */
+auto LogViewWidget::files_icon_color() const -> QColor
+{
+    return m_files_icon_color;
+}
+
+/**
+ * @brief Sets the Files button icon tint.
+ * @param value New stylesheet property value.
+ */
+auto LogViewWidget::set_files_icon_color(const QColor& value) -> void
+{
+    if (m_files_icon_color != value)
+    {
+        m_files_icon_color = value;
+        update_files_icon();
+    }
+}
+/** @brief Refreshes the Files button decoration from stylesheet properties. */
+auto LogViewWidget::update_files_icon() -> void
+{
+    if (!(m_files_icon.isEmpty() || !m_files_icon_color.isValid()))
+    {
+        const QIcon file_icon = UiUtils::colored_svg_icon(m_files_icon, m_files_icon_color);
+        const qreal ratio = ui->filesInViewToolButton->devicePixelRatioF();
+        QPixmap padded_icon(QSize(21, 16) * ratio);
+        padded_icon.setDevicePixelRatio(ratio);
+        padded_icon.fill(Qt::transparent);
+        QPainter icon_painter(&padded_icon);
+        icon_painter.drawPixmap(0, 0, file_icon.pixmap(QSize(16, 16), ratio));
+        icon_painter.end();
+        ui->filesInViewToolButton->setIcon(QIcon(padded_icon));
+        ui->filesInViewToolButton->setIconSize(QSize(21, 16));
+    }
 }

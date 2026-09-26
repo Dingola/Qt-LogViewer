@@ -30,6 +30,28 @@ auto TableView::set_hover_row_color(const QColor& color) -> void
 }
 
 /**
+ * @brief Returns the accent used for search-match borders and translucent fills.
+ * @return Current theme's search-match color.
+ */
+auto TableView::get_search_match_color() const -> QColor
+{
+    return m_search_match_color;
+}
+
+/**
+ * @brief Sets the search-match accent and repaints existing matches when it changes.
+ * @param color Search-match accent supplied by the stylesheet.
+ */
+auto TableView::set_search_match_color(const QColor& color) -> void
+{
+    if (m_search_match_color != color)
+    {
+        m_search_match_color = color;
+        viewport()->update();
+    }
+}
+
+/**
  * @brief Handles mouse move events to emit the hover index signal.
  * @param event The mouse event.
  */

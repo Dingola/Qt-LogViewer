@@ -40,7 +40,7 @@
      </property>
      <property name="icon">
       <iconset>
-       <normaloff>:/Resources/left-arrow.svg</normaloff>:/Resources/left-arrow.svg</iconset>
+       <disabledoff>:/Resources/left-arrow-disabled.svg</disabledoff><normaloff>:/Resources/left-arrow.svg</normaloff>:/Resources/left-arrow.svg</iconset>
      </property>
     </widget>
    </item>
@@ -54,7 +54,7 @@
      </property>
      <property name="icon">
       <iconset>
-       <normaloff>:/Resources/right-arrow.svg</normaloff>:/Resources/right-arrow.svg</iconset>
+       <disabledoff>:/Resources/right-arrow-disabled.svg</disabledoff><normaloff>:/Resources/right-arrow.svg</normaloff>:/Resources/right-arrow.svg</iconset>
      </property>
     </widget>
    </item>
@@ -81,7 +81,7 @@
      </property>
      <property name="icon">
       <iconset>
-       <normaloff>:/Resources/left-arrow.svg</normaloff>:/Resources/left-arrow.svg</iconset>
+       <disabledoff>:/Resources/left-arrow-disabled.svg</disabledoff><normaloff>:/Resources/left-arrow.svg</normaloff>:/Resources/left-arrow.svg</iconset>
      </property>
     </widget>
    </item>
@@ -99,7 +99,7 @@
      </property>
      <property name="icon">
       <iconset>
-       <normaloff>:/Resources/right-arrow.svg</normaloff>:/Resources/right-arrow.svg</iconset>
+       <disabledoff>:/Resources/right-arrow-disabled.svg</disabledoff><normaloff>:/Resources/right-arrow.svg</normaloff>:/Resources/right-arrow.svg</iconset>
      </property>
     </widget>
    </item>

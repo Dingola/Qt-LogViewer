@@ -69,6 +69,14 @@ class HoverRowDelegate: public QStyledItemDelegate
         void paint(QPainter* painter, const QStyleOptionViewItem& option,
                    const QModelIndex& index) const override;
 
+    protected:
+        /**
+         * @brief Applies stylesheet severity colors to the level column.
+         * @param option Cell style option receiving the theme-aware foreground.
+         * @param index Model index whose display roles are applied.
+         */
+        void initStyleOption(QStyleOptionViewItem* option, const QModelIndex& index) const override;
+
     private:
         int m_hovered_row{-1};
         QString m_search_text;

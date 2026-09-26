@@ -20,6 +20,53 @@
 HoverRowDelegate::HoverRowDelegate(QObject* parent): QStyledItemDelegate(parent) {}
 
 /**
+ * @brief Applies the table's severity foreground to the level column.
+ * @param option Cell style option receiving the configured foreground.
+ * @param index Model index providing the field identifier and log level.
+ */
+void HoverRowDelegate::initStyleOption(QStyleOptionViewItem* option, const QModelIndex& index) const
+{
+    QStyledItemDelegate::initStyleOption(option, index);
+    const auto* table = qobject_cast<const TableView*>(option->widget);
+    const auto* model = qobject_cast<const LogModel*>(index.model());
+    if (!(table == nullptr || model == nullptr ||
+          model->get_column_field_id(index.column()) != LogField::Level))
+    {
+        const char* color_property = nullptr;
+        switch (LogModel::map_log_level(index.data(LogModel::LevelRole).toString()))
+        {
+        case SimpleCppLogger::LogLevel::Trace:
+            color_property = "trace_color";
+            break;
+        case SimpleCppLogger::LogLevel::Debug:
+            color_property = "debug_color";
+            break;
+        case SimpleCppLogger::LogLevel::Info:
+            color_property = "info_color";
+            break;
+        case SimpleCppLogger::LogLevel::Warning:
+            color_property = "warning_color";
+            break;
+        case SimpleCppLogger::LogLevel::Error:
+            color_property = "error_color";
+            break;
+        case SimpleCppLogger::LogLevel::Fatal:
+            color_property = "fatal_color";
+            break;
+        default:
+            break;
+        }
+        if (color_property != nullptr)
+        {
+            const QColor color = table->property(color_property).value<QColor>();
+            if (color.isValid())
+            {
+                option->palette.setColor(QPalette::Text, color);
+            }
+        }
+    }
+}
+/**
  * @brief Sets the currently hovered row.
  * @param row Row to highlight, or -1 when no row is hovered.
  */
@@ -221,7 +268,10 @@ void HoverRowDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
     if (can_paint_highlights)
     {
         const QFontMetrics font_metrics(text_option.font);
-        const QColor highlight_color(255, 255, 0, 140);
+        const auto* table_view = qobject_cast<const TableView*>(cell_option.widget);
+        const QColor highlight_color = table_view != nullptr
+                                           ? table_view->get_search_match_color()
+                                           : text_option.palette.color(QPalette::Link);
 
         const int text_margin =
             style->pixelMetric(QStyle::PM_FocusFrameHMargin, &text_option, cell_option.widget) + 1;
@@ -229,7 +279,7 @@ void HoverRowDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
         const int text_start_x = text_rect.left() + text_margin;
 
         painter->save();
-        painter->setClipRect(text_rect);
+        painter->setClipRect(cell_option.rect.adjusted(1, 1, -1, -1));
 
         for (const QPair<int, int>& range: ranges)
         {
@@ -256,10 +306,34 @@ void HoverRowDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
 
             if (can_draw)
             {
-                const QRect match_rect(text_start_x + pixels_before, text_rect.top(), match_width,
-                                       text_rect.height());
+                const int match_top =
+                    text_rect.top() + (text_rect.height() - font_metrics.height()) / 2;
+                const QRect match_rect(text_start_x + pixels_before, match_top, match_width,
+                                       font_metrics.height());
+                // Add breathing room without changing text layout or row height.
+                const QRect marker_rect = match_rect.adjusted(-2, -2, 2, 2)
+                                              .intersected(cell_option.rect.adjusted(1, 1, -1, -1));
+                QColor marker_fill(highlight_color);
+                marker_fill.setAlpha(55);
+                painter->setRenderHint(QPainter::Antialiasing, true);
+                painter->setPen(QPen(highlight_color, 1.0));
+                painter->setBrush(marker_fill);
+                painter->drawRoundedRect(QRectF(marker_rect).adjusted(0.5, 0.5, -0.5, -0.5), 2.0,
+                                         2.0);
 
-                painter->fillRect(match_rect, highlight_color);
+                // Restore the normal text color above the translucent fill.
+                // Drawing the entire string under a clip keeps its original spacing.
+                painter->save();
+                painter->setClipRect(match_rect, Qt::IntersectClip);
+                painter->setFont(text_option.font);
+                painter->setPen(text_option.palette.color(selected ? QPalette::HighlightedText
+                                                                   : QPalette::Text));
+                painter->drawText(QRect(text_start_x, text_rect.top(),
+                                        text_rect.width() - 2 * text_margin, text_rect.height()),
+                                  Qt::AlignLeft | Qt::AlignVCenter | Qt::TextSingleLine,
+                                  font_metrics.elidedText(display_text, text_option.textElideMode,
+                                                          text_rect.width() - 2 * text_margin));
+                painter->restore();
             }
         }
 

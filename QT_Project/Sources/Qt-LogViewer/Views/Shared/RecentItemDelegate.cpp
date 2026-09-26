@@ -8,6 +8,7 @@
 
 #include "Qt-LogViewer/Views/Shared/RecentItemDelegate.h"
 
+#include <QFontMetrics>
 #include <QPainter>
 #include <QStyle>
 #include <QStyleOptionViewItem>
@@ -55,12 +56,15 @@ auto RecentItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& op
     QString date_text;
     extract_texts(index, title, secondary, date_text);
 
-    // Fonts: title bold, secondary slightly smaller
+    // Keep metadata readable; separate it by tone rather than tiny type.
     QFont title_font = opt.font;
-    title_font.setBold(true);
+    title_font.setWeight(QFont::Medium);
 
     QFont secondary_font = opt.font;
-    secondary_font.setPointSizeF(opt.font.pointSizeF() - 1.0);
+    const bool selected = opt.state.testFlag(QStyle::State_Selected);
+    const QColor text_color = pal.color(selected ? QPalette::HighlightedText : QPalette::Text);
+    QColor secondary_color(text_color);
+    secondary_color.setAlphaF(selected ? 0.9 : 0.75);
 
     // Layout rows
     QRect top_row = content_rect;
@@ -71,18 +75,25 @@ auto RecentItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& op
 
     // Title left
     painter->setFont(title_font);
-    painter->setPen(pal.color(QPalette::Text));
-    painter->drawText(top_row.adjusted(0, 0, -120, 0),
-                      Qt::AlignVCenter | Qt::AlignLeft | Qt::TextSingleLine, title);
+    painter->setPen(text_color);
+    const int date_width =
+        qMin(opt.fontMetrics.horizontalAdvance(date_text), qMax(0, top_row.width() / 2));
+    const QRect title_rect = top_row.adjusted(0, 0, -date_width - 16, 0);
+    painter->drawText(
+        title_rect, Qt::AlignVCenter | Qt::AlignLeft | Qt::TextSingleLine,
+        QFontMetrics(title_font).elidedText(title, Qt::ElideRight, qMax(0, title_rect.width())));
 
     // Date right
     painter->setFont(opt.font);
-    painter->setPen(pal.color(QPalette::Mid));
-    painter->drawText(top_row, Qt::AlignVCenter | Qt::AlignRight | Qt::TextSingleLine, date_text);
+    painter->setPen(secondary_color);
+    const QRect date_rect(top_row.right() - date_width + 1, top_row.top(), date_width,
+                          top_row.height());
+    painter->drawText(date_rect, Qt::AlignVCenter | Qt::AlignRight | Qt::TextSingleLine,
+                      opt.fontMetrics.elidedText(date_text, Qt::ElideRight, date_width));
 
     // Secondary (elided)
     painter->setFont(secondary_font);
-    painter->setPen(pal.color(QPalette::Mid));
+    painter->setPen(secondary_color);
     const QString elided_secondary =
         opt.fontMetrics.elidedText(secondary, Qt::ElideMiddle, bottom_row.width());
     painter->drawText(bottom_row, Qt::AlignVCenter | Qt::AlignLeft, elided_secondary);

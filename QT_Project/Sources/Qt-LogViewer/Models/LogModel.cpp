@@ -85,34 +85,6 @@ auto LogModel::data(const QModelIndex& index, int role) const -> QVariant
 
     const QString field_id = get_column_field_id(index.column());
 
-    if (role == Qt::ForegroundRole && field_id == LogField::Level)
-    {
-        switch (map_log_level(entry.get_level()))
-        {
-        case SimpleCppLogger::LogLevel::Info: {
-            return QBrush(QColor("#42a5f5"));
-        }
-        case SimpleCppLogger::LogLevel::Debug: {
-            return QBrush(QColor("#66bb6a"));
-        }
-        case SimpleCppLogger::LogLevel::Trace: {
-            return QBrush(QColor("#b0bec5"));
-        }
-        case SimpleCppLogger::LogLevel::Warning: {
-            return QBrush(QColor("#ffb300"));
-        }
-        case SimpleCppLogger::LogLevel::Error: {
-            return QBrush(QColor("#ef5350"));
-        }
-        case SimpleCppLogger::LogLevel::Fatal: {
-            return QBrush(QColor("#ff1744"));
-        }
-        default: {
-            break;
-        }
-        }
-    }
-
     if (role == Qt::DisplayRole || role == Qt::EditRole)
     {
         QVariant value = entry.get_parsed_field(field_id);

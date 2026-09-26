@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QColor>
 #include <QHBoxLayout>
 #include <QPainter>
 #include <QToolButton>
@@ -22,8 +23,61 @@ class PaginationWidget;
 class PaginationWidget: public QWidget
 {
         Q_OBJECT
+        Q_PROPERTY(QString previous_icon READ previous_icon WRITE set_previous_icon)
+        Q_PROPERTY(QString next_icon READ next_icon WRITE set_next_icon)
+        Q_PROPERTY(QColor arrow_color READ arrow_color WRITE set_arrow_color)
+        Q_PROPERTY(
+            QColor arrow_disabled_color READ arrow_disabled_color WRITE set_arrow_disabled_color)
 
     public:
+        /**
+         * @brief Returns the SVG resource path for backward navigation.
+         * @return Current stylesheet property value.
+         */
+        [[nodiscard]] auto previous_icon() const -> QString;
+
+        /**
+         * @brief Sets the SVG resource path for backward navigation and refreshes navigation icons.
+         * @param value New stylesheet property value.
+         */
+        auto set_previous_icon(const QString& value) -> void;
+
+        /**
+         * @brief Returns the SVG resource path for forward navigation.
+         * @return Current stylesheet property value.
+         */
+        [[nodiscard]] auto next_icon() const -> QString;
+
+        /**
+         * @brief Sets the SVG resource path for forward navigation and refreshes navigation icons.
+         * @param value New stylesheet property value.
+         */
+        auto set_next_icon(const QString& value) -> void;
+
+        /**
+         * @brief Returns the enabled navigation icon color.
+         * @return Current stylesheet property value.
+         */
+        [[nodiscard]] auto arrow_color() const -> QColor;
+
+        /**
+         * @brief Sets the enabled navigation icon color and refreshes navigation icons.
+         * @param value New stylesheet property value.
+         */
+        auto set_arrow_color(const QColor& value) -> void;
+
+        /**
+         * @brief Returns the disabled navigation icon color.
+         * @return Current stylesheet property value.
+         */
+        [[nodiscard]] auto arrow_disabled_color() const -> QColor;
+
+        /**
+         * @brief Sets the disabled navigation icon color and refreshes navigation icons.
+         * @param value New stylesheet property value.
+         */
+        auto set_arrow_disabled_color(const QColor& value) -> void;
+
         /**
          * @brief Constructs a PaginationWidget.
          * @param parent The parent widget, or nullptr.
@@ -66,6 +120,13 @@ class PaginationWidget: public QWidget
         [[nodiscard]] auto get_items_per_page() const -> int;
 
     private:
+        QString m_previous_icon;                   ///< SVG resource path for backward navigation.
+        QString m_next_icon;                       ///< SVG resource path for forward navigation.
+        QColor m_arrow_color = QColor();           ///< enabled navigation icon color.
+        QColor m_arrow_disabled_color = QColor();  ///< disabled navigation icon color.
+        /** @brief Rebuilds normal and disabled icon modes from the configured SVG resources. */
+        auto update_arrow_icons() -> void;
+
         /**
          * @brief Internal display entry used to map a button slot to content.
          */

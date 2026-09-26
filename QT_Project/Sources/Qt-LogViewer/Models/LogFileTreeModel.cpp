@@ -544,18 +544,15 @@ auto LogFileTreeModel::data(const QModelIndex& index, int role) const -> QVarian
         {
             if (type == LogFileTreeItem::Type::Session)
             {
-                value = QIcon(
-                    UiUtils::colored_svg_icon(":/Resources/Icons/session.svg", QColor("#ffa726")));
+                value = QIcon(QStringLiteral(":/Resources/Icons/session.svg"));
             }
             else if (type == LogFileTreeItem::Type::Group)
             {
-                value = QIcon(
-                    UiUtils::colored_svg_icon(":/Resources/Icons/folder.svg", QColor("#66bb6a")));
+                value = QIcon(QStringLiteral(":/Resources/Icons/folder.svg"));
             }
             else if (type == LogFileTreeItem::Type::File)
             {
-                value = QIcon(
-                    UiUtils::colored_svg_icon(":/Resources/Icons/file.svg", QColor("#42a5f5")));
+                value = QIcon(QStringLiteral(":/Resources/Icons/file.svg"));
             }
         }
         else if (role == ItemTypeRole)

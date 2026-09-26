@@ -14,11 +14,17 @@
    <string>SearchBarWidget</string>
   </property>
   <layout class="QGridLayout" name="gridLayout">
+   <property name="horizontalSpacing">
+    <number>8</number>
+   </property>
    <item row="0" column="0">
     <widget class="QComboBox" name="comboBoxSearchArea"/>
    </item>
    <item row="1" column="1">
     <layout class="QHBoxLayout" name="horizontalLayout">
+     <property name="spacing">
+      <number>18</number>
+     </property>
      <property name="leftMargin">
       <number>12</number>
      </property>

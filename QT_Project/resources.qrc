@@ -2,7 +2,19 @@
 	<qresource prefix="/">
 		<file>Resources/style.qss</file>
 		<file>Resources/Icons/App/AppIcon.svg</file>
+		<file>Resources/Icons/check-light.svg</file>
+		<file>Resources/Icons/check-dark.svg</file>
+		<file>Resources/Icons/check-muted.svg</file>
 		<file>Resources/down-arrow.svg</file>
+        <file>Resources/down-arrow-light.svg</file>
+        <file>Resources/left-arrow-light.svg</file>
+        <file>Resources/right-arrow-light.svg</file>
+		<file>Resources/down-arrow-disabled.svg</file>
+		<file>Resources/up-arrow-disabled.svg</file>
+		<file>Resources/left-arrow-disabled.svg</file>
+		<file>Resources/right-arrow-disabled.svg</file>
+		<file>Resources/spin-up.svg</file>
+		<file>Resources/spin-down.svg</file>
 		<file>Resources/left-arrow.svg</file>
 		<file>Resources/right-arrow.svg</file>
 		<file>Resources/Icons/magnifying-glass.svg</file>

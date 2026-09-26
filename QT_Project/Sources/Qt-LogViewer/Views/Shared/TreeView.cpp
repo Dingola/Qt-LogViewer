@@ -3,10 +3,71 @@
 #include <QPainter>
 #include <QStyle>
 #include <QStyleOption>
+#include <QStyledItemDelegate>
 
+#include "Qt-LogViewer/Models/LogFileTreeItem.h"
+#include "Qt-LogViewer/Models/LogFileTreeModel.h"
 #include "QtWidgetsCommonLib/Utils/UiUtils.h"
 
 using QtWidgetsCommonLib::UiUtils;
+
+namespace
+{
+/** @brief Applies the explorer's stylesheet tints to model decoration icons. */
+class ExplorerIconDelegate final: public QStyledItemDelegate
+{
+    public:
+        /**
+     * @brief Creates the icon delegate for a tree.
+     * @param parent Tree supplying the icon color properties.
+     */
+        explicit ExplorerIconDelegate(QObject* parent): QStyledItemDelegate(parent) {}
+
+    protected:
+        /**
+     * @brief Resolves the icon tint from the item's semantic type.
+     * @param option Style option receiving the tinted decoration.
+     * @param index Model index identifying a session, group or file.
+     */
+        void initStyleOption(QStyleOptionViewItem* option, const QModelIndex& index) const override
+        {
+            QStyledItemDelegate::initStyleOption(option, index);
+            if (!(qobject_cast<const LogFileTreeModel*>(index.model()) == nullptr ||
+                  option->widget == nullptr))
+            {
+                const auto type =
+                    index.data(LogFileTreeModel::ItemTypeRole).value<LogFileTreeItem::Type>();
+                QString name;
+                switch (type)
+                {
+                case LogFileTreeItem::Type::Session:
+                    name = QStringLiteral("session");
+                    break;
+                case LogFileTreeItem::Type::Group:
+                    name = QStringLiteral("folder");
+                    break;
+                case LogFileTreeItem::Type::File:
+                    name = QStringLiteral("file");
+                    break;
+                default:
+                    return;
+                }
+                const QColor color =
+                    option->widget
+                        ->property((name + QStringLiteral("_icon_color")).toUtf8().constData())
+                        .value<QColor>();
+                if (color.isValid())
+                {
+                    option->icon = UiUtils::colored_svg_icon(
+                        option->widget
+                            ->property((name + QStringLiteral("_icon")).toUtf8().constData())
+                            .toString(),
+                        color, option->decorationSize);
+                }
+            }
+        }
+};
+}  // namespace
 
 /**
  * @file TreeView.cpp
@@ -24,7 +85,10 @@ using QtWidgetsCommonLib::UiUtils;
  *
  * Uses defaults defined in member initializers; no model is set here.
  */
-TreeView::TreeView(QWidget* parent): QTreeView(parent) {}
+TreeView::TreeView(QWidget* parent): QTreeView(parent)
+{
+    setItemDelegate(new ExplorerIconDelegate(this));
+}
 
 /* ===== Setters ===== */
 /**
@@ -355,6 +419,72 @@ auto TreeView::request_repaint() -> void
 {
     if (viewport() != nullptr)
     {
+        viewport()->update();
+    }
+}
+
+/**
+ * @brief Returns the file icon resource path.
+ * @return Current stylesheet property value.
+ */
+auto TreeView::file_icon() const -> QString
+{
+    return m_file_icon;
+}
+
+/**
+ * @brief Sets the file icon resource path.
+ * @param value New stylesheet property value.
+ */
+auto TreeView::set_file_icon(const QString& value) -> void
+{
+    if (m_file_icon != value)
+    {
+        m_file_icon = value;
+        viewport()->update();
+    }
+}
+
+/**
+ * @brief Returns the folder icon resource path.
+ * @return Current stylesheet property value.
+ */
+auto TreeView::folder_icon() const -> QString
+{
+    return m_folder_icon;
+}
+
+/**
+ * @brief Sets the folder icon resource path.
+ * @param value New stylesheet property value.
+ */
+auto TreeView::set_folder_icon(const QString& value) -> void
+{
+    if (m_folder_icon != value)
+    {
+        m_folder_icon = value;
+        viewport()->update();
+    }
+}
+
+/**
+ * @brief Returns the session icon resource path.
+ * @return Current stylesheet property value.
+ */
+auto TreeView::session_icon() const -> QString
+{
+    return m_session_icon;
+}
+
+/**
+ * @brief Sets the session icon resource path.
+ * @param value New stylesheet property value.
+ */
+auto TreeView::set_session_icon(const QString& value) -> void
+{
+    if (m_session_icon != value)
+    {
+        m_session_icon = value;
         viewport()->update();
     }
 }
