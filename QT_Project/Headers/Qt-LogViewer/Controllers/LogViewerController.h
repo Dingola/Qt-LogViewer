@@ -21,6 +21,7 @@
 // Forward declarations (pointers only)
 class FileCatalogController;
 class FilterCoordinator;
+class LiveTailingCoordinator;
 class LogIngestController;
 class LogQueryController;
 class LogViewContext;
@@ -29,9 +30,7 @@ class LogModel;
 class LogFileTreeModel;
 class LogHistoryService;
 class HistoryWriteService;
-class LogTailerService;
 class LogPageCoordinator;
-class QTimer;
 
 /**
  * @file LogViewerController.h
@@ -796,9 +795,6 @@ class LogViewerController: public QObject
         HistoryWriteService* m_history_write_service{nullptr};
         LogPageCoordinator* m_page_coordinator{nullptr};
         LogQueryController* m_query_controller{nullptr};
-        LogTailerService* m_tailer_service{nullptr};
-        QTimer* m_tail_refresh_timer{nullptr};
-        QSet<QUuid> m_pending_tail_refresh_views;
-        QSet<QUuid> m_live_tailing_views;
+        LiveTailingCoordinator* m_live_tailing{nullptr};
         QHash<QUuid, QSet<QString>> m_failed_ingest_files;
 };

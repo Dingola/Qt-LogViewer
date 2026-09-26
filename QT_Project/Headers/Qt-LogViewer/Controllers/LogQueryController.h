@@ -107,6 +107,17 @@ class LogQueryController final: public QObject
         auto reload_query(const QUuid& view_id) -> bool;
 
         /**
+         * @brief Refreshes a view after new entries were appended to its stored history.
+         *
+         * Page one is reloaded so newest-first results become visible. A historical page keeps
+         * its current rows and only receives updated result totals.
+         *
+         * @param view_id Target view.
+         * @return True when the view has an active page state that could be refreshed.
+         */
+        auto refresh_after_entries_appended(const QUuid& view_id) -> bool;
+
+        /**
          * @brief Applies filters, sorting, page size, and page number with one reload.
          * @param view_id Target view.
          * @param state Complete saved state of the view.

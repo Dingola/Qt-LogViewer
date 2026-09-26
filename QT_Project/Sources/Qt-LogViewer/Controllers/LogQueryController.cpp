@@ -195,6 +195,32 @@ auto LogQueryController::reload_query(const QUuid& view_id) -> bool
 }
 
 /**
+ * @brief Refreshes a view after new entries were appended to its stored history.
+ * @param view_id Target view.
+ * @return True when the current page or its totals were refreshed.
+ */
+auto LogQueryController::refresh_after_entries_appended(const QUuid& view_id) -> bool
+{
+    const LogPageState* page_state =
+        m_pages != nullptr ? m_pages->get_page_state(view_id) : nullptr;
+    bool refreshed = false;
+
+    if (page_state != nullptr)
+    {
+        if (page_state->get_current_page() == 1)
+        {
+            refreshed = m_pages->reload(view_id);
+        }
+        else
+        {
+            refreshed = m_pages->refresh_total_entries(view_id);
+        }
+    }
+
+    return refreshed;
+}
+
+/**
  * @brief Applies filters, sorting, page size, and page number with one reload.
  * @param view_id Target view.
  * @param state Complete saved state of the view.

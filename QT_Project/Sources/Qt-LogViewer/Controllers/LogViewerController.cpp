@@ -8,13 +8,13 @@
 
 #include <QDebug>
 #include <QFileInfo>
-#include <QTimer>
 #include <algorithm>
 #include <optional>
 
 // Concrete includes for forward-declared types used in implementation
 #include "Qt-LogViewer/Controllers/FileCatalogController.h"
 #include "Qt-LogViewer/Controllers/FilterCoordinator.h"
+#include "Qt-LogViewer/Controllers/LiveTailingCoordinator.h"
 #include "Qt-LogViewer/Controllers/LogIngestController.h"
 #include "Qt-LogViewer/Controllers/LogPageCoordinator.h"
 #include "Qt-LogViewer/Controllers/LogQueryController.h"
@@ -26,7 +26,6 @@
 #include "Qt-LogViewer/Services/LogHistoryService.h"
 #include "Qt-LogViewer/Services/LogLoader.h"
 #include "Qt-LogViewer/Services/LogLoadingService.h"
-#include "Qt-LogViewer/Services/LogTailerService.h"
 
 namespace
 {
@@ -125,11 +124,8 @@ LogViewerController::LogViewerController(const LogParsingProfile& profile, QObje
 
     m_page_coordinator = new LogPageCoordinator(m_history_service, m_views, this);
     m_query_controller = new LogQueryController(m_filters, m_page_coordinator, m_views, this);
-    m_tailer_service = new LogTailerService(profile, this);
-
-    m_tail_refresh_timer = new QTimer(this);
-    m_tail_refresh_timer->setSingleShot(true);
-    m_tail_refresh_timer->setInterval(150);
+    m_live_tailing =
+        new LiveTailingCoordinator(profile, m_history_service, m_views, m_query_controller, this);
 
     connect(m_page_coordinator, &LogPageCoordinator::page_loaded, this,
             [this](const QUuid& view_id, qsizetype current_page, qsizetype total_pages,
@@ -140,50 +136,6 @@ LogViewerController::LogViewerController(const LogParsingProfile& profile, QObje
             [this](const QUuid& view_id, qsizetype current_page, qsizetype total_pages,
                    qsizetype total_entries) {
                 emit page_state_updated(view_id, current_page, total_pages, total_entries);
-            });
-
-    connect(m_tail_refresh_timer, &QTimer::timeout, this, [this]() {
-        const QSet<QUuid> views_to_refresh = m_pending_tail_refresh_views;
-
-        m_pending_tail_refresh_views.clear();
-
-        for (const QUuid& view_id: views_to_refresh)
-        {
-            const LogPageState* page_state = m_page_coordinator->get_page_state(view_id);
-
-            const bool can_update = !m_is_shutting_down &&
-                                    m_views->get_context(view_id) != nullptr &&
-                                    page_state != nullptr;
-
-            if (can_update)
-            {
-                if (page_state->get_current_page() == 1)
-                {
-                    m_page_coordinator->reload(view_id);
-                }
-                else
-                {
-                    m_page_coordinator->refresh_total_entries(view_id);
-                }
-            }
-        }
-    });
-
-    connect(m_tailer_service, &LogTailerService::entries_available, this,
-            [this](const QUuid& view_id, const QString&, const QVector<LogEntry>& entries) {
-                const bool can_process = !m_is_shutting_down && !entries.isEmpty() &&
-                                         m_views->get_context(view_id) != nullptr;
-
-                if (can_process)
-                {
-                    const bool entries_added = m_history_service->add_entries(view_id, entries);
-
-                    if (entries_added)
-                    {
-                        m_pending_tail_refresh_views.insert(view_id);
-                        m_tail_refresh_timer->start();
-                    }
-                }
             });
 
     connect(m_views, &ViewRegistry::current_view_id_changed, this,
@@ -307,17 +259,11 @@ LogViewerController::~LogViewerController()
 {
     m_is_shutting_down = true;
 
-    if (m_tail_refresh_timer != nullptr)
-    {
-        m_tail_refresh_timer->stop();
-    }
-
-    m_pending_tail_refresh_views.clear();
     m_failed_ingest_files.clear();
 
-    if (m_tailer_service != nullptr)
+    if (m_live_tailing != nullptr)
     {
-        m_tailer_service->stop_all_tailing();
+        m_live_tailing->shutdown();
     }
 
     if (m_ingest != nullptr)
@@ -389,9 +335,9 @@ auto LogViewerController::remove_view(const QUuid& view_id) -> bool
     {
         cancel_loading(view_id);
 
-        if (m_tailer_service != nullptr)
+        if (m_live_tailing != nullptr)
         {
-            m_tailer_service->stop_tailing_view(view_id);
+            m_live_tailing->remove_view(view_id);
         }
 
         if (m_history_service != nullptr)
@@ -400,8 +346,6 @@ auto LogViewerController::remove_view(const QUuid& view_id) -> bool
             m_history_service->remove_view_entries(view_id);
         }
 
-        m_live_tailing_views.remove(view_id);
-        m_pending_tail_refresh_views.remove(view_id);
         m_failed_ingest_files.remove(view_id);
         removed = m_views->remove_view(view_id);
     }
@@ -524,8 +468,7 @@ auto LogViewerController::load_log_file(const QString& file_path,
 
             m_page_coordinator->set_query(candidate_view_id, query);
 
-            m_live_tailing_views.insert(candidate_view_id);
-            m_tailer_service->start_tailing(candidate_view_id, file_path, profile);
+            m_live_tailing->set_enabled(candidate_view_id, true);
 
             view_id = candidate_view_id;
         }
@@ -609,7 +552,7 @@ auto LogViewerController::load_log_file(const QUuid& view_id, const QString& fil
 
             if (get_live_tailing_enabled(view_id))
             {
-                m_tailer_service->start_tailing(view_id, file_path, profile);
+                m_live_tailing->start_file(view_id, file_path, profile);
             }
 
             loaded = true;
@@ -702,12 +645,7 @@ auto LogViewerController::load_log_files(const QVector<QString>& file_paths,
 
             m_page_coordinator->set_query(candidate_view_id, query);
 
-            m_live_tailing_views.insert(candidate_view_id);
-
-            for (const QString& file_path: file_paths)
-            {
-                m_tailer_service->start_tailing(candidate_view_id, file_path, profile);
-            }
+            m_live_tailing->set_enabled(candidate_view_id, true);
 
             view_id = candidate_view_id;
         }
@@ -1498,18 +1436,8 @@ auto LogViewerController::import_view_state(const SessionViewState& state) -> QU
         {
             cancel_loading(result);
 
-            m_tailer_service->stop_tailing_view(result);
-
             m_history_service->remove_view_entries(result);
-
-            if (state.filters.live_tailing_enabled)
-            {
-                m_live_tailing_views.insert(result);
-            }
-            else
-            {
-                m_live_tailing_views.remove(result);
-            }
+            m_live_tailing->reset_view(result, state.filters.live_tailing_enabled);
 
             apply_view_query_state(result, state);
         }
@@ -1572,18 +1500,8 @@ auto LogViewerController::import_view_state_for_session(
         {
             cancel_loading(result);
 
-            m_tailer_service->stop_tailing_view(result);
-
             m_history_service->remove_view_entries(result);
-
-            if (state.filters.live_tailing_enabled)
-            {
-                m_live_tailing_views.insert(result);
-            }
-            else
-            {
-                m_live_tailing_views.remove(result);
-            }
+            m_live_tailing->reset_view(result, state.filters.live_tailing_enabled);
 
             apply_view_query_state(result, state);
         }
@@ -1635,22 +1553,9 @@ auto LogViewerController::import_view_state_for_session(
  */
 auto LogViewerController::set_live_tailing_enabled(const QUuid& view_id, bool enabled) -> void
 {
-    if (enabled)
+    if (m_live_tailing != nullptr)
     {
-        m_live_tailing_views.insert(view_id);
-
-        const QVector<QString> file_paths = get_view_file_paths(view_id);
-
-        for (const QString& file_path: file_paths)
-        {
-            m_tailer_service->start_tailing(view_id, file_path,
-                                            get_file_profile(view_id, file_path));
-        }
-    }
-    else
-    {
-        m_live_tailing_views.remove(view_id);
-        m_tailer_service->stop_tailing_view(view_id);
+        m_live_tailing->set_enabled(view_id, enabled);
     }
 }
 
@@ -1661,8 +1566,7 @@ auto LogViewerController::set_live_tailing_enabled(const QUuid& view_id, bool en
  */
 auto LogViewerController::get_live_tailing_enabled(const QUuid& view_id) const -> bool
 {
-    const bool enabled = m_live_tailing_views.contains(view_id);
-    return enabled;
+    return m_live_tailing != nullptr && m_live_tailing->is_enabled(view_id);
 }
 
 /**
@@ -1708,7 +1612,7 @@ auto LogViewerController::remove_log_file(const LogFileInfo& file) -> void
 
         if (file_is_loaded)
         {
-            m_tailer_service->stop_tailing(view_id, file_path);
+            m_live_tailing->stop_file(view_id, file_path);
 
             m_history_write_service->discard_file(view_id, file_path);
             m_history_service->remove_file_entries(view_id, file_path);
@@ -1773,7 +1677,7 @@ auto LogViewerController::remove_log_file(const QUuid& view_id, const QString& f
 
     if (can_remove)
     {
-        m_tailer_service->stop_tailing(view_id, file_path);
+        m_live_tailing->stop_file(view_id, file_path);
 
         m_history_write_service->discard_file(view_id, file_path);
         m_history_service->remove_file_entries(view_id, file_path);
@@ -1847,11 +1751,8 @@ auto LogViewerController::handle_history_write_finished(const QUuid& view_id,
         {
             emit loading_finished(view_id, absolute_file_path);
 
-            if (m_live_tailing_views.contains(view_id))
-            {
-                m_tailer_service->start_tailing(view_id, absolute_file_path,
-                                                get_file_profile(view_id, absolute_file_path));
-            }
+            m_live_tailing->start_file(view_id, absolute_file_path,
+                                       get_file_profile(view_id, absolute_file_path));
         }
     }
 }
