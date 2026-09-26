@@ -1,6 +1,7 @@
 #include "Qt-LogViewer/Controllers/LogViewContextTest.h"
 
 #include <QDateTime>
+#include <QFileInfo>
 
 #include "Qt-LogViewer/Models/LogModel.h"
 
@@ -312,4 +313,41 @@ TEST_F(LogViewContextTest, GetEntriesIntegrityAfterRemoval)
         EXPECT_EQ(stored[i].get_file_info().get_file_path(), QString("C:/logs/b.log"));
         EXPECT_EQ(stored[i].get_app_name(), QString("B"));
     }
+}
+
+/**
+ * @brief Verifies that file profiles belong to the view and rebuild its merged columns.
+ */
+TEST_F(LogViewContextTest, OwnsFileProfilesAndRefreshesColumns)
+{
+    const QString first_path = QStringLiteral("profiles/first.log");
+    const QString second_path = QStringLiteral("profiles/second.log");
+    const LogParsingProfile first = LogParsingProfile::create_default(
+        QStringLiteral("{timestamp}|{message}"), QStringLiteral("First"));
+    const LogParsingProfile second = LogParsingProfile::create_default(
+        QStringLiteral("{level}|{message}|{trace_id}"), QStringLiteral("Second"));
+
+    m_ctx->set_file_parsing_profile(first_path, first);
+    m_ctx->set_file_parsing_profile(second_path, second);
+
+    const auto stored_second = m_ctx->get_file_parsing_profile(second_path);
+    ASSERT_TRUE(stored_second.has_value());
+    EXPECT_EQ(stored_second->get_id(), second.get_id());
+    EXPECT_TRUE(
+        m_ctx->get_file_parsing_profiles().contains(QFileInfo(first_path).absoluteFilePath()));
+
+    LogModel* model = m_ctx->get_model();
+    ASSERT_NE(model, nullptr);
+    ASSERT_EQ(model->columnCount(), 4);
+    EXPECT_EQ(model->get_column_field_id(0), LogField::Timestamp);
+    EXPECT_EQ(model->get_column_field_id(1), LogField::Message);
+    EXPECT_EQ(model->get_column_field_id(2), LogField::Level);
+    EXPECT_EQ(model->get_column_field_id(3), QStringLiteral("trace_id"));
+
+    m_ctx->remove_file_parsing_profile(second_path);
+
+    EXPECT_FALSE(m_ctx->get_file_parsing_profile(second_path).has_value());
+    ASSERT_EQ(model->columnCount(), 2);
+    EXPECT_EQ(model->get_column_field_id(0), LogField::Timestamp);
+    EXPECT_EQ(model->get_column_field_id(1), LogField::Message);
 }

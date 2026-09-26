@@ -26,75 +26,10 @@
 #include "Qt-LogViewer/Services/LogHistoryService.h"
 #include "Qt-LogViewer/Services/LogLoader.h"
 #include "Qt-LogViewer/Services/LogLoadingService.h"
-#include "Qt-LogViewer/Services/LogParser.h"
 #include "Qt-LogViewer/Services/LogTailerService.h"
 
 namespace
 {
-/**
- * @brief Creates display columns from the placeholders actually used by a profile.
- * @param profile Parsing profile whose resolved field order is used.
- * @return Ordered display definitions with database capabilities for built-in fields.
- */
-[[nodiscard]] auto get_profile_columns(const LogParsingProfile& profile)
-    -> QVector<LogFieldDefinition>
-{
-    const LogParser parser(profile);
-    const QVector<QString> field_order = parser.get_field_order().fields;
-    const auto& configuration = parser.get_configuration();
-    const QVector<LogFieldDefinition>& builtins = get_builtin_log_field_definitions();
-    QVector<LogFieldDefinition> columns;
-
-    for (const QString& field_id: field_order)
-    {
-        LogFieldDefinition definition;
-        definition.id = field_id;
-        definition.display_name = field_id;
-
-        for (const LogFieldDefinition& builtin: builtins)
-        {
-            if (builtin.id == field_id)
-            {
-                definition = builtin;
-            }
-        }
-
-        for (const QtRecordParser::FieldConfiguration& configured_field: configuration.fields)
-        {
-            if (configured_field.id == field_id && !configured_field.display_name.isEmpty())
-            {
-                definition.display_name = configured_field.display_name;
-            }
-        }
-
-        if (definition.display_name == field_id)
-        {
-            definition.display_name.replace(QLatin1Char('_'), QLatin1Char(' '));
-
-            if (!definition.display_name.isEmpty())
-            {
-                definition.display_name[0] = definition.display_name.at(0).toUpper();
-            }
-        }
-
-        bool already_added = false;
-        for (const LogFieldDefinition& column: columns)
-        {
-            if (column.id == definition.id)
-            {
-                already_added = true;
-            }
-        }
-
-        if (!already_added)
-        {
-            columns.append(definition);
-        }
-    }
-
-    return columns;
-}
-
 /**
  * @brief Resolves the persisted profile identifier for a session file.
  * @param state Restored view state containing optional per-file profile identifiers.
@@ -468,7 +403,6 @@ auto LogViewerController::remove_view(const QUuid& view_id) -> bool
         m_live_tailing_views.remove(view_id);
         m_pending_tail_refresh_views.remove(view_id);
         m_failed_ingest_files.remove(view_id);
-        m_file_parsing_profiles.remove(view_id);
         removed = m_views->remove_view(view_id);
     }
 
@@ -1510,16 +1444,19 @@ auto LogViewerController::export_view_state(const QUuid& view_id) const -> Sessi
         state = m_views->export_view_state(view_id, *m_filters);
         state.filters.live_tailing_enabled = get_live_tailing_enabled(view_id);
 
-        const auto view_profiles = m_file_parsing_profiles.constFind(view_id);
+        const LogViewContext* context = get_view_context(view_id);
+        const QHash<QString, LogParsingProfile> view_profiles =
+            context != nullptr ? context->get_file_parsing_profiles()
+                               : QHash<QString, LogParsingProfile>();
 
-        if (view_profiles != m_file_parsing_profiles.cend())
+        if (!view_profiles.isEmpty())
         {
             for (const LogFileInfo& file_info: state.loaded_files)
             {
                 const QString file_path = QFileInfo(file_info.get_file_path()).absoluteFilePath();
-                const auto profile = view_profiles->constFind(file_path);
+                const auto profile = view_profiles.constFind(file_path);
 
-                if (profile != view_profiles->cend())
+                if (profile != view_profiles.cend())
                 {
                     state.file_parsing_profile_ids.insert(file_path, profile->get_id());
                 }
@@ -1951,27 +1888,11 @@ auto LogViewerController::enqueue_async(const QUuid& view_id, const QString& fil
 auto LogViewerController::remember_file_profile(const QUuid& view_id, const QString& file_path,
                                                 const LogParsingProfile& profile) -> void
 {
-    if (!view_id.isNull() && !file_path.isEmpty())
+    LogViewContext* context = get_view_context(view_id);
+
+    if (context != nullptr)
     {
-        const QString absolute_file_path = QFileInfo(file_path).absoluteFilePath();
-        const bool first_profile = !m_file_parsing_profiles.contains(view_id) ||
-                                   m_file_parsing_profiles.value(view_id).isEmpty();
-        m_file_parsing_profiles[view_id].insert(absolute_file_path, profile);
-
-        LogModel* model = get_log_model(view_id);
-        if (model != nullptr)
-        {
-            const QVector<LogFieldDefinition> columns = get_profile_columns(profile);
-
-            if (first_profile)
-            {
-                model->set_columns(columns);
-            }
-            else
-            {
-                model->append_columns(columns);
-            }
-        }
+        context->set_file_parsing_profile(file_path, profile);
     }
 }
 
@@ -1983,50 +1904,11 @@ auto LogViewerController::remember_file_profile(const QUuid& view_id, const QStr
 auto LogViewerController::forget_file_profile(const QUuid& view_id,
                                               const QString& file_path) -> void
 {
-    auto view_iterator = m_file_parsing_profiles.find(view_id);
-
-    if (view_iterator != m_file_parsing_profiles.end())
-    {
-        view_iterator->remove(QFileInfo(file_path).absoluteFilePath());
-
-        if (view_iterator->isEmpty())
-        {
-            m_file_parsing_profiles.erase(view_iterator);
-        }
-    }
-
     LogViewContext* context = get_view_context(view_id);
-    LogModel* model = get_log_model(view_id);
 
-    if (context != nullptr && model != nullptr && !context->get_loaded_files().isEmpty())
+    if (context != nullptr)
     {
-        QVector<LogFieldDefinition> columns;
-
-        for (const LogFileInfo& file_info: context->get_loaded_files())
-        {
-            const QVector<LogFieldDefinition> file_columns =
-                get_profile_columns(get_file_profile(view_id, file_info.get_file_path()));
-
-            for (const LogFieldDefinition& file_column: file_columns)
-            {
-                bool already_added = false;
-
-                for (const LogFieldDefinition& column: columns)
-                {
-                    if (column.id == file_column.id)
-                    {
-                        already_added = true;
-                    }
-                }
-
-                if (!already_added)
-                {
-                    columns.append(file_column);
-                }
-            }
-        }
-
-        model->set_columns(columns);
+        context->remove_file_parsing_profile(file_path);
     }
 }
 
@@ -2040,16 +1922,16 @@ auto LogViewerController::get_file_profile(const QUuid& view_id,
                                            const QString& file_path) const -> LogParsingProfile
 {
     LogParsingProfile profile = m_default_profile;
-    const auto view_iterator = m_file_parsing_profiles.constFind(view_id);
+    const LogViewContext* context = get_view_context(view_id);
 
-    if (view_iterator != m_file_parsing_profiles.cend())
+    if (context != nullptr)
     {
-        const QString absolute_file_path = QFileInfo(file_path).absoluteFilePath();
-        const auto profile_iterator = view_iterator->constFind(absolute_file_path);
+        const std::optional<LogParsingProfile> stored_profile =
+            context->get_file_parsing_profile(file_path);
 
-        if (profile_iterator != view_iterator->cend())
+        if (stored_profile.has_value())
         {
-            profile = profile_iterator.value();
+            profile = stored_profile.value();
         }
     }
 

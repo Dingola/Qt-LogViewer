@@ -213,6 +213,51 @@ TEST_F(LogViewerControllerTest, UsesProfileFieldsAsViewColumns)
 }
 
 /**
+ * @brief Verifies that one view merges different file profiles and removes obsolete columns.
+ */
+TEST_F(LogViewerControllerTest, UpdatesColumnsForDifferentFileProfiles)
+{
+    QTemporaryFile* first_file =
+        create_temp_file({QStringLiteral("2024-01-01 10:00:00|First message")});
+    QTemporaryFile* second_file =
+        create_temp_file({QStringLiteral("WARN|Second message|SecondApp|trace-1")});
+    ASSERT_NE(first_file, nullptr);
+    ASSERT_NE(second_file, nullptr);
+
+    const LogParsingProfile first_profile = LogParsingProfile::create_default(
+        QStringLiteral("{timestamp}|{message}"), QStringLiteral("First"));
+    const LogParsingProfile second_profile = LogParsingProfile::create_default(
+        QStringLiteral("{level}|{message}|{app_name}|{trace_id}"), QStringLiteral("Second"));
+    const QUuid view_id = m_controller->load_log_file(first_file->fileName(), first_profile);
+
+    ASSERT_FALSE(view_id.isNull());
+    ASSERT_TRUE(m_controller->load_log_file(view_id, second_file->fileName(), second_profile));
+
+    LogModel* model = m_controller->get_log_model(view_id);
+    ASSERT_NE(model, nullptr);
+    ASSERT_EQ(model->columnCount(), 5);
+    EXPECT_EQ(model->get_column_field_id(0), LogField::Timestamp);
+    EXPECT_EQ(model->get_column_field_id(1), LogField::Message);
+    EXPECT_EQ(model->get_column_field_id(2), LogField::Level);
+    EXPECT_EQ(model->get_column_field_id(3), LogField::AppName);
+    EXPECT_EQ(model->get_column_field_id(4), QStringLiteral("trace_id"));
+
+    const SessionViewState exported = m_controller->export_view_state(view_id);
+    EXPECT_EQ(exported.file_parsing_profile_ids.value(
+                  QFileInfo(first_file->fileName()).absoluteFilePath()),
+              first_profile.get_id());
+    EXPECT_EQ(exported.file_parsing_profile_ids.value(
+                  QFileInfo(second_file->fileName()).absoluteFilePath()),
+              second_profile.get_id());
+
+    m_controller->remove_log_file(view_id, second_file->fileName());
+
+    ASSERT_EQ(model->columnCount(), 2);
+    EXPECT_EQ(model->get_column_field_id(0), LogField::Timestamp);
+    EXPECT_EQ(model->get_column_field_id(1), LogField::Message);
+}
+
+/**
  * @brief Tests that all log entries are loaded into the page model after loading log files.
  */
 TEST_F(LogViewerControllerTest, LoadsAllLogEntriesIntoPageModel)

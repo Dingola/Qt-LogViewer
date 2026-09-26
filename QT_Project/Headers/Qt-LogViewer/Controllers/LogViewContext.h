@@ -1,14 +1,17 @@
 #pragma once
 
+#include <QHash>
 #include <QList>
 #include <QObject>
 #include <QString>
 #include <QVector>
+#include <optional>
 
 // Value types used in API - need full definitions
 #include "Qt-LogViewer/Models/LogEntry.h"
 #include "Qt-LogViewer/Models/LogFileInfo.h"
 #include "Qt-LogViewer/Models/SessionTypes.h"
+#include "Qt-LogViewer/Services/LogParsingProfile.h"
 
 // Forward declarations (pointer members only)
 class LogModel;
@@ -25,6 +28,7 @@ class LogModel;
  * Responsibilities:
  * - Own the LogModel containing the currently loaded database page.
  * - Track the files loaded in this view.
+ * - Own the parsing profile selected for each file.
  * - Store the filter and file-visibility state.
  * - Provide entry and loaded-file access.
  */
@@ -104,6 +108,38 @@ class LogViewContext final: public QObject
         auto clear_loaded_files() -> void;
 
         /**
+         * @brief Stores the parsing profile selected for one file.
+         *
+         * The file path is normalized to an absolute path and the model column schema is rebuilt
+         * from every retained profile in insertion order.
+         *
+         * @param file_path File registration belonging to this view.
+         * @param profile Parsing profile selected for the file.
+         */
+        auto set_file_parsing_profile(const QString& file_path,
+                                      const LogParsingProfile& profile) -> void;
+
+        /**
+         * @brief Removes a file's parsing profile and refreshes the model columns.
+         * @param file_path File registration removed from this view.
+         */
+        auto remove_file_parsing_profile(const QString& file_path) -> void;
+
+        /**
+         * @brief Returns the parsing profile selected for one file.
+         * @param file_path File registration belonging to this view.
+         * @return Stored profile, or std::nullopt when no profile is registered.
+         */
+        [[nodiscard]] auto get_file_parsing_profile(const QString& file_path) const
+            -> std::optional<LogParsingProfile>;
+
+        /**
+         * @brief Returns all file-to-profile assignments owned by this view.
+         * @return Profile map keyed by normalized absolute file path.
+         */
+        [[nodiscard]] auto get_file_parsing_profiles() const -> QHash<QString, LogParsingProfile>;
+
+        /**
          * @brief Returns the filter state of this view.
          * @return Current filter and file-visibility state.
          */
@@ -116,7 +152,14 @@ class LogViewContext final: public QObject
         auto set_filter_state(const FilterState& state) -> void;
 
     private:
+        /**
+         * @brief Rebuilds the model columns from the retained profile order.
+         */
+        auto refresh_column_schema() -> void;
+
         LogModel* m_model;
         QList<LogFileInfo> m_loaded_files;
         FilterState m_filter_state;
+        QHash<QString, LogParsingProfile> m_file_parsing_profiles;
+        QVector<QString> m_profile_file_order;
 };

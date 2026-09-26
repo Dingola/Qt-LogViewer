@@ -801,5 +801,4 @@ class LogViewerController: public QObject
         QSet<QUuid> m_pending_tail_refresh_views;
         QSet<QUuid> m_live_tailing_views;
         QHash<QUuid, QSet<QString>> m_failed_ingest_files;
-        QHash<QUuid, QHash<QString, LogParsingProfile>> m_file_parsing_profiles;
 };

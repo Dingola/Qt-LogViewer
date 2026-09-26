@@ -5,6 +5,9 @@
 
 #include "Qt-LogViewer/Controllers/LogViewContext.h"
 
+#include <QFileInfo>
+
+#include "Qt-LogViewer/Models/LogColumnSchemaBuilder.h"
 #include "Qt-LogViewer/Models/LogModel.h"
 
 /**
@@ -12,7 +15,12 @@
  * @param parent QObject parent.
  */
 LogViewContext::LogViewContext(QObject* parent)
-    : QObject(parent), m_model(new LogModel(this)), m_loaded_files(), m_filter_state()
+    : QObject(parent),
+      m_model(new LogModel(this)),
+      m_loaded_files(),
+      m_filter_state(),
+      m_file_parsing_profiles(),
+      m_profile_file_order()
 {}
 
 /**
@@ -150,6 +158,98 @@ auto LogViewContext::get_file_paths() const -> QVector<QString>
 auto LogViewContext::clear_loaded_files() -> void
 {
     m_loaded_files.clear();
+}
+
+/**
+ * @brief Stores the parsing profile selected for one file and refreshes the model schema.
+ * @param file_path File registration belonging to this view.
+ * @param profile Parsing profile selected for the file.
+ */
+auto LogViewContext::set_file_parsing_profile(const QString& file_path,
+                                              const LogParsingProfile& profile) -> void
+{
+    if (!file_path.isEmpty())
+    {
+        const QString absolute_file_path = QFileInfo(file_path).absoluteFilePath();
+
+        if (!m_file_parsing_profiles.contains(absolute_file_path))
+        {
+            m_profile_file_order.append(absolute_file_path);
+        }
+
+        m_file_parsing_profiles.insert(absolute_file_path, profile);
+        refresh_column_schema();
+    }
+}
+
+/**
+ * @brief Removes a file's parsing profile and refreshes the model schema.
+ * @param file_path File registration removed from this view.
+ */
+auto LogViewContext::remove_file_parsing_profile(const QString& file_path) -> void
+{
+    const QString absolute_file_path = QFileInfo(file_path).absoluteFilePath();
+
+    if (m_file_parsing_profiles.remove(absolute_file_path))
+    {
+        m_profile_file_order.removeAll(absolute_file_path);
+        refresh_column_schema();
+    }
+}
+
+/**
+ * @brief Returns the parsing profile selected for one file.
+ * @param file_path File registration belonging to this view.
+ * @return Stored profile, or std::nullopt when no profile is registered.
+ */
+auto LogViewContext::get_file_parsing_profile(const QString& file_path) const
+    -> std::optional<LogParsingProfile>
+{
+    const auto profile = m_file_parsing_profiles.constFind(QFileInfo(file_path).absoluteFilePath());
+
+    if (profile != m_file_parsing_profiles.cend())
+    {
+        return profile.value();
+    }
+
+    return std::nullopt;
+}
+
+/**
+ * @brief Returns all file-to-profile assignments owned by this view.
+ * @return Profile map keyed by normalized absolute file path.
+ */
+auto LogViewContext::get_file_parsing_profiles() const -> QHash<QString, LogParsingProfile>
+{
+    return m_file_parsing_profiles;
+}
+
+/**
+ * @brief Rebuilds the model columns from the retained profile order.
+ */
+auto LogViewContext::refresh_column_schema() -> void
+{
+    QVector<LogParsingProfile> profiles;
+    profiles.reserve(m_profile_file_order.size());
+
+    for (const QString& file_path: m_profile_file_order)
+    {
+        const auto profile = m_file_parsing_profiles.constFind(file_path);
+
+        if (profile != m_file_parsing_profiles.cend())
+        {
+            profiles.append(profile.value());
+        }
+    }
+
+    if (profiles.isEmpty())
+    {
+        m_model->set_columns(get_builtin_log_field_definitions());
+    }
+    else
+    {
+        m_model->set_columns(LogColumnSchemaBuilder::build(profiles));
+    }
 }
 
 /**
