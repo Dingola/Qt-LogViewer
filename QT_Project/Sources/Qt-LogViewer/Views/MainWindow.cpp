@@ -6,7 +6,6 @@
 #include <QDropEvent>
 #include <QFileDialog>
 #include <QFileInfo>
-#include <QHeaderView>
 #include <QIcon>
 #include <QMessageBox>
 #include <QMimeData>
@@ -28,10 +27,10 @@
 #include "Qt-LogViewer/Models/LogFileTreeModel.h"
 #include "Qt-LogViewer/Models/LogModel.h"
 #include "Qt-LogViewer/Models/LogPageState.h"
-#include "Qt-LogViewer/Models/LogQuery.h"
 #include "Qt-LogViewer/Models/RecentItemsModel.h"
 #include "Qt-LogViewer/Models/RecentListSchema.h"
 #include "Qt-LogViewer/Models/SearchFields.h"
+#include "Qt-LogViewer/Presenters/LogViewPresenter.h"
 #include "Qt-LogViewer/Services/LogParsingProfile.h"
 #include "Qt-LogViewer/Services/LogViewerSettings.h"
 #include "Qt-LogViewer/Services/SessionManager.h"
@@ -54,16 +53,6 @@ constexpr auto k_open_log_files_text = QT_TRANSLATE_NOOP("MainWindow", "Open Log
 constexpr auto k_loaded_log_files_status = QT_TRANSLATE_NOOP("MainWindow", "Loaded %1 log file(s)");
 constexpr auto k_untitled_session_text = QT_TRANSLATE_NOOP("MainWindow", "Untitled Session");
 
-/**
- * @brief Maps a stable log field identifier to a table column.
- * @param model Model containing the view-specific column schema.
- * @param field Stable field identifier.
- * @return Matching model column, or -1 when the field is not displayed.
- */
-[[nodiscard]] auto get_log_model_column(const LogModel* model, const QString& field) -> int
-{
-    return model != nullptr ? model->find_column(field) : -1;
-}
 }  // namespace
 
 using QtWidgetsCommonLib::AppMainWindow;
@@ -226,15 +215,6 @@ MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
             &MainWindow::handle_loading_finished);
     connect(m_controller, &LogViewerController::loading_error, this,
             &MainWindow::handle_loading_error);
-    connect(m_controller, &LogViewerController::view_file_paths_changed, this,
-            [this](const QUuid& view_id, const QVector<QString>& file_paths) {
-                const bool updated = ui->tabWidgetLog->set_view_file_paths(view_id, file_paths);
-
-                if (!updated)
-                {
-                    qWarning() << "Could not update tab file paths for view:" << view_id;
-                }
-            });
     const auto update_page_state = [this](const QUuid& view_id, qsizetype current_page,
                                           qsizetype total_pages, qsizetype) {
         if (view_id == m_controller->get_current_view())
@@ -246,13 +226,6 @@ MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
 
             ui->logFilterBarWidget->set_log_level_counts(level_counts);
             m_log_level_pie_chart_widget->set_log_level_counts(level_counts);
-
-            LogViewWidget* log_view_widget = ui->tabWidgetLog->current_log_view();
-
-            if (log_view_widget != nullptr && log_view_widget->get_view_id() == view_id)
-            {
-                log_view_widget->set_log_level_counts(level_counts);
-            }
         }
     };
 
@@ -429,8 +402,6 @@ auto MainWindow::setup_tab_widget() -> void
         {
             QUuid view_id = log_view_widget->get_view_id();
             m_controller->set_current_view(view_id);
-            QVector<QString> file_paths = m_controller->get_view_file_paths(view_id);
-            log_view_widget->set_view_file_paths(file_paths);
             update_pagination_widget();
         }
     });
@@ -824,21 +795,6 @@ auto MainWindow::handle_current_view_id_changed(const QUuid& view_id) -> void
     m_log_level_pie_chart_widget->set_log_level_counts(level_counts);
     ui->logFilterBarWidget->set_log_level_counts(level_counts);
 
-    LogViewWidget* log_view_widget = ui->tabWidgetLog->current_log_view();
-
-    if (log_view_widget != nullptr)
-    {
-        log_view_widget->set_app_names(app_names);
-        log_view_widget->set_current_app_name_filter(app_name_filter);
-        log_view_widget->set_available_log_levels(available_log_levels);
-        log_view_widget->set_log_levels(log_level_filters);
-        log_view_widget->set_log_level_counts(level_counts);
-        log_view_widget->auto_resize_columns();
-
-        QVector<QString> file_paths = m_controller->get_view_file_paths(view_id);
-        log_view_widget->set_view_file_paths(file_paths);
-    }
-
     if (m_controller->get_page_state(view_id) == nullptr)
     {
         m_controller->reload_page_query(view_id);
@@ -1022,8 +978,6 @@ auto MainWindow::restore_view_from_state(const QUuid& view_id,
     LogViewWidget* log_view_widget = create_log_view_widget_for_view(view_id, state);
 
     const QVector<QString> view_paths = m_controller->get_view_file_paths(view_id);
-    log_view_widget->set_view_file_paths(view_paths);
-
     const QString tab_title = state.tab_title.isEmpty() && !view_paths.isEmpty()
                                   ? QFileInfo(view_paths.first()).fileName()
                                   : state.tab_title;
@@ -1037,7 +991,7 @@ auto MainWindow::restore_view_from_state(const QUuid& view_id,
 }
 
 /**
- * @brief Creates a LogViewWidget for a view and connects its signals.
+ * @brief Creates a LogViewWidget and attaches its per-view presenter.
  * @param view_id The view ID.
  * @param state The session view state.
  * @return Pointer to the created LogViewWidget.
@@ -1046,105 +1000,10 @@ auto MainWindow::create_log_view_widget_for_view(const QUuid& view_id,
                                                  const SessionViewState& state) -> LogViewWidget*
 {
     auto* log_view_widget = new LogViewWidget(ui->tabWidgetLog);
-    log_view_widget->set_view_id(view_id);
-    LogModel* page_model = m_controller->get_log_model(view_id);
-    log_view_widget->set_model(page_model);
-
-    if (m_controller->get_page_state(view_id) == nullptr)
-    {
-        m_controller->apply_view_query_state(view_id, state);
-    }
-
-    LogQuery query = m_controller->create_page_query(view_id);
-    log_view_widget->set_search_highlight(query.search_text,
-                                          m_controller->get_search_field(view_id), query.use_regex);
-    QHeaderView* header = log_view_widget->get_table_view()->horizontalHeader();
-
-    if (header != nullptr)
-    {
-        const bool blocked = header->blockSignals(true);
-
-        const int sort_column = get_log_model_column(page_model, query.sort_field);
-        header->setSortIndicatorShown(sort_column >= 0);
-
-        if (sort_column >= 0)
-        {
-            header->setSortIndicator(sort_column, query.sort_order);
-        }
-
-        header->blockSignals(blocked);
-    }
-
-    log_view_widget->set_file_visibility_state(query.show_only_file, query.hidden_files);
-
-    if (header != nullptr)
-    {
-        connect(header, &QHeaderView::sortIndicatorChanged, this,
-                [this, view_id, page_model, header](int column, Qt::SortOrder order) {
-                    if (!m_controller->set_page_sort(view_id, column, order))
-                    {
-                        const LogQuery current_query = m_controller->create_page_query(view_id);
-                        const int current_column =
-                            get_log_model_column(page_model, current_query.sort_field);
-                        const bool blocked = header->blockSignals(true);
-                        header->setSortIndicatorShown(current_column >= 0);
-
-                        if (current_column >= 0)
-                        {
-                            header->setSortIndicator(current_column, current_query.sort_order);
-                        }
-
-                        header->blockSignals(blocked);
-                    }
-                });
-    }
-
-    const QSet<QString> app_names = m_controller->get_app_names(view_id);
-    log_view_widget->set_app_names(app_names);
-    log_view_widget->set_current_app_name_filter(state.filters.app_name);
-    log_view_widget->set_available_log_levels(m_controller->get_available_log_levels(view_id));
-    log_view_widget->set_log_levels(state.filters.log_levels);
-
-    const QMap<QString, int> level_counts = m_controller->get_log_level_counts(view_id);
-    log_view_widget->set_log_level_counts(level_counts);
-
-    log_view_widget->set_live_tailing_enabled(state.filters.live_tailing_enabled);
-
-    connect(log_view_widget, &LogViewWidget::current_row_changed, this,
+    auto* presenter =
+        new LogViewPresenter(m_controller, log_view_widget, view_id, state, log_view_widget);
+    connect(presenter, &LogViewPresenter::current_row_changed, this,
             &MainWindow::update_log_details);
-    connect(
-        log_view_widget, &LogViewWidget::app_filter_changed, this,
-        [this, view_id](const QString& app) { m_controller->set_app_name_filter(view_id, app); });
-    connect(log_view_widget, &LogViewWidget::log_level_filter_changed, this,
-            [this, view_id](const QSet<QString>& levels) {
-                m_controller->set_log_level_filters(view_id, levels);
-            });
-    connect(log_view_widget, &LogViewWidget::toggle_visibility_requested, this,
-            [this, view_id, log_view_widget](const QString& file_path) {
-                m_controller->toggle_file_visibility(view_id, file_path);
-
-                const LogQuery query = m_controller->create_page_query(view_id);
-
-                log_view_widget->set_file_visibility_state(query.show_only_file,
-                                                           query.hidden_files);
-            });
-    connect(log_view_widget, &LogViewWidget::show_only_file_requested, this,
-            [this, view_id, log_view_widget](const QString& file_path) {
-                m_controller->set_show_only_file(view_id, file_path);
-
-                const LogQuery query = m_controller->create_page_query(view_id);
-
-                log_view_widget->set_file_visibility_state(query.show_only_file,
-                                                           query.hidden_files);
-            });
-    connect(log_view_widget, &LogViewWidget::remove_file_requested, this,
-            [this, view_id](const QString& file_path) {
-                m_controller->remove_log_file(view_id, file_path);
-            });
-    connect(log_view_widget, &LogViewWidget::live_tailing_toggled, this,
-            [this, view_id](bool enabled) {
-                m_controller->set_live_tailing_enabled(view_id, enabled);
-            });
 
     return log_view_widget;
 }
@@ -1198,7 +1057,6 @@ auto MainWindow::show_log_import_tab(const LogFileInfo& log_file_info,
                 SessionViewState empty_state;
                 LogViewWidget* log_view_widget =
                     create_log_view_widget_for_view(view_id, empty_state);
-                log_view_widget->set_view_file_paths(m_controller->get_view_file_paths(view_id));
 
                 ui->tabWidgetLog->removeTab(import_tab_index);
                 const int log_tab_index = ui->tabWidgetLog->insertTab(

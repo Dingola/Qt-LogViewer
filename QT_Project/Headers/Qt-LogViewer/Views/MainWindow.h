@@ -168,7 +168,7 @@ class MainWindow: public QtWidgetsCommonLib::AppMainWindow
         auto restore_view_from_state(const QUuid& view_id, const SessionViewState& state) -> void;
 
         /**
-         * @brief Creates a LogViewWidget for a view and connects its signals.
+         * @brief Creates a LogViewWidget and attaches its per-view presenter.
          * @param view_id The view ID.
          * @param state The session view state.
          * @return Pointer to the created LogViewWidget.
