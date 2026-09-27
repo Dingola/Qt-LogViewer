@@ -1288,9 +1288,9 @@ TEST_F(LogViewerControllerTest, KeepsHistoricalPageStableWhileTailing)
 }
 
 /**
- * @brief Verifies that asynchronous batches remain in history until the page is reloaded.
+ * @brief Verifies that asynchronous completion refreshes one bounded visible page.
  */
-TEST_F(LogViewerControllerTest, StoresAsynchronousBatchesWithoutGrowingVisibleModel)
+TEST_F(LogViewerControllerTest, RefreshesBoundedPageAfterAsynchronousImport)
 {
     LogQuery query;
 
@@ -1303,36 +1303,34 @@ TEST_F(LogViewerControllerTest, StoresAsynchronousBatchesWithoutGrowingVisibleMo
     ASSERT_NE(model, nullptr);
     ASSERT_EQ(model->rowCount(), 4);
 
-    QTemporaryFile* additional_file =
-        create_temp_file({QStringLiteral("2024-01-01 10:04:00 INFO AsyncFirst AppC"),
-                          QStringLiteral("2024-01-01 10:05:00 ERROR AsyncSecond AppC")});
+    QVector<QString> lines;
+    for (int index = 1; index <= 30; ++index)
+    {
+        lines.append(QStringLiteral("2024-01-01 11:%1:00 INFO Async%2 AppC")
+                         .arg(index, 2, 10, QLatin1Char('0'))
+                         .arg(index));
+    }
+
+    QTemporaryFile* additional_file = create_temp_file(lines);
 
     ASSERT_NE(additional_file, nullptr);
 
     QSignalSpy loading_finished_spy(m_controller, &LogViewerController::loading_finished);
 
-    ASSERT_TRUE(m_controller->load_log_file_async(m_view_id, additional_file->fileName(), 1));
+    ASSERT_TRUE(m_controller->load_log_file_async(m_view_id, additional_file->fileName(), 5));
 
     QTRY_COMPARE(loading_finished_spy.count(), 1);
-
-    EXPECT_EQ(model->rowCount(), 4);
-
-    EXPECT_EQ(page_loaded_spy.count(), 0);
-
-    ASSERT_TRUE(m_controller->reload_page(m_view_id));
 
     EXPECT_EQ(page_loaded_spy.count(), 1);
 
     const LogPageState* page_state = m_controller->get_page_state(m_view_id);
 
     ASSERT_NE(page_state, nullptr);
-    EXPECT_EQ(page_state->get_total_entries(), 6);
+    EXPECT_EQ(page_state->get_total_entries(), 34);
 
-    ASSERT_EQ(model->rowCount(), 6);
+    ASSERT_EQ(model->rowCount(), 25);
 
-    EXPECT_EQ(model->get_entry(0).get_message(), QStringLiteral("AsyncSecond"));
-
-    EXPECT_EQ(model->get_entry(1).get_message(), QStringLiteral("AsyncFirst"));
+    EXPECT_EQ(model->get_entry(0).get_message(), QStringLiteral("Async30"));
 }
 
 /**

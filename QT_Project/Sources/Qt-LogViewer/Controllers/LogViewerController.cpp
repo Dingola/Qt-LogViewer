@@ -9,12 +9,12 @@
 #include <QDebug>
 #include <QFileInfo>
 #include <algorithm>
-#include <optional>
 
 // Concrete includes for forward-declared types used in implementation
 #include "Qt-LogViewer/Controllers/FileCatalogController.h"
 #include "Qt-LogViewer/Controllers/FilterCoordinator.h"
 #include "Qt-LogViewer/Controllers/LiveTailingCoordinator.h"
+#include "Qt-LogViewer/Controllers/LogImportCoordinator.h"
 #include "Qt-LogViewer/Controllers/LogIngestController.h"
 #include "Qt-LogViewer/Controllers/LogPageCoordinator.h"
 #include "Qt-LogViewer/Controllers/LogQueryController.h"
@@ -24,8 +24,7 @@
 #include "Qt-LogViewer/Models/LogModel.h"
 #include "Qt-LogViewer/Services/HistoryWriteService.h"
 #include "Qt-LogViewer/Services/LogHistoryService.h"
-#include "Qt-LogViewer/Services/LogLoader.h"
-#include "Qt-LogViewer/Services/LogLoadingService.h"
+#include "Qt-LogViewer/Services/LogPreviewService.h"
 
 namespace
 {
@@ -109,7 +108,6 @@ namespace
  */
 LogViewerController::LogViewerController(const LogParsingProfile& profile, QObject* parent)
     : QObject(parent),
-      m_is_shutting_down(false),
       m_default_profile(profile),
       m_ingest(new LogIngestController(profile, this)),
       m_catalog(new FileCatalogController(m_ingest, this)),
@@ -119,13 +117,15 @@ LogViewerController::LogViewerController(const LogParsingProfile& profile, QObje
     // Initialize services
     m_history_service = new LogHistoryService(this);
     m_history_write_service = new HistoryWriteService(m_history_service->get_database_path(), this);
-    connect(m_history_write_service, &HistoryWriteService::import_write_finished, this,
-            &LogViewerController::handle_history_write_finished, Qt::QueuedConnection);
 
     m_page_coordinator = new LogPageCoordinator(m_history_service, m_views, this);
     m_query_controller = new LogQueryController(m_filters, m_page_coordinator, m_views, this);
     m_live_tailing =
         new LiveTailingCoordinator(profile, m_history_service, m_views, m_query_controller, this);
+    m_import_coordinator = new LogImportCoordinator(profile, m_ingest, m_views, m_history_service,
+                                                    m_history_write_service, m_page_coordinator,
+                                                    m_query_controller, m_live_tailing, this);
+    m_preview_service = new LogPreviewService(profile);
 
     connect(m_page_coordinator, &LogPageCoordinator::page_loaded, this,
             [this](const QUuid& view_id, qsizetype current_page, qsizetype total_pages,
@@ -147,106 +147,18 @@ LogViewerController::LogViewerController(const LogParsingProfile& profile, QObje
                 emit view_file_paths_changed(view_id, paths);
             });
 
-    connect(m_ingest, &LogIngestController::entry_batch_parsed, this,
-            [this](const QUuid& view_id, const QString& file_path, const QVector<LogEntry>& batch) {
-                const QString absolute_file_path = QFileInfo(file_path).absoluteFilePath();
-
-                const bool can_store =
-                    !m_is_shutting_down && !view_id.isNull() && !batch.isEmpty() &&
-                    !m_failed_ingest_files.value(view_id).contains(absolute_file_path) &&
-                    m_views->get_context(view_id) != nullptr;
-
-                if (can_store)
-                {
-                    qDebug().nospace()
-                        << "[Controller] batch for view=" << view_id.toString() << " file=\""
-                        << absolute_file_path << "\" count=" << batch.size();
-
-                    m_history_write_service->store_batch(view_id, absolute_file_path, batch);
-                }
-            });
-
-    // Progress pass-through.
-    connect(m_ingest, &LogIngestController::progress, this,
-            [this](const QUuid& view_id, const QString& file_path, qint64 bytes_read,
-                   qint64 total_bytes) {
-                if (!m_is_shutting_down)
-                {
-                    qDebug().nospace()
-                        << "[Controller] progress view=" << view_id.toString() << " file=\""
-                        << file_path << "\" " << bytes_read << '/' << total_bytes;
-
-                    if (!view_id.isNull())
-                    {
-                        emit loading_progress(view_id, bytes_read, total_bytes);
-                    }
-                }
-            });
-
-    // Error pass-through.
-    connect(m_ingest, &LogIngestController::error, this,
-            [this](const QUuid& view_id, const QString& file_path, const QString& message) {
-                const QString absolute_file_path = QFileInfo(file_path).absoluteFilePath();
-
-                const bool can_handle = !m_is_shutting_down && !view_id.isNull();
-
-                if (can_handle)
-                {
-                    qWarning().nospace()
-                        << "[Controller] error view=" << view_id.toString() << " file=\""
-                        << absolute_file_path << "\" msg=\"" << message << '"';
-
-                    emit loading_error(view_id, absolute_file_path, message);
-
-                    m_failed_ingest_files[view_id].insert(absolute_file_path);
-
-                    const bool file_is_registered = m_views->get_context(view_id) != nullptr &&
-                                                    is_file_loaded(view_id, absolute_file_path);
-
-                    if (file_is_registered)
-                    {
-                        remove_log_file(view_id, absolute_file_path);
-                    }
-                }
-            });
-
-    connect(m_ingest, &LogIngestController::finished, this,
+    connect(m_import_coordinator, &LogImportCoordinator::progress, this,
+            &LogViewerController::loading_progress);
+    connect(m_import_coordinator, &LogImportCoordinator::finished, this,
+            &LogViewerController::loading_finished);
+    connect(m_import_coordinator, &LogImportCoordinator::error, this,
+            &LogViewerController::loading_error);
+    connect(m_import_coordinator, &LogImportCoordinator::file_removal_requested, this,
             [this](const QUuid& view_id, const QString& file_path) {
-                if (!m_is_shutting_down)
-                {
-                    m_history_write_service->finish_import(view_id,
-                                                           QFileInfo(file_path).absoluteFilePath());
-                }
+                remove_log_file(view_id, file_path);
             });
-
-    // Advance queue only after thread cleanup (safe to start next).
-    connect(m_ingest, &LogIngestController::idle, this, [this]() {
-        if (!m_is_shutting_down)
-        {
-            qDebug().nospace() << "[Controller] streaming_idle: force idle then try start next. "
-                               << "pending=" << m_ingest->get_pending_count();
-
-            // Start next first, then read new active view id (fix ordering).
-            const bool started = (m_ingest->start_next_if_idle(m_ingest->get_active_batch_size()),
-                                  !m_ingest->get_active_view_id().isNull());
-
-            if (started)
-            {
-                const QUuid new_active = m_ingest->get_active_view_id();
-                qDebug().nospace() << "[Controller] started next view=" << new_active.toString()
-                                   << " file=\"" << m_ingest->get_active_file_path() << '"';
-
-                if (!new_active.isNull() && (m_views->get_current_view() != new_active))
-                {
-                    m_views->set_current_view(new_active);
-                }
-            }
-            else
-            {
-                qDebug().nospace() << "[Controller] no next item started (idle or empty queue).";
-            }
-        }
-    });
+    connect(m_import_coordinator, &LogImportCoordinator::view_removal_requested, this,
+            [this](const QUuid& view_id) { remove_view(view_id); });
 }
 
 /**
@@ -257,23 +169,14 @@ LogViewerController::LogViewerController(const LogParsingProfile& profile, QObje
  */
 LogViewerController::~LogViewerController()
 {
-    m_is_shutting_down = true;
-
-    m_failed_ingest_files.clear();
+    if (m_import_coordinator != nullptr)
+    {
+        m_import_coordinator->shutdown();
+    }
 
     if (m_live_tailing != nullptr)
     {
         m_live_tailing->shutdown();
-    }
-
-    if (m_ingest != nullptr)
-    {
-        const QVector<QUuid> view_ids = m_views->get_all_view_ids();
-
-        for (const QUuid& view_id: view_ids)
-        {
-            m_ingest->cancel_for_view(view_id);
-        }
     }
 
     if (m_history_write_service != nullptr)
@@ -281,6 +184,9 @@ LogViewerController::~LogViewerController()
         QObject::disconnect(m_history_write_service, nullptr, this, nullptr);
         m_history_write_service->shutdown();
     }
+
+    delete m_preview_service;
+    m_preview_service = nullptr;
 }
 
 /**
@@ -346,7 +252,6 @@ auto LogViewerController::remove_view(const QUuid& view_id) -> bool
             m_history_service->remove_view_entries(view_id);
         }
 
-        m_failed_ingest_files.remove(view_id);
         removed = m_views->remove_view(view_id);
     }
 
@@ -440,53 +345,7 @@ auto LogViewerController::load_log_file(const QString& file_path) -> QUuid
 auto LogViewerController::load_log_file(const QString& file_path,
                                         const LogParsingProfile& profile) -> QUuid
 {
-    QUuid view_id;
-
-    const QFileInfo file_info(file_path);
-
-    const bool can_load = file_info.exists() && file_info.isFile() && file_info.isReadable();
-
-    if (can_load)
-    {
-        const QVector<LogEntry> entries = m_ingest->load_file_sync(file_path, profile);
-
-        const QString app_name = !entries.isEmpty() ? entries.first().get_app_name()
-                                                    : LogLoader::identify_app(file_path);
-
-        const QUuid candidate_view_id = m_views->create_view();
-
-        const bool entries_stored =
-            entries.isEmpty() || m_history_service->add_entries(candidate_view_id, entries);
-
-        if (entries_stored)
-        {
-            remember_file_profile(candidate_view_id, file_path, profile);
-            m_views->set_loaded_files(candidate_view_id,
-                                      QList<LogFileInfo>{LogFileInfo(file_path, app_name)});
-
-            const LogQuery query = create_page_query(candidate_view_id);
-
-            m_page_coordinator->set_query(candidate_view_id, query);
-
-            m_live_tailing->set_enabled(candidate_view_id, true);
-
-            view_id = candidate_view_id;
-        }
-        else
-        {
-            qWarning().nospace() << "[Controller] synchronous import failed for view="
-                                 << candidate_view_id.toString() << " file=\""
-                                 << file_info.absoluteFilePath() << '"';
-
-            remove_view(candidate_view_id);
-        }
-    }
-    else
-    {
-        qWarning().nospace() << "[Controller] synchronous import rejected file=\""
-                             << file_info.absoluteFilePath() << '"';
-    }
-
+    const QUuid view_id = m_import_coordinator->import_file(file_path, profile);
     return view_id;
 }
 
@@ -511,60 +370,7 @@ auto LogViewerController::load_log_file(const QUuid& view_id, const QString& fil
 auto LogViewerController::load_log_file(const QUuid& view_id, const QString& file_path,
                                         const LogParsingProfile& profile) -> bool
 {
-    bool loaded = false;
-
-    ensure_view_models(view_id);
-
-    LogViewContext* context = m_views->get_context(view_id);
-
-    const QFileInfo file_info(file_path);
-
-    const bool can_load = context != nullptr && !is_file_loaded(view_id, file_path) &&
-                          file_info.exists() && file_info.isFile() && file_info.isReadable();
-
-    if (can_load)
-    {
-        const QVector<LogEntry> entries = m_ingest->load_file_sync(file_path, profile);
-
-        const QString app_name = !entries.isEmpty() ? entries.first().get_app_name()
-                                                    : LogLoader::identify_app(file_path);
-
-        const bool entries_stored =
-            entries.isEmpty() || m_history_service->add_entries(view_id, entries);
-
-        if (entries_stored)
-        {
-            remember_file_profile(view_id, file_path, profile);
-            m_views->add_loaded_file(view_id, LogFileInfo(file_path, app_name));
-
-            const LogPageState* page_state = m_page_coordinator->get_page_state(view_id);
-
-            if (page_state != nullptr)
-            {
-                m_page_coordinator->reload(view_id);
-            }
-            else
-            {
-                const LogQuery query = create_page_query(view_id);
-
-                m_page_coordinator->set_query(view_id, query);
-            }
-
-            if (get_live_tailing_enabled(view_id))
-            {
-                m_live_tailing->start_file(view_id, file_path, profile);
-            }
-
-            loaded = true;
-        }
-        else
-        {
-            qWarning().nospace() << "[Controller] synchronous import failed for view="
-                                 << view_id.toString() << " file=\"" << file_info.absoluteFilePath()
-                                 << '"';
-        }
-    }
-
+    const bool loaded = m_import_coordinator->import_file(view_id, file_path, profile);
     return loaded;
 }
 
@@ -587,74 +393,7 @@ auto LogViewerController::load_log_files(const QVector<QString>& file_paths) -> 
 auto LogViewerController::load_log_files(const QVector<QString>& file_paths,
                                          const LogParsingProfile& profile) -> QUuid
 {
-    QUuid view_id;
-    bool valid_files = !file_paths.isEmpty();
-
-    for (const QString& file_path: file_paths)
-    {
-        const QFileInfo file_info(file_path);
-
-        const bool valid_file = file_info.exists() && file_info.isFile() && file_info.isReadable();
-
-        if (!valid_file)
-        {
-            valid_files = false;
-
-            qWarning().nospace() << "[Controller] synchronous import rejected file=\""
-                                 << file_info.absoluteFilePath() << '"';
-        }
-    }
-
-    if (valid_files)
-    {
-        const QUuid candidate_view_id = m_views->create_view();
-
-        QList<LogFileInfo> loaded_files;
-        bool entries_stored = true;
-
-        for (qsizetype index = 0; index < file_paths.size() && entries_stored; ++index)
-        {
-            const QString& file_path = file_paths.at(index);
-
-            const QVector<LogEntry> entries = m_ingest->load_file_sync(file_path, profile);
-
-            const QString app_name = !entries.isEmpty() ? entries.first().get_app_name()
-                                                        : LogLoader::identify_app(file_path);
-
-            entries_stored =
-                entries.isEmpty() || m_history_service->add_entries(candidate_view_id, entries);
-
-            if (entries_stored)
-            {
-                remember_file_profile(candidate_view_id, file_path, profile);
-                loaded_files.append(LogFileInfo(file_path, app_name));
-            }
-            else
-            {
-                qWarning().nospace() << "[Controller] synchronous import failed for view="
-                                     << candidate_view_id.toString() << " file=\""
-                                     << QFileInfo(file_path).absoluteFilePath() << '"';
-            }
-        }
-
-        if (entries_stored)
-        {
-            m_views->set_loaded_files(candidate_view_id, loaded_files);
-
-            const LogQuery query = create_page_query(candidate_view_id);
-
-            m_page_coordinator->set_query(candidate_view_id, query);
-
-            m_live_tailing->set_enabled(candidate_view_id, true);
-
-            view_id = candidate_view_id;
-        }
-        else
-        {
-            remove_view(candidate_view_id);
-        }
-    }
-
+    const QUuid view_id = m_import_coordinator->import_files(file_paths, profile);
     return view_id;
 }
 
@@ -669,7 +408,9 @@ auto LogViewerController::preview_log_file(
     const QString& file_path, const LogParsingProfile& profile,
     qsizetype maximum_record_count) const -> QVector<LogParseOutcome>
 {
-    return m_ingest->preview_file(file_path, profile, maximum_record_count);
+    QVector<LogParseOutcome> outcomes =
+        m_preview_service->preview(file_path, profile, maximum_record_count);
+    return outcomes;
 }
 
 /**
@@ -695,21 +436,7 @@ auto LogViewerController::load_log_file_async(const QString& file_path,
                                               const LogParsingProfile& profile,
                                               qsizetype batch_size) -> QUuid
 {
-    QUuid view_id = m_views->create_view();
-    set_live_tailing_enabled(view_id, true);
-
-    const QString app_name = LogLoader::identify_app(file_path);
-    LogFileInfo loaded_log_file(file_path, app_name);
-
-    auto* ctx = m_views->get_context(view_id);
-    if (ctx != nullptr)
-    {
-        m_views->set_loaded_files(view_id, QList<LogFileInfo>{loaded_log_file});
-    }
-
-    enqueue_async(view_id, file_path, profile);
-    try_start_next_async(batch_size);
-
+    const QUuid view_id = m_import_coordinator->import_file_async(file_path, profile, batch_size);
     return view_id;
 }
 
@@ -738,23 +465,8 @@ auto LogViewerController::load_log_file_async(const QUuid& view_id, const QStrin
                                               const LogParsingProfile& profile,
                                               qsizetype batch_size) -> bool
 {
-    bool success = false;
-
-    ensure_view_models(view_id);
-
-    if (!is_file_loaded(view_id, file_path))
-    {
-        const QString app_name = LogLoader::identify_app(file_path);
-        LogFileInfo info(file_path, app_name);
-
-        m_views->add_loaded_file(view_id, info);
-
-        enqueue_async(view_id, file_path, profile);
-        try_start_next_async(batch_size);
-
-        success = true;
-    }
-
+    const bool success =
+        m_import_coordinator->import_file_async(view_id, file_path, profile, batch_size);
     return success;
 }
 
@@ -781,25 +493,7 @@ auto LogViewerController::load_log_files_async(const QVector<QString>& file_path
                                                const LogParsingProfile& profile,
                                                qsizetype batch_size) -> QUuid
 {
-    QUuid view_id;
-
-    if (!file_paths.isEmpty())
-    {
-        view_id = m_views->create_view();
-        set_live_tailing_enabled(view_id, true);
-        QList<LogFileInfo> files_info;
-
-        for (const QString& file_path: file_paths)
-        {
-            const QString app_name = LogLoader::identify_app(file_path);
-            files_info.append(LogFileInfo(file_path, app_name));
-            enqueue_async(view_id, file_path, profile);
-        }
-
-        m_views->set_loaded_files(view_id, files_info);
-        try_start_next_async(batch_size);
-    }
-
+    const QUuid view_id = m_import_coordinator->import_files_async(file_paths, profile, batch_size);
     return view_id;
 }
 
@@ -809,7 +503,7 @@ auto LogViewerController::load_log_files_async(const QVector<QString>& file_path
  */
 auto LogViewerController::cancel_loading(const QUuid& view_id) -> void
 {
-    m_ingest->cancel_for_view(view_id);
+    m_import_coordinator->cancel(view_id);
 }
 
 /**
@@ -1469,9 +1163,8 @@ auto LogViewerController::import_view_state(const SessionViewState& state) -> QU
                 const QString path = lf.get_file_path();
                 if (!path.isEmpty())
                 {
-                    ensure_view_models(result);
-                    enqueue_async(result, path);
-                    try_start_next_async(1000);
+                    m_import_coordinator->enqueue_registered_file(result, path, m_default_profile,
+                                                                  1000);
                 }
             }
         }
@@ -1535,9 +1228,7 @@ auto LogViewerController::import_view_state_for_session(
                 {
                     const LogParsingProfile profile = get_session_file_profile(
                         state, path, available_profiles, m_default_profile);
-                    ensure_view_models(result);
-                    enqueue_async(result, path, profile);
-                    try_start_next_async(1000);
+                    m_import_coordinator->enqueue_registered_file(result, path, profile, 1000);
                 }
             }
         }
@@ -1705,99 +1396,6 @@ auto LogViewerController::remove_log_file(const QUuid& view_id, const QString& f
 }
 
 /**
- * @brief Handles completion of all queued history writes for one import.
- * @param view_id View that owns the import.
- * @param file_path Imported source file.
- * @param succeeded True when every history batch was committed.
- * @param error_message Storage error for a failed import.
- */
-auto LogViewerController::handle_history_write_finished(const QUuid& view_id,
-                                                        const QString& file_path, bool succeeded,
-                                                        const QString& error_message) -> void
-{
-    const QString absolute_file_path = QFileInfo(file_path).absoluteFilePath();
-    const bool ingest_failed = m_failed_ingest_files.value(view_id).contains(absolute_file_path);
-    const bool import_succeeded = succeeded && !ingest_failed;
-    const bool view_exists = !view_id.isNull() && m_views->get_context(view_id) != nullptr;
-
-    m_failed_ingest_files[view_id].remove(absolute_file_path);
-
-    if (m_failed_ingest_files.value(view_id).isEmpty())
-    {
-        m_failed_ingest_files.remove(view_id);
-    }
-
-    if (!m_is_shutting_down)
-    {
-        qDebug().nospace() << "[Controller] history finished view=" << view_id.toString()
-                           << " file=\"" << absolute_file_path << "\" success=" << import_succeeded;
-
-        if (!succeeded && view_exists)
-        {
-            emit loading_error(view_id, absolute_file_path, error_message);
-        }
-
-        if (!import_succeeded)
-        {
-            const bool file_is_registered =
-                view_exists && is_file_loaded(view_id, absolute_file_path);
-
-            if (file_is_registered)
-            {
-                remove_log_file(view_id, absolute_file_path);
-            }
-        }
-        else if (view_exists)
-        {
-            emit loading_finished(view_id, absolute_file_path);
-
-            m_live_tailing->start_file(view_id, absolute_file_path,
-                                       get_file_profile(view_id, absolute_file_path));
-        }
-    }
-}
-
-/**
- * @brief Enqueues an asynchronous load request for a log file.
- * @param view_id The QUuid of the view to load into.
- * @param file_path The path to the log file.
- */
-auto LogViewerController::enqueue_async(const QUuid& view_id, const QString& file_path) -> void
-{
-    enqueue_async(view_id, file_path, m_default_profile);
-}
-
-/**
- * @brief Enqueues an asynchronous load with an explicitly selected profile.
- * @param view_id Target view identifier.
- * @param file_path Path of the log file.
- * @param profile Parsing profile used by this request.
- */
-auto LogViewerController::enqueue_async(const QUuid& view_id, const QString& file_path,
-                                        const LogParsingProfile& profile) -> void
-{
-    remember_file_profile(view_id, file_path, profile);
-    m_ingest->enqueue_stream(view_id, file_path, profile);
-}
-
-/**
- * @brief Retains the selected parsing profile for later live-tailing restarts.
- * @param view_id View containing the imported file.
- * @param file_path Imported file path.
- * @param profile Parsing profile selected for the file.
- */
-auto LogViewerController::remember_file_profile(const QUuid& view_id, const QString& file_path,
-                                                const LogParsingProfile& profile) -> void
-{
-    LogViewContext* context = get_view_context(view_id);
-
-    if (context != nullptr)
-    {
-        context->set_file_parsing_profile(file_path, profile);
-    }
-}
-
-/**
  * @brief Removes a retained profile when its file registration is removed.
  * @param view_id View that contained the file.
  * @param file_path Removed file path.
@@ -1811,65 +1409,6 @@ auto LogViewerController::forget_file_profile(const QUuid& view_id,
     {
         context->remove_file_parsing_profile(file_path);
     }
-}
-
-/**
- * @brief Returns the profile retained for a view/file registration.
- * @param view_id View containing the file.
- * @param file_path Registered file path.
- * @return Retained profile, or the controller default when none was recorded.
- */
-auto LogViewerController::get_file_profile(const QUuid& view_id,
-                                           const QString& file_path) const -> LogParsingProfile
-{
-    LogParsingProfile profile = m_default_profile;
-    const LogViewContext* context = get_view_context(view_id);
-
-    if (context != nullptr)
-    {
-        const std::optional<LogParsingProfile> stored_profile =
-            context->get_file_parsing_profile(file_path);
-
-        if (stored_profile.has_value())
-        {
-            profile = stored_profile.value();
-        }
-    }
-
-    return profile;
-}
-
-/**
- * @brief Attempts to start the next asynchronous load if none is active.
- * @param batch_size Number of entries per batch.
- */
-auto LogViewerController::try_start_next_async(qsizetype batch_size) -> void
-{
-    m_ingest->start_next_if_idle(batch_size);
-
-    const QUuid active_view_id = m_ingest->get_active_view_id();
-    if (!active_view_id.isNull() && (m_views->get_current_view() != active_view_id))
-    {
-        m_views->set_current_view(active_view_id);
-    }
-}
-
-/**
- * @brief Clears pending async requests for a specific view.
- * @param view_id The QUuid of the view.
- */
-auto LogViewerController::clear_pending_for_view(const QUuid& view_id) -> void
-{
-    m_ingest->cancel_for_view(view_id);
-}
-
-/**
- * @brief Ensures that models and proxies exist for the specified view ID.
- * @param view_id The QUuid of the view.
- */
-auto LogViewerController::ensure_view_models(const QUuid& view_id) -> void
-{
-    m_views->ensure_view(view_id);
 }
 
 /**

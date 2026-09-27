@@ -23,6 +23,7 @@ class FileCatalogController;
 class FilterCoordinator;
 class LiveTailingCoordinator;
 class LogIngestController;
+class LogImportCoordinator;
 class LogQueryController;
 class LogViewContext;
 class ViewRegistry;
@@ -31,6 +32,7 @@ class LogFileTreeModel;
 class LogHistoryService;
 class HistoryWriteService;
 class LogPageCoordinator;
+class LogPreviewService;
 
 /**
  * @file LogViewerController.h
@@ -705,33 +707,6 @@ class LogViewerController: public QObject
 
     private:
         /**
-         * @brief Enqueues an asynchronous load request for a log file.
-         * @param view_id The QUuid of the view to load into.
-         * @param file_path The path to the log file.
-         */
-        auto enqueue_async(const QUuid& view_id, const QString& file_path) -> void;
-
-        /**
-         * @brief Enqueues an asynchronous load with an explicitly selected profile.
-         *
-         * @param view_id Target view identifier.
-         * @param file_path Path of the log file.
-         * @param profile Parsing profile used by this request.
-         */
-        auto enqueue_async(const QUuid& view_id, const QString& file_path,
-                           const LogParsingProfile& profile) -> void;
-
-        /**
-         * @brief Retains the selected parsing profile for later live-tailing restarts.
-         *
-         * @param view_id View containing the imported file.
-         * @param file_path Imported file path.
-         * @param profile Parsing profile selected for the file.
-         */
-        auto remember_file_profile(const QUuid& view_id, const QString& file_path,
-                                   const LogParsingProfile& profile) -> void;
-
-        /**
          * @brief Removes a retained profile when its file registration is removed.
          *
          * @param view_id View that contained the file.
@@ -740,54 +715,16 @@ class LogViewerController: public QObject
         auto forget_file_profile(const QUuid& view_id, const QString& file_path) -> void;
 
         /**
-         * @brief Returns the profile retained for a view/file registration.
-         *
-         * @param view_id View containing the file.
-         * @param file_path Registered file path.
-         * @return Retained profile, or the controller default when none was recorded.
-         */
-        [[nodiscard]] auto get_file_profile(const QUuid& view_id,
-                                            const QString& file_path) const -> LogParsingProfile;
-
-        /**
-         * @brief Attempts to start the next asynchronous load if none is active.
-         * @param batch_size Number of entries per batch.
-         */
-        auto try_start_next_async(qsizetype batch_size) -> void;
-
-        /**
-         * @brief Clears all pending items for the specified view.
-         * @param view_id The QUuid of the view.
-         */
-        auto clear_pending_for_view(const QUuid& view_id) -> void;
-
-        /**
-         * @brief Handles completion of all queued history writes for one import.
-         *
-         * @param view_id View that owns the import.
-         * @param file_path Imported source file.
-         * @param succeeded True when every history batch was committed.
-         * @param error_message Storage error for a failed import.
-         */
-        auto handle_history_write_finished(const QUuid& view_id, const QString& file_path,
-                                           bool succeeded, const QString& error_message) -> void;
-
-        /**
-         * @brief Ensures that models and proxies exist for the specified view ID.
-         * @param view_id The QUuid of the view.
-         */
-        auto ensure_view_models(const QUuid& view_id) -> void;
-
-        /**
          * @brief Returns the context for a view or nullptr if not present.
          * @param view_id The QUuid of the view.
          */
         [[nodiscard]] auto get_view_context(const QUuid& view_id) const -> LogViewContext*;
 
     private:
-        bool m_is_shutting_down{false};
         LogParsingProfile m_default_profile;
         LogIngestController* m_ingest{nullptr};
+        LogImportCoordinator* m_import_coordinator{nullptr};
+        LogPreviewService* m_preview_service{nullptr};
         FileCatalogController* m_catalog{nullptr};
         ViewRegistry* m_views{nullptr};
         FilterCoordinator* m_filters{nullptr};
@@ -796,5 +733,4 @@ class LogViewerController: public QObject
         LogPageCoordinator* m_page_coordinator{nullptr};
         LogQueryController* m_query_controller{nullptr};
         LiveTailingCoordinator* m_live_tailing{nullptr};
-        QHash<QUuid, QSet<QString>> m_failed_ingest_files;
 };

@@ -1337,19 +1337,9 @@ auto MainWindow::handle_loading_progress(const QUuid& view_id, qint64 bytes_read
  */
 auto MainWindow::handle_loading_finished(const QUuid& view_id, const QString& file_path) -> void
 {
-    const bool is_current = (view_id == m_controller->get_current_view());
     QFileInfo info(file_path);
     statusBar()->showMessage(tr("Loaded %1 (%2 bytes)").arg(info.fileName()).arg(info.size()),
                              4000);
-
-    if (m_controller->get_page_state(view_id) != nullptr)
-    {
-        m_controller->reload_page(view_id);
-    }
-    else
-    {
-        m_controller->reload_page_query(view_id);
-    }
 
     if (view_id == m_controller->get_current_view())
     {
