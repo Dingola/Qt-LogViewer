@@ -27,6 +27,7 @@ class LogImportCoordinator;
 class LogQueryController;
 class LogViewContext;
 class ViewRegistry;
+class ViewLifecycleCoordinator;
 class LogModel;
 class LogFileTreeModel;
 class LogHistoryService;
@@ -707,14 +708,6 @@ class LogViewerController: public QObject
 
     private:
         /**
-         * @brief Removes a retained profile when its file registration is removed.
-         *
-         * @param view_id View that contained the file.
-         * @param file_path Removed file path.
-         */
-        auto forget_file_profile(const QUuid& view_id, const QString& file_path) -> void;
-
-        /**
          * @brief Returns the context for a view or nullptr if not present.
          * @param view_id The QUuid of the view.
          */
@@ -724,6 +717,7 @@ class LogViewerController: public QObject
         LogParsingProfile m_default_profile;
         LogIngestController* m_ingest{nullptr};
         LogImportCoordinator* m_import_coordinator{nullptr};
+        ViewLifecycleCoordinator* m_view_lifecycle{nullptr};
         LogPreviewService* m_preview_service{nullptr};
         FileCatalogController* m_catalog{nullptr};
         ViewRegistry* m_views{nullptr};

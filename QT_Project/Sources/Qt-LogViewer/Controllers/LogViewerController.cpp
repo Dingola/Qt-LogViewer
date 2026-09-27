@@ -19,6 +19,7 @@
 #include "Qt-LogViewer/Controllers/LogPageCoordinator.h"
 #include "Qt-LogViewer/Controllers/LogQueryController.h"
 #include "Qt-LogViewer/Controllers/LogViewContext.h"
+#include "Qt-LogViewer/Controllers/ViewLifecycleCoordinator.h"
 #include "Qt-LogViewer/Controllers/ViewRegistry.h"
 #include "Qt-LogViewer/Models/LogFileTreeModel.h"
 #include "Qt-LogViewer/Models/LogModel.h"
@@ -125,6 +126,9 @@ LogViewerController::LogViewerController(const LogParsingProfile& profile, QObje
     m_import_coordinator = new LogImportCoordinator(profile, m_ingest, m_views, m_history_service,
                                                     m_history_write_service, m_page_coordinator,
                                                     m_query_controller, m_live_tailing, this);
+    m_view_lifecycle = new ViewLifecycleCoordinator(
+        m_views, m_filters, m_catalog, m_import_coordinator, m_live_tailing, m_history_service,
+        m_history_write_service, m_page_coordinator, m_query_controller, this);
     m_preview_service = new LogPreviewService(profile);
 
     connect(m_page_coordinator, &LogPageCoordinator::page_loaded, this,
@@ -155,10 +159,10 @@ LogViewerController::LogViewerController(const LogParsingProfile& profile, QObje
             &LogViewerController::loading_error);
     connect(m_import_coordinator, &LogImportCoordinator::file_removal_requested, this,
             [this](const QUuid& view_id, const QString& file_path) {
-                remove_log_file(view_id, file_path);
+                m_view_lifecycle->remove_file(view_id, file_path);
             });
     connect(m_import_coordinator, &LogImportCoordinator::view_removal_requested, this,
-            [this](const QUuid& view_id) { remove_view(view_id); });
+            [this](const QUuid& view_id) { m_view_lifecycle->close_view(view_id); });
 }
 
 /**
@@ -235,26 +239,7 @@ auto LogViewerController::get_all_view_ids() const -> QVector<QUuid>
  */
 auto LogViewerController::remove_view(const QUuid& view_id) -> bool
 {
-    bool removed = false;
-
-    if (!view_id.isNull() && m_views->get_context(view_id) != nullptr)
-    {
-        cancel_loading(view_id);
-
-        if (m_live_tailing != nullptr)
-        {
-            m_live_tailing->remove_view(view_id);
-        }
-
-        if (m_history_service != nullptr)
-        {
-            m_history_write_service->discard_view(view_id);
-            m_history_service->remove_view_entries(view_id);
-        }
-
-        removed = m_views->remove_view(view_id);
-    }
-
+    const bool removed = m_view_lifecycle->close_view(view_id);
     return removed;
 }
 
@@ -266,12 +251,7 @@ auto LogViewerController::remove_view(const QUuid& view_id) -> bool
  */
 auto LogViewerController::clear_all_views() -> void
 {
-    const QVector<QUuid> view_ids = m_views->get_all_view_ids();
-
-    for (const QUuid& view_id: view_ids)
-    {
-        remove_view(view_id);
-    }
+    m_view_lifecycle->close_all_views();
 }
 
 /**
@@ -1291,64 +1271,7 @@ auto LogViewerController::search_history(const QUuid& view_id, const QString& se
  */
 auto LogViewerController::remove_log_file(const LogFileInfo& file) -> void
 {
-    QList<QUuid> views_to_remove;
-    const QString file_path = file.get_file_path();
-    const QVector<QUuid> view_ids = m_views->get_all_view_ids();
-
-    for (const QUuid& view_id: view_ids)
-    {
-        LogViewContext* context = m_views->get_context(view_id);
-
-        const bool file_is_loaded = context != nullptr && is_file_loaded(view_id, file_path);
-
-        if (file_is_loaded)
-        {
-            m_live_tailing->stop_file(view_id, file_path);
-
-            m_history_write_service->discard_file(view_id, file_path);
-            m_history_service->remove_file_entries(view_id, file_path);
-
-            QList<LogFileInfo> files = context->get_loaded_files();
-
-            files.erase(std::remove_if(files.begin(), files.end(),
-                                       [&file_path](const LogFileInfo& info) {
-                                           return info.get_file_path() == file_path;
-                                       }),
-                        files.end());
-
-            context->set_loaded_files(files);
-            context->remove_entries_by_file_path(file_path);
-
-            m_filters->adjust_visibility_on_file_removed(view_id, file_path);
-
-            forget_file_profile(view_id, file_path);
-
-            const bool view_became_empty = files.isEmpty();
-
-            if (view_became_empty)
-            {
-                views_to_remove.append(view_id);
-            }
-            else if (m_page_coordinator->get_page_state(view_id) != nullptr)
-            {
-                const LogQuery query = create_page_query(view_id);
-
-                m_page_coordinator->set_query(view_id, query);
-            }
-
-            emit view_file_paths_changed(view_id, context->get_file_paths());
-        }
-    }
-
-    if (m_catalog != nullptr)
-    {
-        m_catalog->remove_file(file);
-    }
-
-    for (const QUuid& view_id: views_to_remove)
-    {
-        remove_view(view_id);
-    }
+    m_view_lifecycle->remove_file(file);
 }
 
 /**
@@ -1361,54 +1284,7 @@ auto LogViewerController::remove_log_file(const LogFileInfo& file) -> void
  */
 auto LogViewerController::remove_log_file(const QUuid& view_id, const QString& file_path) -> void
 {
-    const bool can_remove =
-        !view_id.isNull() && !file_path.isEmpty() && is_file_loaded(view_id, file_path);
-
-    bool view_became_empty = false;
-
-    if (can_remove)
-    {
-        m_live_tailing->stop_file(view_id, file_path);
-
-        m_history_write_service->discard_file(view_id, file_path);
-        m_history_service->remove_file_entries(view_id, file_path);
-
-        m_views->remove_entries_by_file(view_id, file_path);
-
-        m_filters->adjust_visibility_on_file_removed(view_id, file_path);
-
-        forget_file_profile(view_id, file_path);
-
-        view_became_empty = get_view_file_paths(view_id).isEmpty();
-
-        if (!view_became_empty && m_page_coordinator->get_page_state(view_id) != nullptr)
-        {
-            const LogQuery query = create_page_query(view_id);
-
-            m_page_coordinator->set_query(view_id, query);
-        }
-    }
-
-    if (can_remove && view_became_empty)
-    {
-        remove_view(view_id);
-    }
-}
-
-/**
- * @brief Removes a retained profile when its file registration is removed.
- * @param view_id View that contained the file.
- * @param file_path Removed file path.
- */
-auto LogViewerController::forget_file_profile(const QUuid& view_id,
-                                              const QString& file_path) -> void
-{
-    LogViewContext* context = get_view_context(view_id);
-
-    if (context != nullptr)
-    {
-        context->remove_file_parsing_profile(file_path);
-    }
+    m_view_lifecycle->remove_file(view_id, file_path);
 }
 
 /**

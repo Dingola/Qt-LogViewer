@@ -212,6 +212,11 @@ auto LogImportCoordinator::import_files(const QVector<QString>& file_paths,
 
 /**
  * @brief Enqueues one asynchronous import in a new view.
+ *
+ * The view retains enabled live-tail state without starting a file registration until the import
+ * has completed. This prevents the default profile from being captured before the selected file
+ * profile is retained.
+ *
  * @param file_path File to import.
  * @param profile Parsing profile selected for the file.
  * @param batch_size Number of parsed entries per storage batch.
@@ -233,7 +238,7 @@ auto LogImportCoordinator::import_file_async(const QString& file_path,
 
         if (m_live_tailing != nullptr)
         {
-            m_live_tailing->set_enabled(view_id, true);
+            m_live_tailing->reset_view(view_id, true);
         }
 
         enqueue(view_id, absolute_file_path, profile);
@@ -277,6 +282,10 @@ auto LogImportCoordinator::import_file_async(const QUuid& view_id, const QString
 
 /**
  * @brief Enqueues multiple asynchronous imports in one new view.
+ *
+ * Live-tail registrations are deferred until the corresponding import completes, so every file
+ * starts with the profile retained by enqueue().
+ *
  * @param file_paths Files to import.
  * @param profile Parsing profile selected for every file.
  * @param batch_size Number of parsed entries per storage batch.
@@ -305,7 +314,7 @@ auto LogImportCoordinator::import_files_async(const QVector<QString>& file_paths
 
         if (m_live_tailing != nullptr)
         {
-            m_live_tailing->set_enabled(view_id, true);
+            m_live_tailing->reset_view(view_id, true);
         }
 
         start_next(batch_size);

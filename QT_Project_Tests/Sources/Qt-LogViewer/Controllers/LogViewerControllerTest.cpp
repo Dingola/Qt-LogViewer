@@ -1931,6 +1931,73 @@ TEST_F(LogViewerControllerTest, CancelsActiveAndPendingImportsWhenRemovingView)
 }
 
 /**
+ * @brief Verifies that reopening a cancelled file uses only the newly selected parsing profile.
+ */
+TEST_F(LogViewerControllerTest, ReopensCancelledFileWithNewParsingProfile)
+{
+    QVector<QString> lines;
+    const QString record = QStringLiteral(
+        R"(2026-07-16 04:10:06.642 Info Application started - [default] D:\Projects\Qt-LogViewer\main.cpp:95, int main() Qt-LogViewer)");
+
+    for (int index = 0; index < 10000; ++index)
+    {
+        lines.append(record);
+    }
+
+    QTemporaryFile* file = create_temp_file(lines);
+    ASSERT_NE(file, nullptr);
+
+    const LogParsingProfile short_profile = LogParsingProfile::create_default(
+        QStringLiteral("{timestamp} {level} {message}"), QStringLiteral("Short"));
+    const LogParsingProfile complete_profile = LogParsingProfile::create_default(
+        QStringLiteral(
+            "{timestamp} {level} {message} - [{category}] {file}:{line}, {function} {app_name}"),
+        QStringLiteral("Complete"));
+    QSignalSpy progress_spy(m_controller, &LogViewerController::loading_progress);
+
+    const QUuid cancelled_view_id =
+        m_controller->load_log_file_async(file->fileName(), short_profile, 1);
+
+    ASSERT_FALSE(cancelled_view_id.isNull());
+    QTRY_VERIFY(progress_spy.count() > 0);
+    ASSERT_TRUE(m_controller->remove_view(cancelled_view_id));
+
+    QSignalSpy loading_finished_spy(m_controller, &LogViewerController::loading_finished);
+    const QUuid reopened_view_id =
+        m_controller->load_log_file_async(file->fileName(), complete_profile, 1000);
+
+    ASSERT_FALSE(reopened_view_id.isNull());
+    QTRY_COMPARE_WITH_TIMEOUT(loading_finished_spy.count(), 1, 30000);
+
+    QFile append_file(file->fileName());
+    ASSERT_TRUE(append_file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text));
+
+    QTextStream output(&append_file);
+    output << "2026-07-16 04:10:07.642 Info Application tailed - [runtime] "
+              "D:\\Projects\\Qt-LogViewer\\tail.cpp:96, void tail() Qt-LogViewer\n";
+    output.flush();
+    append_file.close();
+
+    ASSERT_NE(m_controller->get_page_state(reopened_view_id), nullptr);
+    QTRY_COMPARE_WITH_TIMEOUT(m_controller->get_page_state(reopened_view_id)->get_total_entries(),
+                              static_cast<qsizetype>(10001), 30000);
+
+    const QVector<LogEntry> entries = m_controller->get_page_entries(reopened_view_id);
+    ASSERT_FALSE(entries.isEmpty());
+
+    const LogEntry& entry = entries.first();
+    EXPECT_EQ(entry.get_message(), QStringLiteral("Application tailed"));
+    EXPECT_EQ(entry.get_parsed_field(QStringLiteral("category")).toString(),
+              QStringLiteral("runtime"));
+    EXPECT_EQ(entry.get_parsed_field(QStringLiteral("file")).toString(),
+              QStringLiteral("D:\\Projects\\Qt-LogViewer\\tail.cpp"));
+    EXPECT_EQ(entry.get_parsed_field(QStringLiteral("line")).toLongLong(), 96);
+    EXPECT_EQ(entry.get_parsed_field(QStringLiteral("function")).toString(),
+              QStringLiteral("void tail()"));
+    EXPECT_EQ(entry.get_app_name(), QStringLiteral("Qt-LogViewer"));
+}
+
+/**
  * @brief Verifies that restoring the same session view does not duplicate archived entries.
  */
 TEST_F(LogViewerControllerTest, RestoresSessionViewWithoutDuplicatingEntries)

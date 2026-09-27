@@ -83,6 +83,11 @@ class LogImportCoordinator final: public QObject
 
         /**
          * @brief Enqueues one asynchronous import in a new view.
+         *
+         * Live tailing is enabled for the view but starts only after the import was stored
+         * successfully, ensuring the selected profile is registered before appended records are
+         * parsed.
+         *
          * @param file_path File to import.
          * @param profile Parsing profile selected for the file.
          * @param batch_size Number of parsed entries per storage batch.
@@ -104,6 +109,10 @@ class LogImportCoordinator final: public QObject
 
         /**
          * @brief Enqueues multiple asynchronous imports in one new view.
+         *
+         * Live tailing is enabled without registering files prematurely. Each file starts tailing
+         * with its retained profile after its asynchronous import was stored successfully.
+         *
          * @param file_paths Files to import.
          * @param profile Parsing profile selected for every file.
          * @param batch_size Number of parsed entries per storage batch.
