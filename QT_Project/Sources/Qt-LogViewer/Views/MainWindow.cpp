@@ -186,6 +186,10 @@ MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
             &MainWindow::handle_all_sessions_removed);
     connect(m_session_controller, &SessionController::current_session_changed, this,
             [this](const QString&) { show_start_page_if_needed(); });
+    connect(m_session_controller, &SessionController::session_restore_started, this,
+            [this](const QString&) { close_all_tabs(); });
+    connect(m_session_controller, &SessionController::view_restored, this,
+            &MainWindow::restore_view_from_state);
     connect(m_session_controller, &SessionController::session_renamed, this,
             [this](const QString&, const QString&) { m_menu_controller->rebuild_recent_menus(); });
     connect(m_session_controller, &SessionController::session_deleted, this,
@@ -976,18 +980,6 @@ auto MainWindow::restore_session(const SessionState& state) -> void
             central_stack->setCurrentIndex(0);
         }
 
-        close_all_tabs();
-
-        for (const LogFileInfo& file_info: state.explorer_files)
-        {
-            auto* tree_model = m_controller->get_log_file_tree_model();
-            if (tree_model != nullptr)
-            {
-                tree_model->add_log_file(state.id, file_info);
-            }
-        }
-
-        // Then restore views (tabs)
         QString profile_error;
         const QVector<LogParsingProfile> available_profiles =
             m_log_viewer_settings->get_log_parsing_profiles(&profile_error);
@@ -998,15 +990,20 @@ auto MainWindow::restore_session(const SessionState& state) -> void
                        << profile_error;
         }
 
-        for (const SessionViewState& view_state: state.views)
-        {
-            restore_view_from_state(state.id, view_state, available_profiles);
-        }
+        const bool restored = m_session_controller->restore_session(state, available_profiles);
 
-        m_session_controller->request_expand_session(state.id);
-        m_menu_controller->rebuild_recent_menus();
-        update_pagination_widget();
-        show_start_page_if_needed();
+        if (restored)
+        {
+            m_session_controller->request_expand_session(state.id);
+            m_menu_controller->rebuild_recent_menus();
+            update_pagination_widget();
+            show_start_page_if_needed();
+        }
+        else
+        {
+            QMessageBox::warning(this, tr("Open Session"),
+                                 tr("Session data could not be restored."));
+        }
     }
     else
     {
@@ -1016,17 +1013,12 @@ auto MainWindow::restore_session(const SessionState& state) -> void
 
 /**
  * @brief Restores a single view from typed session state.
- * @param session_id The session identifier.
+ * @param view_id Restored view identifier.
  * @param state The view state.
- * @param available_profiles Profiles loaded from the application settings.
  */
-auto MainWindow::restore_view_from_state(const QString& session_id, const SessionViewState& state,
-                                         const QVector<LogParsingProfile>& available_profiles)
-    -> void
+auto MainWindow::restore_view_from_state(const QUuid& view_id,
+                                         const SessionViewState& state) -> void
 {
-    const QUuid view_id =
-        m_controller->import_view_state_for_session(session_id, state, available_profiles);
-
     LogViewWidget* log_view_widget = create_log_view_widget_for_view(view_id, state);
 
     const QVector<QString> view_paths = m_controller->get_view_file_paths(view_id);

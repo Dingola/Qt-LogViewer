@@ -162,12 +162,10 @@ class MainWindow: public QtWidgetsCommonLib::AppMainWindow
 
         /**
          * @brief Restores a single view from typed session state.
-         * @param session_id The session identifier.
+         * @param view_id Restored view identifier.
          * @param state The view state.
-         * @param available_profiles Profiles loaded from the application settings.
          */
-        auto restore_view_from_state(const QString& session_id, const SessionViewState& state,
-                                     const QVector<LogParsingProfile>& available_profiles) -> void;
+        auto restore_view_from_state(const QUuid& view_id, const SessionViewState& state) -> void;
 
         /**
          * @brief Creates a LogViewWidget for a view and connects its signals.

@@ -1,13 +1,17 @@
 #pragma once
 
+#include <QHash>
 #include <QObject>
+#include <QSet>
 #include <QString>
 #include <QUuid>
+#include <QVector>
 #include <optional>
 
 // Value types used by value in API
 #include "Qt-LogViewer/Models/LogFileInfo.h"
 #include "Qt-LogViewer/Models/SessionTypes.h"
+#include "Qt-LogViewer/Services/LogParsingProfile.h"
 
 // Forward declarations (pointers only)
 class LogViewerController;
@@ -23,6 +27,7 @@ class LogFileTreeModel;
  * - Add files to sessions via the main controller.
  * - Create, close, delete, and rename sessions.
  * - Convert persisted sessions into typed state through SessionCodec.
+ * - Restore typed sessions and defer final view queries until their imports complete.
  * - Coordinate between SessionManager, LogFileTreeModel, and LogViewerController.
  */
 class SessionController: public QObject
@@ -124,6 +129,19 @@ class SessionController: public QObject
         [[nodiscard]] auto load_session(const QString& session_id) -> std::optional<SessionState>;
 
         /**
+         * @brief Restores a complete typed session through one coordinated workflow.
+         *
+         * Existing views are closed, explorer files are registered, restored views are imported,
+         * and their saved query and page state is applied after all files of that view finish.
+         *
+         * @param state Typed session snapshot to restore.
+         * @param available_profiles Parsing profiles available for persisted profile references.
+         * @return True when the session snapshot was accepted.
+         */
+        auto restore_session(const SessionState& state,
+                             const QVector<LogParsingProfile>& available_profiles = {}) -> bool;
+
+        /**
          * @brief Exports the current session as typed state.
          * @return The session state.
          */
@@ -192,6 +210,25 @@ class SessionController: public QObject
          */
         void current_session_changed(const QString& session_id);
 
+        /**
+         * @brief Emitted after existing controller views were cleared for a session restore.
+         * @param session_id Session being restored.
+         */
+        void session_restore_started(const QString& session_id);
+
+        /**
+         * @brief Requests creation of a tab for one registered restored view.
+         * @param view_id Restored view identifier.
+         * @param state Typed presentation state associated with the view.
+         */
+        void view_restored(const QUuid& view_id, const SessionViewState& state);
+
+        /**
+         * @brief Emitted after every restored view has completed its imports and state application.
+         * @param session_id Restored session identifier.
+         */
+        void session_restored(const QString& session_id);
+
     private:
         /**
          * @brief Creates a new session with the given name.
@@ -224,8 +261,24 @@ class SessionController: public QObject
          */
         [[nodiscard]] auto build_view_state(const QUuid& view_id) const -> SessionViewState;
 
+        /**
+         * @brief Marks one restored file import as resolved and applies the view state when ready.
+         * @param view_id View receiving the import result.
+         * @param file_path File whose import finished or failed.
+         */
+        auto complete_restored_file(const QUuid& view_id, const QString& file_path) -> void;
+
+        /**
+         * @brief Emits session_restored() once no restored view is awaiting file imports.
+         */
+        auto finish_session_restore_if_ready() -> void;
+
     private:
         SessionManager* m_session_manager{nullptr};
         LogFileTreeModel* m_tree_model{nullptr};
         LogViewerController* m_controller{nullptr};
+        QHash<QUuid, SessionViewState> m_pending_restore_states;
+        QHash<QUuid, QSet<QString>> m_pending_restore_files;
+        QString m_restoring_session_id;
+        bool m_registering_restored_views{false};
 };

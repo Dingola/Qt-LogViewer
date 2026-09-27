@@ -1154,9 +1154,15 @@ auto LogViewerController::import_view_state(const SessionViewState& state) -> QU
 }
 
 /**
- * @brief Imports a single view state for a specific session.
+ * @brief Registers and enqueues a single restored view for a specific session.
+ *
+ * Query, sorting, and pagination state are applied immediately so direct callers retain the
+ * established controller contract. SessionController applies the state again after every file
+ * import for the view has completed, when the final page count is known.
+ *
  * @param session_id The session identifier for the tree model.
  * @param state The view state to apply.
+ * @param available_profiles Profiles loaded from the application settings.
  * @return QUuid of the imported/ensured view.
  */
 auto LogViewerController::import_view_state_for_session(
@@ -1175,8 +1181,6 @@ auto LogViewerController::import_view_state_for_session(
 
             m_history_service->remove_view_entries(result);
             m_live_tailing->reset_view(result, state.filters.live_tailing_enabled);
-
-            apply_view_query_state(result, state);
         }
 
         // Update explorer tree with session context
@@ -1201,6 +1205,8 @@ auto LogViewerController::import_view_state_for_session(
 
         if (!result.isNull())
         {
+            apply_view_query_state(result, state);
+
             for (const auto& lf: state.loaded_files)
             {
                 const QString path = lf.get_file_path();

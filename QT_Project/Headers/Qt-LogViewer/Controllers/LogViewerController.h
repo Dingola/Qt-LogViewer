@@ -589,7 +589,12 @@ class LogViewerController: public QObject
         auto import_view_state(const SessionViewState& state) -> QUuid;
 
         /**
-         * @brief Imports a single view state for a specific session.
+         * @brief Registers and enqueues a single restored view for a specific session.
+         *
+         * Query, sorting, and pagination state are applied immediately for direct callers.
+         * SessionController reapplies the state after queued imports complete so the saved page
+         * can be selected against the final result count.
+         *
          * @param session_id The session identifier for the tree model.
          * @param state The view state to apply.
          * @param available_profiles Profiles loaded from the application settings.
