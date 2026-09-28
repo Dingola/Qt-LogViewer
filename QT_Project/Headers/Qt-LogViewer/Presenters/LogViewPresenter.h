@@ -5,7 +5,14 @@
 #include <QUuid>
 
 class LogViewWidget;
-class LogViewerController;
+class FilterCoordinator;
+class LiveTailingCoordinator;
+class LogHistoryService;
+class LogImportCoordinator;
+class LogPageCoordinator;
+class LogQueryController;
+class ViewLifecycleCoordinator;
+class ViewRegistry;
 struct SessionViewState;
 
 /**
@@ -28,13 +35,24 @@ class LogViewPresenter: public QObject
     public:
         /**
          * @brief Binds a widget to an existing runtime view.
-         * @param controller Controller providing view-specific operations and state.
+         * @param views Registry providing the bound model and file paths.
+         * @param filters Per-view filter state.
+         * @param history Persistent history used for filter values and counts.
+         * @param pages Per-view pagination state and update signals.
+         * @param queries Query operations triggered by the widget.
+         * @param imports Import completion notifications.
+         * @param lifecycle View and file removal operations.
+         * @param live_tailing Live-tailing state and operations.
          * @param widget Widget displaying the runtime view.
          * @param view_id Immutable identifier of the bound runtime view.
          * @param state Initial typed presentation state.
          * @param parent QObject owning the presenter, normally @p widget.
          */
-        explicit LogViewPresenter(LogViewerController* controller, LogViewWidget* widget,
+        explicit LogViewPresenter(ViewRegistry* views, FilterCoordinator* filters,
+                                  LogHistoryService* history, LogPageCoordinator* pages,
+                                  LogQueryController* queries, LogImportCoordinator* imports,
+                                  ViewLifecycleCoordinator* lifecycle,
+                                  LiveTailingCoordinator* live_tailing, LogViewWidget* widget,
                                   const QUuid& view_id, const SessionViewState& state,
                                   QObject* parent = nullptr);
 
@@ -63,7 +81,14 @@ class LogViewPresenter: public QObject
         auto restore_sort_indicator() -> void;
 
     private:
-        LogViewerController* m_controller{nullptr};
+        ViewRegistry* m_views{nullptr};
+        FilterCoordinator* m_filters{nullptr};
+        LogHistoryService* m_history{nullptr};
+        LogPageCoordinator* m_pages{nullptr};
+        LogQueryController* m_queries{nullptr};
+        LogImportCoordinator* m_imports{nullptr};
+        ViewLifecycleCoordinator* m_lifecycle{nullptr};
+        LiveTailingCoordinator* m_live_tailing{nullptr};
         LogViewWidget* m_widget{nullptr};
         QUuid m_view_id;
 };

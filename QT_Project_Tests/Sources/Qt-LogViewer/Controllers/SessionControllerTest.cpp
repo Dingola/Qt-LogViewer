@@ -6,12 +6,13 @@
 #include <QTest>
 #include <QTextStream>
 
-#include "Qt-LogViewer/Controllers/LogViewerController.h"
+#include "Qt-LogViewer/Controllers/LogViewContext.h"
 #include "Qt-LogViewer/Controllers/SessionController.h"
 #include "Qt-LogViewer/Models/LogFileTreeModel.h"
 #include "Qt-LogViewer/Models/LogModel.h"
 #include "Qt-LogViewer/Models/LogPageState.h"
 #include "Qt-LogViewer/Models/SessionTypes.h"
+#include "Qt-LogViewer/Support/TestLogRuntime.h"
 
 /**
  * @file SessionControllerTest.cpp
@@ -26,9 +27,12 @@ void SessionControllerTest::SetUp()
     m_default_profile = LogParsingProfile::create_default(
         QStringLiteral("{timestamp} {level} {message} {app_name}"),
         QStringLiteral("Session test default"));
-    m_log_controller = new LogViewerController(m_default_profile);
+    m_runtime = new TestLogRuntime(m_default_profile);
     m_session_controller = new SessionController(
-        nullptr, m_log_controller->get_log_file_tree_model(), m_log_controller);
+        nullptr, m_runtime->catalog().get_model(), m_default_profile, &m_runtime->catalog(),
+        &m_runtime->views(), &m_runtime->filters(), &m_runtime->history(), &m_runtime->pages(),
+        &m_runtime->queries(), &m_runtime->imports(), &m_runtime->lifecycle(),
+        &m_runtime->live_tailing());
 }
 
 /**
@@ -38,8 +42,8 @@ void SessionControllerTest::TearDown()
 {
     delete m_session_controller;
     m_session_controller = nullptr;
-    delete m_log_controller;
-    m_log_controller = nullptr;
+    delete m_runtime;
+    m_runtime = nullptr;
 
     for (QTemporaryFile* file: m_temp_files)
     {
@@ -118,7 +122,7 @@ TEST_F(SessionControllerTest, AppliesSavedQueryStateAfterImportCompletion)
     ASSERT_TRUE(m_session_controller->restore_session(state));
     QTRY_COMPARE(restored_spy.count(), 1);
 
-    const LogPageState* page_state = m_log_controller->get_page_state(view_state.id);
+    const LogPageState* page_state = m_runtime->pages().get_page_state(view_state.id);
     ASSERT_NE(page_state, nullptr);
     EXPECT_EQ(page_state->get_current_page(), 2);
     EXPECT_EQ(page_state->get_page_size(), 2);
@@ -126,7 +130,7 @@ TEST_F(SessionControllerTest, AppliesSavedQueryStateAfterImportCompletion)
     EXPECT_EQ(page_state->get_query().sort_field, LogField::Message);
     EXPECT_EQ(page_state->get_query().sort_order, Qt::DescendingOrder);
 
-    LogModel* model = m_log_controller->get_log_model(view_state.id);
+    LogModel* model = m_runtime->views().get_context(view_state.id)->get_model();
     ASSERT_NE(model, nullptr);
     ASSERT_EQ(model->rowCount(), 2);
     EXPECT_EQ(model->get_entry(0).get_message(), QStringLiteral("D"));
@@ -173,15 +177,15 @@ TEST_F(SessionControllerTest, RestoresMultipleViewsIndependently)
     EXPECT_EQ(restored_view_count, 2);
     QTRY_COMPARE(restored_spy.count(), 1);
 
-    const LogPageState* first_page = m_log_controller->get_page_state(first_state.id);
-    const LogPageState* second_page = m_log_controller->get_page_state(second_state.id);
+    const LogPageState* first_page = m_runtime->pages().get_page_state(first_state.id);
+    const LogPageState* second_page = m_runtime->pages().get_page_state(second_state.id);
     ASSERT_NE(first_page, nullptr);
     ASSERT_NE(second_page, nullptr);
     EXPECT_EQ(first_page->get_total_entries(), 1);
     EXPECT_EQ(second_page->get_total_entries(), 1);
 
-    LogModel* first_model = m_log_controller->get_log_model(first_state.id);
-    LogModel* second_model = m_log_controller->get_log_model(second_state.id);
+    LogModel* first_model = m_runtime->views().get_context(first_state.id)->get_model();
+    LogModel* second_model = m_runtime->views().get_context(second_state.id)->get_model();
     ASSERT_NE(first_model, nullptr);
     ASSERT_NE(second_model, nullptr);
     ASSERT_EQ(first_model->rowCount(), 1);
@@ -215,12 +219,14 @@ TEST_F(SessionControllerTest, FallsBackWhenPersistedProfileIsUnavailable)
     ASSERT_TRUE(m_session_controller->restore_session(state));
     QTRY_COMPARE(restored_spy.count(), 1);
 
-    LogModel* model = m_log_controller->get_log_model(view_state.id);
+    LogModel* model = m_runtime->views().get_context(view_state.id)->get_model();
     ASSERT_NE(model, nullptr);
     ASSERT_EQ(model->rowCount(), 1);
     EXPECT_EQ(model->get_entry(0).get_message(), QStringLiteral("FallbackEntry"));
 
-    const SessionViewState exported = m_log_controller->export_view_state(view_state.id);
+    const SessionState exported_session = m_session_controller->export_session_state();
+    ASSERT_EQ(exported_session.views.size(), 1);
+    const SessionViewState exported = exported_session.views.constFirst();
     const auto profile_id = exported.file_parsing_profile_ids.constFind(file_path);
     ASSERT_NE(profile_id, exported.file_parsing_profile_ids.cend());
     EXPECT_EQ(profile_id.value(), m_default_profile.get_id());
@@ -252,15 +258,15 @@ TEST_F(SessionControllerTest, RestoresSameSessionWithoutDuplicatingViewsOrEntrie
     ASSERT_TRUE(m_session_controller->restore_session(state));
     QTRY_COMPARE(restored_spy.count(), 2);
 
-    const QVector<QUuid> view_ids = m_log_controller->get_all_view_ids();
+    const QVector<QUuid> view_ids = m_runtime->views().get_all_view_ids();
     ASSERT_EQ(view_ids.size(), 1);
     EXPECT_EQ(view_ids.constFirst(), view_state.id);
 
-    const LogPageState* page_state = m_log_controller->get_page_state(view_state.id);
+    const LogPageState* page_state = m_runtime->pages().get_page_state(view_state.id);
     ASSERT_NE(page_state, nullptr);
     EXPECT_EQ(page_state->get_total_entries(), 2);
 
-    LogModel* model = m_log_controller->get_log_model(view_state.id);
+    LogModel* model = m_runtime->views().get_context(view_state.id)->get_model();
     ASSERT_NE(model, nullptr);
     EXPECT_EQ(model->rowCount(), 2);
 }

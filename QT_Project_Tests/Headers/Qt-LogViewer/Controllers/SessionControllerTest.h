@@ -7,8 +7,8 @@
 
 #include "Qt-LogViewer/Services/LogParsingProfile.h"
 
-class LogViewerController;
 class SessionController;
+class TestLogRuntime;
 
 /**
  * @file SessionControllerTest.h
@@ -38,7 +38,7 @@ class SessionControllerTest: public ::testing::Test
         LogParsingProfile m_default_profile{LogParsingProfile::create_default(
             QStringLiteral("{timestamp} {level} {message} {app_name}"),
             QStringLiteral("Session test default"))};
-        LogViewerController* m_log_controller{nullptr};
+        TestLogRuntime* m_runtime{nullptr};
         SessionController* m_session_controller{nullptr};
         QVector<QTemporaryFile*> m_temp_files;
 };

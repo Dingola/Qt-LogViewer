@@ -8,12 +8,19 @@
 #include <QVector>
 
 #include "Qt-LogViewer/Controllers/DockController.h"
-#include "Qt-LogViewer/Controllers/LogViewerController.h"
+#include "Qt-LogViewer/Controllers/FilterCoordinator.h"
+#include "Qt-LogViewer/Controllers/LogImportCoordinator.h"
+#include "Qt-LogViewer/Controllers/LogPageCoordinator.h"
+#include "Qt-LogViewer/Controllers/LogQueryController.h"
+#include "Qt-LogViewer/Controllers/LogViewContext.h"
 #include "Qt-LogViewer/Controllers/SessionController.h"
+#include "Qt-LogViewer/Controllers/ViewLifecycleCoordinator.h"
+#include "Qt-LogViewer/Controllers/ViewRegistry.h"
 #include "Qt-LogViewer/Models/LogEntry.h"
 #include "Qt-LogViewer/Models/LogModel.h"
 #include "Qt-LogViewer/Models/LogPageState.h"
 #include "Qt-LogViewer/Presenters/LogViewPresenter.h"
+#include "Qt-LogViewer/Services/LogHistoryService.h"
 #include "Qt-LogViewer/Views/App/LogFilterBarWidget.h"
 #include "Qt-LogViewer/Views/App/LogLevelPieChartWidget.h"
 #include "Qt-LogViewer/Views/App/LogTabWidget.h"
@@ -28,7 +35,13 @@
 
 /**
  * @brief Constructs and connects the shared workspace presentation.
- * @param controller Runtime log-view operations and state.
+ * @param views Registry providing active views and models.
+ * @param filters Per-view filter state.
+ * @param history Persistent history used for filter values and counts.
+ * @param pages Per-view pagination state and update signals.
+ * @param queries Query operations triggered by shared controls.
+ * @param imports Import completion notifications.
+ * @param lifecycle View-closing operations.
  * @param session_controller Session state used for start-page selection.
  * @param tab_widget Workspace tab container.
  * @param filter_bar Shared filter and search controls.
@@ -39,15 +52,21 @@
  * @param dock_controller Controller used to suspend docks on the start page.
  * @param parent Optional QObject parent.
  */
-WorkspacePresenter::WorkspacePresenter(LogViewerController* controller,
-                                       SessionController* session_controller,
-                                       LogTabWidget* tab_widget, LogFilterBarWidget* filter_bar,
-                                       PaginationWidget* pagination, QPlainTextEdit* details_text,
-                                       LogLevelPieChartWidget* level_chart,
-                                       QStackedWidget* central_stack,
-                                       DockController* dock_controller, QObject* parent)
+WorkspacePresenter::WorkspacePresenter(
+    ViewRegistry* views, FilterCoordinator* filters, LogHistoryService* history,
+    LogPageCoordinator* pages, LogQueryController* queries, LogImportCoordinator* imports,
+    ViewLifecycleCoordinator* lifecycle, SessionController* session_controller,
+    LogTabWidget* tab_widget, LogFilterBarWidget* filter_bar, PaginationWidget* pagination,
+    QPlainTextEdit* details_text, LogLevelPieChartWidget* level_chart,
+    QStackedWidget* central_stack, DockController* dock_controller, QObject* parent)
     : QObject(parent),
-      m_controller(controller),
+      m_views(views),
+      m_filters(filters),
+      m_history(history),
+      m_pages(pages),
+      m_queries(queries),
+      m_imports(imports),
+      m_lifecycle(lifecycle),
       m_session_controller(session_controller),
       m_tab_widget(tab_widget),
       m_filter_bar(filter_bar),
@@ -83,16 +102,23 @@ auto WorkspacePresenter::refresh_active_view() -> void
 {
     const QUuid view_id = get_active_view_id();
 
-    if (!view_id.isNull() && m_controller != nullptr && m_filter_bar != nullptr)
+    if (!view_id.isNull() && m_filters != nullptr && m_history != nullptr && m_pages != nullptr &&
+        m_queries != nullptr && m_filter_bar != nullptr)
     {
         const QSignalBlocker blocker(m_filter_bar);
         m_filter_bar->set_search_bar_enabled(true);
-        m_filter_bar->set_app_names(m_controller->get_app_names(view_id));
-        m_filter_bar->set_current_app_name_filter(m_controller->get_app_name_filter(view_id));
-        m_filter_bar->set_available_log_levels(m_controller->get_available_log_levels(view_id));
-        m_filter_bar->set_log_levels(m_controller->get_log_level_filters(view_id));
+        m_filter_bar->set_app_names(m_history->get_distinct_values(view_id, LogField::AppName));
+        m_filter_bar->set_current_app_name_filter(m_filters->get_app_name(view_id));
+        m_filter_bar->set_available_log_levels(FilterCoordinator::get_available_log_levels());
+        m_filter_bar->set_log_levels(m_filters->get_log_levels(view_id));
 
-        const QMap<QString, int> level_counts = m_controller->get_log_level_counts(view_id);
+        QMap<QString, int> level_counts;
+        const QMap<QString, qsizetype> history_counts =
+            m_history->get_log_level_counts(m_queries->create_query(view_id));
+        for (auto iterator = history_counts.cbegin(); iterator != history_counts.cend(); ++iterator)
+        {
+            level_counts.insert(iterator.key(), static_cast<int>(iterator.value()));
+        }
         m_filter_bar->set_log_level_counts(level_counts);
 
         if (m_level_chart != nullptr)
@@ -100,9 +126,9 @@ auto WorkspacePresenter::refresh_active_view() -> void
             m_level_chart->set_log_level_counts(level_counts);
         }
 
-        if (m_controller->get_page_state(view_id) == nullptr)
+        if (m_pages->get_page_state(view_id) == nullptr)
         {
-            m_controller->reload_page_query(view_id);
+            m_queries->reload_query(view_id);
         }
     }
     else
@@ -122,9 +148,9 @@ auto WorkspacePresenter::refresh_pagination() -> void
     int total_pages = 1;
     const QUuid view_id = get_active_view_id();
 
-    if (!view_id.isNull() && m_controller != nullptr)
+    if (!view_id.isNull() && m_pages != nullptr)
     {
-        const LogPageState* state = m_controller->get_page_state(view_id);
+        const LogPageState* state = m_pages->get_page_state(view_id);
 
         if (state != nullptr)
         {
@@ -202,9 +228,9 @@ auto WorkspacePresenter::reset_presentation() -> void
 auto WorkspacePresenter::apply_search(const QUuid& view_id, const QString& text, SearchField field,
                                       bool use_regex) -> void
 {
-    if (!view_id.isNull() && m_controller != nullptr)
+    if (!view_id.isNull() && m_queries != nullptr)
     {
-        m_controller->set_search_filter(view_id, text, field, use_regex);
+        m_queries->set_search(view_id, text, field, use_regex);
     }
 }
 
@@ -217,17 +243,17 @@ auto WorkspacePresenter::connect_workspace_actions() -> void
     {
         connect(m_pagination, &PaginationWidget::page_changed, this, [this](int page) {
             const QUuid view_id = get_active_view_id();
-            if (!view_id.isNull() && m_controller != nullptr)
+            if (!view_id.isNull() && m_pages != nullptr)
             {
-                m_controller->set_current_page(view_id, page);
+                m_pages->set_current_page(view_id, page);
             }
         });
         connect(m_pagination, &PaginationWidget::items_per_page_changed, this,
                 [this](int items_per_page) {
                     const QUuid view_id = get_active_view_id();
-                    if (!view_id.isNull() && m_controller != nullptr)
+                    if (!view_id.isNull() && m_pages != nullptr)
                     {
-                        m_controller->set_page_size(view_id, items_per_page);
+                        m_pages->set_page_size(view_id, items_per_page);
                     }
                 });
     }
@@ -237,17 +263,17 @@ auto WorkspacePresenter::connect_workspace_actions() -> void
         connect(m_filter_bar, &LogFilterBarWidget::app_filter_changed, this,
                 [this](const QString& app_name) {
                     const QUuid view_id = get_active_view_id();
-                    if (!view_id.isNull() && m_controller != nullptr)
+                    if (!view_id.isNull() && m_queries != nullptr)
                     {
-                        m_controller->set_app_name_filter(view_id, app_name);
+                        m_queries->set_app_name(view_id, app_name);
                     }
                 });
         connect(m_filter_bar, &LogFilterBarWidget::log_level_filter_changed, this,
                 [this](const QSet<QString>& levels) {
                     const QUuid view_id = get_active_view_id();
-                    if (!view_id.isNull() && m_controller != nullptr)
+                    if (!view_id.isNull() && m_queries != nullptr)
                     {
-                        m_controller->set_log_level_filters(view_id, levels);
+                        m_queries->set_log_levels(view_id, levels);
                     }
                 });
         connect(m_filter_bar, &LogFilterBarWidget::search_requested, this,
@@ -268,17 +294,17 @@ auto WorkspacePresenter::connect_workspace_actions() -> void
     {
         connect(m_tab_widget, &QTabWidget::currentChanged, this, [this](int) {
             const QUuid view_id = get_active_view_id();
-            if (!view_id.isNull() && m_controller != nullptr)
+            if (!view_id.isNull() && m_views != nullptr)
             {
-                m_controller->set_current_view(view_id);
+                m_views->set_current_view(view_id);
             }
             refresh_active_view();
         });
         connect(m_tab_widget, &TabWidget::about_to_close_tab, this, [this](int index, QWidget*) {
             LogViewWidget* log_view_widget = m_tab_widget->log_view_at(index);
-            if (log_view_widget != nullptr && m_controller != nullptr)
+            if (log_view_widget != nullptr && m_lifecycle != nullptr)
             {
-                m_controller->remove_view(log_view_widget->get_view_id());
+                m_lifecycle->close_view(log_view_widget->get_view_id());
             }
         });
         connect(m_tab_widget, &TabWidget::close_tab_requested, this,
@@ -291,25 +317,24 @@ auto WorkspacePresenter::connect_workspace_actions() -> void
  */
 auto WorkspacePresenter::connect_workspace_updates() -> void
 {
-    if (m_controller != nullptr)
+    if (m_views != nullptr && m_pages != nullptr && m_imports != nullptr)
     {
-        connect(m_controller, &LogViewerController::current_view_id_changed, this,
+        connect(m_views, &ViewRegistry::current_view_id_changed, this,
                 [this](const QUuid&) { refresh_active_view(); });
-        connect(m_controller, &LogViewerController::view_removed, this,
-                [this](const QUuid& view_id) {
-                    if (m_tab_widget != nullptr)
-                    {
-                        m_tab_widget->remove_view_tab_by_id(view_id);
-                    }
-                    refresh_active_view();
-                });
-        connect(m_controller, &LogViewerController::page_loaded, this,
+        connect(m_views, &ViewRegistry::view_removed, this, [this](const QUuid& view_id) {
+            if (m_tab_widget != nullptr)
+            {
+                m_tab_widget->remove_view_tab_by_id(view_id);
+            }
+            refresh_active_view();
+        });
+        connect(m_pages, &LogPageCoordinator::page_loaded, this,
                 [this](const QUuid& view_id, qsizetype current_page, qsizetype total_pages,
                        qsizetype) { update_page_state(view_id, current_page, total_pages); });
-        connect(m_controller, &LogViewerController::page_state_updated, this,
+        connect(m_pages, &LogPageCoordinator::page_state_updated, this,
                 [this](const QUuid& view_id, qsizetype current_page, qsizetype total_pages,
                        qsizetype) { update_page_state(view_id, current_page, total_pages); });
-        connect(m_controller, &LogViewerController::loading_finished, this,
+        connect(m_imports, &LogImportCoordinator::finished, this,
                 [this](const QUuid& view_id, const QString&) {
                     if (view_id == get_active_view_id())
                     {
@@ -364,9 +389,16 @@ auto WorkspacePresenter::update_page_state(const QUuid& view_id, qsizetype curre
                                          static_cast<int>(total_pages));
         }
 
-        if (m_controller != nullptr)
+        if (m_history != nullptr && m_queries != nullptr)
         {
-            const QMap<QString, int> level_counts = m_controller->get_log_level_counts(view_id);
+            QMap<QString, int> level_counts;
+            const QMap<QString, qsizetype> history_counts =
+                m_history->get_log_level_counts(m_queries->create_query(view_id));
+            for (auto iterator = history_counts.cbegin(); iterator != history_counts.cend();
+                 ++iterator)
+            {
+                level_counts.insert(iterator.key(), static_cast<int>(iterator.value()));
+            }
 
             if (m_filter_bar != nullptr)
             {
@@ -392,9 +424,10 @@ auto WorkspacePresenter::update_log_details(const QUuid& view_id,
 {
     QString details;
 
-    if (view_id == get_active_view_id() && current.isValid() && m_controller != nullptr)
+    if (view_id == get_active_view_id() && current.isValid() && m_views != nullptr)
     {
-        LogModel* model = m_controller->get_log_model(view_id);
+        LogViewContext* context = m_views->get_context(view_id);
+        LogModel* model = context != nullptr ? context->get_model() : nullptr;
 
         if (model != nullptr)
         {

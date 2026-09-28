@@ -19,14 +19,23 @@
 
 #include "Qt-LogViewer/Adapters/RecentItemsAdapter.h"
 #include "Qt-LogViewer/Controllers/DockController.h"
-#include "Qt-LogViewer/Controllers/LogViewerController.h"
+#include "Qt-LogViewer/Controllers/FileCatalogController.h"
+#include "Qt-LogViewer/Controllers/FilterCoordinator.h"
+#include "Qt-LogViewer/Controllers/LiveTailingCoordinator.h"
+#include "Qt-LogViewer/Controllers/LogImportCoordinator.h"
+#include "Qt-LogViewer/Controllers/LogPageCoordinator.h"
+#include "Qt-LogViewer/Controllers/LogQueryController.h"
 #include "Qt-LogViewer/Controllers/MainMenuController.h"
 #include "Qt-LogViewer/Controllers/SessionController.h"
+#include "Qt-LogViewer/Controllers/ViewLifecycleCoordinator.h"
+#include "Qt-LogViewer/Controllers/ViewRegistry.h"
 #include "Qt-LogViewer/Models/LogFileTreeModel.h"
 #include "Qt-LogViewer/Models/RecentItemsModel.h"
 #include "Qt-LogViewer/Presenters/LogImportTabPresenter.h"
 #include "Qt-LogViewer/Presenters/LogViewPresenter.h"
 #include "Qt-LogViewer/Presenters/WorkspacePresenter.h"
+#include "Qt-LogViewer/Services/LogHistoryService.h"
+#include "Qt-LogViewer/Services/LogPreviewService.h"
 #include "Qt-LogViewer/Services/LogViewerSettings.h"
 #include "Qt-LogViewer/Services/SessionManager.h"
 #include "Qt-LogViewer/Views/App/Dialogs/SettingsDialog.h"
@@ -57,18 +66,40 @@ using QtWidgetsCommonLib::AppMainWindow;
  * signals/slots.
  *
  * @param settings Application settings owned by the composition root.
- * @param controller Transitional log-viewer facade owned by the composition root.
+ * @param catalog File catalog used by the explorer.
+ * @param views Runtime view registry.
+ * @param filters Per-view filter state.
+ * @param history Persistent log history.
+ * @param pages Per-view pagination state.
+ * @param queries Query operations.
+ * @param imports Log import workflow.
+ * @param lifecycle View and file cleanup workflow.
+ * @param live_tailing Live-tailing workflow.
+ * @param preview Log preview service used by import tabs.
  * @param session_manager Session state service owned by the composition root.
  * @param recent_items_adapter Adapter supplying synchronized recent-item models.
  * @param session_controller Session workflow controller owned by the composition root.
  * @param parent The parent widget, or nullptr if this is a top-level window.
  */
-MainWindow::MainWindow(LogViewerSettings& settings, LogViewerController& controller,
+MainWindow::MainWindow(LogViewerSettings& settings, FileCatalogController& catalog,
+                       ViewRegistry& views, FilterCoordinator& filters, LogHistoryService& history,
+                       LogPageCoordinator& pages, LogQueryController& queries,
+                       LogImportCoordinator& imports, ViewLifecycleCoordinator& lifecycle,
+                       LiveTailingCoordinator& live_tailing, LogPreviewService& preview,
                        SessionManager& session_manager, RecentItemsAdapter& recent_items_adapter,
                        SessionController& session_controller, QWidget* parent)
     : AppMainWindow(&settings, parent),
       m_log_viewer_settings(&settings),
-      m_controller(&controller),
+      m_catalog(&catalog),
+      m_views(&views),
+      m_filters(&filters),
+      m_history(&history),
+      m_pages(&pages),
+      m_queries(&queries),
+      m_imports(&imports),
+      m_lifecycle(&lifecycle),
+      m_live_tailing(&live_tailing),
+      m_preview(&preview),
       m_session_manager(&session_manager),
       m_recent_items_adapter(&recent_items_adapter),
       m_recent_files_model(recent_items_adapter.get_recent_files_model()),
@@ -145,20 +176,17 @@ MainWindow::MainWindow(LogViewerSettings& settings, LogViewerController& control
             &MainWindow::handle_delete_session);
     central_stack->addWidget(start_page);
 
-    connect(m_controller, &LogViewerController::loading_progress, this,
-            &MainWindow::handle_loading_progress);
-    connect(m_controller, &LogViewerController::loading_finished, this,
-            &MainWindow::handle_loading_finished);
-    connect(m_controller, &LogViewerController::loading_error, this,
-            &MainWindow::handle_loading_error);
+    connect(m_imports, &LogImportCoordinator::progress, this, &MainWindow::handle_loading_progress);
+    connect(m_imports, &LogImportCoordinator::finished, this, &MainWindow::handle_loading_finished);
+    connect(m_imports, &LogImportCoordinator::error, this, &MainWindow::handle_loading_error);
     initialize_dock_controller();
     m_workspace_presenter = new WorkspacePresenter(
-        m_controller, m_session_controller, ui->tabWidgetLog, ui->logFilterBarWidget,
-        ui->paginationWidget, m_log_details_text_edit, m_log_level_pie_chart_widget, central_stack,
-        m_dock_controller, this);
+        m_views, m_filters, m_history, m_pages, m_queries, m_imports, m_lifecycle,
+        m_session_controller, ui->tabWidgetLog, ui->logFilterBarWidget, ui->paginationWidget,
+        m_log_details_text_edit, m_log_level_pie_chart_widget, central_stack, m_dock_controller,
+        this);
     m_log_import_tab_presenter = new LogImportTabPresenter(
-        *m_log_viewer_settings, *m_controller->get_preview_service(),
-        *m_controller->get_import_coordinator(), *ui->tabWidgetLog,
+        *m_log_viewer_settings, *m_preview, *m_imports, *ui->tabWidgetLog,
         [this](const QUuid& view_id) {
             SessionViewState empty_state;
             return create_log_view_widget_for_view(view_id, empty_state);
@@ -191,7 +219,7 @@ MainWindow::~MainWindow()
  */
 auto MainWindow::setup_log_file_explorer() -> void
 {
-    m_log_file_explorer = new LogFileExplorer(m_controller->get_log_file_tree_model(), this);
+    m_log_file_explorer = new LogFileExplorer(m_catalog->get_model(), this);
     m_log_file_explorer_dock_widget = new DockWidget(tr("Log File Explorer"), this);
     m_log_file_explorer_dock_widget->setContentsMargins(0, 0, 0, 0);
     m_log_file_explorer_dock_widget->setTitleBarWidget(
@@ -206,9 +234,8 @@ auto MainWindow::setup_log_file_explorer() -> void
             &MainWindow::handle_log_file_open_requested);
     connect(m_log_file_explorer, &LogFileExplorer::add_to_current_view_requested, this,
             &MainWindow::handle_add_log_file_to_current_view_requested);
-    connect(
-        m_log_file_explorer, &LogFileExplorer::remove_file_requested, m_controller,
-        [this](const LogFileInfo& log_file_info) { m_controller->remove_log_file(log_file_info); });
+    connect(m_log_file_explorer, &LogFileExplorer::remove_file_requested, m_lifecycle,
+            [this](const LogFileInfo& log_file_info) { m_lifecycle->remove_file(log_file_info); });
 
     // Session actions from LogFileExplorer - delegate to SessionController
     connect(m_log_file_explorer, &LogFileExplorer::rename_session_requested, this,
@@ -265,7 +292,7 @@ auto MainWindow::setup_log_details_dock() -> void
  */
 auto MainWindow::setup_filter_bar() -> void
 {
-    QVector<QString> available_log_levels = m_controller->get_available_log_levels({});
+    QVector<QString> available_log_levels = FilterCoordinator::get_available_log_levels();
     ui->logFilterBarWidget->setContentsMargins(0, 0, 0, 0);
     ui->logFilterBarWidget->set_filter_widget_visible(false);
     ui->logFilterBarWidget->set_search_bar_enabled(false);
@@ -680,7 +707,7 @@ auto MainWindow::restore_view_from_state(const QUuid& view_id,
 {
     LogViewWidget* log_view_widget = create_log_view_widget_for_view(view_id, state);
 
-    const QVector<QString> view_paths = m_controller->get_view_file_paths(view_id);
+    const QVector<QString> view_paths = m_views->get_file_paths(view_id);
     const QString tab_title = state.tab_title.isEmpty() && !view_paths.isEmpty()
                                   ? QFileInfo(view_paths.first()).fileName()
                                   : state.tab_title;
@@ -703,8 +730,9 @@ auto MainWindow::create_log_view_widget_for_view(const QUuid& view_id,
                                                  const SessionViewState& state) -> LogViewWidget*
 {
     auto* log_view_widget = new LogViewWidget(ui->tabWidgetLog);
-    auto* presenter =
-        new LogViewPresenter(m_controller, log_view_widget, view_id, state, log_view_widget);
+    auto* presenter = new LogViewPresenter(m_views, m_filters, m_history, m_pages, m_queries,
+                                           m_imports, m_lifecycle, m_live_tailing, log_view_widget,
+                                           view_id, state, log_view_widget);
     m_workspace_presenter->bind_log_view_presenter(presenter);
 
     return log_view_widget;
@@ -755,7 +783,7 @@ auto MainWindow::handle_log_file_open_requested(const LogFileInfo& log_file_info
 auto MainWindow::handle_add_log_file_to_current_view_requested(const LogFileInfo& log_file_info)
     -> void
 {
-    const QUuid current_view = m_controller->get_current_view();
+    const QUuid current_view = m_views->get_current_view();
 
     if (!current_view.isNull())
     {

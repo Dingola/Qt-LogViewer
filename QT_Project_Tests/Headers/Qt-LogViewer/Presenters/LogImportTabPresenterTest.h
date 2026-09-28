@@ -8,7 +8,7 @@
 
 class LogImportTabPresenter;
 class LogTabWidget;
-class LogViewerController;
+class TestLogRuntime;
 class LogViewerSettings;
 class QTemporaryDir;
 
@@ -43,7 +43,7 @@ class LogImportTabPresenterTest: public ::testing::Test
             QStringLiteral("Import tab presenter test"))};
         QTemporaryDir* m_temp_dir = nullptr;
         LogViewerSettings* m_settings = nullptr;
-        LogViewerController* m_controller = nullptr;
+        TestLogRuntime* m_runtime = nullptr;
         LogTabWidget* m_tab_widget = nullptr;
         LogImportTabPresenter* m_presenter = nullptr;
 };

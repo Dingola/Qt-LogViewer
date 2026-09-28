@@ -7,13 +7,14 @@
 #include <QTextStream>
 #include <QWidget>
 
-#include "Qt-LogViewer/Controllers/LogViewerController.h"
+#include "Qt-LogViewer/Controllers/LogViewContext.h"
 #include "Qt-LogViewer/Models/LogModel.h"
 #include "Qt-LogViewer/Models/LogPageState.h"
 #include "Qt-LogViewer/Models/LogQuery.h"
 #include "Qt-LogViewer/Models/SessionTypes.h"
 #include "Qt-LogViewer/Presenters/LogViewPresenter.h"
 #include "Qt-LogViewer/Presenters/WorkspacePresenter.h"
+#include "Qt-LogViewer/Support/TestLogRuntime.h"
 #include "Qt-LogViewer/Views/App/LogFilterBarWidget.h"
 #include "Qt-LogViewer/Views/App/LogLevelPieChartWidget.h"
 #include "Qt-LogViewer/Views/App/LogTabWidget.h"
@@ -30,7 +31,7 @@
  */
 void WorkspacePresenterTest::SetUp()
 {
-    m_controller = new LogViewerController(m_profile);
+    m_runtime = new TestLogRuntime(m_profile);
     m_tab_widget = new LogTabWidget();
     m_tab_widget->setup_default_behavior();
     m_filter_bar = new LogFilterBarWidget();
@@ -40,9 +41,11 @@ void WorkspacePresenterTest::SetUp()
     m_central_stack = new QStackedWidget();
     m_central_stack->addWidget(new QWidget());
     m_central_stack->addWidget(new QWidget());
-    m_presenter =
-        new WorkspacePresenter(m_controller, nullptr, m_tab_widget, m_filter_bar, m_pagination,
-                               m_details_text, m_level_chart, m_central_stack, nullptr);
+    m_presenter = new WorkspacePresenter(
+        &m_runtime->views(), &m_runtime->filters(), &m_runtime->history(), &m_runtime->pages(),
+        &m_runtime->queries(), &m_runtime->imports(), &m_runtime->lifecycle(), nullptr,
+        m_tab_widget, m_filter_bar, m_pagination, m_details_text, m_level_chart, m_central_stack,
+        nullptr);
 }
 
 /**
@@ -64,8 +67,8 @@ void WorkspacePresenterTest::TearDown()
     m_level_chart = nullptr;
     delete m_central_stack;
     m_central_stack = nullptr;
-    delete m_controller;
-    m_controller = nullptr;
+    delete m_runtime;
+    m_runtime = nullptr;
 
     for (QTemporaryFile* file: m_temp_files)
     {
@@ -101,15 +104,18 @@ auto WorkspacePresenterTest::add_log_view(const QVector<QString>& records) -> QU
         file->close();
         m_temp_files.append(file);
 
-        view_id = m_controller->load_log_file(file->fileName(), m_profile);
+        view_id = m_runtime->imports().import_file(file->fileName(), m_profile);
 
         if (!view_id.isNull())
         {
             auto* widget = new LogViewWidget(m_tab_widget);
             SessionViewState state;
             state.id = view_id;
-            auto* view_presenter =
-                new LogViewPresenter(m_controller, widget, view_id, state, widget);
+            auto* view_presenter = new LogViewPresenter(
+                &m_runtime->views(), &m_runtime->filters(), &m_runtime->history(),
+                &m_runtime->pages(), &m_runtime->queries(), &m_runtime->imports(),
+                &m_runtime->lifecycle(), &m_runtime->live_tailing(), widget, view_id, state,
+                widget);
             m_presenter->bind_log_view_presenter(view_presenter);
             m_tab_widget->add_log_view_tab(widget, QStringLiteral("Test View"), false);
         }
@@ -135,15 +141,15 @@ TEST_F(WorkspacePresenterTest, SwitchesBetweenLogViews)
     ASSERT_FALSE(first_view.isNull());
     ASSERT_FALSE(second_view.isNull());
 
-    m_controller->set_app_name_filter(first_view, QStringLiteral("FirstApp"));
-    m_controller->set_app_name_filter(second_view, QStringLiteral("SecondApp"));
+    m_runtime->queries().set_app_name(first_view, QStringLiteral("FirstApp"));
+    m_runtime->queries().set_app_name(second_view, QStringLiteral("SecondApp"));
 
     m_tab_widget->setCurrentIndex(0);
-    EXPECT_EQ(m_controller->get_current_view(), first_view);
+    EXPECT_EQ(m_runtime->views().get_current_view(), first_view);
     EXPECT_EQ(m_filter_bar->get_current_app_name(), QStringLiteral("FirstApp"));
 
     m_tab_widget->setCurrentIndex(1);
-    EXPECT_EQ(m_controller->get_current_view(), second_view);
+    EXPECT_EQ(m_runtime->views().get_current_view(), second_view);
     EXPECT_EQ(m_filter_bar->get_current_app_name(), QStringLiteral("SecondApp"));
 }
 
@@ -161,7 +167,7 @@ TEST_F(WorkspacePresenterTest, KeepsSharedActionsInactiveForImportTab)
 
     emit m_filter_bar->search_requested(QStringLiteral("Ignored"), SearchField::Message, false);
 
-    EXPECT_TRUE(m_controller->get_search_text(view_id).isEmpty());
+    EXPECT_TRUE(m_runtime->filters().get_search_text(view_id).isEmpty());
     EXPECT_TRUE(m_pagination->isHidden());
 }
 
@@ -180,11 +186,11 @@ TEST_F(WorkspacePresenterTest, RoutesSearchAndPaginationToActiveView)
     emit m_pagination->items_per_page_changed(1);
     emit m_pagination->page_changed(2);
 
-    const LogQuery query = m_controller->create_page_query(view_id);
+    const LogQuery query = m_runtime->queries().create_query(view_id);
     EXPECT_EQ(query.search_text, QStringLiteral("SearchApp"));
     EXPECT_TRUE(query.search_fields.contains(LogField::AppName));
 
-    const LogPageState* page_state = m_controller->get_page_state(view_id);
+    const LogPageState* page_state = m_runtime->pages().get_page_state(view_id);
     ASSERT_NE(page_state, nullptr);
     EXPECT_EQ(page_state->get_page_size(), 1);
     EXPECT_EQ(page_state->get_current_page(), 2);
@@ -203,7 +209,7 @@ TEST_F(WorkspacePresenterTest, PresentsSelectedRowDetails)
     ASSERT_NE(widget, nullptr);
     LogViewPresenter* view_presenter = widget->findChild<LogViewPresenter*>();
     ASSERT_NE(view_presenter, nullptr);
-    LogModel* model = m_controller->get_log_model(view_id);
+    LogModel* model = m_runtime->views().get_context(view_id)->get_model();
     ASSERT_NE(model, nullptr);
 
     emit view_presenter->current_row_changed(view_id, model->index(0, 0));
@@ -232,7 +238,7 @@ TEST_F(WorkspacePresenterTest, ClearsPresentationAfterLastViewCloses)
         add_log_view({QStringLiteral("2024-01-01 12:00:00 INFO ClosingMessage ClosingApp")});
     ASSERT_FALSE(view_id.isNull());
 
-    ASSERT_TRUE(m_controller->remove_view(view_id));
+    ASSERT_TRUE(m_runtime->lifecycle().close_view(view_id));
 
     EXPECT_EQ(m_tab_widget->count(), 0);
     EXPECT_TRUE(m_pagination->isHidden());

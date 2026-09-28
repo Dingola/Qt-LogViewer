@@ -23,7 +23,7 @@ class LogViewContext;
  * - Create / remove per-view contexts.
  * - Provide lookup helpers for contexts, entries and loaded file paths.
  * - Mutate per-view loaded-files and remove per-view entries by file path.
- * - Emit lifecycle signals consumed by the facade (LogViewerController).
+ * - Emit lifecycle signals consumed directly by presenters and coordinators.
  *
  * Serialization helpers:
  * - `export_view_state()` captures a view's loaded files and filters into `SessionViewState`

@@ -11,7 +11,7 @@
 class LogFilterBarWidget;
 class LogLevelPieChartWidget;
 class LogTabWidget;
-class LogViewerController;
+class TestLogRuntime;
 class PaginationWidget;
 class QPlainTextEdit;
 class QStackedWidget;
@@ -47,7 +47,7 @@ class WorkspacePresenterTest: public ::testing::Test
         LogParsingProfile m_profile{LogParsingProfile::create_default(
             QStringLiteral("{timestamp} {level} {message} {app_name}"),
             QStringLiteral("Workspace presenter test default"))};
-        LogViewerController* m_controller{nullptr};
+        TestLogRuntime* m_runtime{nullptr};
         LogTabWidget* m_tab_widget{nullptr};
         LogFilterBarWidget* m_filter_bar{nullptr};
         PaginationWidget* m_pagination{nullptr};

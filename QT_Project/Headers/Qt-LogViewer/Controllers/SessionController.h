@@ -14,7 +14,15 @@
 #include "Qt-LogViewer/Services/LogParsingProfile.h"
 
 // Forward declarations (pointers only)
-class LogViewerController;
+class FileCatalogController;
+class FilterCoordinator;
+class LiveTailingCoordinator;
+class LogHistoryService;
+class LogImportCoordinator;
+class LogPageCoordinator;
+class LogQueryController;
+class ViewLifecycleCoordinator;
+class ViewRegistry;
 class SessionManager;
 class LogFileTreeModel;
 
@@ -24,11 +32,11 @@ class LogFileTreeModel;
  *
  * Responsibilities:
  * - Ensure a current session exists before file operations.
- * - Add files to sessions via the main controller.
+ * - Add files to sessions through the file catalog.
  * - Create, close, delete, and rename sessions.
  * - Convert persisted sessions into typed state through SessionCodec.
  * - Restore typed sessions and defer final view queries until their imports complete.
- * - Coordinate between SessionManager, LogFileTreeModel, and LogViewerController.
+ * - Coordinate persisted session state with focused runtime components.
  */
 class SessionController: public QObject
 {
@@ -39,11 +47,26 @@ class SessionController: public QObject
          * @brief Constructs a SessionController.
          * @param session_manager The session manager for persistence.
          * @param tree_model The tree model for UI representation.
-         * @param controller The main log viewer controller.
+         * @param default_profile Fallback profile for legacy session files.
+         * @param catalog File catalog used for session explorer entries.
+         * @param views Runtime view registry.
+         * @param filters Per-view filter state.
+         * @param history Persistent log history.
+         * @param pages Per-view pagination state.
+         * @param queries Query state and reload operations.
+         * @param imports Asynchronous import workflow.
+         * @param lifecycle View cleanup workflow.
+         * @param live_tailing Per-view live-tailing state.
          * @param parent Optional QObject parent.
          */
         explicit SessionController(SessionManager* session_manager, LogFileTreeModel* tree_model,
-                                   LogViewerController* controller, QObject* parent = nullptr);
+                                   const LogParsingProfile& default_profile,
+                                   FileCatalogController* catalog, ViewRegistry* views,
+                                   FilterCoordinator* filters, LogHistoryService* history,
+                                   LogPageCoordinator* pages, LogQueryController* queries,
+                                   LogImportCoordinator* imports,
+                                   ViewLifecycleCoordinator* lifecycle,
+                                   LiveTailingCoordinator* live_tailing, QObject* parent = nullptr);
 
         /**
          * @brief Ensures a current session exists, creating one if necessary.
@@ -276,7 +299,16 @@ class SessionController: public QObject
     private:
         SessionManager* m_session_manager{nullptr};
         LogFileTreeModel* m_tree_model{nullptr};
-        LogViewerController* m_controller{nullptr};
+        LogParsingProfile m_default_profile;
+        FileCatalogController* m_catalog{nullptr};
+        ViewRegistry* m_views{nullptr};
+        FilterCoordinator* m_filters{nullptr};
+        LogHistoryService* m_history{nullptr};
+        LogPageCoordinator* m_pages{nullptr};
+        LogQueryController* m_queries{nullptr};
+        LogImportCoordinator* m_imports{nullptr};
+        ViewLifecycleCoordinator* m_lifecycle{nullptr};
+        LiveTailingCoordinator* m_live_tailing{nullptr};
         QHash<QUuid, SessionViewState> m_pending_restore_states;
         QHash<QUuid, QSet<QString>> m_pending_restore_files;
         QString m_restoring_session_id;

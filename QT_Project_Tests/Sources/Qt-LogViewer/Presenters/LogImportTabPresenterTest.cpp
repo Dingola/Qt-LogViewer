@@ -8,11 +8,12 @@
 #include <QTemporaryDir>
 #include <QTextStream>
 
-#include "Qt-LogViewer/Controllers/LogViewerController.h"
+#include "Qt-LogViewer/Controllers/LogViewContext.h"
 #include "Qt-LogViewer/Models/LogFileInfo.h"
 #include "Qt-LogViewer/Models/LogModel.h"
 #include "Qt-LogViewer/Presenters/LogImportTabPresenter.h"
 #include "Qt-LogViewer/Services/LogViewerSettings.h"
+#include "Qt-LogViewer/Support/TestLogRuntime.h"
 #include "Qt-LogViewer/Views/App/LogImportWidget.h"
 #include "Qt-LogViewer/Views/App/LogTabWidget.h"
 #include "Qt-LogViewer/Views/App/LogViewWidget.h"
@@ -32,16 +33,16 @@ void LogImportTabPresenterTest::SetUp()
     m_settings = new LogViewerSettings(m_temp_dir->filePath(QStringLiteral("settings.ini")),
                                        QSettings::IniFormat);
     ASSERT_TRUE(m_settings->set_log_parsing_profiles({m_profile}));
-    m_controller = new LogViewerController(m_profile);
+    m_runtime = new TestLogRuntime(m_profile);
     m_tab_widget = new LogTabWidget();
     m_tab_widget->setup_default_behavior();
     m_presenter = new LogImportTabPresenter(
-        *m_settings, *m_controller->get_preview_service(), *m_controller->get_import_coordinator(),
-        *m_tab_widget,
+        *m_settings, m_runtime->preview(), m_runtime->imports(), *m_tab_widget,
         [this](const QUuid& view_id) {
             auto* widget = new LogViewWidget(m_tab_widget);
             widget->set_view_id(view_id);
-            widget->set_model(m_controller->get_log_model(view_id));
+            LogViewContext* context = m_runtime->views().get_context(view_id);
+            widget->set_model(context != nullptr ? context->get_model() : nullptr);
             return widget;
         },
         nullptr, nullptr);
@@ -56,8 +57,8 @@ void LogImportTabPresenterTest::TearDown()
     m_presenter = nullptr;
     delete m_tab_widget;
     m_tab_widget = nullptr;
-    delete m_controller;
-    m_controller = nullptr;
+    delete m_runtime;
+    m_runtime = nullptr;
     delete m_settings;
     m_settings = nullptr;
     delete m_temp_dir;
@@ -135,7 +136,7 @@ TEST_F(LogImportTabPresenterTest, ReplacesImportTabWithNewView)
     LogViewWidget* log_view_widget = m_tab_widget->current_log_view();
     ASSERT_NE(log_view_widget, nullptr);
     EXPECT_FALSE(log_view_widget->get_view_id().isNull());
-    EXPECT_EQ(m_controller->get_all_view_ids().size(), 1);
+    EXPECT_EQ(m_runtime->views().get_all_view_ids().size(), 1);
 }
 
 /**
@@ -151,11 +152,11 @@ TEST_F(LogImportTabPresenterTest, ImportsIntoExistingView)
                         {QStringLiteral("2024-01-01 12:01:00 INFO AddedMessage AddedApp")});
     ASSERT_FALSE(first_file.isEmpty());
     ASSERT_FALSE(added_file.isEmpty());
-    const QUuid target_view = m_controller->load_log_file(first_file, m_profile);
+    const QUuid target_view = m_runtime->imports().import_file(first_file, m_profile);
     ASSERT_FALSE(target_view.isNull());
     auto* target_widget = new LogViewWidget(m_tab_widget);
     target_widget->set_view_id(target_view);
-    target_widget->set_model(m_controller->get_log_model(target_view));
+    target_widget->set_model(m_runtime->views().get_context(target_view)->get_model());
     m_tab_widget->add_log_view_tab(target_widget, QStringLiteral("Existing"), false);
 
     m_presenter->show_import_tab(LogFileInfo(added_file), target_view);
@@ -171,7 +172,8 @@ TEST_F(LogImportTabPresenterTest, ImportsIntoExistingView)
     ASSERT_EQ(m_tab_widget->count(), 1);
     ASSERT_NE(m_tab_widget->current_log_view(), nullptr);
     EXPECT_EQ(m_tab_widget->current_log_view()->get_view_id(), target_view);
-    EXPECT_TRUE(m_controller->get_view_file_paths(target_view)
+    EXPECT_TRUE(m_runtime->views()
+                    .get_file_paths(target_view)
                     .contains(QFileInfo(added_file).absoluteFilePath()));
 }
 
@@ -188,11 +190,11 @@ TEST_F(LogImportTabPresenterTest, KeepsImportTabWhenTargetViewWasClosed)
                         {QStringLiteral("2024-01-01 12:01:00 INFO PendingMessage PendingApp")});
     ASSERT_FALSE(first_file.isEmpty());
     ASSERT_FALSE(added_file.isEmpty());
-    const QUuid target_view = m_controller->load_log_file(first_file, m_profile);
+    const QUuid target_view = m_runtime->imports().import_file(first_file, m_profile);
     ASSERT_FALSE(target_view.isNull());
     auto* target_widget = new LogViewWidget(m_tab_widget);
     target_widget->set_view_id(target_view);
-    target_widget->set_model(m_controller->get_log_model(target_view));
+    target_widget->set_model(m_runtime->views().get_context(target_view)->get_model());
     m_tab_widget->add_log_view_tab(target_widget, QStringLiteral("Closing"), false);
     m_presenter->show_import_tab(LogFileInfo(added_file), target_view);
     auto* import_widget = qobject_cast<LogImportWidget*>(m_tab_widget->currentWidget());
@@ -202,7 +204,7 @@ TEST_F(LogImportTabPresenterTest, KeepsImportTabWhenTargetViewWasClosed)
     ASSERT_NE(import_button, nullptr);
     ASSERT_TRUE(import_button->isEnabled());
     ASSERT_TRUE(m_tab_widget->remove_view_tab_by_id(target_view));
-    ASSERT_TRUE(m_controller->remove_view(target_view));
+    ASSERT_TRUE(m_runtime->lifecycle().close_view(target_view));
     QSignalSpy status_spy(m_presenter, &LogImportTabPresenter::status_message_requested);
 
     import_button->click();

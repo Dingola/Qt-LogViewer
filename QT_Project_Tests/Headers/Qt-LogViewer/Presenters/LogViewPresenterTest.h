@@ -7,7 +7,7 @@
 
 class LogViewPresenter;
 class LogViewWidget;
-class LogViewerController;
+class TestLogRuntime;
 class QTemporaryFile;
 
 /**
@@ -25,10 +25,10 @@ class LogViewPresenterTest: public ::testing::Test
         /** @brief Creates one controller view, widget, and bound presenter. */
         void SetUp() override;
 
-        /** @brief Destroys the widget-owned presenter and controller. */
+        /** @brief Destroys the widget-owned presenter and runtime components. */
         void TearDown() override;
 
-        LogViewerController* m_controller{nullptr};
+        TestLogRuntime* m_runtime{nullptr};
         LogViewWidget* m_widget{nullptr};
         LogViewPresenter* m_presenter{nullptr};
         QTemporaryFile* m_log_file{nullptr};

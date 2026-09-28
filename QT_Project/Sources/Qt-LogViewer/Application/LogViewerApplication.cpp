@@ -17,7 +17,6 @@
 #include "Qt-LogViewer/Controllers/LogIngestController.h"
 #include "Qt-LogViewer/Controllers/LogPageCoordinator.h"
 #include "Qt-LogViewer/Controllers/LogQueryController.h"
-#include "Qt-LogViewer/Controllers/LogViewerController.h"
 #include "Qt-LogViewer/Controllers/SessionController.h"
 #include "Qt-LogViewer/Controllers/ViewLifecycleCoordinator.h"
 #include "Qt-LogViewer/Controllers/ViewRegistry.h"
@@ -76,24 +75,15 @@ class LogViewerApplication::Implementation final
               m_view_lifecycle(&m_views, &m_filters, &m_catalog, &m_imports, &m_live_tailing,
                                &m_history, &m_history_writer, &m_pages, &m_queries),
               m_preview(m_default_profile),
-              m_controller(m_default_profile,
-                           LogViewerControllerDependencies{.ingest = &m_ingest,
-                                                           .imports = &m_imports,
-                                                           .view_lifecycle = &m_view_lifecycle,
-                                                           .preview = &m_preview,
-                                                           .catalog = &m_catalog,
-                                                           .views = &m_views,
-                                                           .filters = &m_filters,
-                                                           .history = &m_history,
-                                                           .history_writer = &m_history_writer,
-                                                           .pages = &m_pages,
-                                                           .queries = &m_queries,
-                                                           .live_tailing = &m_live_tailing}),
               m_session_manager(create_session_manager(&m_session_repository)),
               m_recent_items_adapter(m_session_manager.get()),
-              m_session_controller(m_session_manager.get(), m_controller.get_log_file_tree_model(),
-                                   &m_controller),
-              m_main_window(new MainWindow(settings, m_controller, *m_session_manager,
+              m_session_controller(m_session_manager.get(), m_catalog.get_model(),
+                                   m_default_profile, &m_catalog, &m_views, &m_filters, &m_history,
+                                   &m_pages, &m_queries, &m_imports, &m_view_lifecycle,
+                                   &m_live_tailing),
+              m_main_window(new MainWindow(settings, m_catalog, m_views, m_filters, m_history,
+                                           m_pages, m_queries, m_imports, m_view_lifecycle,
+                                           m_live_tailing, m_preview, *m_session_manager,
                                            m_recent_items_adapter, m_session_controller)),
               m_app_window(std::make_unique<QtWidgetsCommonLib::AppWindow>(nullptr, m_main_window))
         {
@@ -126,7 +116,6 @@ class LogViewerApplication::Implementation final
         LogImportCoordinator m_imports;
         ViewLifecycleCoordinator m_view_lifecycle;
         LogPreviewService m_preview;
-        LogViewerController m_controller;
         SessionRepository m_session_repository;
         std::unique_ptr<SessionManager> m_session_manager;
         RecentItemsAdapter m_recent_items_adapter;

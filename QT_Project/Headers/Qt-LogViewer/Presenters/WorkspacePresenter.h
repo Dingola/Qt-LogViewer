@@ -8,11 +8,17 @@
 #include "Qt-LogViewer/Models/SearchFields.h"
 
 class DockController;
+class FilterCoordinator;
+class LogHistoryService;
+class LogImportCoordinator;
+class LogPageCoordinator;
+class LogQueryController;
 class LogFilterBarWidget;
 class LogLevelPieChartWidget;
 class LogTabWidget;
 class LogViewPresenter;
-class LogViewerController;
+class ViewLifecycleCoordinator;
+class ViewRegistry;
 class PaginationWidget;
 class QPlainTextEdit;
 class QStackedWidget;
@@ -39,7 +45,13 @@ class WorkspacePresenter: public QObject
     public:
         /**
          * @brief Constructs and connects the shared workspace presentation.
-         * @param controller Runtime log-view operations and state.
+         * @param views Registry providing active views and models.
+         * @param filters Per-view filter state.
+         * @param history Persistent history used for filter values and counts.
+         * @param pages Per-view pagination state and update signals.
+         * @param queries Query operations triggered by shared controls.
+         * @param imports Import completion notifications.
+         * @param lifecycle View-closing operations.
          * @param session_controller Session state used for start-page selection.
          * @param tab_widget Workspace tab container.
          * @param filter_bar Shared filter and search controls.
@@ -50,7 +62,10 @@ class WorkspacePresenter: public QObject
          * @param dock_controller Controller used to suspend docks on the start page.
          * @param parent Optional QObject parent.
          */
-        explicit WorkspacePresenter(LogViewerController* controller,
+        explicit WorkspacePresenter(ViewRegistry* views, FilterCoordinator* filters,
+                                    LogHistoryService* history, LogPageCoordinator* pages,
+                                    LogQueryController* queries, LogImportCoordinator* imports,
+                                    ViewLifecycleCoordinator* lifecycle,
                                     SessionController* session_controller, LogTabWidget* tab_widget,
                                     LogFilterBarWidget* filter_bar, PaginationWidget* pagination,
                                     QPlainTextEdit* details_text,
@@ -123,7 +138,13 @@ class WorkspacePresenter: public QObject
          */
         auto update_log_details(const QUuid& view_id, const QModelIndex& current) -> void;
 
-        LogViewerController* m_controller{nullptr};
+        ViewRegistry* m_views{nullptr};
+        FilterCoordinator* m_filters{nullptr};
+        LogHistoryService* m_history{nullptr};
+        LogPageCoordinator* m_pages{nullptr};
+        LogQueryController* m_queries{nullptr};
+        LogImportCoordinator* m_imports{nullptr};
+        ViewLifecycleCoordinator* m_lifecycle{nullptr};
         SessionController* m_session_controller{nullptr};
         LogTabWidget* m_tab_widget{nullptr};
         LogFilterBarWidget* m_filter_bar{nullptr};

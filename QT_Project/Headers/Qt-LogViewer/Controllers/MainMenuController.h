@@ -16,7 +16,7 @@ class RecentItemsModel;
  * - Create and translate the main menu bar.
  * - Rebuild the Recent Files and Recent Sessions submenus from models.
  * - Add native dock toggle actions to the Views menu.
- * - Emit user intent without depending on MainWindow or LogViewerController.
+ * - Emit user intent without depending on MainWindow or runtime services.
  */
 class MainMenuController: public QObject
 {

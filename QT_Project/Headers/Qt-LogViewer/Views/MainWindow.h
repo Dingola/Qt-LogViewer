@@ -23,8 +23,17 @@ class MainWindow;
 }
 
 class LogViewerSettings;
-class LogViewerController;
 class LogParsingProfile;
+class FileCatalogController;
+class FilterCoordinator;
+class LiveTailingCoordinator;
+class LogHistoryService;
+class LogImportCoordinator;
+class LogPageCoordinator;
+class LogPreviewService;
+class LogQueryController;
+class ViewLifecycleCoordinator;
+class ViewRegistry;
 class DockController;
 class MainMenuController;
 class SessionController;
@@ -60,13 +69,27 @@ class MainWindow: public QtWidgetsCommonLib::AppMainWindow
          * Initializes the main window and its user interface.
          *
          * @param settings Application settings owned by the composition root.
-         * @param controller Transitional log-viewer facade owned by the composition root.
+         * @param catalog File catalog used by the explorer.
+         * @param views Runtime view registry.
+         * @param filters Per-view filter state.
+         * @param history Persistent log history.
+         * @param pages Per-view pagination state.
+         * @param queries Query operations.
+         * @param imports Log import workflow.
+         * @param lifecycle View and file cleanup workflow.
+         * @param live_tailing Live-tailing workflow.
+         * @param preview Log preview service used by import tabs.
          * @param session_manager Session state service owned by the composition root.
          * @param recent_items_adapter Adapter supplying synchronized recent-item models.
          * @param session_controller Session workflow controller owned by the composition root.
          * @param parent The parent widget, or nullptr if this is a top-level window.
          */
-        explicit MainWindow(LogViewerSettings& settings, LogViewerController& controller,
+        explicit MainWindow(LogViewerSettings& settings, FileCatalogController& catalog,
+                            ViewRegistry& views, FilterCoordinator& filters,
+                            LogHistoryService& history, LogPageCoordinator& pages,
+                            LogQueryController& queries, LogImportCoordinator& imports,
+                            ViewLifecycleCoordinator& lifecycle,
+                            LiveTailingCoordinator& live_tailing, LogPreviewService& preview,
                             SessionManager& session_manager,
                             RecentItemsAdapter& recent_items_adapter,
                             SessionController& session_controller, QWidget* parent = nullptr);
@@ -315,7 +338,16 @@ class MainWindow: public QtWidgetsCommonLib::AppMainWindow
     private:
         Ui::MainWindow* ui;
         LogViewerSettings* m_log_viewer_settings = nullptr;
-        LogViewerController* m_controller = nullptr;
+        FileCatalogController* m_catalog{nullptr};
+        ViewRegistry* m_views{nullptr};
+        FilterCoordinator* m_filters{nullptr};
+        LogHistoryService* m_history{nullptr};
+        LogPageCoordinator* m_pages{nullptr};
+        LogQueryController* m_queries{nullptr};
+        LogImportCoordinator* m_imports{nullptr};
+        ViewLifecycleCoordinator* m_lifecycle{nullptr};
+        LiveTailingCoordinator* m_live_tailing{nullptr};
+        LogPreviewService* m_preview{nullptr};
         DockController* m_dock_controller = nullptr;
         MainMenuController* m_menu_controller = nullptr;
         LogImportTabPresenter* m_log_import_tab_presenter = nullptr;

@@ -8,13 +8,14 @@
 #include <QTemporaryFile>
 #include <QTextStream>
 
-#include "Qt-LogViewer/Controllers/LogViewerController.h"
+#include "Qt-LogViewer/Controllers/LogViewContext.h"
 #include "Qt-LogViewer/Models/LogFieldDefinition.h"
 #include "Qt-LogViewer/Models/LogModel.h"
 #include "Qt-LogViewer/Models/LogQuery.h"
 #include "Qt-LogViewer/Models/SessionTypes.h"
 #include "Qt-LogViewer/Presenters/LogViewPresenter.h"
 #include "Qt-LogViewer/Services/LogParsingProfile.h"
+#include "Qt-LogViewer/Support/TestLogRuntime.h"
 #include "Qt-LogViewer/Views/App/LogTableView.h"
 #include "Qt-LogViewer/Views/App/LogViewWidget.h"
 
@@ -39,15 +40,18 @@ void LogViewPresenterTest::SetUp()
     m_file_path = m_log_file->fileName();
     m_log_file->close();
 
-    m_controller = new LogViewerController(profile);
-    m_view_id = m_controller->load_log_file(m_file_path, profile);
-    m_controller->set_live_tailing_enabled(m_view_id, false);
+    m_runtime = new TestLogRuntime(profile);
+    m_view_id = m_runtime->imports().import_file(m_file_path, profile);
+    m_runtime->live_tailing().set_enabled(m_view_id, false);
     m_widget = new LogViewWidget();
 
     SessionViewState state;
     state.id = m_view_id;
     state.filters.live_tailing_enabled = false;
-    m_presenter = new LogViewPresenter(m_controller, m_widget, m_view_id, state, m_widget);
+    m_presenter = new LogViewPresenter(
+        &m_runtime->views(), &m_runtime->filters(), &m_runtime->history(), &m_runtime->pages(),
+        &m_runtime->queries(), &m_runtime->imports(), &m_runtime->lifecycle(),
+        &m_runtime->live_tailing(), m_widget, m_view_id, state, m_widget);
 }
 
 /**
@@ -58,8 +62,8 @@ void LogViewPresenterTest::TearDown()
     delete m_widget;
     m_widget = nullptr;
     m_presenter = nullptr;
-    delete m_controller;
-    m_controller = nullptr;
+    delete m_runtime;
+    m_runtime = nullptr;
     delete m_log_file;
     m_log_file = nullptr;
     m_file_path.clear();
@@ -70,14 +74,16 @@ void LogViewPresenterTest::TearDown()
  */
 TEST_F(LogViewPresenterTest, BindsWidgetToRuntimeView)
 {
-    ASSERT_NE(m_controller, nullptr);
+    ASSERT_NE(m_runtime, nullptr);
     ASSERT_NE(m_widget, nullptr);
     ASSERT_NE(m_presenter, nullptr);
     ASSERT_FALSE(m_view_id.isNull());
 
     EXPECT_EQ(m_widget->get_view_id(), m_view_id);
-    EXPECT_EQ(m_widget->get_table_view()->model(), m_controller->get_log_model(m_view_id));
-    EXPECT_NE(m_controller->get_page_state(m_view_id), nullptr);
+    ASSERT_NE(m_runtime->views().get_context(m_view_id), nullptr);
+    EXPECT_EQ(m_widget->get_table_view()->model(),
+              m_runtime->views().get_context(m_view_id)->get_model());
+    EXPECT_NE(m_runtime->pages().get_page_state(m_view_id), nullptr);
     EXPECT_FALSE(m_widget->get_live_tailing_enabled());
     EXPECT_EQ(m_presenter->parent(), m_widget);
 }
@@ -93,10 +99,10 @@ TEST_F(LogViewPresenterTest, RoutesWidgetActionsToBoundView)
     emit m_widget->log_level_filter_changed(levels);
     emit m_widget->live_tailing_toggled(true);
 
-    EXPECT_EQ(m_controller->get_app_name_filter(m_view_id), QStringLiteral("PresenterApp"));
-    EXPECT_EQ(m_controller->get_log_level_filters(m_view_id),
+    EXPECT_EQ(m_runtime->filters().get_app_name(m_view_id), QStringLiteral("PresenterApp"));
+    EXPECT_EQ(m_runtime->filters().get_log_levels(m_view_id),
               QSet<QString>({QStringLiteral("error"), QStringLiteral("warning")}));
-    EXPECT_TRUE(m_controller->get_live_tailing_enabled(m_view_id));
+    EXPECT_TRUE(m_runtime->live_tailing().is_enabled(m_view_id));
 }
 
 /**
@@ -105,13 +111,13 @@ TEST_F(LogViewPresenterTest, RoutesWidgetActionsToBoundView)
 TEST_F(LogViewPresenterTest, RoutesFileVisibilityActionsToBoundView)
 {
     emit m_widget->show_only_file_requested(m_file_path);
-    EXPECT_EQ(m_controller->create_page_query(m_view_id).show_only_file, m_file_path);
+    EXPECT_EQ(m_runtime->queries().create_query(m_view_id).show_only_file, m_file_path);
 
     emit m_widget->show_only_file_requested({});
-    EXPECT_TRUE(m_controller->create_page_query(m_view_id).show_only_file.isEmpty());
+    EXPECT_TRUE(m_runtime->queries().create_query(m_view_id).show_only_file.isEmpty());
 
     emit m_widget->toggle_visibility_requested(m_file_path);
-    EXPECT_TRUE(m_controller->create_page_query(m_view_id).hidden_files.contains(m_file_path));
+    EXPECT_TRUE(m_runtime->queries().create_query(m_view_id).hidden_files.contains(m_file_path));
 }
 
 /**
@@ -119,7 +125,7 @@ TEST_F(LogViewPresenterTest, RoutesFileVisibilityActionsToBoundView)
  */
 TEST_F(LogViewPresenterTest, RoutesTableSortingToBoundView)
 {
-    LogModel* model = m_controller->get_log_model(m_view_id);
+    LogModel* model = m_runtime->views().get_context(m_view_id)->get_model();
     ASSERT_NE(model, nullptr);
     const int message_column = model->find_column(LogField::Message);
     ASSERT_GE(message_column, 0);
@@ -128,7 +134,7 @@ TEST_F(LogViewPresenterTest, RoutesTableSortingToBoundView)
     ASSERT_NE(header, nullptr);
     header->setSortIndicator(message_column, Qt::AscendingOrder);
 
-    const LogQuery query = m_controller->create_page_query(m_view_id);
+    const LogQuery query = m_runtime->queries().create_query(m_view_id);
     EXPECT_EQ(query.sort_field, LogField::Message);
     EXPECT_EQ(query.sort_order, Qt::AscendingOrder);
 }
@@ -158,7 +164,7 @@ TEST_F(LogViewPresenterTest, SharesLifetimeWithBoundWidget)
 
     EXPECT_TRUE(guarded_presenter.isNull());
 
-    emit m_controller->page_loaded(m_view_id, 1, 1, 0);
+    emit m_runtime->pages().page_loaded(m_view_id, 1, 1, 0);
 }
 
 /**
@@ -169,7 +175,7 @@ TEST_F(LogViewPresenterTest, ReleasesBindingAfterRuntimeViewRemoval)
     QPointer<LogViewWidget> guarded_widget(m_widget);
     QPointer<LogViewPresenter> guarded_presenter(m_presenter);
 
-    ASSERT_TRUE(m_controller->remove_view(m_view_id));
+    ASSERT_TRUE(m_runtime->lifecycle().close_view(m_view_id));
     QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
     m_widget = nullptr;
     m_presenter = nullptr;

@@ -186,7 +186,7 @@ auto LogIngestController::get_active_profile() const -> std::optional<LogParsing
 
 /**
  * @brief Wires internal service signals and maps them to per-view signals using the queue's
- *        active view id. Keeps logic aligned with previous `LogViewerController` behavior.
+ *        active view id so queued imports remain associated with their originating view.
  */
 auto LogIngestController::wire_service_signals() -> void
 {

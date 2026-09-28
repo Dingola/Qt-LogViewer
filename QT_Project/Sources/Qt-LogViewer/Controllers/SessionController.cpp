@@ -5,29 +5,130 @@
 
 #include "Qt-LogViewer/Controllers/SessionController.h"
 
+#include <QDebug>
 #include <QFileInfo>
 #include <QUuid>
 
 // Concrete includes for forward-declared types and value usage
-#include "Qt-LogViewer/Controllers/LogViewerController.h"
+#include "Qt-LogViewer/Controllers/FileCatalogController.h"
+#include "Qt-LogViewer/Controllers/FilterCoordinator.h"
+#include "Qt-LogViewer/Controllers/LiveTailingCoordinator.h"
+#include "Qt-LogViewer/Controllers/LogImportCoordinator.h"
+#include "Qt-LogViewer/Controllers/LogPageCoordinator.h"
+#include "Qt-LogViewer/Controllers/LogQueryController.h"
+#include "Qt-LogViewer/Controllers/LogViewContext.h"
+#include "Qt-LogViewer/Controllers/ViewLifecycleCoordinator.h"
+#include "Qt-LogViewer/Controllers/ViewRegistry.h"
 #include "Qt-LogViewer/Models/LogFileTreeModel.h"
+#include "Qt-LogViewer/Models/LogModel.h"
 #include "Qt-LogViewer/Models/SessionTypes.h"
+#include "Qt-LogViewer/Services/LogHistoryService.h"
 #include "Qt-LogViewer/Services/SessionCodec.h"
 #include "Qt-LogViewer/Services/SessionManager.h"
+
+namespace
+{
+/**
+ * @brief Resolves the persisted parsing profile for one restored file.
+ * @param state Restored view state containing profile identifiers.
+ * @param file_path File whose profile is requested.
+ * @param available_profiles Profiles currently configured by the application.
+ * @param default_profile Fallback for legacy or missing profiles.
+ * @return Matching configured profile or the fallback profile.
+ */
+[[nodiscard]] auto get_session_file_profile(const SessionViewState& state, const QString& file_path,
+                                            const QVector<LogParsingProfile>& available_profiles,
+                                            const LogParsingProfile& default_profile)
+    -> LogParsingProfile
+{
+    const QString absolute_file_path = QFileInfo(file_path).absoluteFilePath();
+    const auto profile_id = state.file_parsing_profile_ids.constFind(absolute_file_path);
+    LogParsingProfile profile = default_profile;
+
+    if (profile_id != state.file_parsing_profile_ids.cend())
+    {
+        bool profile_found = false;
+        for (const LogParsingProfile& available_profile: available_profiles)
+        {
+            if (available_profile.get_id() == profile_id.value())
+            {
+                profile = available_profile;
+                profile_found = true;
+            }
+        }
+
+        if (!profile_found)
+        {
+            qWarning().nospace() << "Could not resolve parsing profile "
+                                 << profile_id->toString(QUuid::WithoutBraces) << " for file=\""
+                                 << absolute_file_path << "\"; using the default profile.";
+        }
+    }
+
+    return profile;
+}
+
+/**
+ * @brief Maps a stable sort field to its model column.
+ * @param field Stable field identifier.
+ * @return Matching LogModel column.
+ */
+[[nodiscard]] auto get_model_sort_column(const QString& field) -> int
+{
+    int column = LogModel::Timestamp;
+    if (field == LogField::Level)
+    {
+        column = LogModel::Level;
+    }
+    else if (field == LogField::Message)
+    {
+        column = LogModel::Message;
+    }
+    else if (field == LogField::AppName)
+    {
+        column = LogModel::AppName;
+    }
+    return column;
+}
+}  // namespace
 
 /**
  * @brief Constructs a SessionController.
  * @param session_manager The session manager for persistence.
  * @param tree_model The tree model for UI representation.
- * @param controller The main log viewer controller.
+ * @param default_profile Fallback profile for legacy session files.
+ * @param catalog File catalog used for session explorer entries.
+ * @param views Runtime view registry.
+ * @param filters Per-view filter state.
+ * @param history Persistent log history.
+ * @param pages Per-view pagination state.
+ * @param queries Query state and reload operations.
+ * @param imports Asynchronous import workflow.
+ * @param lifecycle View cleanup workflow.
+ * @param live_tailing Per-view live-tailing state.
  * @param parent Optional QObject parent.
  */
 SessionController::SessionController(SessionManager* session_manager, LogFileTreeModel* tree_model,
-                                     LogViewerController* controller, QObject* parent)
+                                     const LogParsingProfile& default_profile,
+                                     FileCatalogController* catalog, ViewRegistry* views,
+                                     FilterCoordinator* filters, LogHistoryService* history,
+                                     LogPageCoordinator* pages, LogQueryController* queries,
+                                     LogImportCoordinator* imports,
+                                     ViewLifecycleCoordinator* lifecycle,
+                                     LiveTailingCoordinator* live_tailing, QObject* parent)
     : QObject(parent),
       m_session_manager(session_manager),
       m_tree_model(tree_model),
-      m_controller(controller)
+      m_default_profile(default_profile),
+      m_catalog(catalog),
+      m_views(views),
+      m_filters(filters),
+      m_history(history),
+      m_pages(pages),
+      m_queries(queries),
+      m_imports(imports),
+      m_lifecycle(lifecycle),
+      m_live_tailing(live_tailing)
 {
     if (m_tree_model != nullptr)
     {
@@ -35,13 +136,13 @@ SessionController::SessionController(SessionManager* session_manager, LogFileTre
                 &SessionController::all_sessions_removed);
     }
 
-    if (m_controller != nullptr)
+    if (m_imports != nullptr)
     {
-        connect(m_controller, &LogViewerController::loading_finished, this,
+        connect(m_imports, &LogImportCoordinator::finished, this,
                 [this](const QUuid& view_id, const QString& file_path) {
                     complete_restored_file(view_id, file_path);
                 });
-        connect(m_controller, &LogViewerController::loading_error, this,
+        connect(m_imports, &LogImportCoordinator::error, this,
                 [this](const QUuid& view_id, const QString& file_path, const QString&) {
                     complete_restored_file(view_id, file_path);
                 });
@@ -125,9 +226,9 @@ auto SessionController::add_files_to_current_session(const QVector<QString>& fil
 {
     const QString session_id = get_current_session_id();
 
-    if (!session_id.isEmpty() && m_controller != nullptr)
+    if (!session_id.isEmpty() && m_catalog != nullptr)
     {
-        m_controller->add_log_files_to_session(session_id, file_paths);
+        m_catalog->add_files_to_session(session_id, file_paths);
     }
 }
 
@@ -139,9 +240,9 @@ auto SessionController::add_files_to_current_session(const QVector<QString>& fil
 auto SessionController::add_file_to_session(const QString& session_id,
                                             const QString& file_path) -> void
 {
-    if (!session_id.isEmpty() && m_controller != nullptr)
+    if (!session_id.isEmpty() && m_catalog != nullptr)
     {
-        m_controller->add_log_file_to_session(session_id, file_path);
+        m_catalog->add_file_to_session(session_id, file_path);
     }
 }
 
@@ -183,14 +284,14 @@ auto SessionController::save_current_session() -> void
         {
             // Collect views with files
             QVector<QUuid> nonempty_view_ids;
-            if (m_controller != nullptr)
+            if (m_views != nullptr)
             {
-                const QVector<QUuid> view_ids = m_controller->get_all_view_ids();
+                const QVector<QUuid> view_ids = m_views->get_all_view_ids();
                 nonempty_view_ids.reserve(view_ids.size());
 
                 for (const QUuid& vid: view_ids)
                 {
-                    if (!m_controller->get_view_file_paths(vid).isEmpty())
+                    if (!m_views->get_file_paths(vid).isEmpty())
                     {
                         nonempty_view_ids.append(vid);
                     }
@@ -407,7 +508,9 @@ auto SessionController::load_session(const QString& session_id) -> std::optional
 auto SessionController::restore_session(
     const SessionState& state, const QVector<LogParsingProfile>& available_profiles) -> bool
 {
-    const bool can_restore = !state.id.isEmpty() && m_controller != nullptr;
+    const bool can_restore = !state.id.isEmpty() && m_views != nullptr && m_filters != nullptr &&
+                             m_history != nullptr && m_queries != nullptr && m_imports != nullptr &&
+                             m_lifecycle != nullptr && m_live_tailing != nullptr;
     bool restored = false;
 
     if (can_restore)
@@ -417,7 +520,7 @@ auto SessionController::restore_session(
         m_restoring_session_id = state.id;
         m_registering_restored_views = true;
 
-        m_controller->clear_all_views();
+        m_lifecycle->close_all_views();
         emit session_restore_started(state.id);
 
         if (m_tree_model != nullptr)
@@ -452,14 +555,39 @@ auto SessionController::restore_session(
                 m_pending_restore_files.insert(view_state.id, pending_files);
             }
 
-            const QUuid view_id = m_controller->import_view_state_for_session(state.id, view_state,
-                                                                              available_profiles);
+            const QUuid view_id = m_views->import_view_state(view_state);
 
             if (!view_id.isNull())
             {
+                m_imports->cancel(view_id);
+                m_history->remove_view_entries(view_id);
+                m_live_tailing->reset_view(view_id, view_state.filters.live_tailing_enabled);
+                m_queries->apply_view_state(view_id, view_state);
+
+                QVector<QString> paths;
+                for (const LogFileInfo& file_info: view_state.loaded_files)
+                {
+                    const QString path = file_info.get_file_path();
+                    if (!path.isEmpty())
+                    {
+                        paths.append(path);
+                    }
+                }
+                if (m_catalog != nullptr && !paths.isEmpty())
+                {
+                    m_catalog->add_files_to_session(state.id, paths);
+                }
+
+                for (const QString& path: paths)
+                {
+                    const LogParsingProfile profile = get_session_file_profile(
+                        view_state, path, available_profiles, m_default_profile);
+                    m_imports->enqueue_registered_file(view_id, path, profile, 1000);
+                }
+
                 if (pending_files.isEmpty())
                 {
-                    m_controller->apply_view_query_state(view_id, view_state);
+                    m_queries->apply_view_state(view_id, view_state);
                 }
 
                 emit view_restored(view_id, view_state);
@@ -488,13 +616,13 @@ auto SessionController::export_session_state() const -> SessionState
     SessionState state;
     state.id = get_current_session_id();
 
-    if (m_controller != nullptr)
+    if (m_views != nullptr)
     {
-        const QVector<QUuid> view_ids = m_controller->get_all_view_ids();
+        const QVector<QUuid> view_ids = m_views->get_all_view_ids();
 
         for (const QUuid& vid: view_ids)
         {
-            if (!m_controller->get_view_file_paths(vid).isEmpty())
+            if (!m_views->get_file_paths(vid).isEmpty())
             {
                 state.views.append(build_view_state(vid));
             }
@@ -544,9 +672,9 @@ auto SessionController::request_expand_session(const QString& session_id) -> voi
  */
 auto SessionController::clear_all_views() -> void
 {
-    if (m_controller != nullptr)
+    if (m_lifecycle != nullptr)
     {
-        m_controller->clear_all_views();
+        m_lifecycle->close_all_views();
     }
 }
 
@@ -595,33 +723,32 @@ auto SessionController::collect_session_files_from_tree(const QString& session_i
 {
     QList<LogFileInfo> files;
 
-    if (m_tree_model == nullptr || session_id.isEmpty())
+    const bool can_collect = m_tree_model != nullptr && !session_id.isEmpty();
+    QModelIndex session_index;
+    if (can_collect)
     {
-        return files;
+        session_index = m_tree_model->get_session_index(session_id);
     }
 
-    const QModelIndex session_index = m_tree_model->get_session_index(session_id);
-    if (!session_index.isValid())
+    if (session_index.isValid())
     {
-        return files;
-    }
-
-    // Iterate through all groups in the session
-    const int group_count = m_tree_model->rowCount(session_index);
-    for (int g = 0; g < group_count; ++g)
-    {
-        const QModelIndex group_index = m_tree_model->index(g, 0, session_index);
-        const int file_count = m_tree_model->rowCount(group_index);
-
-        for (int f = 0; f < file_count; ++f)
+        const int group_count = m_tree_model->rowCount(session_index);
+        for (int group = 0; group < group_count; ++group)
         {
-            const QModelIndex file_index = m_tree_model->index(f, 0, group_index);
-            const QString file_path = file_index.data(LogFileTreeModel::FilePathRole).toString();
-            const QString app_name = file_index.data(LogFileTreeModel::AppNameRole).toString();
+            const QModelIndex group_index = m_tree_model->index(group, 0, session_index);
+            const int file_count = m_tree_model->rowCount(group_index);
 
-            if (!file_path.isEmpty())
+            for (int file = 0; file < file_count; ++file)
             {
-                files.append(LogFileInfo(file_path, app_name));
+                const QModelIndex file_index = m_tree_model->index(file, 0, group_index);
+                const QString file_path =
+                    file_index.data(LogFileTreeModel::FilePathRole).toString();
+                const QString app_name = file_index.data(LogFileTreeModel::AppNameRole).toString();
+
+                if (!file_path.isEmpty())
+                {
+                    files.append(LogFileInfo(file_path, app_name));
+                }
             }
         }
     }
@@ -639,44 +766,37 @@ auto SessionController::save_session_impl(const QString& session_id,
                                           const QVector<QUuid>& nonempty_view_ids,
                                           const QList<LogFileInfo>& tree_files) -> void
 {
-    if (m_session_manager == nullptr || session_id.isEmpty())
+    if (m_session_manager != nullptr && !session_id.isEmpty())
     {
-        return;
-    }
+        QString session_name = QStringLiteral("Session");
 
-    QString session_name = QStringLiteral("Session");
-
-    // Try to get existing session name
-    const std::optional<SessionState> existing_state =
-        SessionCodec::from_json(m_session_manager->load_session(session_id), session_id);
-    if (existing_state.has_value() && !existing_state->name.isEmpty())
-    {
-        session_name = existing_state->name;
-    }
-
-    SessionState state;
-    state.id = session_id;
-    state.explorer_files = tree_files;
-
-    for (const QUuid& vid: nonempty_view_ids)
-    {
-        const SessionViewState view_state = build_view_state(vid);
-        state.views.append(view_state);
-
-        // Use first tab title as session name if not set
-        if (state.views.size() == 1)
+        const std::optional<SessionState> existing_state =
+            SessionCodec::from_json(m_session_manager->load_session(session_id), session_id);
+        if (existing_state.has_value() && !existing_state->name.isEmpty())
         {
-            if (!view_state.tab_title.isEmpty() && session_name == QStringLiteral("Session"))
+            session_name = existing_state->name;
+        }
+
+        SessionState state;
+        state.id = session_id;
+        state.explorer_files = tree_files;
+
+        for (const QUuid& view_id: nonempty_view_ids)
+        {
+            const SessionViewState view_state = build_view_state(view_id);
+            state.views.append(view_state);
+
+            if (state.views.size() == 1 && !view_state.tab_title.isEmpty() &&
+                session_name == QStringLiteral("Session"))
             {
                 session_name = view_state.tab_title;
             }
         }
+
+        state.name = session_name;
+        m_session_manager->save_session(session_id, SessionCodec::to_json(state));
+        m_session_manager->upsert_session_metadata(session_id, session_name, false);
     }
-
-    state.name = session_name;
-
-    m_session_manager->save_session(session_id, SessionCodec::to_json(state));
-    m_session_manager->upsert_session_metadata(session_id, session_name, false);
 }
 
 /**
@@ -688,9 +808,34 @@ auto SessionController::build_view_state(const QUuid& view_id) const -> SessionV
 {
     SessionViewState state;
 
-    if (m_controller != nullptr)
+    if (m_views != nullptr && m_filters != nullptr && m_pages != nullptr &&
+        m_live_tailing != nullptr)
     {
-        state = m_controller->export_view_state(view_id);
+        state = m_views->export_view_state(view_id, *m_filters);
+        state.filters.live_tailing_enabled = m_live_tailing->is_enabled(view_id);
+
+        const LogViewContext* context = m_views->get_context(view_id);
+        const QHash<QString, LogParsingProfile> profiles =
+            context != nullptr ? context->get_file_parsing_profiles()
+                               : QHash<QString, LogParsingProfile>();
+        for (const LogFileInfo& file_info: state.loaded_files)
+        {
+            const QString path = QFileInfo(file_info.get_file_path()).absoluteFilePath();
+            const auto profile = profiles.constFind(path);
+            if (profile != profiles.cend())
+            {
+                state.file_parsing_profile_ids.insert(path, profile->get_id());
+            }
+        }
+
+        const LogPageState* page_state = m_pages->get_page_state(view_id);
+        if (page_state != nullptr)
+        {
+            state.page_size = static_cast<int>(page_state->get_page_size());
+            state.current_page = static_cast<int>(page_state->get_current_page());
+            state.sort_column = get_model_sort_column(page_state->get_query().sort_field);
+            state.sort_order = page_state->get_query().sort_order;
+        }
     }
 
     return state;
@@ -715,9 +860,9 @@ auto SessionController::complete_restored_file(const QUuid& view_id,
             const SessionViewState state = m_pending_restore_states.take(view_id);
             m_pending_restore_files.erase(pending_files);
 
-            if (m_controller != nullptr)
+            if (m_queries != nullptr)
             {
-                m_controller->apply_view_query_state(view_id, state);
+                m_queries->apply_view_state(view_id, state);
             }
 
             finish_session_restore_if_ready();
