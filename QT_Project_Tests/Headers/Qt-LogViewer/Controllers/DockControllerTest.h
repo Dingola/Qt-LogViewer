@@ -6,8 +6,8 @@
  * @file DockControllerTest.h
  * @brief Test fixture for DockController.
  *
- * Covers preservation of user-selected dock extents across repeated horizontal, vertical and
- * diagonal main-window resize cycles.
+ * Covers dock suspension and preservation of user-selected dock extents across repeated
+ * horizontal, vertical and diagonal main-window resize cycles.
  */
 class DockControllerTest: public ::testing::Test
 {

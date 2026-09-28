@@ -15,7 +15,8 @@
 
 /**
  * @file LogViewPresenter.cpp
- * @brief Implements the one-to-one binding between a log view widget and its runtime view.
+ * @brief Implements the one-to-one binding between a log view widget and its
+ * runtime view.
  */
 
 /**
@@ -70,7 +71,7 @@ auto LogViewPresenter::connect_widget_actions() -> void
 
     connect(m_widget, &LogViewWidget::current_row_changed, this,
             [this](const QModelIndex& current, const QModelIndex&) {
-                emit current_row_changed(current);
+                emit current_row_changed(m_view_id, current);
             });
     connect(m_widget, &LogViewWidget::app_filter_changed, this, [this](const QString& app_name) {
         m_controller->set_app_name_filter(m_view_id, app_name);
@@ -113,6 +114,7 @@ auto LogViewPresenter::connect_view_updates() -> void
                 if (view_id == m_view_id)
                 {
                     refresh_filter_presentation();
+                    refresh_query_presentation();
                 }
             });
     connect(m_controller, &LogViewerController::page_state_updated, this,

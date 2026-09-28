@@ -37,6 +37,42 @@ auto DockControllerTest::process_layout_events() -> void
 }
 
 /**
+ * @brief Repeating suspension must hide docks made visible by a later layout restoration.
+ */
+TEST_F(DockControllerTest, ReappliesSuspensionAfterLayoutRestore)
+{
+    QMainWindow main_window;
+    main_window.setCentralWidget(new QWidget(&main_window));
+
+    auto* left_dock = new QDockWidget(QStringLiteral("Left"), &main_window);
+    left_dock->setObjectName(QStringLiteral("leftDock"));
+    left_dock->setWidget(new QWidget(left_dock));
+    main_window.addDockWidget(Qt::LeftDockWidgetArea, left_dock);
+    main_window.show();
+    process_layout_events();
+
+    const QByteArray visible_layout = main_window.saveState();
+    DockController controller(&main_window);
+    controller.register_dock(left_dock);
+    controller.set_docks_suspended(true);
+    EXPECT_FALSE(left_dock->isVisible());
+    EXPECT_FALSE(left_dock->toggleViewAction()->isEnabled());
+
+    main_window.restoreState(visible_layout);
+    process_layout_events();
+    ASSERT_TRUE(left_dock->isVisible());
+
+    controller.set_docks_suspended(true);
+    EXPECT_FALSE(left_dock->isVisible());
+    EXPECT_FALSE(left_dock->toggleViewAction()->isEnabled());
+
+    controller.set_docks_suspended(false);
+    process_layout_events();
+    EXPECT_TRUE(left_dock->isVisible());
+    EXPECT_TRUE(left_dock->toggleViewAction()->isEnabled());
+}
+
+/**
  * @brief Repeated diagonal resizing of a main window with mixed dock areas must not change the dock
  * extents.
  */

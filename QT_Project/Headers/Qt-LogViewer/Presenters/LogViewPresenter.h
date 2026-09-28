@@ -41,9 +41,10 @@ class LogViewPresenter: public QObject
     signals:
         /**
          * @brief Forwards a row selection for presentation outside the individual log tab.
+         * @param view_id Originating view identifier.
          * @param current Newly selected model index.
          */
-        void current_row_changed(const QModelIndex& current);
+        void current_row_changed(const QUuid& view_id, const QModelIndex& current);
 
     private:
         /** @brief Connects user actions emitted by the bound widget. */

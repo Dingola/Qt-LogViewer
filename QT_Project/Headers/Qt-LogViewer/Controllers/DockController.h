@@ -57,8 +57,8 @@ class DockController: public QObject
          * @param suspended True to capture the current layout and hide all docks; false to restore
          * the captured layout.
          *
-         * While suspended, the native dock toggle actions are disabled. Repeating the current
-         * state has no effect.
+         * While suspended, the native dock toggle actions are disabled. Repeating suspension
+         * reapplies the hidden state without replacing the captured layout.
          */
         auto set_docks_suspended(bool suspended) -> void;
 

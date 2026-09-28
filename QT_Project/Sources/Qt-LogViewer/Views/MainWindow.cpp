@@ -11,10 +11,8 @@
 #include <QMimeData>
 #include <QPlainTextEdit>
 #include <QResizeEvent>
-#include <QSet>
 #include <QStackedWidget>
 #include <QStringList>
-#include <QTabWidget>
 #include <QTimer>
 #include <QUrl>
 #include <optional>
@@ -23,14 +21,11 @@
 #include "Qt-LogViewer/Controllers/LogViewerController.h"
 #include "Qt-LogViewer/Controllers/MainMenuController.h"
 #include "Qt-LogViewer/Controllers/SessionController.h"
-#include "Qt-LogViewer/Models/LogEntry.h"
 #include "Qt-LogViewer/Models/LogFileTreeModel.h"
-#include "Qt-LogViewer/Models/LogModel.h"
-#include "Qt-LogViewer/Models/LogPageState.h"
 #include "Qt-LogViewer/Models/RecentItemsModel.h"
 #include "Qt-LogViewer/Models/RecentListSchema.h"
-#include "Qt-LogViewer/Models/SearchFields.h"
 #include "Qt-LogViewer/Presenters/LogViewPresenter.h"
+#include "Qt-LogViewer/Presenters/WorkspacePresenter.h"
 #include "Qt-LogViewer/Services/LogParsingProfile.h"
 #include "Qt-LogViewer/Services/LogViewerSettings.h"
 #include "Qt-LogViewer/Services/SessionManager.h"
@@ -173,8 +168,6 @@ MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
             &LogFileExplorer::expand_session);
     connect(m_session_controller, &SessionController::all_sessions_removed, this,
             &MainWindow::handle_all_sessions_removed);
-    connect(m_session_controller, &SessionController::current_session_changed, this,
-            [this](const QString&) { show_start_page_if_needed(); });
     connect(m_session_controller, &SessionController::session_restore_started, this,
             [this](const QString&) { close_all_tabs(); });
     connect(m_session_controller, &SessionController::view_restored, this,
@@ -204,35 +197,17 @@ MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
             &MainWindow::handle_delete_session);
     central_stack->addWidget(start_page);
 
-    m_controller->set_current_view(m_controller->load_log_files({}));
-    connect(m_controller, &LogViewerController::current_view_id_changed, this,
-            &MainWindow::handle_current_view_id_changed);
-    connect(m_controller, &LogViewerController::view_removed, this,
-            &MainWindow::handle_view_removed);
     connect(m_controller, &LogViewerController::loading_progress, this,
             &MainWindow::handle_loading_progress);
     connect(m_controller, &LogViewerController::loading_finished, this,
             &MainWindow::handle_loading_finished);
     connect(m_controller, &LogViewerController::loading_error, this,
             &MainWindow::handle_loading_error);
-    const auto update_page_state = [this](const QUuid& view_id, qsizetype current_page,
-                                          qsizetype total_pages, qsizetype) {
-        if (view_id == m_controller->get_current_view())
-        {
-            ui->paginationWidget->set_pagination(static_cast<int>(current_page),
-                                                 static_cast<int>(total_pages));
-
-            const QMap<QString, int> level_counts = m_controller->get_log_level_counts(view_id);
-
-            ui->logFilterBarWidget->set_log_level_counts(level_counts);
-            m_log_level_pie_chart_widget->set_log_level_counts(level_counts);
-        }
-    };
-
-    connect(m_controller, &LogViewerController::page_loaded, this, update_page_state);
-    connect(m_controller, &LogViewerController::page_state_updated, this, update_page_state);
-
     initialize_dock_controller();
+    m_workspace_presenter = new WorkspacePresenter(
+        m_controller, m_session_controller, ui->tabWidgetLog, ui->logFilterBarWidget,
+        ui->paginationWidget, m_log_details_text_edit, m_log_level_pie_chart_widget, central_stack,
+        m_dock_controller, this);
     initialize_menu();
     m_menu_controller->rebuild_recent_menus();
 
@@ -271,11 +246,9 @@ auto MainWindow::setup_log_file_explorer() -> void
             &MainWindow::handle_log_file_open_requested);
     connect(m_log_file_explorer, &LogFileExplorer::add_to_current_view_requested, this,
             &MainWindow::handle_add_log_file_to_current_view_requested);
-    connect(m_log_file_explorer, &LogFileExplorer::remove_file_requested, m_controller,
-            [this](const LogFileInfo& log_file_info) {
-                m_controller->remove_log_file(log_file_info);
-                update_pagination_widget();
-            });
+    connect(
+        m_log_file_explorer, &LogFileExplorer::remove_file_requested, m_controller,
+        [this](const LogFileInfo& log_file_info) { m_controller->remove_log_file(log_file_info); });
 
     // Session actions from LogFileExplorer - delegate to SessionController
     connect(m_log_file_explorer, &LogFileExplorer::rename_session_requested, this,
@@ -308,25 +281,6 @@ auto MainWindow::setup_log_level_pie_chart() -> void
 auto MainWindow::setup_pagination_widget() -> void
 {
     ui->paginationWidget->set_max_page_buttons(7);
-
-    connect(ui->paginationWidget, &PaginationWidget::page_changed, this, [this](int page) {
-        const QUuid view_id = m_controller->get_current_view();
-
-        if (!view_id.isNull())
-        {
-            m_controller->set_current_page(view_id, page);
-        }
-    });
-
-    connect(ui->paginationWidget, &PaginationWidget::items_per_page_changed, this,
-            [this](int items_per_page) {
-                const QUuid view_id = m_controller->get_current_view();
-
-                if (!view_id.isNull())
-                {
-                    m_controller->set_page_size(view_id, items_per_page);
-                }
-            });
 }
 
 /**
@@ -356,32 +310,6 @@ auto MainWindow::setup_filter_bar() -> void
     ui->logFilterBarWidget->set_filter_widget_visible(false);
     ui->logFilterBarWidget->set_search_bar_enabled(false);
     ui->logFilterBarWidget->set_available_log_levels(available_log_levels);
-    connect(ui->logFilterBarWidget, &LogFilterBarWidget::app_filter_changed, this,
-            [this](const QString& app_name) {
-                const QUuid view_id = m_controller->get_current_view();
-
-                if (!view_id.isNull())
-                {
-                    m_controller->set_app_name_filter(view_id, app_name);
-                }
-            });
-    connect(ui->logFilterBarWidget, &LogFilterBarWidget::log_level_filter_changed, this,
-            [this](const QSet<QString>& log_levels) {
-                const QUuid view_id = m_controller->get_current_view();
-
-                if (!view_id.isNull())
-                {
-                    m_controller->set_log_level_filters(view_id, log_levels);
-                }
-            });
-
-    // React only to search_requested; avoids double-calling when live search is on.
-    connect(ui->logFilterBarWidget, &LogFilterBarWidget::search_requested, this,
-            &MainWindow::handle_search_changed);
-    connect(ui->logFilterBarWidget, &LogFilterBarWidget::search_field_changed, this,
-            &MainWindow::handle_search_changed);
-    connect(ui->logFilterBarWidget, &LogFilterBarWidget::regex_toggled, this,
-            &MainWindow::handle_search_changed);
 }
 
 /**
@@ -390,40 +318,6 @@ auto MainWindow::setup_filter_bar() -> void
 auto MainWindow::setup_tab_widget() -> void
 {
     ui->tabWidgetLog->setup_default_behavior();
-
-    connect(ui->tabWidgetLog, &QTabWidget::currentChanged, this, [this](int index) {
-        Q_UNUSED(index);
-
-        LogViewWidget* log_view_widget = ui->tabWidgetLog->current_log_view();
-        ui->logFilterBarWidget->set_search_bar_enabled(log_view_widget != nullptr);
-        ui->paginationWidget->setVisible(log_view_widget != nullptr);
-
-        if (log_view_widget != nullptr)
-        {
-            QUuid view_id = log_view_widget->get_view_id();
-            m_controller->set_current_view(view_id);
-            update_pagination_widget();
-        }
-    });
-    connect(ui->tabWidgetLog, &TabWidget::about_to_close_tab, this,
-            [this](int index, QWidget* widget) {
-                Q_UNUSED(widget);
-
-                LogViewWidget* log_view_widget = ui->tabWidgetLog->log_view_at(index);
-                if (log_view_widget != nullptr)
-                {
-                    QUuid view_id = log_view_widget->get_view_id();
-                    m_controller->remove_view(view_id);
-                }
-            });
-    connect(ui->tabWidgetLog, &TabWidget::close_tab_requested, this, [this](int index) {
-        Q_UNUSED(index);
-        if (ui->tabWidgetLog->count() == 0)
-        {
-            m_log_level_pie_chart_widget->set_log_level_counts({});
-            update_pagination_widget();
-        }
-    });
 }
 
 /**
@@ -484,78 +378,6 @@ auto MainWindow::initialize_menu() -> void
 }
 
 /**
- * @brief Shows the start page and suspends docks if there is no current session.
- */
-auto MainWindow::show_start_page_if_needed() -> void
-{
-    const bool has_session = m_session_controller->has_current_session();
-
-    auto* central_stack = qobject_cast<QStackedWidget*>(this->centralWidget());
-    if (central_stack != nullptr)
-    {
-        central_stack->setCurrentIndex(has_session ? 0 : 1);
-    }
-
-    m_dock_controller->set_docks_suspended(!has_session);
-}
-
-/**
- * @brief Updates the log details view when a row is selected.
- * @param current Selected page-model index.
- */
-auto MainWindow::update_log_details(const QModelIndex& current) -> void
-{
-    QString details;
-
-    if (current.isValid())
-    {
-        LogModel* model = m_controller->get_log_model();
-
-        if (model != nullptr)
-        {
-            const LogEntry entry = model->get_entry(current.row());
-
-            details =
-                QStringLiteral(
-                    "Timestamp: %1\n"
-                    "Level: %2\n"
-                    "App: %3\n"
-                    "Message: %4")
-                    .arg(entry.get_timestamp().toString(QStringLiteral("yyyy-MM-dd HH:mm:ss")))
-                    .arg(entry.get_level())
-                    .arg(entry.get_app_name())
-                    .arg(entry.get_message());
-        }
-    }
-
-    m_log_details_text_edit->setPlainText(details);
-}
-
-/**
- * @brief Updates the pagination widget from the current page state.
- */
-auto MainWindow::update_pagination_widget() -> void
-{
-    int current_page = 1;
-    int total_pages = 1;
-
-    const QUuid view_id = m_controller->get_current_view();
-
-    if (!view_id.isNull())
-    {
-        const LogPageState* state = m_controller->get_page_state(view_id);
-
-        if (state != nullptr)
-        {
-            current_page = static_cast<int>(state->get_current_page());
-            total_pages = static_cast<int>(state->get_total_pages());
-        }
-    }
-
-    ui->paginationWidget->set_pagination(current_page, total_pages);
-}
-
-/**
  * @brief Handles drag enter events to allow dropping log files.
  * @param event The drag enter event.
  */
@@ -588,7 +410,7 @@ void MainWindow::dropEvent(QDropEvent* event)
         m_session_controller->ensure_current_session(tr(k_untitled_session_text));
     m_session_controller->add_files_to_current_session(files);
     m_session_controller->request_expand_session(session_id);
-    show_start_page_if_needed();
+    m_workspace_presenter->refresh_start_page();
 }
 
 /**
@@ -626,8 +448,7 @@ auto MainWindow::changeEvent(QEvent* event) -> void
         }
         m_log_file_explorer_dock_widget->setWindowTitle(tr("Log File Explorer"));
         m_log_details_dock_widget->setWindowTitle(tr("Log Details"));
-        ui->logFilterBarWidget->set_app_names(m_controller->get_app_names());
-        update_pagination_widget();
+        m_workspace_presenter->refresh_active_view();
     }
 
     AppMainWindow::changeEvent(event);
@@ -641,7 +462,7 @@ void MainWindow::showEvent(QShowEvent* event)
 {
     AppMainWindow::showEvent(event);
     m_dock_controller->capture_current_sizes();
-    show_start_page_if_needed();
+    m_workspace_presenter->refresh_start_page();
 }
 
 /**
@@ -694,7 +515,7 @@ void MainWindow::handle_open_log_file_dialog_requested()
             m_menu_controller->rebuild_recent_menus();
         }
 
-        show_start_page_if_needed();
+        m_workspace_presenter->refresh_start_page();
     }
 }
 
@@ -745,80 +566,6 @@ void MainWindow::handle_show_settings_dialog_requested()
         AppMainWindow::get_translator()->get_available_language_names());
 
     dialog.exec();
-}
-
-/**
- * @brief Applies the current search to the active database query and table presentation.
- *
- * The controller reloads the matching database page while the active
- * LogViewWidget highlights matching text inside the displayed cells.
- */
-auto MainWindow::handle_search_changed() -> void
-{
-    QString search_text = ui->logFilterBarWidget->get_search_text();
-    SearchField field = ui->logFilterBarWidget->get_search_field();
-    bool use_regex = ui->logFilterBarWidget->get_use_regex();
-    QString field_key = to_string(field);
-
-    qDebug() << "Search filter:" << search_text << "Field:" << field_key << "Regex:" << use_regex;
-    const QUuid view_id = m_controller->get_current_view();
-
-    if (!view_id.isNull())
-    {
-        m_controller->set_search_filter(view_id, search_text, field, use_regex);
-
-        LogViewWidget* log_view_widget = ui->tabWidgetLog->current_log_view();
-
-        if (log_view_widget != nullptr)
-        {
-            log_view_widget->set_search_highlight(search_text, field, use_regex);
-        }
-    }
-}
-
-/**
- * @brief Slot to handle changes in the current view ID.
- * @param view_id The new current view ID.
- */
-auto MainWindow::handle_current_view_id_changed(const QUuid& view_id) -> void
-{
-    QSet<QString> app_names = m_controller->get_app_names(view_id);
-    ui->logFilterBarWidget->set_app_names(app_names);
-    QString app_name_filter = m_controller->get_app_name_filter(view_id);
-    ui->logFilterBarWidget->set_current_app_name_filter(app_name_filter);
-    QVector<QString> available_log_levels = m_controller->get_available_log_levels(view_id);
-    ui->logFilterBarWidget->set_available_log_levels(available_log_levels);
-    QSet<QString> log_level_filters = m_controller->get_log_level_filters(view_id);
-    ui->logFilterBarWidget->set_log_levels(log_level_filters);
-
-    QMap<QString, int> level_counts = m_controller->get_log_level_counts(view_id);
-    m_log_level_pie_chart_widget->set_log_level_counts(level_counts);
-    ui->logFilterBarWidget->set_log_level_counts(level_counts);
-
-    if (m_controller->get_page_state(view_id) == nullptr)
-    {
-        m_controller->reload_page_query(view_id);
-    }
-
-    update_pagination_widget();
-}
-
-/**
- * @brief Handles removal of a view by closing the corresponding tab.
- * @param view_id The QUuid of the removed view.
- */
-auto MainWindow::handle_view_removed(const QUuid& view_id) -> void
-{
-    const bool removed = ui->tabWidgetLog->remove_view_tab_by_id(view_id);
-
-    if (!removed)
-    {
-        qWarning() << "Could not remove tab for view:" << view_id;
-    }
-
-    ui->logFilterBarWidget->set_app_names({});
-    ui->logFilterBarWidget->set_log_levels({});
-    update_pagination_widget();
 }
 
 /**
@@ -881,7 +628,7 @@ auto MainWindow::handle_delete_session(const QString& session_id) -> void
         close_all_tabs();
     }
 
-    show_start_page_if_needed();
+    m_workspace_presenter->refresh_start_page();
 }
 
 /**
@@ -930,11 +677,7 @@ auto MainWindow::restore_session(const SessionState& state) -> void
 {
     if (!state.id.isEmpty())
     {
-        auto* central_stack = qobject_cast<QStackedWidget*>(this->centralWidget());
-        if (central_stack != nullptr)
-        {
-            central_stack->setCurrentIndex(0);
-        }
+        m_workspace_presenter->set_session_active(true);
 
         QString profile_error;
         const QVector<LogParsingProfile> available_profiles =
@@ -952,8 +695,8 @@ auto MainWindow::restore_session(const SessionState& state) -> void
         {
             m_session_controller->request_expand_session(state.id);
             m_menu_controller->rebuild_recent_menus();
-            update_pagination_widget();
-            show_start_page_if_needed();
+            m_workspace_presenter->refresh_active_view();
+            m_workspace_presenter->refresh_start_page();
         }
         else
         {
@@ -1002,8 +745,7 @@ auto MainWindow::create_log_view_widget_for_view(const QUuid& view_id,
     auto* log_view_widget = new LogViewWidget(ui->tabWidgetLog);
     auto* presenter =
         new LogViewPresenter(m_controller, log_view_widget, view_id, state, log_view_widget);
-    connect(presenter, &LogViewPresenter::current_row_changed, this,
-            &MainWindow::update_log_details);
+    m_workspace_presenter->bind_log_view_presenter(presenter);
 
     return log_view_widget;
 }
@@ -1066,8 +808,8 @@ auto MainWindow::show_log_import_tab(const LogFileInfo& log_file_info,
                 import_widget->deleteLater();
 
                 m_session_controller->request_expand_session(session_id);
-                update_pagination_widget();
-                show_start_page_if_needed();
+                m_workspace_presenter->refresh_active_view();
+                m_workspace_presenter->refresh_start_page();
             }
             else if (selected_profile.has_value() && import_tab_index >= 0)
             {
@@ -1121,7 +863,7 @@ auto MainWindow::handle_open_recent_file(const QString& file_path) -> void
         m_session_controller->save_current_session();
 
         m_menu_controller->rebuild_recent_menus();
-        show_start_page_if_needed();
+        m_workspace_presenter->refresh_start_page();
     }
 }
 
@@ -1162,7 +904,7 @@ auto MainWindow::handle_add_log_file_to_current_view_requested(const LogFileInfo
 auto MainWindow::handle_loading_progress(const QUuid& view_id, qint64 bytes_read,
                                          qint64 total_bytes) -> void
 {
-    bool is_current = (view_id == m_controller->get_current_view());
+    Q_UNUSED(view_id);
     int percent = 0;
 
     if (total_bytes > 0)
@@ -1173,11 +915,6 @@ auto MainWindow::handle_loading_progress(const QUuid& view_id, qint64 bytes_read
 
     statusBar()->showMessage(
         tr("Loading... %1% (%2 / %3 bytes)").arg(percent).arg(bytes_read).arg(total_bytes));
-
-    if (is_current)
-    {
-        update_pagination_widget();
-    }
 }
 
 /**
@@ -1187,14 +924,10 @@ auto MainWindow::handle_loading_progress(const QUuid& view_id, qint64 bytes_read
  */
 auto MainWindow::handle_loading_finished(const QUuid& view_id, const QString& file_path) -> void
 {
+    Q_UNUSED(view_id);
     QFileInfo info(file_path);
     statusBar()->showMessage(tr("Loaded %1 (%2 bytes)").arg(info.fileName()).arg(info.size()),
                              4000);
-
-    if (view_id == m_controller->get_current_view())
-    {
-        handle_current_view_id_changed(view_id);
-    }
 }
 
 /**
@@ -1233,13 +966,9 @@ auto MainWindow::handle_all_sessions_removed() -> void
     // Clear all views to prevent stale data
     m_session_controller->clear_all_views();
 
-    // Reset UI state
-    ui->logFilterBarWidget->set_app_names({});
-    ui->logFilterBarWidget->set_log_levels({});
-    m_log_level_pie_chart_widget->set_log_level_counts({});
-    update_pagination_widget();
-
-    show_start_page_if_needed();
+    m_workspace_presenter->reset_presentation();
+    m_workspace_presenter->refresh_pagination();
+    m_workspace_presenter->refresh_start_page();
 }
 
 /**
@@ -1254,12 +983,9 @@ auto MainWindow::handle_close_session(const QString& session_id) -> void
 
     if (m_session_controller->get_session_count() == 0)
     {
-        // Reset UI state
-        ui->logFilterBarWidget->set_app_names({});
-        ui->logFilterBarWidget->set_log_levels({});
-        m_log_level_pie_chart_widget->set_log_level_counts({});
-        update_pagination_widget();
+        m_workspace_presenter->reset_presentation();
+        m_workspace_presenter->refresh_pagination();
     }
 
-    show_start_page_if_needed();
+    m_workspace_presenter->refresh_start_page();
 }

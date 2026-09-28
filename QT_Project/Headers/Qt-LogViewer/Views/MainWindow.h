@@ -1,9 +1,6 @@
 #pragma once
 
 #include <QMainWindow>
-#include <QMap>
-#include <QModelIndex>
-#include <QSet>
 #include <QString>
 #include <QUuid>
 #include <QVector>
@@ -31,6 +28,7 @@ class LogParsingProfile;
 class DockController;
 class MainMenuController;
 class SessionController;
+class WorkspacePresenter;
 class LogFileInfo;
 class RecentItemsModel;
 class SessionManager;
@@ -113,27 +111,6 @@ class MainWindow: public QtWidgetsCommonLib::AppMainWindow
          * Connects menu requests to the existing window handlers and adds registered dock actions.
          */
         auto initialize_menu() -> void;
-
-        /**
-         * @brief Shows the start page if there is no current session.
-         *
-         * Delegates temporary dock suspension to DockController.
-         */
-        auto show_start_page_if_needed() -> void;
-
-        /**
-         * @brief Updates the log details view when a row is selected.
-         * @param current The current selected index.
-         */
-        auto update_log_details(const QModelIndex& current) -> void;
-
-        /**
-         * @brief Updates the pagination widget based on the current page and total pages.
-         *
-         * This method retrieves the current page and total pages from the proxy model,
-         * ensures they are within valid ranges, and updates the pagination widget accordingly.
-         */
-        auto update_pagination_widget() -> void;
 
         /**
          * @brief Handles drag enter events to allow dropping log files.
@@ -228,14 +205,6 @@ class MainWindow: public QtWidgetsCommonLib::AppMainWindow
         void handle_show_settings_dialog_requested();
 
         /**
-         * @brief Applies the current search to the active database query and table presentation.
-         *
-         * The controller reloads the matching database page while the active
-         * LogViewWidget highlights matching text inside the displayed cells.
-         */
-        auto handle_search_changed() -> void;
-
-        /**
          * @brief Handles open log file requests and creates a new tab with a LogViewWidget.
          *        Uses streaming loading to keep the UI responsive.
          * @param log_file_info The LogFileInfo to load and display.
@@ -248,18 +217,6 @@ class MainWindow: public QtWidgetsCommonLib::AppMainWindow
          */
         auto handle_add_log_file_to_current_view_requested(const LogFileInfo& log_file_info)
             -> void;
-
-        /**
-         * @brief Slot to handle changes in the current view ID.
-         * @param view_id The new current view ID.
-         */
-        auto handle_current_view_id_changed(const QUuid& view_id) -> void;
-
-        /**
-         * @brief Handles removal of a view by closing the corresponding tab.
-         * @param view_id The QUuid of the removed view.
-         */
-        auto handle_view_removed(const QUuid& view_id) -> void;
 
         /**
          * @brief Handles streaming progress for a specific view.
@@ -360,6 +317,7 @@ class MainWindow: public QtWidgetsCommonLib::AppMainWindow
         LogViewerController* m_controller = nullptr;
         DockController* m_dock_controller = nullptr;
         MainMenuController* m_menu_controller = nullptr;
+        WorkspacePresenter* m_workspace_presenter = nullptr;
 
         // Session-related
         SessionManager* m_session_manager = nullptr;

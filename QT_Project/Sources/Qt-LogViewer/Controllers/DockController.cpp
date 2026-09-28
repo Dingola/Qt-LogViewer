@@ -208,9 +208,9 @@ auto DockController::get_toggle_actions() const -> QList<QAction*>
  */
 auto DockController::set_docks_suspended(bool suspended) -> void
 {
-    if (m_docks_suspended != suspended)
+    if (suspended)
     {
-        if (suspended)
+        if (!m_docks_suspended)
         {
             if (m_main_window != nullptr)
             {
@@ -218,33 +218,34 @@ auto DockController::set_docks_suspended(bool suspended) -> void
             }
 
             m_docks_suspended = true;
-            for (const QPointer<QDockWidget>& dock_pointer: std::as_const(m_docks))
-            {
-                QDockWidget* dock_widget = dock_pointer.data();
-                if (dock_widget != nullptr)
-                {
-                    dock_widget->toggleViewAction()->setEnabled(false);
-                    dock_widget->setVisible(false);
-                }
-            }
         }
-        else
+
+        for (const QPointer<QDockWidget>& dock_pointer: std::as_const(m_docks))
         {
-            if (m_main_window != nullptr && !m_suspended_layout_state.isEmpty())
+            QDockWidget* dock_widget = dock_pointer.data();
+            if (dock_widget != nullptr)
             {
-                m_main_window->restoreState(m_suspended_layout_state);
+                dock_widget->toggleViewAction()->setEnabled(false);
+                dock_widget->setVisible(false);
             }
-
-            for (const QPointer<QDockWidget>& dock_pointer: std::as_const(m_docks))
-            {
-                QDockWidget* dock_widget = dock_pointer.data();
-                if (dock_widget != nullptr)
-                {
-                    dock_widget->toggleViewAction()->setEnabled(true);
-                }
-            }
-
-            m_docks_suspended = false;
         }
+    }
+    else if (m_docks_suspended)
+    {
+        if (m_main_window != nullptr && !m_suspended_layout_state.isEmpty())
+        {
+            m_main_window->restoreState(m_suspended_layout_state);
+        }
+
+        for (const QPointer<QDockWidget>& dock_pointer: std::as_const(m_docks))
+        {
+            QDockWidget* dock_widget = dock_pointer.data();
+            if (dock_widget != nullptr)
+            {
+                dock_widget->toggleViewAction()->setEnabled(true);
+            }
+        }
+
+        m_docks_suspended = false;
     }
 }
