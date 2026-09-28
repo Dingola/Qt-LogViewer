@@ -113,7 +113,8 @@ LogViewerController::LogViewerController(const LogParsingProfile& profile, QObje
       m_ingest(new LogIngestController(profile, this)),
       m_catalog(new FileCatalogController(m_ingest, this)),
       m_views(new ViewRegistry(this)),
-      m_filters(new FilterCoordinator(m_views, this))
+      m_filters(new FilterCoordinator(m_views, this)),
+      m_owns_preview_service(true)
 {
     // Initialize services
     m_history_service = new LogHistoryService(this);
@@ -131,6 +132,41 @@ LogViewerController::LogViewerController(const LogParsingProfile& profile, QObje
         m_history_write_service, m_page_coordinator, m_query_controller, this);
     m_preview_service = new LogPreviewService(profile);
 
+    connect_dependencies();
+}
+
+/**
+ * @brief Constructs a LogViewerController around externally owned application collaborators.
+ * @param profile Parsing profile used by compatibility operations.
+ * @param dependencies Complete set of non-owning collaborators.
+ * @param parent Optional parent QObject.
+ */
+LogViewerController::LogViewerController(const LogParsingProfile& profile,
+                                         const LogViewerControllerDependencies& dependencies,
+                                         QObject* parent)
+    : QObject(parent),
+      m_default_profile(profile),
+      m_ingest(dependencies.ingest),
+      m_import_coordinator(dependencies.imports),
+      m_view_lifecycle(dependencies.view_lifecycle),
+      m_preview_service(dependencies.preview),
+      m_catalog(dependencies.catalog),
+      m_views(dependencies.views),
+      m_filters(dependencies.filters),
+      m_history_service(dependencies.history),
+      m_history_write_service(dependencies.history_writer),
+      m_page_coordinator(dependencies.pages),
+      m_query_controller(dependencies.queries),
+      m_live_tailing(dependencies.live_tailing)
+{
+    connect_dependencies();
+}
+
+/**
+ * @brief Connects collaborator signals exposed by the transitional facade.
+ */
+auto LogViewerController::connect_dependencies() -> void
+{
     connect(m_page_coordinator, &LogPageCoordinator::page_loaded, this,
             [this](const QUuid& view_id, qsizetype current_page, qsizetype total_pages,
                    qsizetype total_entries) {
@@ -189,8 +225,11 @@ LogViewerController::~LogViewerController()
         m_history_write_service->shutdown();
     }
 
-    delete m_preview_service;
-    m_preview_service = nullptr;
+    if (m_owns_preview_service)
+    {
+        delete m_preview_service;
+        m_preview_service = nullptr;
+    }
 }
 
 /**

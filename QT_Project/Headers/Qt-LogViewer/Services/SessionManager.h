@@ -33,7 +33,7 @@ class SessionManager: public QObject
     public:
         /**
          * @brief Constructs a SessionManager with a given repository and optional parent.
-         * @param repository Persistence repository (owned by this manager).
+         * @param repository Persistence repository owned by the composition root.
          * @param parent Optional QObject parent.
          */
         explicit SessionManager(SessionRepository* repository, QObject* parent = nullptr);

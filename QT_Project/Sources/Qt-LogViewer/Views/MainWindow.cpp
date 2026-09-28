@@ -17,20 +17,18 @@
 #include <QUrl>
 #include <optional>
 
+#include "Qt-LogViewer/Adapters/RecentItemsAdapter.h"
 #include "Qt-LogViewer/Controllers/DockController.h"
 #include "Qt-LogViewer/Controllers/LogViewerController.h"
 #include "Qt-LogViewer/Controllers/MainMenuController.h"
 #include "Qt-LogViewer/Controllers/SessionController.h"
 #include "Qt-LogViewer/Models/LogFileTreeModel.h"
 #include "Qt-LogViewer/Models/RecentItemsModel.h"
-#include "Qt-LogViewer/Models/RecentListSchema.h"
 #include "Qt-LogViewer/Presenters/LogImportTabPresenter.h"
 #include "Qt-LogViewer/Presenters/LogViewPresenter.h"
 #include "Qt-LogViewer/Presenters/WorkspacePresenter.h"
-#include "Qt-LogViewer/Services/LogParsingProfile.h"
 #include "Qt-LogViewer/Services/LogViewerSettings.h"
 #include "Qt-LogViewer/Services/SessionManager.h"
-#include "Qt-LogViewer/Services/SessionRepository.h"
 #include "Qt-LogViewer/Views/App/Dialogs/SettingsDialog.h"
 #include "Qt-LogViewer/Views/App/LogFileExplorer.h"
 #include "Qt-LogViewer/Views/App/LogLevelPieChartWidget.h"
@@ -58,17 +56,24 @@ using QtWidgetsCommonLib::AppMainWindow;
  * Initializes the main window, sets up the user interface, menu, status bar, and connects all
  * signals/slots.
  *
- * @param settings The application settings.
+ * @param settings Application settings owned by the composition root.
+ * @param controller Transitional log-viewer facade owned by the composition root.
+ * @param session_manager Session state service owned by the composition root.
+ * @param recent_items_adapter Adapter supplying synchronized recent-item models.
+ * @param session_controller Session workflow controller owned by the composition root.
  * @param parent The parent widget, or nullptr if this is a top-level window.
  */
-MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
-    : AppMainWindow(settings, parent),
-      m_log_viewer_settings(settings),
-      m_controller(
-          new LogViewerController(LogParsingProfile::create_default(
-                                      QStringLiteral("{timestamp} {level} {message} {app_name}"),
-                                      QStringLiteral("Qt-LogViewer default")),
-                                  this)),
+MainWindow::MainWindow(LogViewerSettings& settings, LogViewerController& controller,
+                       SessionManager& session_manager, RecentItemsAdapter& recent_items_adapter,
+                       SessionController& session_controller, QWidget* parent)
+    : AppMainWindow(&settings, parent),
+      m_log_viewer_settings(&settings),
+      m_controller(&controller),
+      m_session_manager(&session_manager),
+      m_recent_items_adapter(&recent_items_adapter),
+      m_recent_files_model(recent_items_adapter.get_recent_files_model()),
+      m_recent_sessions_model(recent_items_adapter.get_recent_sessions_model()),
+      m_session_controller(&session_controller),
       m_log_level_pie_chart_widget(new LogLevelPieChartWidget(this)),
       ui(new Ui::MainWindow)
 {
@@ -92,66 +97,12 @@ MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
         central_stack->addWidget(old_central);
     }
 
-    // Initialize session manager and recent models (unified, schema-driven)
-    m_session_manager = new SessionManager(new SessionRepository(this), this);
-    m_session_manager->initialize_from_storage();
-
-    const RecentListSchema files_schema = RecentListSchemas::make_recent_files_schema();
-    const RecentListSchema sessions_schema = RecentListSchemas::make_recent_sessions_schema();
-
-    m_recent_files_model = new RecentItemsModel(files_schema, this);
-    m_recent_sessions_model = new RecentItemsModel(sessions_schema, this);
-
-    // Build rows from SessionManager data and set them on the generic model
-    {
-        QVector<QHash<int, QVariant>> file_rows;
-        const auto recent_files = m_session_manager->get_recent_log_files();
-        file_rows.reserve(recent_files.size());
-        for (const auto& rf: recent_files)
+    connect(m_recent_items_adapter, &RecentItemsAdapter::recent_items_changed, this, [this] {
+        if (m_menu_controller != nullptr)
         {
-            file_rows.push_back(RecentListSchemas::build_recent_file_row(rf));
+            m_menu_controller->rebuild_recent_menus();
         }
-        m_recent_files_model->set_rows(std::move(file_rows));
-    }
-    {
-        QVector<QHash<int, QVariant>> session_rows;
-        const auto recent_sessions = m_session_manager->get_recent_sessions();
-        session_rows.reserve(recent_sessions.size());
-        for (const auto& rs: recent_sessions)
-        {
-            session_rows.push_back(RecentListSchemas::build_recent_session_row(rs));
-        }
-        m_recent_sessions_model->set_rows(std::move(session_rows));
-    }
-
-    connect(m_session_manager, &SessionManager::recent_log_files_changed, this,
-            [this](const QVector<RecentLogFileRecord>& items) {
-                QVector<QHash<int, QVariant>> rows;
-                rows.reserve(items.size());
-                for (const auto& rf: items)
-                {
-                    rows.push_back(RecentListSchemas::build_recent_file_row(rf));
-                }
-                m_recent_files_model->set_rows(std::move(rows));
-                if (m_menu_controller != nullptr)
-                {
-                    m_menu_controller->rebuild_recent_menus();
-                }
-            });
-    connect(m_session_manager, &SessionManager::recent_sessions_changed, this,
-            [this](const QVector<RecentSessionRecord>& items) {
-                QVector<QHash<int, QVariant>> rows;
-                rows.reserve(items.size());
-                for (const auto& rs: items)
-                {
-                    rows.push_back(RecentListSchemas::build_recent_session_row(rs));
-                }
-                m_recent_sessions_model->set_rows(std::move(rows));
-                if (m_menu_controller != nullptr)
-                {
-                    m_menu_controller->rebuild_recent_menus();
-                }
-            });
+    });
 
     setup_log_file_explorer();
     setup_log_level_pie_chart();
@@ -159,9 +110,6 @@ MainWindow::MainWindow(LogViewerSettings* settings, QWidget* parent)
     setup_log_details_dock();
     setup_filter_bar();
     setup_tab_widget();
-
-    m_session_controller = new SessionController(
-        m_session_manager, m_controller->get_log_file_tree_model(), m_controller, this);
 
     // Connect session controller signals
     connect(m_session_controller, &SessionController::expand_session_requested, m_log_file_explorer,

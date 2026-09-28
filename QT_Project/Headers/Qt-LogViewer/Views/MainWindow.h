@@ -33,6 +33,7 @@ class WorkspacePresenter;
 class LogFileInfo;
 class RecentItemsModel;
 class SessionManager;
+class RecentItemsAdapter;
 class LogFileExplorer;
 class LogLevelPieChartWidget;
 class LogViewWidget;
@@ -58,10 +59,17 @@ class MainWindow: public QtWidgetsCommonLib::AppMainWindow
          *
          * Initializes the main window and its user interface.
          *
-         * @param settings Optional app settings.
+         * @param settings Application settings owned by the composition root.
+         * @param controller Transitional log-viewer facade owned by the composition root.
+         * @param session_manager Session state service owned by the composition root.
+         * @param recent_items_adapter Adapter supplying synchronized recent-item models.
+         * @param session_controller Session workflow controller owned by the composition root.
          * @param parent The parent widget, or nullptr if this is a top-level window.
          */
-        explicit MainWindow(LogViewerSettings* settings = nullptr, QWidget* parent = nullptr);
+        explicit MainWindow(LogViewerSettings& settings, LogViewerController& controller,
+                            SessionManager& session_manager,
+                            RecentItemsAdapter& recent_items_adapter,
+                            SessionController& session_controller, QWidget* parent = nullptr);
 
         /**
          * @brief Destroys the MainWindow object.
@@ -315,6 +323,7 @@ class MainWindow: public QtWidgetsCommonLib::AppMainWindow
 
         // Session-related
         SessionManager* m_session_manager = nullptr;
+        RecentItemsAdapter* m_recent_items_adapter = nullptr;
 
         // Unified, schema-driven recent models
         RecentItemsModel* m_recent_files_model = nullptr;

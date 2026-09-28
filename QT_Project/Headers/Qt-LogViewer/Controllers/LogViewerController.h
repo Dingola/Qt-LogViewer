@@ -36,6 +36,29 @@ class LogPageCoordinator;
 class LogPreviewService;
 
 /**
+ * @struct LogViewerControllerDependencies
+ * @brief Collects the non-owning collaborators used by the transitional controller facade.
+ *
+ * The application composition root creates and owns these objects. Keeping the dependency list
+ * explicit allows the facade to be removed incrementally without hiding service construction in
+ * another forwarding class.
+ */
+struct LogViewerControllerDependencies {
+        LogIngestController* ingest{nullptr};
+        LogImportCoordinator* imports{nullptr};
+        ViewLifecycleCoordinator* view_lifecycle{nullptr};
+        LogPreviewService* preview{nullptr};
+        FileCatalogController* catalog{nullptr};
+        ViewRegistry* views{nullptr};
+        FilterCoordinator* filters{nullptr};
+        LogHistoryService* history{nullptr};
+        HistoryWriteService* history_writer{nullptr};
+        LogPageCoordinator* pages{nullptr};
+        LogQueryController* queries{nullptr};
+        LiveTailingCoordinator* live_tailing{nullptr};
+};
+
+/**
  * @file LogViewerController.h
  * @brief Controller/service class for managing log loading and filtering.
  */
@@ -50,6 +73,16 @@ class LogViewerController: public QObject
          * @param parent The parent QObject.
          */
         explicit LogViewerController(const LogParsingProfile& profile, QObject* parent = nullptr);
+
+        /**
+         * @brief Constructs a facade around collaborators owned by the application composition.
+         * @param profile Default parsing profile used by compatibility operations.
+         * @param dependencies Complete set of non-owning controller collaborators.
+         * @param parent Optional QObject parent.
+         */
+        explicit LogViewerController(const LogParsingProfile& profile,
+                                     const LogViewerControllerDependencies& dependencies,
+                                     QObject* parent = nullptr);
 
         /**
          * @brief Destroys the LogViewerController. Cancels any ongoing streaming.
@@ -725,6 +758,11 @@ class LogViewerController: public QObject
 
     private:
         /**
+         * @brief Connects collaborator signals exposed by the transitional facade.
+         */
+        auto connect_dependencies() -> void;
+
+        /**
          * @brief Returns the context for a view or nullptr if not present.
          * @param view_id The QUuid of the view.
          */
@@ -744,4 +782,5 @@ class LogViewerController: public QObject
         LogPageCoordinator* m_page_coordinator{nullptr};
         LogQueryController* m_query_controller{nullptr};
         LiveTailingCoordinator* m_live_tailing{nullptr};
+        bool m_owns_preview_service{false};
 };
