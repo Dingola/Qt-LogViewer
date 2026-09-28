@@ -67,14 +67,16 @@ TEST_F(LogViewerApplicationTest, StartsAndStopsWithExplicitDependencies)
 
     {
         LogViewerApplication application(settings);
-        application.show();
-        QApplication::processEvents();
 
         QtWidgetsCommonLib::AppWindow* app_window = find_app_window();
         ASSERT_NE(app_window, nullptr);
         EXPECT_EQ(app_window->size(), QSize(1120, 800));
         EXPECT_EQ(app_window->windowTitle(), QStringLiteral("Qt-LogViewer"));
         EXPECT_TRUE(app_window->get_adopt_menubar());
+
+        application.show();
+        QApplication::processEvents();
+        EXPECT_TRUE(app_window->isVisible());
     }
 }
 
@@ -96,8 +98,6 @@ TEST_F(LogViewerApplicationTest, StartsWithCustomWindowOptions)
 
     {
         LogViewerApplication application(settings, options);
-        application.show();
-        QApplication::processEvents();
 
         QtWidgetsCommonLib::AppWindow* app_window = find_app_window();
         ASSERT_NE(app_window, nullptr);
@@ -107,5 +107,9 @@ TEST_F(LogViewerApplicationTest, StartsWithCustomWindowOptions)
         const QImage expected_icon = QIcon(options.window_icon_path).pixmap(32, 32).toImage();
         EXPECT_EQ(actual_icon, expected_icon);
         EXPECT_EQ(app_window->get_adopt_menubar(), options.adopt_menubar);
+
+        application.show();
+        QApplication::processEvents();
+        EXPECT_TRUE(app_window->isVisible());
     }
 }
