@@ -28,6 +28,7 @@ class LogParsingProfile;
 class DockController;
 class MainMenuController;
 class SessionController;
+class LogImportTabPresenter;
 class WorkspacePresenter;
 class LogFileInfo;
 class RecentItemsModel;
@@ -157,14 +158,6 @@ class MainWindow: public QtWidgetsCommonLib::AppMainWindow
          * @brief Closes all tabs in the tab widget.
          */
         auto close_all_tabs() -> void;
-
-        /**
-         * @brief Opens a temporary profile-selection tab before importing a log file.
-         * @param log_file_info File selected for import.
-         * @param target_view Existing target view, or a null identifier to create a new view.
-         */
-        auto show_log_import_tab(const LogFileInfo& log_file_info,
-                                 const QUuid& target_view = QUuid()) -> void;
 
     protected:
         /**
@@ -317,6 +310,7 @@ class MainWindow: public QtWidgetsCommonLib::AppMainWindow
         LogViewerController* m_controller = nullptr;
         DockController* m_dock_controller = nullptr;
         MainMenuController* m_menu_controller = nullptr;
+        LogImportTabPresenter* m_log_import_tab_presenter = nullptr;
         WorkspacePresenter* m_workspace_presenter = nullptr;
 
         // Session-related

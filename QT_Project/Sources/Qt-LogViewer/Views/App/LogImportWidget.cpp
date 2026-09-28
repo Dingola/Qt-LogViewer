@@ -38,9 +38,9 @@
 #include <algorithm>
 #include <utility>
 
-#include "Qt-LogViewer/Controllers/LogViewerController.h"
 #include "Qt-LogViewer/Models/LogFieldDefinition.h"
 #include "Qt-LogViewer/Services/LogParseOutcome.h"
+#include "Qt-LogViewer/Services/LogPreviewService.h"
 #include "Qt-LogViewer/Services/LogViewerSettings.h"
 #include "QtWidgetsCommonLib/Layouts/FlowLayout.h"
 #include "ui_LogImportWidget.h"
@@ -426,15 +426,15 @@ auto configure_scrollable_content(Ui::LogImportWidget& ui) -> void
  * @brief Constructs a log import widget for one file.
  * @param file_path File whose records are previewed and later imported.
  * @param settings Application settings containing reusable parsing profiles.
- * @param controller Controller used for bounded, side-effect-free preview parsing.
+ * @param preview_service Service used for bounded, side-effect-free preview parsing.
  * @param parent Parent widget responsible for ownership.
  */
 LogImportWidget::LogImportWidget(QString file_path, LogViewerSettings& settings,
-                                 const LogViewerController& controller, QWidget* parent)
+                                 const LogPreviewService& preview_service, QWidget* parent)
     : QWidget(parent),
       ui(new Ui::LogImportWidget),
       m_settings(settings),
-      m_controller(controller),
+      m_preview_service(preview_service),
       m_raw_records_model(new QStandardItemModel(this)),
       m_parsed_fields_model(new QStandardItemModel(this)),
       m_preview_timer(new QTimer(this)),
@@ -672,7 +672,7 @@ auto LogImportWidget::refresh_preview() -> void
 
     if (profile.has_value())
     {
-        QVector<LogParseOutcome> outcomes = m_controller.preview_log_file(
+        QVector<LogParseOutcome> outcomes = m_preview_service.preview(
             m_file_path, profile.value(), ui->spinBoxPreviewRecords->value());
         m_preview_matches_complete_record = contains_successful_parse(outcomes);
 
@@ -683,16 +683,16 @@ auto LogImportWidget::refresh_preview() -> void
 
             if (trimmed_profile.get_configuration().format != profile->get_configuration().format)
             {
-                outcomes = m_controller.preview_log_file(m_file_path, trimmed_profile,
-                                                         ui->spinBoxPreviewRecords->value());
+                outcomes = m_preview_service.preview(m_file_path, trimmed_profile,
+                                                     ui->spinBoxPreviewRecords->value());
             }
 
             if (!contains_successful_parse(outcomes))
             {
                 const LogParsingProfile prefix_profile =
                     create_prefix_preview_profile(trimmed_profile);
-                outcomes = m_controller.preview_log_file(m_file_path, prefix_profile,
-                                                         ui->spinBoxPreviewRecords->value());
+                outcomes = m_preview_service.preview(m_file_path, prefix_profile,
+                                                     ui->spinBoxPreviewRecords->value());
             }
 
             m_showing_partial_preview = contains_successful_parse(outcomes);
@@ -755,7 +755,7 @@ auto LogImportWidget::show_raw_preview() -> void
     const LogParsingProfile raw_profile = LogParsingProfile::create_default(
         QStringLiteral("{raw_record}"), QStringLiteral("Raw preview"));
     const QVector<LogParseOutcome> outcomes =
-        m_controller.preview_log_file(m_file_path, raw_profile, ui->spinBoxPreviewRecords->value());
+        m_preview_service.preview(m_file_path, raw_profile, ui->spinBoxPreviewRecords->value());
 
     m_showing_raw_preview = true;
     m_showing_partial_preview = false;

@@ -13,7 +13,7 @@ namespace Ui
 class LogImportWidget;
 }
 
-class LogViewerController;
+class LogPreviewService;
 class LogViewerSettings;
 class QModelIndex;
 class QStandardItemModel;
@@ -41,11 +41,12 @@ class LogImportWidget final: public QWidget
          * @brief Constructs a log import widget for one file.
          * @param file_path File whose records are previewed and later imported.
          * @param settings Application settings containing reusable parsing profiles.
-         * @param controller Controller used for bounded, side-effect-free preview parsing.
+         * @param preview_service Service used for bounded, side-effect-free preview parsing.
          * @param parent Parent widget responsible for ownership.
          */
         explicit LogImportWidget(QString file_path, LogViewerSettings& settings,
-                                 const LogViewerController& controller, QWidget* parent = nullptr);
+                                 const LogPreviewService& preview_service,
+                                 QWidget* parent = nullptr);
 
         /** @brief Destroys the widget and its generated user interface. */
         ~LogImportWidget() override;
@@ -149,7 +150,7 @@ class LogImportWidget final: public QWidget
     private:
         Ui::LogImportWidget* ui;
         LogViewerSettings& m_settings;
-        const LogViewerController& m_controller;
+        const LogPreviewService& m_preview_service;
         QStandardItemModel* m_raw_records_model = nullptr;
         QStandardItemModel* m_parsed_fields_model = nullptr;
         QTimer* m_preview_timer = nullptr;

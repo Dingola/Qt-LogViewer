@@ -57,6 +57,18 @@ class LogViewerController: public QObject
         ~LogViewerController() override;
 
         /**
+         * @brief Returns the focused import workflow component.
+         * @return Import coordinator owned by this transitional facade.
+         */
+        [[nodiscard]] auto get_import_coordinator() const -> LogImportCoordinator*;
+
+        /**
+         * @brief Returns the bounded preview service.
+         * @return Preview service owned by this transitional facade.
+         */
+        [[nodiscard]] auto get_preview_service() const -> const LogPreviewService*;
+
+        /**
          * @brief Sets the current view to the given QUuid if it exists.
          * @param view_id The QUuid of the view to set as current.
          * @return True if the view was set successfully, false if the view_id does not exist.
