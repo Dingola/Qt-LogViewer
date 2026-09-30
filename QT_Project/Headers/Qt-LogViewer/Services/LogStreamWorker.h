@@ -1,8 +1,10 @@
 #pragma once
 
+#include <QMutex>
 #include <QObject>
 #include <QString>
 #include <QVector>
+#include <QWaitCondition>
 #include <atomic>
 
 #include "Qt-LogViewer/Models/LogEntry.h"
@@ -30,6 +32,9 @@ class LogStreamWorker: public QObject
         Q_OBJECT
 
     public:
+        /** Maximum number of emitted batches awaiting durable writer processing. */
+        static constexpr qsizetype maximum_in_flight_batches = 4;
+
         /**
          * @brief Constructs a LogStreamWorker.
          * @param parser Parser instance (copied) used for line parsing.
@@ -53,6 +58,14 @@ class LogStreamWorker: public QObject
          * line/token is processed.
          */
         auto cancel() -> void;
+
+        /**
+         * @brief Releases capacity after writer processing completes.
+         * @param batch_count Number of processed batches to acknowledge.
+         *
+         * This method is thread-safe and may be called directly from the GUI thread.
+         */
+        auto acknowledge_batches(qsizetype batch_count) -> void;
 
     signals:
         /**
@@ -84,6 +97,12 @@ class LogStreamWorker: public QObject
         auto error(const QString& file_path, const QString& message) -> void;
 
     private:
+        /** @brief Waits for bounded downstream capacity before emitting one batch. */
+        auto reserve_batch_slot() -> bool;
+
         LogParser m_parser;
         std::atomic_bool m_cancelled{false};
+        QMutex m_backpressure_mutex;
+        QWaitCondition m_backpressure_available;
+        qsizetype m_in_flight_batches{0};
 };

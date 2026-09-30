@@ -243,3 +243,15 @@ auto LogLoader::cancel_async() -> void
         m_worker->cancel();
     }
 }
+
+/**
+ * @brief Releases parser capacity after downstream writer processing.
+ * @param batch_count Number of stored batches to acknowledge.
+ */
+auto LogLoader::acknowledge_batches(qsizetype batch_count) -> void
+{
+    if (m_worker != nullptr)
+    {
+        m_worker->acknowledge_batches(batch_count);
+    }
+}

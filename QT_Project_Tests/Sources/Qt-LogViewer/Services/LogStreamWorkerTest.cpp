@@ -2,6 +2,8 @@
 
 #include <QDir>
 #include <QFile>
+#include <QSignalSpy>
+#include <QTest>
 #include <QTextStream>
 #include <QThread>
 
@@ -302,4 +304,78 @@ TEST_F(LogStreamWorkerTest, CancelWhileStreamingStopsSoon)
     EXPECT_GE(batch_count, 1);
     EXPECT_LT(total_entries, lines.size());
     EXPECT_FALSE(thread.isRunning());
+}
+
+/** @test Verifies parsing pauses when the downstream writer backlog reaches its bound. */
+TEST_F(LogStreamWorkerTest, WaitsForWriterCapacityBeforeEmittingMoreBatches)
+{
+    QVector<QString> lines;
+    const int total_batch_count = static_cast<int>(LogStreamWorker::maximum_in_flight_batches) + 2;
+    for (int index = 0; index < total_batch_count; ++index)
+    {
+        lines.append(QStringLiteral("Info bounded_%1 AppB").arg(index));
+    }
+
+    QTemporaryFile* file = create_temp_file(lines);
+    auto* worker = new LogStreamWorker(LogParser(LogParsingProfile::create_default(m_format)));
+    QThread thread;
+    QSignalSpy batch_spy(worker, &LogStreamWorker::entry_batch_parsed);
+    QSignalSpy finished_spy(worker, &LogStreamWorker::finished);
+
+    QObject::connect(worker, &LogStreamWorker::finished, &thread, &QThread::quit,
+                     Qt::QueuedConnection);
+    QObject::connect(&thread, &QThread::finished, worker, &QObject::deleteLater);
+    worker->moveToThread(&thread);
+    QObject::connect(
+        &thread, &QThread::started, worker,
+        [worker, file]() { worker->start(file->fileName(), 1); }, Qt::QueuedConnection);
+
+    thread.start();
+
+    QTRY_COMPARE_WITH_TIMEOUT(batch_spy.count(),
+                              static_cast<int>(LogStreamWorker::maximum_in_flight_batches), 5000);
+    QTest::qWait(50);
+    EXPECT_EQ(batch_spy.count(), LogStreamWorker::maximum_in_flight_batches);
+    EXPECT_EQ(finished_spy.count(), 0);
+
+    worker->acknowledge_batches(2);
+
+    QTRY_COMPARE_WITH_TIMEOUT(finished_spy.count(), 1, 5000);
+    EXPECT_EQ(batch_spy.count(), total_batch_count);
+    QTRY_VERIFY_WITH_TIMEOUT(!thread.isRunning(), 5000);
+}
+
+/** @test Verifies cancellation wakes a reader blocked by the downstream backlog limit. */
+TEST_F(LogStreamWorkerTest, CancellationReleasesWriterCapacityWait)
+{
+    QVector<QString> lines;
+    const int total_batch_count = static_cast<int>(LogStreamWorker::maximum_in_flight_batches) + 2;
+    for (int index = 0; index < total_batch_count; ++index)
+    {
+        lines.append(QStringLiteral("Info cancel_wait_%1 AppC").arg(index));
+    }
+
+    QTemporaryFile* file = create_temp_file(lines);
+    auto* worker = new LogStreamWorker(LogParser(LogParsingProfile::create_default(m_format)));
+    QThread thread;
+    QSignalSpy batch_spy(worker, &LogStreamWorker::entry_batch_parsed);
+    QSignalSpy finished_spy(worker, &LogStreamWorker::finished);
+
+    QObject::connect(worker, &LogStreamWorker::finished, &thread, &QThread::quit,
+                     Qt::QueuedConnection);
+    QObject::connect(&thread, &QThread::finished, worker, &QObject::deleteLater);
+    worker->moveToThread(&thread);
+    QObject::connect(
+        &thread, &QThread::started, worker,
+        [worker, file]() { worker->start(file->fileName(), 1); }, Qt::QueuedConnection);
+
+    thread.start();
+
+    QTRY_COMPARE_WITH_TIMEOUT(batch_spy.count(),
+                              static_cast<int>(LogStreamWorker::maximum_in_flight_batches), 5000);
+    worker->cancel();
+
+    QTRY_COMPARE_WITH_TIMEOUT(finished_spy.count(), 1, 5000);
+    EXPECT_EQ(batch_spy.count(), LogStreamWorker::maximum_in_flight_batches);
+    QTRY_VERIFY_WITH_TIMEOUT(!thread.isRunning(), 5000);
 }

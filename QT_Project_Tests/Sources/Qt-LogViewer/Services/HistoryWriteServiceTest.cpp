@@ -51,6 +51,7 @@ TEST_F(HistoryWriteServiceTest, StoresBatchesBeforeCompletingImport)
     LogHistoryService history(get_database_path());
     HistoryWriteService writer(get_database_path());
     QSignalSpy finished_spy(&writer, &HistoryWriteService::import_write_finished);
+    QSignalSpy processed_spy(&writer, &HistoryWriteService::batches_processed);
 
     ASSERT_TRUE(writer.begin_import(operation_id, view_id, file_path));
     ASSERT_TRUE(writer.store_batch(operation_id, view_id, file_path, {create_entry(1, file_path)}));
@@ -58,6 +59,14 @@ TEST_F(HistoryWriteServiceTest, StoresBatchesBeforeCompletingImport)
     ASSERT_TRUE(writer.finish_import(operation_id, view_id, file_path));
 
     QTRY_COMPARE_WITH_TIMEOUT(finished_spy.count(), 1, 5000);
+    qsizetype processed_batch_count = 0;
+    for (const QList<QVariant>& arguments: processed_spy)
+    {
+        ASSERT_EQ(arguments.size(), 2);
+        EXPECT_EQ(arguments.at(0).toUuid(), operation_id);
+        processed_batch_count += arguments.at(1).value<qsizetype>();
+    }
+    EXPECT_EQ(processed_batch_count, 2);
     ASSERT_EQ(finished_spy.first().size(), 5);
     EXPECT_EQ(finished_spy.first().at(0).toUuid(), operation_id);
     EXPECT_TRUE(finished_spy.first().at(3).toBool());

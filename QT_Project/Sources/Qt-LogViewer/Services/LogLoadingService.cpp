@@ -272,6 +272,15 @@ auto LogLoadingService::cancel_async() -> void
 }
 
 /**
+ * @brief Releases parser capacity after downstream writer processing.
+ * @param batch_count Number of stored batches to acknowledge.
+ */
+auto LogLoadingService::acknowledge_batches(qsizetype batch_count) -> void
+{
+    m_loader.acknowledge_batches(batch_count);
+}
+
+/**
  * @brief Sets the maximum number of retries on streaming errors for the same file.
  * @param max_retries Number of retry attempts (0 disables retry).
  */

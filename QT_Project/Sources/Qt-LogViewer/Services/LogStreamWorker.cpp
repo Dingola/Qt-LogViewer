@@ -6,7 +6,9 @@
 #include "Qt-LogViewer/Services/LogStreamWorker.h"
 
 #include <QFile>
+#include <QMutexLocker>
 #include <QTextStream>
+#include <algorithm>
 
 /**
  * @brief Constructs a LogStreamWorker.
@@ -60,7 +62,7 @@ auto LogStreamWorker::start(const QString& file_path, qsizetype batch_size) -> v
                 batch.append(outcome.entry.value());
             }
 
-            if (batch.size() >= batch_size)
+            if (batch.size() >= batch_size && reserve_batch_slot())
             {
                 emit entry_batch_parsed(file_path, batch);
                 batch.clear();
@@ -74,7 +76,7 @@ auto LogStreamWorker::start(const QString& file_path, qsizetype batch_size) -> v
             }
         }
 
-        if (!batch.isEmpty() && !m_cancelled.load())
+        if (!batch.isEmpty() && !m_cancelled.load() && reserve_batch_slot())
         {
             emit entry_batch_parsed(file_path, batch);
         }
@@ -88,5 +90,41 @@ auto LogStreamWorker::start(const QString& file_path, qsizetype batch_size) -> v
  */
 auto LogStreamWorker::cancel() -> void
 {
-    m_cancelled.store(true);
+    m_cancelled.store(true, std::memory_order_release);
+    QMutexLocker locker(&m_backpressure_mutex);
+    m_backpressure_available.wakeAll();
+}
+
+/**
+ * @brief Releases capacity after writer processing completes.
+ * @param batch_count Number of processed batches to acknowledge.
+ */
+auto LogStreamWorker::acknowledge_batches(qsizetype batch_count) -> void
+{
+    if (batch_count > 0)
+    {
+        QMutexLocker locker(&m_backpressure_mutex);
+        m_in_flight_batches = std::max<qsizetype>(0, m_in_flight_batches - batch_count);
+        m_backpressure_available.wakeAll();
+    }
+}
+
+/** @brief Waits until another batch may enter the downstream pipeline. */
+auto LogStreamWorker::reserve_batch_slot() -> bool
+{
+    QMutexLocker locker(&m_backpressure_mutex);
+
+    while (!m_cancelled.load(std::memory_order_acquire) &&
+           m_in_flight_batches >= maximum_in_flight_batches)
+    {
+        m_backpressure_available.wait(&m_backpressure_mutex);
+    }
+
+    const bool reserved = !m_cancelled.load(std::memory_order_acquire);
+    if (reserved)
+    {
+        ++m_in_flight_batches;
+    }
+
+    return reserved;
 }

@@ -103,6 +103,7 @@ auto HistoryWriteService::store_batch(const QUuid& operation_id, const QUuid& vi
         if (accepted)
         {
             operation->pending_entries.append(entries);
+            ++operation->pending_batch_count;
             if (!operation->drain_scheduled)
             {
                 operation->drain_scheduled = true;
@@ -176,6 +177,7 @@ auto HistoryWriteService::cancel_view(const QUuid& view_id) -> void
             operation->cancelled.store(true, std::memory_order_release);
             QMutexLocker locker(&operation->mutex);
             operation->pending_entries.clear();
+            operation->pending_batch_count = 0;
             cancelled_operation_ids.append(iterator.key());
         }
     }
@@ -225,6 +227,7 @@ auto HistoryWriteService::discard_file(const QUuid& view_id, const QString& file
             operation->cancelled.store(true, std::memory_order_release);
             QMutexLocker locker(&operation->mutex);
             operation->pending_entries.clear();
+            operation->pending_batch_count = 0;
             cancelled_operation_ids.append(iterator.key());
         }
     }
@@ -288,13 +291,15 @@ auto HistoryWriteService::queue_drain(const QUuid& operation_id,
                                       const std::shared_ptr<ImportOperation>& operation) -> void
 {
     LogHistoryWriter* writer = m_writer;
+    HistoryWriteService* service = this;
     QMetaObject::invokeMethod(
         writer,
-        [writer, operation_id, operation]() {
+        [writer, service, operation_id, operation]() {
             bool draining = true;
             while (draining)
             {
                 QVector<LogEntry> entries;
+                qsizetype batch_count = 0;
                 bool finish_import = false;
 
                 {
@@ -302,12 +307,14 @@ auto HistoryWriteService::queue_drain(const QUuid& operation_id,
                     if (operation->cancelled.load(std::memory_order_acquire))
                     {
                         operation->pending_entries.clear();
+                        operation->pending_batch_count = 0;
                         operation->drain_scheduled = false;
                         draining = false;
                     }
                     else if (!operation->pending_entries.isEmpty())
                     {
                         entries.swap(operation->pending_entries);
+                        batch_count = std::exchange(operation->pending_batch_count, 0);
                     }
                     else
                     {
@@ -320,6 +327,12 @@ auto HistoryWriteService::queue_drain(const QUuid& operation_id,
                 if (!entries.isEmpty() && !operation->cancelled.load(std::memory_order_acquire))
                 {
                     writer->store_batch(operation->view_id, operation->file_path, entries);
+                    QMetaObject::invokeMethod(
+                        service,
+                        [service, operation_id, batch_count]() {
+                            emit service->batches_processed(operation_id, batch_count);
+                        },
+                        Qt::QueuedConnection);
                 }
 
                 if (finish_import && !operation->cancelled.load(std::memory_order_acquire))

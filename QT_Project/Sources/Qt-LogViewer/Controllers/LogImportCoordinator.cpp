@@ -492,6 +492,15 @@ auto LogImportCoordinator::connect_workflow() -> void
 
     if (m_history_writer != nullptr)
     {
+        connect(m_history_writer, &HistoryWriteService::batches_processed, this,
+                [this](const QUuid& operation_id, qsizetype batch_count) {
+                    if (!m_shutting_down && m_ingest != nullptr &&
+                        m_operation_views.contains(operation_id))
+                    {
+                        m_ingest->acknowledge_batches(operation_id, batch_count);
+                    }
+                });
+
         connect(m_history_writer, &HistoryWriteService::import_write_finished, this,
                 &LogImportCoordinator::handle_write_finished, Qt::QueuedConnection);
     }

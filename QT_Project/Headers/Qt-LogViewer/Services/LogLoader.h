@@ -117,6 +117,12 @@ class LogLoader: public QObject
          */
         auto cancel_async() -> void;
 
+        /**
+         * @brief Releases parser capacity after downstream writer processing.
+         * @param batch_count Number of stored batches to acknowledge.
+         */
+        auto acknowledge_batches(qsizetype batch_count) -> void;
+
     signals:
         /**
          * @brief Emitted when a batch of entries has been parsed during streaming.

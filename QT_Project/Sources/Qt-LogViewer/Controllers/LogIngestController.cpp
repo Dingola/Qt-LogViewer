@@ -138,6 +138,20 @@ auto LogIngestController::cancel_for_view(const QUuid& view_id) -> void
 }
 
 /**
+ * @brief Releases parser capacity for a processed active import batch.
+ * @param operation_id Import operation owning the acknowledgement.
+ * @param batch_count Number of processed batches.
+ */
+auto LogIngestController::acknowledge_batches(const QUuid& operation_id,
+                                              qsizetype batch_count) -> void
+{
+    if (!operation_id.isNull() && operation_id == m_queue.get_active_operation_id())
+    {
+        m_loader.acknowledge_batches(batch_count);
+    }
+}
+
+/**
  * @brief Returns the active view id (empty if none).
  * @return The currently active view id, or a null QUuid if idle.
  */

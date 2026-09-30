@@ -109,6 +109,13 @@ class HistoryWriteService final: public QObject
 
     signals:
         /**
+         * @brief Emitted after coalesced batches have left the writer backlog.
+         * @param operation_id Import operation owning the batches.
+         * @param batch_count Number of processed parser batches.
+         */
+        auto batches_processed(const QUuid& operation_id, qsizetype batch_count) -> void;
+
+        /**
          * @brief Emitted when an active import completion request has been processed.
          * @param operation_id Unique identifier of the completed import attempt.
          * @param view_id View that owns the import.
@@ -128,6 +135,7 @@ class HistoryWriteService final: public QObject
                 std::atomic_bool cancelled{false};
                 QMutex mutex;
                 QVector<LogEntry> pending_entries;
+                qsizetype pending_batch_count{0};
                 bool drain_scheduled{false};
                 bool finish_requested{false};
         };

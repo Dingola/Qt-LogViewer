@@ -105,6 +105,13 @@ class LogIngestController: public QObject
         auto cancel_for_view(const QUuid& view_id) -> void;
 
         /**
+         * @brief Releases parser capacity for a processed active import batch.
+         * @param operation_id Import operation owning the acknowledgement.
+         * @param batch_count Number of processed batches.
+         */
+        auto acknowledge_batches(const QUuid& operation_id, qsizetype batch_count) -> void;
+
+        /**
          * @brief Returns the active view id (empty if none).
          * @return The currently active view id, or a null QUuid if idle.
          */
