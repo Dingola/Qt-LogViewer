@@ -664,8 +664,6 @@ auto MainWindow::restore_session(const SessionState& state) -> void
 {
     if (!state.id.isEmpty())
     {
-        m_workspace_presenter->set_session_active(true);
-
         QString profile_error;
         const QVector<LogParsingProfile> available_profiles =
             m_log_viewer_settings->get_log_parsing_profiles(&profile_error);
@@ -682,8 +680,6 @@ auto MainWindow::restore_session(const SessionState& state) -> void
         {
             m_session_controller->request_expand_session(state.id);
             m_menu_controller->rebuild_recent_menus();
-            m_workspace_presenter->refresh_active_view();
-            m_workspace_presenter->refresh_start_page();
         }
         else
         {

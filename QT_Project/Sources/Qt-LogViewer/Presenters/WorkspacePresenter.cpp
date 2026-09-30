@@ -7,6 +7,8 @@
 #include <QStackedWidget>
 #include <QVector>
 
+#include "Qt-LogViewer/Animations/SnapshotTransitionAnimator.h"
+#include "Qt-LogViewer/Animations/StackedWidgetTransition.h"
 #include "Qt-LogViewer/Controllers/DockController.h"
 #include "Qt-LogViewer/Controllers/FilterCoordinator.h"
 #include "Qt-LogViewer/Controllers/LogImportCoordinator.h"
@@ -24,6 +26,7 @@
 #include "Qt-LogViewer/Views/App/LogFilterBarWidget.h"
 #include "Qt-LogViewer/Views/App/LogLevelPieChartWidget.h"
 #include "Qt-LogViewer/Views/App/LogTabWidget.h"
+#include "Qt-LogViewer/Views/App/LogTableView.h"
 #include "Qt-LogViewer/Views/App/LogViewWidget.h"
 #include "Qt-LogViewer/Views/Shared/PaginationWidget.h"
 #include "Qt-LogViewer/Views/Shared/TabWidget.h"
@@ -76,6 +79,21 @@ WorkspacePresenter::WorkspacePresenter(
       m_central_stack(central_stack),
       m_dock_controller(dock_controller)
 {
+    m_table_transition = new SnapshotTransitionAnimator(this);
+
+    if (m_central_stack != nullptr)
+    {
+        m_page_transition = new StackedWidgetTransition(m_central_stack, this);
+        m_page_transition->set_transition_surface(m_central_stack->window());
+        connect(m_page_transition, &StackedWidgetTransition::target_page_activated, this,
+                [this](int target_index) {
+                    if (m_dock_controller != nullptr)
+                    {
+                        m_dock_controller->set_docks_suspended(target_index != 0);
+                    }
+                });
+    }
+
     connect_workspace_actions();
     connect_workspace_updates();
     refresh_active_view();
@@ -182,14 +200,27 @@ auto WorkspacePresenter::refresh_start_page() -> void
  */
 auto WorkspacePresenter::set_session_active(bool session_active) -> void
 {
-    if (m_central_stack != nullptr)
-    {
-        m_central_stack->setCurrentIndex(session_active ? 0 : 1);
-    }
+    const int target_index = session_active ? 0 : 1;
 
-    if (m_dock_controller != nullptr)
+    if (m_page_transition != nullptr)
     {
-        m_dock_controller->set_docks_suspended(!session_active);
+        const bool page_changes =
+            m_central_stack != nullptr && m_central_stack->currentIndex() != target_index;
+
+        if (!page_changes && m_dock_controller != nullptr)
+        {
+            m_dock_controller->set_docks_suspended(!session_active);
+        }
+
+        m_page_transition->transition_to(target_index);
+    }
+    else if (m_central_stack != nullptr)
+    {
+        m_central_stack->setCurrentIndex(target_index);
+        if (m_dock_controller != nullptr)
+        {
+            m_dock_controller->set_docks_suspended(!session_active);
+        }
     }
 }
 
@@ -235,19 +266,57 @@ auto WorkspacePresenter::apply_search(const QUuid& view_id, const QString& text,
 }
 
 /**
+ * @brief Changes the active log table page through a directional snapshot transition.
+ * @param page Requested one-based page number.
+ */
+auto WorkspacePresenter::navigate_to_page(int page) -> void
+{
+    const QUuid view_id = get_active_view_id();
+
+    if (!view_id.isNull() && m_pages != nullptr)
+    {
+        const LogPageState* page_state = m_pages->get_page_state(view_id);
+        LogViewWidget* log_view_widget =
+            m_tab_widget != nullptr ? m_tab_widget->current_log_view() : nullptr;
+        LogTableView* table_view =
+            log_view_widget != nullptr ? log_view_widget->get_table_view() : nullptr;
+
+        if (page_state != nullptr && table_view != nullptr &&
+            page_state->get_current_page() != page)
+        {
+            if (m_table_transition->is_running())
+            {
+                m_table_transition->finish();
+            }
+
+            WidgetTransitionConfiguration configuration;
+            configuration.effect = WidgetTransitionEffect::FadeAndSlide;
+            configuration.direction = page > page_state->get_current_page()
+                                          ? WidgetTransitionDirection::Left
+                                          : WidgetTransitionDirection::Right;
+            configuration.easing_curve = QEasingCurve::InOutQuad;
+            configuration.duration_ms = 560;
+            configuration.motion_distance = 128;
+            m_table_transition->set_configuration(configuration);
+            m_table_transition->transition(
+                table_view, [this, view_id, page] { m_pages->set_current_page(view_id, page); });
+        }
+        else if (page_state == nullptr || table_view == nullptr)
+        {
+            m_pages->set_current_page(view_id, page);
+        }
+    }
+}
+
+/**
  * @brief Connects shared widgets to active-view operations.
  */
 auto WorkspacePresenter::connect_workspace_actions() -> void
 {
     if (m_pagination != nullptr)
     {
-        connect(m_pagination, &PaginationWidget::page_changed, this, [this](int page) {
-            const QUuid view_id = get_active_view_id();
-            if (!view_id.isNull() && m_pages != nullptr)
-            {
-                m_pages->set_current_page(view_id, page);
-            }
-        });
+        connect(m_pagination, &PaginationWidget::page_changed, this,
+                &WorkspacePresenter::navigate_to_page);
         connect(m_pagination, &PaginationWidget::items_per_page_changed, this,
                 [this](int items_per_page) {
                     const QUuid view_id = get_active_view_id();
@@ -345,8 +414,13 @@ auto WorkspacePresenter::connect_workspace_updates() -> void
 
     if (m_session_controller != nullptr)
     {
-        connect(m_session_controller, &SessionController::current_session_changed, this,
-                [this](const QString&) { refresh_start_page(); });
+        connect(
+            m_session_controller, &SessionController::current_session_changed, this,
+            [this](const QString&) { refresh_start_page(); }, Qt::QueuedConnection);
+        connect(m_session_controller, &SessionController::session_restore_started, this,
+                [this](const QString&) { set_session_active(true); });
+        connect(m_session_controller, &SessionController::session_restored, this,
+                [this](const QString&) { refresh_active_view(); });
         connect(m_session_controller, &SessionController::all_sessions_removed, this,
                 [this] { refresh_start_page(); });
     }

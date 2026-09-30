@@ -1,12 +1,18 @@
 #include "Qt-LogViewer/Presenters/WorkspacePresenterTest.h"
 
+#include <QApplication>
+#include <QDockWidget>
 #include <QFile>
+#include <QMainWindow>
 #include <QPlainTextEdit>
 #include <QStackedWidget>
 #include <QTemporaryFile>
+#include <QTest>
 #include <QTextStream>
 #include <QWidget>
 
+#include "Qt-LogViewer/Animations/SnapshotTransitionAnimator.h"
+#include "Qt-LogViewer/Controllers/DockController.h"
 #include "Qt-LogViewer/Controllers/LogViewContext.h"
 #include "Qt-LogViewer/Models/LogModel.h"
 #include "Qt-LogViewer/Models/LogPageState.h"
@@ -196,6 +202,43 @@ TEST_F(WorkspacePresenterTest, RoutesSearchAndPaginationToActiveView)
     EXPECT_EQ(page_state->get_current_page(), 2);
 }
 
+/** @test Verifies page navigation reuses the generic animator for the complete log table. */
+TEST_F(WorkspacePresenterTest, AnimatesVisibleTablePageChanges)
+{
+    const QUuid view_id = add_log_view({QStringLiteral("2024-01-01 12:00:00 INFO First PageApp"),
+                                        QStringLiteral("2024-01-01 12:01:00 INFO Second PageApp"),
+                                        QStringLiteral("2024-01-01 12:02:00 INFO Third PageApp")});
+    ASSERT_FALSE(view_id.isNull());
+    emit m_pagination->items_per_page_changed(1);
+    m_tab_widget->show();
+    QApplication::processEvents();
+    SnapshotTransitionAnimator* table_transition =
+        m_presenter->findChild<SnapshotTransitionAnimator*>(QString(), Qt::FindDirectChildrenOnly);
+    ASSERT_NE(table_transition, nullptr);
+
+    emit m_pagination->page_changed(2);
+
+    EXPECT_TRUE(table_transition->is_running());
+    WidgetTransitionConfiguration configuration = table_transition->get_configuration();
+    EXPECT_EQ(configuration.effect, WidgetTransitionEffect::FadeAndSlide);
+    EXPECT_EQ(configuration.direction, WidgetTransitionDirection::Left);
+    EXPECT_EQ(configuration.easing_curve.type(), QEasingCurve::InOutQuad);
+    EXPECT_EQ(configuration.duration_ms, 480);
+    EXPECT_EQ(configuration.motion_distance, 32);
+    const LogPageState* page_state = m_runtime->pages().get_page_state(view_id);
+    ASSERT_NE(page_state, nullptr);
+    EXPECT_EQ(page_state->get_current_page(), 2);
+    QTRY_VERIFY_WITH_TIMEOUT(!table_transition->is_running(), 1000);
+
+    emit m_pagination->page_changed(1);
+
+    EXPECT_TRUE(table_transition->is_running());
+    configuration = table_transition->get_configuration();
+    EXPECT_EQ(configuration.direction, WidgetTransitionDirection::Right);
+    EXPECT_EQ(page_state->get_current_page(), 1);
+    QTRY_VERIFY_WITH_TIMEOUT(!table_transition->is_running(), 1000);
+}
+
 /**
  * @test Verifies that row selection is presented through the shared details
  * view.
@@ -229,6 +272,32 @@ TEST_F(WorkspacePresenterTest, SwitchesBetweenWorkspaceAndStartPage)
     EXPECT_EQ(m_central_stack->currentIndex(), 1);
 }
 
+/** @test Verifies docks are suspended when the start page is already selected. */
+TEST_F(WorkspacePresenterTest, SuspendsDocksWithoutStartingAnotherPageTransition)
+{
+    delete m_presenter;
+    m_presenter = nullptr;
+
+    QMainWindow main_window;
+    auto* central_stack = new QStackedWidget(&main_window);
+    central_stack->addWidget(new QWidget());
+    central_stack->addWidget(new QWidget());
+    central_stack->setCurrentIndex(1);
+    main_window.setCentralWidget(central_stack);
+    auto* dock_widget = new QDockWidget(&main_window);
+    main_window.addDockWidget(Qt::LeftDockWidgetArea, dock_widget);
+    DockController dock_controller(&main_window);
+    dock_controller.register_dock(dock_widget);
+
+    WorkspacePresenter presenter(&m_runtime->views(), &m_runtime->filters(), &m_runtime->history(),
+                                 &m_runtime->pages(), &m_runtime->queries(), &m_runtime->imports(),
+                                 &m_runtime->lifecycle(), nullptr, m_tab_widget, m_filter_bar,
+                                 m_pagination, m_details_text, m_level_chart, central_stack,
+                                 &dock_controller);
+
+    EXPECT_EQ(central_stack->currentIndex(), 1);
+    EXPECT_TRUE(dock_widget->isHidden());
+}
 /**
  * @test Verifies that removing the final view clears shared workspace controls.
  */

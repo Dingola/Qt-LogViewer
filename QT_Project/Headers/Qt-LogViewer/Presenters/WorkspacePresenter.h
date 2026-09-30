@@ -23,6 +23,8 @@ class PaginationWidget;
 class QPlainTextEdit;
 class QStackedWidget;
 class SessionController;
+class SnapshotTransitionAnimator;
+class StackedWidgetTransition;
 
 /**
  * @file WorkspacePresenter.h
@@ -110,6 +112,12 @@ class WorkspacePresenter: public QObject
                           bool use_regex) -> void;
 
     private:
+        /**
+         * @brief Changes the active log table page through a directional snapshot transition.
+         * @param page Requested one-based page number.
+         */
+        auto navigate_to_page(int page) -> void;
+
         /** @brief Connects shared widgets to active-view operations. */
         auto connect_workspace_actions() -> void;
 
@@ -153,4 +161,6 @@ class WorkspacePresenter: public QObject
         LogLevelPieChartWidget* m_level_chart{nullptr};
         QStackedWidget* m_central_stack{nullptr};
         DockController* m_dock_controller{nullptr};
+        StackedWidgetTransition* m_page_transition{nullptr};
+        SnapshotTransitionAnimator* m_table_transition{nullptr};
 };
