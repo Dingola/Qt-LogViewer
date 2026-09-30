@@ -1,0 +1,258 @@
+/**
+ * @file LogCacheCatalogTest.cpp
+ * @brief Verifies cache fingerprints, catalog lifecycle rules and per-file schemas.
+ */
+
+#include "Qt-LogViewer/Services/LogCacheCatalogTest.h"
+
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
+#include <QSqlDatabase>
+#include <QSqlQuery>
+#include <QTextStream>
+
+#include "Qt-LogViewer/Services/LogCacheCatalog.h"
+#include "Qt-LogViewer/Services/LogCacheIdentity.h"
+#include "Qt-LogViewer/Services/LogFileCacheDatabase.h"
+#include "Qt-LogViewer/Services/LogParsingProfile.h"
+
+namespace
+{
+/**
+ * @brief Replaces a UTF-8 text file with deterministic test contents.
+ * @param path Destination file path.
+ * @param contents Text written to the file.
+ * @return True when the file was opened, written and flushed without stream errors.
+ */
+auto write_file(const QString& path, const QString& contents) -> bool
+{
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text))
+    {
+        return false;
+    }
+    QTextStream stream(&file);
+    stream << contents;
+    return stream.status() == QTextStream::Ok;
+}
+}  // namespace
+
+/**
+ * @test Verifies deterministic fingerprints, parser-configuration sensitivity and source-change
+ * detection.
+ */
+TEST_F(LogCacheCatalogTest, FingerprintChangesWithFileOrParserConfiguration)
+{
+    const QString file_path = m_temporary_directory.filePath(QStringLiteral("source.log"));
+    ASSERT_TRUE(write_file(file_path, QStringLiteral("INFO first App\n")));
+    const LogParsingProfile first_profile =
+        LogParsingProfile::create_default(QStringLiteral("{level} {message} {app_name}"));
+    const LogParsingProfile second_profile =
+        LogParsingProfile::create_default(QStringLiteral("{message} {level} {app_name}"));
+    const LogParsingProfile equivalent_profile = LogParsingProfile::create_default(
+        QStringLiteral("{level} {message} {app_name}"), QStringLiteral("Other name"));
+
+    const auto first = LogCacheIdentity::create(file_path, first_profile);
+    const auto same = LogCacheIdentity::create(file_path, first_profile);
+    const auto other_profile = LogCacheIdentity::create(file_path, second_profile);
+    const auto equivalent = LogCacheIdentity::create(file_path, equivalent_profile);
+    ASSERT_TRUE(first.has_value());
+    ASSERT_TRUE(same.has_value());
+    ASSERT_TRUE(other_profile.has_value());
+    ASSERT_TRUE(equivalent.has_value());
+    EXPECT_TRUE(first->is_valid());
+    EXPECT_EQ(first->cache_key, same->cache_key);
+    EXPECT_EQ(first->parser_sha256, same->parser_sha256);
+    EXPECT_EQ(first->parser_sha256, equivalent->parser_sha256);
+    EXPECT_EQ(first->cache_key, equivalent->cache_key);
+    EXPECT_NE(first->cache_key, other_profile->cache_key);
+
+    ASSERT_TRUE(write_file(file_path, QStringLiteral("INFO changed App\n")));
+    const auto changed_file = LogCacheIdentity::create(file_path, first_profile);
+    ASSERT_TRUE(changed_file.has_value());
+    EXPECT_NE(first->sample_sha256, changed_file->sample_sha256);
+    EXPECT_NE(first->cache_key, changed_file->cache_key);
+}
+
+/**
+ * @test Verifies the building-to-complete transition and ordered, removable view mappings.
+ */
+TEST_F(LogCacheCatalogTest, StoresCompleteGenerationAndOrderedViewMapping)
+{
+    const QString file_path = m_temporary_directory.filePath(QStringLiteral("source.log"));
+    ASSERT_TRUE(write_file(file_path, QStringLiteral("INFO message App\n")));
+    const LogParsingProfile profile =
+        LogParsingProfile::create_default(QStringLiteral("{level} {message} {app_name}"));
+    const auto identity = LogCacheIdentity::create(file_path, profile);
+    ASSERT_TRUE(identity.has_value());
+
+    LogCacheCatalog catalog(m_temporary_directory.filePath(QStringLiteral("cache")));
+    ASSERT_TRUE(catalog.is_available());
+    EXPECT_EQ(catalog.get_schema_version(), LogCacheCatalog::SchemaVersion);
+
+    const auto building = catalog.begin_generation(identity.value());
+    ASSERT_TRUE(building.has_value());
+    EXPECT_EQ(building->state, LogCacheGenerationState::Building);
+    EXPECT_TRUE(building->database_path.endsWith(identity->cache_key + QStringLiteral(".sqlite")));
+    EXPECT_FALSE(catalog.find_complete_generation(identity.value()).has_value());
+
+    ASSERT_TRUE(catalog.mark_complete(building->id, identity->file_size, 1, 4096));
+    const auto complete = catalog.find_complete_generation(identity.value());
+    ASSERT_TRUE(complete.has_value());
+    EXPECT_EQ(complete->state, LogCacheGenerationState::Complete);
+    EXPECT_EQ(complete->entry_count, 1);
+    EXPECT_EQ(complete->storage_bytes, 4096);
+
+    const QUuid view_id = QUuid::createUuid();
+    ASSERT_TRUE(catalog.bind_view(view_id, {complete->id}));
+    EXPECT_EQ(catalog.get_view_generations(view_id), QVector<qint64>({complete->id}));
+    EXPECT_TRUE(catalog.remove_view(view_id));
+    EXPECT_TRUE(catalog.get_view_generations(view_id).isEmpty());
+    EXPECT_TRUE(catalog.find_complete_generation(identity.value()).has_value());
+}
+
+/**
+ * @test Verifies that an incompatible catalog schema and its stale cache files are rebuilt.
+ */
+TEST_F(LogCacheCatalogTest, RebuildsAnIncompatibleCatalogSchema)
+{
+    const QString cache_root = m_temporary_directory.filePath(QStringLiteral("cache"));
+    ASSERT_TRUE(QDir().mkpath(cache_root));
+    const QString database_path = QDir(cache_root).filePath(QStringLiteral("catalog.sqlite"));
+    const QString stale_file_path = QDir(QDir(cache_root).filePath(QStringLiteral("files")))
+                                        .filePath(QStringLiteral("stale.sqlite"));
+    ASSERT_TRUE(QDir().mkpath(QFileInfo(stale_file_path).absolutePath()));
+    ASSERT_TRUE(write_file(stale_file_path, QStringLiteral("obsolete")));
+    const QString connection_name = QStringLiteral("old_cache_schema_test");
+    {
+        QSqlDatabase database =
+            QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection_name);
+        database.setDatabaseName(database_path);
+        ASSERT_TRUE(database.open());
+        QSqlQuery query(database);
+        ASSERT_TRUE(query.exec(QStringLiteral("CREATE TABLE cache_sources(legacy TEXT)")));
+        ASSERT_TRUE(query.exec(QStringLiteral("PRAGMA user_version=1")));
+        database.close();
+    }
+    QSqlDatabase::removeDatabase(connection_name);
+
+    LogCacheCatalog catalog(cache_root);
+    ASSERT_TRUE(catalog.is_available());
+    EXPECT_EQ(catalog.get_schema_version(), LogCacheCatalog::SchemaVersion);
+    EXPECT_FALSE(QFileInfo::exists(stale_file_path));
+
+    const QString verification_name = QStringLiteral("rebuilt_cache_schema_test");
+    {
+        QSqlDatabase database =
+            QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), verification_name);
+        database.setDatabaseName(database_path);
+        ASSERT_TRUE(database.open());
+        QSqlQuery query(database);
+        ASSERT_TRUE(query.exec(QStringLiteral("PRAGMA table_info(cache_sources)")));
+        QStringList columns;
+        while (query.next())
+        {
+            columns.append(query.value(1).toString());
+        }
+        EXPECT_TRUE(columns.contains(QStringLiteral("canonical_path")));
+        EXPECT_FALSE(columns.contains(QStringLiteral("legacy")));
+        database.close();
+    }
+    QSqlDatabase::removeDatabase(verification_name);
+}
+
+/**
+ * @test Verifies that building or failed generations cannot become visible through a view.
+ */
+TEST_F(LogCacheCatalogTest, DoesNotBindIncompleteGenerationToView)
+{
+    const QString file_path = m_temporary_directory.filePath(QStringLiteral("source.log"));
+    ASSERT_TRUE(write_file(file_path, QStringLiteral("INFO message App\n")));
+    const LogParsingProfile profile =
+        LogParsingProfile::create_default(QStringLiteral("{level} {message} {app_name}"));
+    const auto identity = LogCacheIdentity::create(file_path, profile);
+    ASSERT_TRUE(identity.has_value());
+    LogCacheCatalog catalog(m_temporary_directory.filePath(QStringLiteral("cache")));
+    const auto building = catalog.begin_generation(identity.value());
+    ASSERT_TRUE(building.has_value());
+
+    const QUuid view_id = QUuid::createUuid();
+    EXPECT_FALSE(catalog.bind_view(view_id, {building->id}));
+    EXPECT_TRUE(catalog.get_view_generations(view_id).isEmpty());
+    EXPECT_TRUE(catalog.mark_failed(building->id, QStringLiteral("cancelled")));
+    EXPECT_FALSE(catalog.find_complete_generation(identity.value()).has_value());
+}
+
+/**
+ * @test Verifies the normalized per-file schema stores byte ranges instead of duplicated text.
+ */
+TEST_F(LogCacheCatalogTest, CreatesNormalizedDisposableFileCacheSchema)
+{
+    const QString file_path = m_temporary_directory.filePath(QStringLiteral("source.log"));
+    ASSERT_TRUE(write_file(file_path, QStringLiteral("INFO message App\n")));
+    const LogParsingProfile profile =
+        LogParsingProfile::create_default(QStringLiteral("{level} {message} {app_name}"));
+    const auto identity = LogCacheIdentity::create(file_path, profile);
+    ASSERT_TRUE(identity.has_value());
+    const QString database_path =
+        m_temporary_directory.filePath(QStringLiteral("file-cache.sqlite"));
+
+    LogFileCacheDatabase cache(database_path, identity.value());
+    ASSERT_TRUE(cache.is_available());
+    EXPECT_EQ(cache.get_schema_version(), LogFileCacheDatabase::SchemaVersion);
+    EXPECT_EQ(cache.get_identity().cache_key, identity->cache_key);
+
+    const QString connection_name = QStringLiteral("file_cache_schema_test");
+    {
+        QSqlDatabase database =
+            QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection_name);
+        database.setDatabaseName(database_path);
+        ASSERT_TRUE(database.open());
+        QSqlQuery query(database);
+        ASSERT_TRUE(query.exec(QStringLiteral("PRAGMA table_info(log_entries)")));
+        QStringList columns;
+        while (query.next())
+        {
+            columns.append(query.value(1).toString());
+        }
+        EXPECT_TRUE(columns.contains(QStringLiteral("byte_offset")));
+        EXPECT_TRUE(columns.contains(QStringLiteral("byte_length")));
+        EXPECT_TRUE(columns.contains(QStringLiteral("level_id")));
+        EXPECT_TRUE(columns.contains(QStringLiteral("app_id")));
+        EXPECT_TRUE(columns.contains(QStringLiteral("parsed_fields_cbor")));
+        EXPECT_FALSE(columns.contains(QStringLiteral("view_id")));
+        EXPECT_FALSE(columns.contains(QStringLiteral("file_path")));
+        EXPECT_FALSE(columns.contains(QStringLiteral("raw_record")));
+        EXPECT_FALSE(columns.contains(QStringLiteral("message")));
+        database.close();
+    }
+    QSqlDatabase::removeDatabase(connection_name);
+}
+
+/**
+ * @test Verifies that a per-file database cannot be reused for a different source identity.
+ */
+TEST_F(LogCacheCatalogTest, RejectsFileCacheOpenedWithDifferentIdentity)
+{
+    const QString first_path = m_temporary_directory.filePath(QStringLiteral("first.log"));
+    const QString second_path = m_temporary_directory.filePath(QStringLiteral("second.log"));
+    ASSERT_TRUE(write_file(first_path, QStringLiteral("INFO first App\n")));
+    ASSERT_TRUE(write_file(second_path, QStringLiteral("INFO second App\n")));
+    const LogParsingProfile profile =
+        LogParsingProfile::create_default(QStringLiteral("{level} {message} {app_name}"));
+    const auto first_identity = LogCacheIdentity::create(first_path, profile);
+    const auto second_identity = LogCacheIdentity::create(second_path, profile);
+    ASSERT_TRUE(first_identity.has_value());
+    ASSERT_TRUE(second_identity.has_value());
+    const QString database_path =
+        m_temporary_directory.filePath(QStringLiteral("file-cache.sqlite"));
+
+    {
+        LogFileCacheDatabase cache(database_path, first_identity.value());
+        ASSERT_TRUE(cache.is_available());
+    }
+
+    LogFileCacheDatabase mismatched_cache(database_path, second_identity.value());
+    EXPECT_FALSE(mismatched_cache.is_available());
+}
