@@ -18,10 +18,11 @@
  * @brief Enqueues a file to be streamed for a specific view.
  * @param view_id Target view id.
  * @param file_path Absolute file path.
+ * @return Unique operation identifier, or a null identifier for a duplicate request.
  */
-auto LogViewLoadQueue::enqueue(const QUuid& view_id, const QString& file_path) -> void
+auto LogViewLoadQueue::enqueue(const QUuid& view_id, const QString& file_path) -> QUuid
 {
-    enqueue_request(view_id, file_path, std::nullopt);
+    return enqueue_request(view_id, file_path, std::nullopt);
 }
 
 /**
@@ -29,11 +30,12 @@ auto LogViewLoadQueue::enqueue(const QUuid& view_id, const QString& file_path) -
  * @param view_id Target view identifier.
  * @param file_path Absolute file path.
  * @param profile Parsing profile used for this request.
+ * @return Unique operation identifier, or a null identifier for a duplicate request.
  */
 auto LogViewLoadQueue::enqueue(const QUuid& view_id, const QString& file_path,
-                               const LogParsingProfile& profile) -> void
+                               const LogParsingProfile& profile) -> QUuid
 {
-    enqueue_request(view_id, file_path, profile);
+    return enqueue_request(view_id, file_path, profile);
 }
 
 /**
@@ -41,12 +43,15 @@ auto LogViewLoadQueue::enqueue(const QUuid& view_id, const QString& file_path,
  * @param view_id Target view identifier.
  * @param file_path Absolute file path.
  * @param profile Optional profile overriding the loader default.
+ * @return Unique operation identifier, or a null identifier for a duplicate request.
  */
 auto LogViewLoadQueue::enqueue_request(const QUuid& view_id, const QString& file_path,
-                                       std::optional<LogParsingProfile> profile) -> void
+                                       std::optional<LogParsingProfile> profile) -> QUuid
 {
+    QUuid operation_id;
     bool already_pending = false;
-    const bool already_active = (m_active_view_id == view_id) && (m_active_file_path == file_path);
+    const bool already_active = !m_active_cancel_requested && (m_active_view_id == view_id) &&
+                                (m_active_file_path == file_path);
 
     if (!already_active)
     {
@@ -65,9 +70,11 @@ auto LogViewLoadQueue::enqueue_request(const QUuid& view_id, const QString& file
 
     if (should_enqueue)
     {
-        m_queue.append({view_id, file_path, std::move(profile)});
-        qDebug().nospace() << "[Queue] enqueue view=" << view_id.toString() << " file=\""
-                           << file_path << "\" size=" << m_queue.size();
+        operation_id = QUuid::createUuid();
+        m_queue.append({view_id, operation_id, file_path, std::move(profile)});
+        qDebug().nospace() << "[Queue] enqueue operation=" << operation_id.toString()
+                           << " view=" << view_id.toString() << " file=\"" << file_path
+                           << "\" size=" << m_queue.size();
     }
     else
     {
@@ -75,6 +82,8 @@ auto LogViewLoadQueue::enqueue_request(const QUuid& view_id, const QString& file
                            << " file=\"" << file_path << "\" active=" << already_active
                            << " pending_dup=" << already_pending << " size=" << m_queue.size();
     }
+
+    return operation_id;
 }
 
 /**
@@ -97,9 +106,11 @@ auto LogViewLoadQueue::try_start_next(LogLoadingService* loader, qsizetype batch
         m_queue.pop_front();
 
         m_active_view_id = next_item.view_id;
+        m_active_operation_id = next_item.operation_id;
         m_active_file_path = next_item.file_path;
         m_active_profile = next_item.profile;
         m_active_batch_size = batch_size;
+        m_active_cancel_requested = false;
 
         qDebug().nospace() << "[Queue] start_next view=" << m_active_view_id.toString()
                            << " file=\"" << m_active_file_path << "\" batch=" << m_active_batch_size
@@ -167,6 +178,7 @@ auto LogViewLoadQueue::cancel_if_active(LogLoadingService* loader, const QUuid& 
 
     if (can_cancel)
     {
+        m_active_cancel_requested = true;
         qDebug().nospace() << "[Queue] cancel active view=" << view_id.toString() << " file=\""
                            << m_active_file_path << '"';
 
@@ -188,9 +200,11 @@ auto LogViewLoadQueue::clear_active_if(const QString& file_path) -> void
     {
         qDebug().nospace() << "[Queue] clear_active_if match file=\"" << file_path << "\"";
         m_active_view_id = QUuid();
+        m_active_operation_id = QUuid();
         m_active_file_path = QString();
         m_active_profile.reset();
         m_active_batch_size = 1000;
+        m_active_cancel_requested = false;
     }
     else
     {
@@ -207,9 +221,11 @@ auto LogViewLoadQueue::clear_active() -> void
     qDebug().nospace() << "[Queue] clear_active force idle (was view="
                        << m_active_view_id.toString() << " file=\"" << m_active_file_path << "\")";
     m_active_view_id = QUuid();
+    m_active_operation_id = QUuid();
     m_active_file_path = QString();
     m_active_profile.reset();
     m_active_batch_size = 1000;
+    m_active_cancel_requested = false;
 }
 
 /**
@@ -220,6 +236,15 @@ auto LogViewLoadQueue::get_active_view_id() const -> QUuid
 {
     auto result = m_active_view_id;
     return result;
+}
+
+/**
+ * @brief Returns the active import operation identifier.
+ * @return Unique operation identifier, or a null identifier while idle.
+ */
+auto LogViewLoadQueue::get_active_operation_id() const -> QUuid
+{
+    return m_active_operation_id;
 }
 
 /**

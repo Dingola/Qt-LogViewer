@@ -79,6 +79,7 @@ auto LogViewLoadQueueTest::make_nonexistent_path() const -> QString
 TEST_F(LogViewLoadQueueTest, InitialStateIsIdleAndDefaults)
 {
     EXPECT_TRUE(m_queue.get_active_view_id().isNull());
+    EXPECT_TRUE(m_queue.get_active_operation_id().isNull());
     EXPECT_TRUE(m_queue.get_active_file_path().isEmpty());
     EXPECT_EQ(m_queue.get_pending_count(), 0);
     EXPECT_EQ(m_queue.get_active_batch_size(), 1000);
@@ -94,9 +95,11 @@ TEST_F(LogViewLoadQueueTest, KeepsSelectedProfileWithQueuedRequest)
     const LogParsingProfile profile = LogParsingProfile::create_default(
         QStringLiteral("{level}|{message}"), QStringLiteral("Pipe separated"));
 
-    m_queue.enqueue(m_view_a, file_path, profile);
+    const QUuid operation_id = m_queue.enqueue(m_view_a, file_path, profile);
+    ASSERT_FALSE(operation_id.isNull());
 
     ASSERT_TRUE(m_queue.try_start_next(m_loader, 25));
+    EXPECT_EQ(m_queue.get_active_operation_id(), operation_id);
 
     const std::optional<LogParsingProfile> active_profile = m_queue.get_active_profile();
 
@@ -140,6 +143,25 @@ TEST_F(LogViewLoadQueueTest, EnqueueAddsAndSkipsDuplicates)
 
     m_queue.enqueue(m_view_a, path1);
     EXPECT_EQ(m_queue.get_pending_count(), 2);
+}
+
+/**
+ * @brief A cancelled active request must not suppress a replacement for the same view and file.
+ */
+TEST_F(LogViewLoadQueueTest, AllowsReplacementAfterActiveCancellation)
+{
+    const QString file_path = make_nonexistent_path();
+    const QUuid cancelled_operation = m_queue.enqueue(m_view_a, file_path);
+    ASSERT_FALSE(cancelled_operation.isNull());
+    ASSERT_TRUE(m_queue.try_start_next(m_loader, 50));
+
+    m_queue.cancel_if_active(m_loader, m_view_a);
+
+    const QUuid replacement_operation = m_queue.enqueue(m_view_a, file_path);
+    EXPECT_FALSE(replacement_operation.isNull());
+    EXPECT_NE(replacement_operation, cancelled_operation);
+    EXPECT_EQ(m_queue.get_pending_count(), 1);
+    EXPECT_EQ(m_queue.get_active_operation_id(), cancelled_operation);
 }
 
 /**
@@ -367,6 +389,7 @@ TEST_F(LogViewLoadQueueTest, ClearActiveAlwaysResetsToIdle)
     m_queue.clear_active();
 
     EXPECT_TRUE(m_queue.get_active_view_id().isNull());
+    EXPECT_TRUE(m_queue.get_active_operation_id().isNull());
     EXPECT_TRUE(m_queue.get_active_file_path().isEmpty());
     EXPECT_EQ(m_queue.get_active_batch_size(), 1000);
 }

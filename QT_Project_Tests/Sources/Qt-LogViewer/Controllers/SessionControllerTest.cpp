@@ -1,5 +1,6 @@
 #include "Qt-LogViewer/Controllers/SessionControllerTest.h"
 
+#include <QDateTime>
 #include <QFile>
 #include <QFileInfo>
 #include <QSignalSpy>
@@ -8,6 +9,7 @@
 
 #include "Qt-LogViewer/Controllers/LogViewContext.h"
 #include "Qt-LogViewer/Controllers/SessionController.h"
+#include "Qt-LogViewer/Models/LogEntry.h"
 #include "Qt-LogViewer/Models/LogFileTreeModel.h"
 #include "Qt-LogViewer/Models/LogModel.h"
 #include "Qt-LogViewer/Models/LogPageState.h"
@@ -174,7 +176,7 @@ TEST_F(SessionControllerTest, RestoresMultipleViewsIndependently)
     QSignalSpy restored_spy(m_session_controller, &SessionController::session_restored);
 
     ASSERT_TRUE(m_session_controller->restore_session(state));
-    EXPECT_EQ(restored_view_count, 2);
+    QTRY_COMPARE(restored_view_count, 2);
     QTRY_COMPARE(restored_spy.count(), 1);
 
     const LogPageState* first_page = m_runtime->pages().get_page_state(first_state.id);
@@ -269,4 +271,49 @@ TEST_F(SessionControllerTest, RestoresSameSessionWithoutDuplicatingViewsOrEntrie
     LogModel* model = m_runtime->views().get_context(view_state.id)->get_model();
     ASSERT_NE(model, nullptr);
     EXPECT_EQ(model->rowCount(), 2);
+}
+
+/**
+ * @brief A restored view is exposed only after stale history was discarded and replaced.
+ */
+TEST_F(SessionControllerTest, DoesNotExposeStalePartialHistoryWhileRestoring)
+{
+    QTemporaryFile* file =
+        create_temp_file({QStringLiteral("2024-01-01 12:00:00 INFO FreshEntry RestoreApp")});
+    ASSERT_NE(file, nullptr);
+
+    const QUuid view_id = QUuid::createUuid();
+    const QString file_path = QFileInfo(file->fileName()).absoluteFilePath();
+    const LogEntry stale_entry(
+        QDateTime::fromString(QStringLiteral("2024-01-01T11:00:00.000Z"), Qt::ISODateWithMs),
+        QStringLiteral("INFO"), QStringLiteral("StalePartialEntry"),
+        LogFileInfo(file_path, QStringLiteral("RestoreApp")));
+    ASSERT_TRUE(m_runtime->history().add_entries(view_id, {stale_entry}));
+
+    SessionViewState view_state;
+    view_state.id = view_id;
+    view_state.loaded_files = {LogFileInfo(file_path, QStringLiteral("RestoreApp"))};
+    view_state.filters.live_tailing_enabled = false;
+
+    SessionState state;
+    state.id = QStringLiteral("restore-with-stale-partial-history");
+    state.views = {view_state};
+
+    QSignalSpy view_restored_spy(m_session_controller, &SessionController::view_restored);
+    QSignalSpy session_restored_spy(m_session_controller, &SessionController::session_restored);
+
+    ASSERT_TRUE(m_session_controller->restore_session(state));
+    EXPECT_EQ(view_restored_spy.count(), 0);
+
+    QTRY_COMPARE_WITH_TIMEOUT(session_restored_spy.count(), 1, 5000);
+    ASSERT_EQ(view_restored_spy.count(), 1);
+
+    const LogPageState* page_state = m_runtime->pages().get_page_state(view_id);
+    ASSERT_NE(page_state, nullptr);
+    EXPECT_EQ(page_state->get_total_entries(), 1);
+
+    LogModel* model = m_runtime->views().get_context(view_id)->get_model();
+    ASSERT_NE(model, nullptr);
+    ASSERT_EQ(model->rowCount(), 1);
+    EXPECT_EQ(model->get_entry(0).get_message(), QStringLiteral("FreshEntry"));
 }

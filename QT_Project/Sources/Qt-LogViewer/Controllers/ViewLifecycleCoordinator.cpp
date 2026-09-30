@@ -61,9 +61,11 @@ auto ViewLifecycleCoordinator::close_view(const QUuid& view_id) -> bool
 
     if (view_exists)
     {
+        bool cleanup_queued = false;
         if (m_imports != nullptr)
         {
             m_imports->cancel(view_id);
+            cleanup_queued = m_imports->discard_history(view_id);
         }
 
         if (m_live_tailing != nullptr)
@@ -71,12 +73,12 @@ auto ViewLifecycleCoordinator::close_view(const QUuid& view_id) -> bool
             m_live_tailing->remove_view(view_id);
         }
 
-        if (m_history_writer != nullptr)
+        if (!cleanup_queued && m_history_writer != nullptr)
         {
-            m_history_writer->discard_view(view_id);
+            cleanup_queued = m_history_writer->discard_view(view_id);
         }
 
-        if (m_history != nullptr)
+        if (!cleanup_queued && m_history != nullptr)
         {
             m_history->remove_view_entries(view_id);
         }
@@ -170,12 +172,9 @@ auto ViewLifecycleCoordinator::remove_registered_file(const QUuid& view_id,
             m_live_tailing->stop_file(view_id, file_path);
         }
 
-        if (m_history_writer != nullptr)
-        {
-            m_history_writer->discard_file(view_id, file_path);
-        }
-
-        if (m_history != nullptr)
+        const bool cleanup_queued =
+            m_history_writer != nullptr && m_history_writer->discard_file(view_id, file_path);
+        if (!cleanup_queued && m_history != nullptr)
         {
             m_history->remove_file_entries(view_id, file_path);
         }

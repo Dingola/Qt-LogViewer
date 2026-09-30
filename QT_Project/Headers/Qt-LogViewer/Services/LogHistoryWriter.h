@@ -52,10 +52,12 @@ class LogHistoryWriter final: public QObject
 
         /**
          * @brief Completes an import after all earlier queued batches were processed.
+         * @param operation_id Unique identifier of the completed import attempt.
          * @param view_id View that owns the import.
          * @param file_path Imported source file.
          */
-        auto finish_import(const QUuid& view_id, const QString& file_path) -> void;
+        auto finish_import(const QUuid& operation_id, const QUuid& view_id,
+                           const QString& file_path) -> void;
 
         /**
          * @brief Removes entries that may have been queued before a view was discarded.
@@ -73,12 +75,14 @@ class LogHistoryWriter final: public QObject
     signals:
         /**
          * @brief Emitted after the completion marker reaches the writer.
+         * @param operation_id Unique identifier of the completed import attempt.
          * @param view_id View that owns the import.
          * @param file_path Imported source file.
          * @param succeeded True when every batch was committed.
          * @param error_message Storage error for a failed import.
          */
-        auto import_write_finished(const QUuid& view_id, const QString& file_path, bool succeeded,
+        auto import_write_finished(const QUuid& operation_id, const QUuid& view_id,
+                                   const QString& file_path, bool succeeded,
                                    const QString& error_message) -> void;
 
     private:

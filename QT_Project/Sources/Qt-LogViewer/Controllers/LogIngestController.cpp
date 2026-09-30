@@ -93,10 +93,11 @@ auto LogIngestController::preview_file(const QString& file_path, const LogParsin
  * @brief Enqueues a file to be streamed for a specific view. Idempotent per `(view_id, file_path)`.
  * @param view_id Target view id.
  * @param file_path Absolute file path to stream.
+ * @return Unique operation identifier, or a null identifier for a duplicate request.
  */
-auto LogIngestController::enqueue_stream(const QUuid& view_id, const QString& file_path) -> void
+auto LogIngestController::enqueue_stream(const QUuid& view_id, const QString& file_path) -> QUuid
 {
-    m_queue.enqueue(view_id, file_path, m_default_profile);
+    return m_queue.enqueue(view_id, file_path, m_default_profile);
 }
 
 /**
@@ -104,11 +105,12 @@ auto LogIngestController::enqueue_stream(const QUuid& view_id, const QString& fi
  * @param view_id Target view identifier.
  * @param file_path Absolute file path to stream.
  * @param profile Parsing profile used by the queued request.
+ * @return Unique operation identifier, or a null identifier for a duplicate request.
  */
 auto LogIngestController::enqueue_stream(const QUuid& view_id, const QString& file_path,
-                                         const LogParsingProfile& profile) -> void
+                                         const LogParsingProfile& profile) -> QUuid
 {
-    m_queue.enqueue(view_id, file_path, profile);
+    return m_queue.enqueue(view_id, file_path, profile);
 }
 
 /**
@@ -143,6 +145,15 @@ auto LogIngestController::get_active_view_id() const -> QUuid
 {
     QUuid id = m_queue.get_active_view_id();
     return id;
+}
+
+/**
+ * @brief Returns the active import operation identifier.
+ * @return Unique operation identifier, or a null identifier while idle.
+ */
+auto LogIngestController::get_active_operation_id() const -> QUuid
+{
+    return m_queue.get_active_operation_id();
 }
 
 /**
@@ -194,13 +205,14 @@ auto LogIngestController::wire_service_signals() -> void
             [this](const QString& file_path, const QVector<LogEntry>& batch) {
                 if (!m_is_shutting_down)
                 {
+                    const QUuid operation_id = m_queue.get_active_operation_id();
                     const QUuid view_id = m_queue.get_active_view_id();
                     qDebug().nospace() << "[Ingest] batch for view=" << view_id.toString()
                                        << " file=\"" << file_path << "\" count=" << batch.size();
 
-                    if (!view_id.isNull())
+                    if (!operation_id.isNull() && !view_id.isNull())
                     {
-                        emit entry_batch_parsed(view_id, file_path, batch);
+                        emit entry_batch_parsed(operation_id, view_id, file_path, batch);
                     }
                 }
             });
@@ -209,14 +221,15 @@ auto LogIngestController::wire_service_signals() -> void
             [this](const QString& file_path, qint64 bytes_read, qint64 total_bytes) {
                 if (!m_is_shutting_down)
                 {
+                    const QUuid operation_id = m_queue.get_active_operation_id();
                     const QUuid view_id = m_queue.get_active_view_id();
                     qDebug().nospace()
                         << "[Ingest] progress view=" << view_id.toString() << " file=\""
                         << file_path << "\" " << bytes_read << '/' << total_bytes;
 
-                    if (!view_id.isNull())
+                    if (!operation_id.isNull() && !view_id.isNull())
                     {
-                        emit progress(view_id, file_path, bytes_read, total_bytes);
+                        emit progress(operation_id, view_id, file_path, bytes_read, total_bytes);
                     }
                 }
             });
@@ -225,14 +238,15 @@ auto LogIngestController::wire_service_signals() -> void
             [this](const QString& file_path, const QString& message) {
                 if (!m_is_shutting_down)
                 {
+                    const QUuid operation_id = m_queue.get_active_operation_id();
                     const QUuid view_id = m_queue.get_active_view_id();
                     qWarning().nospace()
                         << "[Ingest] error view=" << view_id.toString() << " file=\"" << file_path
                         << "\" msg=\"" << message << '"';
 
-                    if (!view_id.isNull())
+                    if (!operation_id.isNull() && !view_id.isNull())
                     {
-                        emit error(view_id, file_path, message);
+                        emit error(operation_id, view_id, file_path, message);
                     }
                     // IMPORTANT: Do not clear active state here; wait for streaming_idle to ensure
                     // any late batches are still routed to the active view.
@@ -242,13 +256,14 @@ auto LogIngestController::wire_service_signals() -> void
     connect(&m_loader, &LogLoadingService::finished, this, [this](const QString& file_path) {
         if (!m_is_shutting_down)
         {
+            const QUuid operation_id = m_queue.get_active_operation_id();
             const QUuid view_id = m_queue.get_active_view_id();
             qDebug().nospace() << "[Ingest] finished view=" << view_id.toString() << " file=\""
                                << file_path << '"';
 
-            if (!view_id.isNull())
+            if (!operation_id.isNull() && !view_id.isNull())
             {
-                emit finished(view_id, file_path);
+                emit finished(operation_id, view_id, file_path);
             }
             // IMPORTANT: Do not clear active state here; wait for streaming_idle to avoid
             // dropping a late-arriving last batch for very small files.

@@ -223,8 +223,8 @@ TEST_F(WorkspacePresenterTest, AnimatesVisibleTablePageChanges)
     EXPECT_EQ(configuration.effect, WidgetTransitionEffect::FadeAndSlide);
     EXPECT_EQ(configuration.direction, WidgetTransitionDirection::Left);
     EXPECT_EQ(configuration.easing_curve.type(), QEasingCurve::InOutQuad);
-    EXPECT_EQ(configuration.duration_ms, 480);
-    EXPECT_EQ(configuration.motion_distance, 32);
+    EXPECT_EQ(configuration.duration_ms, 560);
+    EXPECT_EQ(configuration.motion_distance, 128);
     const LogPageState* page_state = m_runtime->pages().get_page_state(view_id);
     ASSERT_NE(page_state, nullptr);
     EXPECT_EQ(page_state->get_current_page(), 2);

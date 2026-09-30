@@ -56,10 +56,12 @@ auto LogHistoryWriter::store_batch(const QUuid& view_id, const QString& file_pat
 
 /**
  * @brief Completes an import after all earlier queued batches were processed.
+ * @param operation_id Unique identifier of the completed import attempt.
  * @param view_id View that owns the import.
  * @param file_path Imported source file.
  */
-auto LogHistoryWriter::finish_import(const QUuid& view_id, const QString& file_path) -> void
+auto LogHistoryWriter::finish_import(const QUuid& operation_id, const QUuid& view_id,
+                                     const QString& file_path) -> void
 {
     const QString absolute_file_path = QFileInfo(file_path).absoluteFilePath();
     const bool service_available = ensure_history_service();
@@ -69,7 +71,8 @@ auto LogHistoryWriter::finish_import(const QUuid& view_id, const QString& file_p
         write_failed ? QString::fromLatin1(k_history_write_error) : QString();
 
     clear_failed_import(view_id, absolute_file_path);
-    emit import_write_finished(view_id, absolute_file_path, !write_failed, error_message);
+    emit import_write_finished(operation_id, view_id, absolute_file_path, !write_failed,
+                               error_message);
 }
 
 /**

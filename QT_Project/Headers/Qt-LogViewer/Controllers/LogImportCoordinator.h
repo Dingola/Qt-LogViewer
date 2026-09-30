@@ -139,6 +139,13 @@ class LogImportCoordinator final: public QObject
         auto cancel(const QUuid& view_id) -> void;
 
         /**
+         * @brief Queues removal of stored history belonging to one view.
+         * @param view_id View whose stored history is discarded.
+         * @return True when asynchronous history cleanup was queued.
+         */
+        auto discard_history(const QUuid& view_id) -> bool;
+
+        /**
          * @brief Stops accepting import callbacks and cancels every registered view.
          */
         auto shutdown() -> void;
@@ -174,7 +181,12 @@ class LogImportCoordinator final: public QObject
         [[nodiscard]] auto get_profile(const QUuid& view_id,
                                        const QString& file_path) const -> LogParsingProfile;
 
-        /** @brief Registers and enqueues one asynchronous file. */
+        /**
+         * @brief Registers and enqueues one asynchronous file.
+         * @param view_id Target view.
+         * @param file_path File to enqueue.
+         * @param profile Selected parsing profile.
+         */
         auto enqueue(const QUuid& view_id, const QString& file_path,
                      const LogParsingProfile& profile) -> void;
 
@@ -185,7 +197,8 @@ class LogImportCoordinator final: public QObject
         auto refresh_visible_page(const QUuid& view_id) -> bool;
 
         /** @brief Completes one asynchronous import after ordered history writes finish. */
-        auto handle_write_finished(const QUuid& view_id, const QString& file_path, bool succeeded,
+        auto handle_write_finished(const QUuid& operation_id, const QUuid& view_id,
+                                   const QString& file_path, bool succeeded,
                                    const QString& error_message) -> void;
 
     private:
@@ -198,5 +211,6 @@ class LogImportCoordinator final: public QObject
         LogPageCoordinator* m_pages{nullptr};
         LogQueryController* m_queries{nullptr};
         LiveTailingCoordinator* m_live_tailing{nullptr};
-        QHash<QUuid, QSet<QString>> m_failed_files;
+        QHash<QUuid, QUuid> m_operation_views;
+        QSet<QUuid> m_failed_operations;
 };

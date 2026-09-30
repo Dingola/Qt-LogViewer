@@ -560,9 +560,12 @@ auto SessionController::restore_session(
             if (!view_id.isNull())
             {
                 m_imports->cancel(view_id);
-                m_history->remove_view_entries(view_id);
+                const bool cleanup_queued = m_imports->discard_history(view_id);
+                if (!cleanup_queued)
+                {
+                    m_history->remove_view_entries(view_id);
+                }
                 m_live_tailing->reset_view(view_id, view_state.filters.live_tailing_enabled);
-                m_queries->apply_view_state(view_id, view_state);
 
                 QVector<QString> paths;
                 for (const LogFileInfo& file_info: view_state.loaded_files)
@@ -588,9 +591,8 @@ auto SessionController::restore_session(
                 if (pending_files.isEmpty())
                 {
                     m_queries->apply_view_state(view_id, view_state);
+                    emit view_restored(view_id, view_state);
                 }
-
-                emit view_restored(view_id, view_state);
             }
             else
             {
@@ -864,6 +866,8 @@ auto SessionController::complete_restored_file(const QUuid& view_id,
             {
                 m_queries->apply_view_state(view_id, state);
             }
+
+            emit view_restored(view_id, state);
 
             finish_session_restore_if_ready();
         }

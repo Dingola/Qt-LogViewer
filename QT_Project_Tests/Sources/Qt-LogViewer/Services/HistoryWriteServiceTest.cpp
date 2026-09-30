@@ -44,6 +44,7 @@ auto HistoryWriteServiceTest::get_database_path() const -> QString
  */
 TEST_F(HistoryWriteServiceTest, StoresBatchesBeforeCompletingImport)
 {
+    const QUuid operation_id = QUuid::createUuid();
     const QUuid view_id = QUuid::createUuid();
     const QString file_path =
         QDir(m_temporary_directory.path()).filePath(QStringLiteral("ordered.log"));
@@ -51,14 +52,16 @@ TEST_F(HistoryWriteServiceTest, StoresBatchesBeforeCompletingImport)
     HistoryWriteService writer(get_database_path());
     QSignalSpy finished_spy(&writer, &HistoryWriteService::import_write_finished);
 
-    ASSERT_TRUE(writer.store_batch(view_id, file_path, {create_entry(1, file_path)}));
-    ASSERT_TRUE(writer.store_batch(view_id, file_path, {create_entry(2, file_path)}));
-    ASSERT_TRUE(writer.finish_import(view_id, file_path));
+    ASSERT_TRUE(writer.begin_import(operation_id, view_id, file_path));
+    ASSERT_TRUE(writer.store_batch(operation_id, view_id, file_path, {create_entry(1, file_path)}));
+    ASSERT_TRUE(writer.store_batch(operation_id, view_id, file_path, {create_entry(2, file_path)}));
+    ASSERT_TRUE(writer.finish_import(operation_id, view_id, file_path));
 
     QTRY_COMPARE_WITH_TIMEOUT(finished_spy.count(), 1, 5000);
-    ASSERT_EQ(finished_spy.first().size(), 4);
-    EXPECT_TRUE(finished_spy.first().at(2).toBool());
-    EXPECT_TRUE(finished_spy.first().at(3).toString().isEmpty());
+    ASSERT_EQ(finished_spy.first().size(), 5);
+    EXPECT_EQ(finished_spy.first().at(0).toUuid(), operation_id);
+    EXPECT_TRUE(finished_spy.first().at(3).toBool());
+    EXPECT_TRUE(finished_spy.first().at(4).toString().isEmpty());
 
     LogQuery query;
     query.view_id = view_id;
@@ -78,18 +81,21 @@ TEST_F(HistoryWriteServiceTest, ReportsStorageFailure)
 
     const QString invalid_path =
         QDir(blocking_file_path).filePath(QStringLiteral("history.sqlite"));
+    const QUuid operation_id = QUuid::createUuid();
     const QUuid view_id = QUuid::createUuid();
     const QString file_path =
         QDir(m_temporary_directory.path()).filePath(QStringLiteral("failed.log"));
     HistoryWriteService writer(invalid_path);
     QSignalSpy finished_spy(&writer, &HistoryWriteService::import_write_finished);
 
-    ASSERT_TRUE(writer.store_batch(view_id, file_path, {create_entry(1, file_path)}));
-    ASSERT_TRUE(writer.finish_import(view_id, file_path));
+    ASSERT_TRUE(writer.begin_import(operation_id, view_id, file_path));
+    ASSERT_TRUE(writer.store_batch(operation_id, view_id, file_path, {create_entry(1, file_path)}));
+    ASSERT_TRUE(writer.finish_import(operation_id, view_id, file_path));
 
     QTRY_COMPARE_WITH_TIMEOUT(finished_spy.count(), 1, 5000);
-    EXPECT_FALSE(finished_spy.first().at(2).toBool());
-    EXPECT_FALSE(finished_spy.first().at(3).toString().isEmpty());
+    EXPECT_EQ(finished_spy.first().at(0).toUuid(), operation_id);
+    EXPECT_FALSE(finished_spy.first().at(3).toBool());
+    EXPECT_FALSE(finished_spy.first().at(4).toString().isEmpty());
 }
 
 /**
@@ -97,18 +103,18 @@ TEST_F(HistoryWriteServiceTest, ReportsStorageFailure)
  */
 TEST_F(HistoryWriteServiceTest, DiscardsFileAfterEarlierWrites)
 {
+    const QUuid operation_id = QUuid::createUuid();
     const QUuid view_id = QUuid::createUuid();
     const QString file_path =
         QDir(m_temporary_directory.path()).filePath(QStringLiteral("discarded.log"));
     LogHistoryService history(get_database_path());
     HistoryWriteService writer(get_database_path());
-    QSignalSpy finished_spy(&writer, &HistoryWriteService::import_write_finished);
 
-    ASSERT_TRUE(writer.store_batch(view_id, file_path, {create_entry(1, file_path)}));
+    ASSERT_TRUE(writer.begin_import(operation_id, view_id, file_path));
+    ASSERT_TRUE(writer.store_batch(operation_id, view_id, file_path, {create_entry(1, file_path)}));
     ASSERT_TRUE(writer.discard_file(view_id, file_path));
-    ASSERT_TRUE(writer.finish_import(view_id, file_path));
-
-    QTRY_COMPARE_WITH_TIMEOUT(finished_spy.count(), 1, 5000);
+    EXPECT_FALSE(writer.finish_import(operation_id, view_id, file_path));
+    writer.shutdown();
 
     LogQuery query;
     query.view_id = view_id;
@@ -120,23 +126,69 @@ TEST_F(HistoryWriteServiceTest, DiscardsFileAfterEarlierWrites)
  */
 TEST_F(HistoryWriteServiceTest, ShutdownDrainsPendingWrites)
 {
+    const QUuid operation_id = QUuid::createUuid();
     const QUuid view_id = QUuid::createUuid();
     const QString file_path =
         QDir(m_temporary_directory.path()).filePath(QStringLiteral("shutdown.log"));
     HistoryWriteService writer(get_database_path());
 
+    ASSERT_TRUE(writer.begin_import(operation_id, view_id, file_path));
     for (int index = 1; index <= 20; ++index)
     {
-        ASSERT_TRUE(writer.store_batch(view_id, file_path, {create_entry(index, file_path)}));
+        ASSERT_TRUE(
+            writer.store_batch(operation_id, view_id, file_path, {create_entry(index, file_path)}));
     }
 
     writer.shutdown();
 
     EXPECT_FALSE(writer.is_running());
-    EXPECT_FALSE(writer.store_batch(view_id, file_path, {create_entry(21, file_path)}));
+    EXPECT_FALSE(
+        writer.store_batch(operation_id, view_id, file_path, {create_entry(21, file_path)}));
 
     LogHistoryService history(get_database_path());
     LogQuery query;
     query.view_id = view_id;
     EXPECT_EQ(history.count_entries(query), 20);
+}
+
+/**
+ * @brief Verifies that cancelling one import does not cancel a later import of the same view.
+ */
+TEST_F(HistoryWriteServiceTest, ReopenedViewUsesIndependentImportOperation)
+{
+    const QUuid reopened_operation_id = QUuid::createUuid();
+    const QUuid view_id = QUuid::createUuid();
+    const QString file_path =
+        QDir(m_temporary_directory.path()).filePath(QStringLiteral("reopened.log"));
+    HistoryWriteService writer(get_database_path());
+    QSignalSpy finished_spy(&writer, &HistoryWriteService::import_write_finished);
+
+    for (int attempt = 1; attempt <= 3; ++attempt)
+    {
+        const QUuid cancelled_operation_id = QUuid::createUuid();
+        ASSERT_TRUE(writer.begin_import(cancelled_operation_id, view_id, file_path));
+
+        for (int batch = 1; batch <= 100; ++batch)
+        {
+            ASSERT_TRUE(writer.store_batch(cancelled_operation_id, view_id, file_path,
+                                           {create_entry(batch, file_path)}));
+        }
+
+        ASSERT_TRUE(writer.discard_view(view_id));
+        EXPECT_FALSE(writer.store_batch(cancelled_operation_id, view_id, file_path,
+                                        {create_entry(attempt, file_path)}));
+    }
+
+    ASSERT_TRUE(writer.begin_import(reopened_operation_id, view_id, file_path));
+    ASSERT_TRUE(writer.store_batch(reopened_operation_id, view_id, file_path,
+                                   {create_entry(3, file_path)}));
+    ASSERT_TRUE(writer.finish_import(reopened_operation_id, view_id, file_path));
+
+    QTRY_COMPARE_WITH_TIMEOUT(finished_spy.count(), 1, 5000);
+    writer.shutdown();
+
+    LogHistoryService history(get_database_path());
+    LogQuery query;
+    query.view_id = view_id;
+    EXPECT_EQ(history.count_entries(query), 1);
 }

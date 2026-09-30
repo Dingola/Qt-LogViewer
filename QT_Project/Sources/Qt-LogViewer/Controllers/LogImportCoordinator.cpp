@@ -7,6 +7,7 @@
 
 #include <QDebug>
 #include <QFileInfo>
+#include <QList>
 #include <optional>
 
 #include "Qt-LogViewer/Controllers/LiveTailingCoordinator.h"
@@ -347,12 +348,41 @@ auto LogImportCoordinator::enqueue_registered_file(const QUuid& view_id, const Q
  */
 auto LogImportCoordinator::cancel(const QUuid& view_id) -> void
 {
-    m_failed_files.remove(view_id);
+    QList<QUuid> cancelled_operations;
+    for (auto iterator = m_operation_views.cbegin(); iterator != m_operation_views.cend();
+         ++iterator)
+    {
+        if (iterator.value() == view_id)
+        {
+            cancelled_operations.append(iterator.key());
+        }
+    }
+
+    for (const QUuid& operation_id: cancelled_operations)
+    {
+        m_operation_views.remove(operation_id);
+        m_failed_operations.remove(operation_id);
+    }
 
     if (m_ingest != nullptr)
     {
         m_ingest->cancel_for_view(view_id);
     }
+
+    if (m_history_writer != nullptr)
+    {
+        m_history_writer->cancel_view(view_id);
+    }
+}
+
+/**
+ * @brief Queues removal of stored history belonging to one view.
+ * @param view_id View whose stored history is discarded.
+ * @return True when asynchronous history cleanup was queued.
+ */
+auto LogImportCoordinator::discard_history(const QUuid& view_id) -> bool
+{
+    return m_history_writer != nullptr && m_history_writer->discard_view(view_id);
 }
 
 /**
@@ -363,14 +393,15 @@ auto LogImportCoordinator::shutdown() -> void
     if (!m_shutting_down)
     {
         m_shutting_down = true;
-        m_failed_files.clear();
+        m_operation_views.clear();
+        m_failed_operations.clear();
 
-        if (m_ingest != nullptr && m_views != nullptr)
+        if (m_views != nullptr)
         {
             const QVector<QUuid> view_ids = m_views->get_all_view_ids();
             for (const QUuid& view_id: view_ids)
             {
-                m_ingest->cancel_for_view(view_id);
+                cancel(view_id);
             }
         }
     }
@@ -383,48 +414,51 @@ auto LogImportCoordinator::connect_workflow() -> void
 {
     if (m_ingest != nullptr)
     {
-        connect(
-            m_ingest, &LogIngestController::entry_batch_parsed, this,
-            [this](const QUuid& view_id, const QString& file_path, const QVector<LogEntry>& batch) {
-                const QString absolute_file_path = QFileInfo(file_path).absoluteFilePath();
-                const bool can_store =
-                    !m_shutting_down && !view_id.isNull() && !batch.isEmpty() &&
-                    !m_failed_files.value(view_id).contains(absolute_file_path) &&
-                    m_views != nullptr && m_views->get_context(view_id) != nullptr &&
-                    m_history_writer != nullptr;
+        connect(m_ingest, &LogIngestController::entry_batch_parsed, this,
+                [this](const QUuid& operation_id, const QUuid& view_id, const QString& file_path,
+                       const QVector<LogEntry>& batch) {
+                    const QString absolute_file_path = QFileInfo(file_path).absoluteFilePath();
+                    const bool can_store =
+                        !m_shutting_down && !view_id.isNull() && !operation_id.isNull() &&
+                        m_operation_views.value(operation_id) == view_id && !batch.isEmpty() &&
+                        !m_failed_operations.contains(operation_id) && m_views != nullptr &&
+                        m_views->get_context(view_id) != nullptr && m_history_writer != nullptr;
 
-                if (can_store)
-                {
-                    const bool accepted =
-                        m_history_writer->store_batch(view_id, absolute_file_path, batch);
-
-                    if (!accepted)
+                    if (can_store)
                     {
-                        m_failed_files[view_id].insert(absolute_file_path);
-                        emit error(view_id, absolute_file_path,
-                                   tr("The imported entries could not be queued for storage."));
-                        emit file_removal_requested(view_id, absolute_file_path);
-                    }
-                }
-            });
+                        const bool accepted = m_history_writer->store_batch(
+                            operation_id, view_id, absolute_file_path, batch);
 
-        connect(
-            m_ingest, &LogIngestController::progress, this,
-            [this](const QUuid& view_id, const QString&, qint64 bytes_read, qint64 total_bytes) {
-                if (!m_shutting_down && !view_id.isNull())
-                {
-                    emit progress(view_id, bytes_read, total_bytes);
-                }
-            });
+                        if (!accepted)
+                        {
+                            m_failed_operations.insert(operation_id);
+                            emit error(view_id, absolute_file_path,
+                                       tr("The imported entries could not be queued for storage."));
+                            emit file_removal_requested(view_id, absolute_file_path);
+                        }
+                    }
+                });
+
+        connect(m_ingest, &LogIngestController::progress, this,
+                [this](const QUuid& operation_id, const QUuid& view_id, const QString&,
+                       qint64 bytes_read, qint64 total_bytes) {
+                    if (!m_shutting_down && !view_id.isNull() &&
+                        m_operation_views.value(operation_id) == view_id)
+                    {
+                        emit progress(view_id, bytes_read, total_bytes);
+                    }
+                });
 
         connect(m_ingest, &LogIngestController::error, this,
-                [this](const QUuid& view_id, const QString& file_path, const QString& message) {
+                [this](const QUuid& operation_id, const QUuid& view_id, const QString& file_path,
+                       const QString& message) {
                     const QString absolute_file_path = QFileInfo(file_path).absoluteFilePath();
-                    const bool can_handle = !m_shutting_down && !view_id.isNull();
+                    const bool can_handle = !m_shutting_down && !view_id.isNull() &&
+                                            m_operation_views.value(operation_id) == view_id;
 
                     if (can_handle)
                     {
-                        m_failed_files[view_id].insert(absolute_file_path);
+                        m_failed_operations.insert(operation_id);
                         emit error(view_id, absolute_file_path, message);
 
                         const bool registered =
@@ -438,10 +472,12 @@ auto LogImportCoordinator::connect_workflow() -> void
                 });
 
         connect(m_ingest, &LogIngestController::finished, this,
-                [this](const QUuid& view_id, const QString& file_path) {
-                    if (!m_shutting_down && m_history_writer != nullptr)
+                [this](const QUuid& operation_id, const QUuid& view_id, const QString& file_path) {
+                    if (!m_shutting_down && !operation_id.isNull() &&
+                        m_operation_views.value(operation_id) == view_id &&
+                        m_history_writer != nullptr)
                     {
-                        m_history_writer->finish_import(view_id,
+                        m_history_writer->finish_import(operation_id, view_id,
                                                         QFileInfo(file_path).absoluteFilePath());
                     }
                 });
@@ -524,9 +560,25 @@ auto LogImportCoordinator::enqueue(const QUuid& view_id, const QString& file_pat
                                    const LogParsingProfile& profile) -> void
 {
     remember_profile(view_id, file_path, profile);
-    if (m_ingest != nullptr)
+
+    if (m_ingest != nullptr && m_history_writer != nullptr)
     {
-        m_ingest->enqueue_stream(view_id, file_path, profile);
+        const QUuid operation_id = m_ingest->enqueue_stream(view_id, file_path, profile);
+        const bool registered = operation_id.isNull() ||
+                                m_history_writer->begin_import(operation_id, view_id, file_path);
+
+        if (!operation_id.isNull() && registered)
+        {
+            m_operation_views.insert(operation_id, view_id);
+        }
+
+        if (!registered)
+        {
+            m_ingest->cancel_for_view(view_id);
+            emit error(view_id, file_path,
+                       tr("The import could not be registered for background storage."));
+            emit file_removal_requested(view_id, QFileInfo(file_path).absoluteFilePath());
+        }
     }
 }
 
@@ -576,28 +628,27 @@ auto LogImportCoordinator::refresh_visible_page(const QUuid& view_id) -> bool
 
 /**
  * @brief Completes one asynchronous import after ordered history writes finish.
+ * @param operation_id Unique identifier of the completed import attempt.
  * @param view_id View that owns the import.
  * @param file_path Imported source file.
  * @param succeeded Whether all queued history operations succeeded.
  * @param error_message Storage error for a failed import.
  */
-auto LogImportCoordinator::handle_write_finished(const QUuid& view_id, const QString& file_path,
-                                                 bool succeeded,
+auto LogImportCoordinator::handle_write_finished(const QUuid& operation_id, const QUuid& view_id,
+                                                 const QString& file_path, bool succeeded,
                                                  const QString& error_message) -> void
 {
     const QString absolute_file_path = QFileInfo(file_path).absoluteFilePath();
-    const bool ingest_failed = m_failed_files.value(view_id).contains(absolute_file_path);
+    const bool operation_is_active = m_operation_views.value(operation_id) == view_id;
+    const bool ingest_failed = m_failed_operations.contains(operation_id);
     const bool import_succeeded = succeeded && !ingest_failed;
     const bool view_exists =
         m_views != nullptr && !view_id.isNull() && m_views->get_context(view_id) != nullptr;
 
-    m_failed_files[view_id].remove(absolute_file_path);
-    if (m_failed_files.value(view_id).isEmpty())
-    {
-        m_failed_files.remove(view_id);
-    }
+    m_operation_views.remove(operation_id);
+    m_failed_operations.remove(operation_id);
 
-    if (!m_shutting_down)
+    if (!m_shutting_down && operation_is_active)
     {
         if (!succeeded && view_exists)
         {

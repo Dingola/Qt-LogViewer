@@ -193,8 +193,8 @@ TEST_F(LogIngestControllerTest, EnqueueInvalidStartEmitsErrorAndIdleAndClearsQue
     if (spy_error.count() > 0)
     {
         const auto error_args = spy_error.first();
-        const QUuid err_view = error_args.at(0).toUuid();
-        const QString err_path = error_args.at(1).toString();
+        const QUuid err_view = error_args.at(1).toUuid();
+        const QString err_path = error_args.at(2).toString();
 
         EXPECT_EQ(err_view, view);
         EXPECT_EQ(err_path, invalid_path);
@@ -238,17 +238,17 @@ TEST_F(LogIngestControllerTest, EnqueueValidStartEmitsAllSignalsAndClearsActiveO
     // Verify payload view id if signals were observed
     if (spy_finished.count() > 0)
     {
-        const QUuid finished_view = spy_finished.first().at(0).toUuid();
+        const QUuid finished_view = spy_finished.first().at(1).toUuid();
         EXPECT_EQ(finished_view, view);
     }
     if (spy_batch.count() > 0)
     {
-        const QUuid batch_view = spy_batch.first().at(0).toUuid();
+        const QUuid batch_view = spy_batch.first().at(1).toUuid();
         EXPECT_EQ(batch_view, view);
     }
     if (spy_progress.count() > 0)
     {
-        const QUuid progress_view = spy_progress.first().at(0).toUuid();
+        const QUuid progress_view = spy_progress.first().at(1).toUuid();
         EXPECT_EQ(progress_view, view);
     }
 
@@ -351,7 +351,7 @@ TEST_F(LogIngestControllerTest, ProgressAndBatchSignalsEmittedWithBatching)
     // Batch emissions may be zero for very small files; do not assert strictly.
     if (spy_batch.count() > 0)
     {
-        const QUuid batch_view = spy_batch.first().at(0).toUuid();
+        const QUuid batch_view = spy_batch.first().at(1).toUuid();
         EXPECT_EQ(batch_view, view);
     }
 
@@ -409,14 +409,14 @@ TEST_F(LogIngestControllerTest, MixedValidThenInvalidQueueEmitsFinishedAndError)
 
     if (spy_finished.count() > 0)
     {
-        const QUuid finished_view = spy_finished.first().at(0).toUuid();
+        const QUuid finished_view = spy_finished.first().at(1).toUuid();
         EXPECT_EQ(finished_view, v_valid);
     }
     if (spy_error.count() > 0)
     {
         const auto err_args = spy_error.first();
-        const QUuid err_view = err_args.at(0).toUuid();
-        const QString err_path = err_args.at(1).toString();
+        const QUuid err_view = err_args.at(1).toUuid();
+        const QString err_path = err_args.at(2).toString();
         EXPECT_EQ(err_view, v_invalid);
         EXPECT_EQ(err_path, invalid_path);
     }
@@ -554,9 +554,10 @@ TEST_F(LogIngestControllerTest, DestructorCancelsAndDisconnectsNoLateSignals)
     // Connect controller signals to lambdas whose lifetime is tied to the application (qApp).
     QObject::connect(m_ctrl, &LogIngestController::idle, qApp,
                      [&idle_count]() { idle_count.fetch_add(1); });
-    QObject::connect(
-        m_ctrl, &LogIngestController::finished, qApp,
-        [&finished_count](const QUuid&, const QString&) { finished_count.fetch_add(1); });
+    QObject::connect(m_ctrl, &LogIngestController::finished, qApp,
+                     [&finished_count](const QUuid&, const QUuid&, const QString&) {
+                         finished_count.fetch_add(1);
+                     });
 
     // Start a stream so the controller has work in flight.
     m_ctrl->enqueue_stream(view, m_temp_log_path);
@@ -625,7 +626,7 @@ TEST_F(LogIngestControllerTest, KeepsCancelledStreamAssignedUntilLoaderIsIdle)
     {
         ASSERT_GE(arguments.size(), 1);
 
-        const QUuid signal_view_id = arguments.at(0).toUuid();
+        const QUuid signal_view_id = arguments.at(1).toUuid();
 
         EXPECT_TRUE(signal_view_id == cancelled_view_id || signal_view_id == following_view_id);
     }
@@ -634,7 +635,7 @@ TEST_F(LogIngestControllerTest, KeepsCancelledStreamAssignedUntilLoaderIsIdle)
     {
         ASSERT_GE(arguments.size(), 1);
 
-        const QUuid signal_view_id = arguments.at(0).toUuid();
+        const QUuid signal_view_id = arguments.at(1).toUuid();
 
         EXPECT_TRUE(signal_view_id == cancelled_view_id || signal_view_id == following_view_id);
     }

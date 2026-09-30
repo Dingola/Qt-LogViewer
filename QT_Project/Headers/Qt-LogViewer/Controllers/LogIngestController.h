@@ -78,17 +78,19 @@ class LogIngestController: public QObject
          *        Idempotent per `(view_id, file_path)`.
          * @param view_id Target view id.
          * @param file_path Absolute file path to stream.
+         * @return Unique operation identifier, or a null identifier for a duplicate request.
          */
-        auto enqueue_stream(const QUuid& view_id, const QString& file_path) -> void;
+        auto enqueue_stream(const QUuid& view_id, const QString& file_path) -> QUuid;
 
         /**
          * @brief Enqueues a file with the parsing profile selected for this import.
          * @param view_id Target view identifier.
          * @param file_path Absolute file path to stream.
          * @param profile Parsing profile used by the queued request.
+         * @return Unique operation identifier, or a null identifier for a duplicate request.
          */
         auto enqueue_stream(const QUuid& view_id, const QString& file_path,
-                            const LogParsingProfile& profile) -> void;
+                            const LogParsingProfile& profile) -> QUuid;
 
         /**
          * @brief Attempts to start the next asynchronous load if none is active.
@@ -107,6 +109,12 @@ class LogIngestController: public QObject
          * @return The currently active view id, or a null QUuid if idle.
          */
         [[nodiscard]] auto get_active_view_id() const -> QUuid;
+
+        /**
+         * @brief Returns the active import operation identifier.
+         * @return Unique operation identifier, or a null identifier while idle.
+         */
+        [[nodiscard]] auto get_active_operation_id() const -> QUuid;
 
         /**
          * @brief Returns the active file path (empty if none).
@@ -135,12 +143,13 @@ class LogIngestController: public QObject
     signals:
         /**
          * @brief Emitted when a batch of entries is parsed during streaming for a view.
+         * @param operation_id Immutable identifier of the import producing the batch.
          * @param view_id View receiving streamed data.
          * @param file_path File being streamed.
          * @param batch Parsed entries batch.
          */
-        void entry_batch_parsed(const QUuid& view_id, const QString& file_path,
-                                const QVector<LogEntry>& batch);
+        void entry_batch_parsed(const QUuid& operation_id, const QUuid& view_id,
+                                const QString& file_path, const QVector<LogEntry>& batch);
 
         /**
          * @brief Emitted to report streaming progress for a specific view.
@@ -149,8 +158,8 @@ class LogIngestController: public QObject
          * @param bytes_read Bytes read so far.
          * @param total_bytes Total file size.
          */
-        void progress(const QUuid& view_id, const QString& file_path, qint64 bytes_read,
-                      qint64 total_bytes);
+        void progress(const QUuid& operation_id, const QUuid& view_id, const QString& file_path,
+                      qint64 bytes_read, qint64 total_bytes);
 
         /**
          * @brief Emitted when an error occurs during streaming for a view.
@@ -158,14 +167,16 @@ class LogIngestController: public QObject
          * @param file_path File that errored.
          * @param message Error message.
          */
-        void error(const QUuid& view_id, const QString& file_path, const QString& message);
+        void error(const QUuid& operation_id, const QUuid& view_id, const QString& file_path,
+                   const QString& message);
 
         /**
          * @brief Emitted when a file finishes streaming for a view.
+         * @param operation_id Immutable identifier of the completed streaming attempt.
          * @param view_id View that received the data.
          * @param file_path File that finished.
          */
-        void finished(const QUuid& view_id, const QString& file_path);
+        void finished(const QUuid& operation_id, const QUuid& view_id, const QString& file_path);
 
         /**
          * @brief Emitted when the underlying loader reports idle (safe to start next task).

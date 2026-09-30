@@ -40,21 +40,24 @@ class LogViewLoadQueue
          * @brief Enqueues a file to be streamed for a specific view.
          *
          * Idempotent per `(view_id, file_path)`: if the same pair is already pending or currently
-         * active, this method is a no-op to avoid duplicates causing the same file to start again.
+         * active, this method is a no-op. An active request whose cancellation was already
+         * requested no longer suppresses a replacement request for the same pair.
          *
          * @param view_id Target view id.
          * @param file_path Absolute file path.
+         * @return Unique operation identifier, or a null identifier for a duplicate request.
          */
-        auto enqueue(const QUuid& view_id, const QString& file_path) -> void;
+        auto enqueue(const QUuid& view_id, const QString& file_path) -> QUuid;
 
         /**
          * @brief Enqueues a file together with the parsing profile selected for its import.
          * @param view_id Target view identifier.
          * @param file_path Absolute file path.
          * @param profile Parsing profile used for this request.
+         * @return Unique operation identifier, or a null identifier for a duplicate request.
          */
         auto enqueue(const QUuid& view_id, const QString& file_path,
-                     const LogParsingProfile& profile) -> void;
+                     const LogParsingProfile& profile) -> QUuid;
 
         /**
          * @brief Attempts to start the next async stream if none is active.
@@ -102,6 +105,12 @@ class LogViewLoadQueue
         [[nodiscard]] auto get_active_view_id() const -> QUuid;
 
         /**
+         * @brief Returns the active import operation identifier.
+         * @return Unique operation identifier, or a null identifier while idle.
+         */
+        [[nodiscard]] auto get_active_operation_id() const -> QUuid;
+
+        /**
          * @brief Returns the active file path (empty if none).
          * @return The currently active file path, or empty if idle.
          */
@@ -133,9 +142,10 @@ class LogViewLoadQueue
          * @param view_id Target view identifier.
          * @param file_path Absolute file path.
          * @param profile Optional profile overriding the loader default.
+         * @return Unique operation identifier, or a null identifier for a duplicate request.
          */
-        auto enqueue_request(const QUuid& view_id, const QString& file_path,
-                             std::optional<LogParsingProfile> profile) -> void;
+        [[nodiscard]] auto enqueue_request(const QUuid& view_id, const QString& file_path,
+                                           std::optional<LogParsingProfile> profile) -> QUuid;
 
         /**
          * @struct LoadRequest
@@ -144,6 +154,9 @@ class LogViewLoadQueue
         struct LoadRequest {
                 /** View that receives parsed entries. */
                 QUuid view_id;
+
+                /** Unique identifier separating repeated imports of the same view and file. */
+                QUuid operation_id;
 
                 /** Source file passed to the loading service. */
                 QString file_path;
@@ -154,7 +167,9 @@ class LogViewLoadQueue
 
         QList<LoadRequest> m_queue;
         QUuid m_active_view_id;
+        QUuid m_active_operation_id;
         QString m_active_file_path;
         std::optional<LogParsingProfile> m_active_profile;
         qsizetype m_active_batch_size{1000};
+        bool m_active_cancel_requested{false};
 };

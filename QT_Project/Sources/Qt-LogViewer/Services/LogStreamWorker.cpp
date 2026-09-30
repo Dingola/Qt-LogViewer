@@ -74,7 +74,7 @@ auto LogStreamWorker::start(const QString& file_path, qsizetype batch_size) -> v
             }
         }
 
-        if (!batch.isEmpty())
+        if (!batch.isEmpty() && !m_cancelled.load())
         {
             emit entry_batch_parsed(file_path, batch);
         }
