@@ -13,6 +13,7 @@
 #include "Qt-LogViewer/Controllers/ViewRegistry.h"
 #include "Qt-LogViewer/Services/HistoryWriteService.h"
 #include "Qt-LogViewer/Services/LogCacheCatalog.h"
+#include "Qt-LogViewer/Services/LogCacheReadService.h"
 #include "Qt-LogViewer/Services/LogHistoryService.h"
 #include "Qt-LogViewer/Services/LogParsingProfile.h"
 #include "Qt-LogViewer/Services/LogPreviewService.h"
@@ -85,6 +86,7 @@ class TestLogRuntime final
         FileCatalogController m_catalog;
         ViewRegistry m_views;
         FilterCoordinator m_filters;
+        LogCacheReadService m_cache_reader;
         LogHistoryService m_history;
         HistoryWriteService m_history_writer;
         LogPageCoordinator m_pages;

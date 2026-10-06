@@ -17,6 +17,7 @@ TestLogRuntime::TestLogRuntime(const LogParsingProfile& profile)
       m_ingest(m_profile),
       m_catalog(&m_ingest),
       m_filters(&m_views),
+      m_cache_reader(&m_cache_catalog, &m_views),
       m_history(m_cache_directory.filePath(QStringLiteral("history.sqlite"))),
       m_history_writer(m_history.get_database_path()),
       m_pages(&m_history, &m_views),
@@ -28,6 +29,7 @@ TestLogRuntime::TestLogRuntime(const LogParsingProfile& profile)
                   &m_history_writer, &m_pages, &m_queries),
       m_preview(m_profile)
 {
+    m_history.set_cache_read_service(&m_cache_reader);
     QObject::connect(&m_imports, &LogImportCoordinator::file_removal_requested, &m_lifecycle,
                      [this](const QUuid& view_id, const QString& file_path) {
                          m_lifecycle.remove_file(view_id, file_path);

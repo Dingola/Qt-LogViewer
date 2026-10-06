@@ -54,7 +54,7 @@ class LogHistoryWriter final: public QObject
                           const std::optional<LogCacheGeneration>& cache_generation) -> void;
 
         /**
-         * @brief Stores one parsed batch for an asynchronous import.
+         * @brief Stores one parsed batch in its per-file cache or legacy history fallback.
          * @param operation_id Unique identifier of the import attempt.
          * @param view_id View that owns the imported entries.
          * @param file_path Source file used to identify one import operation.

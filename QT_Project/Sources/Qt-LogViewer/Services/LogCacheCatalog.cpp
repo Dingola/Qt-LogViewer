@@ -247,6 +247,19 @@ auto LogCacheCatalog::find_complete_generation(const LogCacheIdentity& identity)
 }
 
 /**
+ * @brief Loads one catalog generation without restricting its lifecycle state.
+ * @param generation_id Catalog generation primary key.
+ * @return Reconstructed generation metadata, or std::nullopt when the catalog is unavailable or
+ * the identifier does not exist.
+ */
+auto LogCacheCatalog::get_generation(qint64 generation_id) const
+    -> std::optional<LogCacheGeneration>
+{
+    const std::optional<LogCacheGeneration> generation = load_generation(generation_id);
+    return generation;
+}
+
+/**
  * @brief Finalizes a building generation and stores its measured sizes.
  * @param generation_id Catalog generation primary key.
  * @param indexed_bytes Number of source bytes represented by the cache.

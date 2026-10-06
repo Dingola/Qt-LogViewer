@@ -21,6 +21,7 @@
 #include <QVariant>
 
 #include "Qt-LogViewer/Models/LogFieldDefinition.h"
+#include "Qt-LogViewer/Services/LogCacheReadService.h"
 
 namespace
 {
@@ -494,6 +495,15 @@ LogHistoryService::~LogHistoryService()
 }
 
 /**
+ * @brief Installs the non-owning cache reader used before legacy-history queries.
+ * @param cache_reader Application-owned cache reader, or nullptr to restore legacy-only reads.
+ */
+auto LogHistoryService::set_cache_read_service(LogCacheReadService* cache_reader) -> void
+{
+    m_cache_read_service = cache_reader;
+}
+
+/**
  * @brief Stores a parsed entry batch for a view.
  * @param view_id View that owns the entries.
  * @param entries Parsed entries to archive.
@@ -502,8 +512,15 @@ LogHistoryService::~LogHistoryService()
 auto LogHistoryService::add_entries(const QUuid& view_id, const QVector<LogEntry>& entries) -> bool
 {
     bool added = false;
+    const bool cache_query =
+        m_cache_read_service != nullptr && m_cache_read_service->can_query(view_id);
 
-    if (m_is_available && !view_id.isNull() && !entries.isEmpty())
+    if (cache_query && !entries.isEmpty())
+    {
+        m_cache_read_service->append_live_entries(view_id, entries);
+        added = true;
+    }
+    else if (m_is_available && !view_id.isNull() && !entries.isEmpty())
     {
         QSqlDatabase database = QSqlDatabase::database(m_connection_name);
         const bool transaction_started = database.transaction();
@@ -580,7 +597,13 @@ auto LogHistoryService::count_entries(const LogQuery& log_query) const -> qsizet
 {
     qsizetype entry_count = 0;
 
-    if (m_is_available && !log_query.view_id.isNull())
+    const bool cache_query =
+        m_cache_read_service != nullptr && m_cache_read_service->can_query(log_query.view_id);
+    if (cache_query)
+    {
+        entry_count = m_cache_read_service->count_entries(log_query);
+    }
+    else if (m_is_available && !log_query.view_id.isNull())
     {
         const SqlFilter filter = create_query_filter(log_query);
 
@@ -626,7 +649,13 @@ auto LogHistoryService::load_entries_page(const LogQuery& log_query, qsizetype o
 {
     QVector<LogEntry> entries;
 
-    if (m_is_available && !log_query.view_id.isNull() && offset >= 0 && limit > 0)
+    const bool cache_query =
+        m_cache_read_service != nullptr && m_cache_read_service->can_query(log_query.view_id);
+    if (cache_query && offset >= 0 && limit > 0)
+    {
+        entries = m_cache_read_service->load_entries_page(log_query, offset, limit);
+    }
+    else if (m_is_available && !log_query.view_id.isNull() && offset >= 0 && limit > 0)
     {
         const SqlFilter filter = create_query_filter(log_query);
         QString query_error = filter.error;
@@ -687,7 +716,13 @@ auto LogHistoryService::get_log_level_counts(const LogQuery& log_query) const
 {
     QMap<QString, qsizetype> level_counts;
 
-    if (m_is_available && !log_query.view_id.isNull())
+    const bool cache_query =
+        m_cache_read_service != nullptr && m_cache_read_service->can_query(log_query.view_id);
+    if (cache_query)
+    {
+        level_counts = m_cache_read_service->get_log_level_counts(log_query);
+    }
+    else if (m_is_available && !log_query.view_id.isNull())
     {
         LogQuery facet_query = log_query;
         facet_query.log_levels.clear();
@@ -747,9 +782,15 @@ auto LogHistoryService::get_distinct_values(const QUuid& view_id,
     QSet<QString> values;
     const QString column = get_distinct_value_column(field_id);
 
-    const bool can_query = m_is_available && !view_id.isNull() && !column.isEmpty();
+    const bool cache_query =
+        m_cache_read_service != nullptr && m_cache_read_service->can_query(view_id);
+    const bool can_query = !cache_query && m_is_available && !view_id.isNull() && !column.isEmpty();
 
-    if (can_query)
+    if (cache_query)
+    {
+        values = m_cache_read_service->get_distinct_values(view_id, field_id);
+    }
+    else if (can_query)
     {
         QSqlQuery query(QSqlDatabase::database(m_connection_name));
 
@@ -797,7 +838,28 @@ auto LogHistoryService::search_entries(const QUuid& view_id, const QString& sear
 {
     QVector<LogEntry> entries;
 
-    if (m_is_available && !view_id.isNull() && !search_text.trimmed().isEmpty() && limit > 0)
+    const bool cache_query =
+        m_cache_read_service != nullptr && m_cache_read_service->can_query(view_id);
+    if (cache_query && !search_text.trimmed().isEmpty() && limit > 0)
+    {
+        LogQuery query;
+        query.view_id = view_id;
+        query.search_text = search_text;
+        if (search_field == SearchField::Message)
+        {
+            query.search_fields.insert(LogField::Message);
+        }
+        else if (search_field == SearchField::Level)
+        {
+            query.search_fields.insert(LogField::Level);
+        }
+        else if (search_field == SearchField::AppName)
+        {
+            query.search_fields.insert(LogField::AppName);
+        }
+        entries = m_cache_read_service->load_entries_page(query, 0, limit);
+    }
+    else if (m_is_available && !view_id.isNull() && !search_text.trimmed().isEmpty() && limit > 0)
     {
         QString fts_column;
 
@@ -867,6 +929,10 @@ auto LogHistoryService::search_entries(const QUuid& view_id, const QString& sear
  */
 auto LogHistoryService::remove_view_entries(const QUuid& view_id) -> void
 {
+    if (m_cache_read_service != nullptr)
+    {
+        m_cache_read_service->remove_view(view_id);
+    }
     if (m_is_available && !view_id.isNull())
     {
         QSqlQuery query(QSqlDatabase::database(m_connection_name));
@@ -883,6 +949,10 @@ auto LogHistoryService::remove_view_entries(const QUuid& view_id) -> void
  */
 auto LogHistoryService::remove_file_entries(const QUuid& view_id, const QString& file_path) -> void
 {
+    if (m_cache_read_service != nullptr)
+    {
+        m_cache_read_service->remove_file(view_id, file_path);
+    }
     if (m_is_available && !view_id.isNull() && !file_path.isEmpty())
     {
         QSqlQuery query(QSqlDatabase::database(m_connection_name));

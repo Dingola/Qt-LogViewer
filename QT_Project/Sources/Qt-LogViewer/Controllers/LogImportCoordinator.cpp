@@ -75,9 +75,11 @@ auto LogImportCoordinator::import_file(const QString& file_path,
         const std::optional<LogCacheGeneration> cache_generation =
             prepare_cache_generation(absolute_file_path, profile);
         const bool cache_prepared = m_cache_catalog == nullptr || cache_generation.has_value();
+        const bool cache_hit = cache_generation.has_value() &&
+                               cache_generation->state == LogCacheGenerationState::Complete;
         const QVector<LogEntry> entries =
-            cache_prepared ? m_ingest->load_file_sync(absolute_file_path, profile)
-                           : QVector<LogEntry>();
+            cache_prepared && !cache_hit ? m_ingest->load_file_sync(absolute_file_path, profile)
+                                         : QVector<LogEntry>();
         const QString app_name = !entries.isEmpty() ? entries.first().get_app_name()
                                                     : LogLoader::identify_app(absolute_file_path);
         const QUuid candidate_view_id = m_views->create_view();
@@ -85,8 +87,8 @@ auto LogImportCoordinator::import_file(const QString& file_path,
             cache_prepared && (!cache_generation.has_value() ||
                                complete_synchronous_cache(cache_generation.value(), entries));
         const bool history_stored =
-            cache_completed &&
-            (entries.isEmpty() || m_history->add_entries(candidate_view_id, entries));
+            cache_completed && (cache_generation.has_value() || entries.isEmpty() ||
+                                m_history->add_entries(candidate_view_id, entries));
         const bool stored = cache_completed && history_stored;
 
         if (!stored)
@@ -159,16 +161,18 @@ auto LogImportCoordinator::import_file(const QUuid& view_id, const QString& file
         const std::optional<LogCacheGeneration> cache_generation =
             prepare_cache_generation(absolute_file_path, profile);
         const bool cache_prepared = m_cache_catalog == nullptr || cache_generation.has_value();
+        const bool cache_hit = cache_generation.has_value() &&
+                               cache_generation->state == LogCacheGenerationState::Complete;
         const QVector<LogEntry> entries =
-            cache_prepared ? m_ingest->load_file_sync(absolute_file_path, profile)
-                           : QVector<LogEntry>();
+            cache_prepared && !cache_hit ? m_ingest->load_file_sync(absolute_file_path, profile)
+                                         : QVector<LogEntry>();
         const QString app_name = !entries.isEmpty() ? entries.first().get_app_name()
                                                     : LogLoader::identify_app(absolute_file_path);
         const bool cache_completed =
             cache_prepared && (!cache_generation.has_value() ||
                                complete_synchronous_cache(cache_generation.value(), entries));
-        const bool stored =
-            cache_completed && (entries.isEmpty() || m_history->add_entries(view_id, entries));
+        const bool stored = cache_completed && (cache_generation.has_value() || entries.isEmpty() ||
+                                                m_history->add_entries(view_id, entries));
 
         if (stored)
         {
@@ -225,17 +229,19 @@ auto LogImportCoordinator::import_files(const QVector<QString>& file_paths,
             const std::optional<LogCacheGeneration> cache_generation =
                 prepare_cache_generation(absolute_file_path, profile);
             const bool cache_prepared = m_cache_catalog == nullptr || cache_generation.has_value();
+            const bool cache_hit = cache_generation.has_value() &&
+                                   cache_generation->state == LogCacheGenerationState::Complete;
             const QVector<LogEntry> entries =
-                cache_prepared ? m_ingest->load_file_sync(absolute_file_path, profile)
-                               : QVector<LogEntry>();
+                cache_prepared && !cache_hit ? m_ingest->load_file_sync(absolute_file_path, profile)
+                                             : QVector<LogEntry>();
             const QString app_name = !entries.isEmpty()
                                          ? entries.first().get_app_name()
                                          : LogLoader::identify_app(absolute_file_path);
             const bool cache_completed =
                 cache_prepared && (!cache_generation.has_value() ||
                                    complete_synchronous_cache(cache_generation.value(), entries));
-            stored = cache_completed &&
-                     (entries.isEmpty() || m_history->add_entries(candidate_view_id, entries));
+            stored = cache_completed && (cache_generation.has_value() || entries.isEmpty() ||
+                                         m_history->add_entries(candidate_view_id, entries));
 
             if (stored)
             {
@@ -368,7 +374,6 @@ auto LogImportCoordinator::import_files_async(const QVector<QString>& file_paths
             const QString absolute_file_path = QFileInfo(file_path).absoluteFilePath();
             loaded_files.append(
                 LogFileInfo(absolute_file_path, LogLoader::identify_app(absolute_file_path)));
-            enqueue(view_id, absolute_file_path, profile);
         }
 
         m_views->set_loaded_files(view_id, loaded_files);
@@ -376,6 +381,11 @@ auto LogImportCoordinator::import_files_async(const QVector<QString>& file_paths
         if (m_live_tailing != nullptr)
         {
             m_live_tailing->reset_view(view_id, true);
+        }
+
+        for (const QString& file_path: file_paths)
+        {
+            enqueue(view_id, QFileInfo(file_path).absoluteFilePath(), profile);
         }
 
         start_next(batch_size);
@@ -718,40 +728,57 @@ auto LogImportCoordinator::enqueue(const QUuid& view_id, const QString& file_pat
         }
         else
         {
-            const QUuid operation_id = m_ingest->enqueue_stream(view_id, file_path, profile);
-            std::optional<LogCacheGeneration> writer_generation;
-            if (cache_generation.has_value())
+            const bool cache_hit = cache_generation.has_value() &&
+                                   cache_generation->state == LogCacheGenerationState::Complete;
+            if (cache_hit)
             {
-                if (cache_generation->state == LogCacheGenerationState::Building)
+                remember_view_generation(view_id, file_path, cache_generation->id);
+                const bool view_bound = bind_view_generations(view_id);
+                if (view_bound)
+                {
+                    refresh_visible_page(view_id);
+                }
+                emit finished(view_id, QFileInfo(file_path).absoluteFilePath());
+                if (m_live_tailing != nullptr)
+                {
+                    m_live_tailing->start_file(view_id, file_path, profile);
+                }
+            }
+            else
+            {
+                const QUuid operation_id = m_ingest->enqueue_stream(view_id, file_path, profile);
+                std::optional<LogCacheGeneration> writer_generation;
+                if (cache_generation.has_value() &&
+                    cache_generation->state == LogCacheGenerationState::Building)
                 {
                     writer_generation = cache_generation;
                 }
-            }
-            const bool registered =
-                !operation_id.isNull() &&
-                m_history_writer->begin_import(operation_id, view_id, file_path, writer_generation);
+                const bool registered = !operation_id.isNull() &&
+                                        m_history_writer->begin_import(
+                                            operation_id, view_id, file_path, writer_generation);
 
-            if (!operation_id.isNull() && registered)
-            {
-                m_operation_views.insert(operation_id, view_id);
-                if (cache_generation.has_value())
+                if (!operation_id.isNull() && registered)
                 {
-                    m_operation_generations.insert(operation_id, cache_generation.value());
+                    m_operation_views.insert(operation_id, view_id);
+                    if (cache_generation.has_value())
+                    {
+                        m_operation_generations.insert(operation_id, cache_generation.value());
+                    }
                 }
-            }
 
-            if (!registered)
-            {
-                if (cache_generation.has_value() && m_cache_catalog != nullptr &&
-                    cache_generation->state == LogCacheGenerationState::Building)
+                if (!registered)
                 {
-                    m_cache_catalog->discard_generation(
-                        cache_generation->id, QStringLiteral("Writer registration failed."));
+                    if (cache_generation.has_value() && m_cache_catalog != nullptr &&
+                        cache_generation->state == LogCacheGenerationState::Building)
+                    {
+                        m_cache_catalog->discard_generation(
+                            cache_generation->id, QStringLiteral("Writer registration failed."));
+                    }
+                    m_ingest->cancel_for_view(view_id);
+                    emit error(view_id, file_path,
+                               tr("The import could not be registered for background storage."));
+                    emit file_removal_requested(view_id, QFileInfo(file_path).absoluteFilePath());
                 }
-                m_ingest->cancel_for_view(view_id);
-                emit error(view_id, file_path,
-                           tr("The import could not be registered for background storage."));
-                emit file_removal_requested(view_id, QFileInfo(file_path).absoluteFilePath());
             }
         }
     }

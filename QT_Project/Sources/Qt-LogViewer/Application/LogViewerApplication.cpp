@@ -22,6 +22,7 @@
 #include "Qt-LogViewer/Controllers/ViewRegistry.h"
 #include "Qt-LogViewer/Services/HistoryWriteService.h"
 #include "Qt-LogViewer/Services/LogCacheCatalog.h"
+#include "Qt-LogViewer/Services/LogCacheReadService.h"
 #include "Qt-LogViewer/Services/LogHistoryService.h"
 #include "Qt-LogViewer/Services/LogParsingProfile.h"
 #include "Qt-LogViewer/Services/LogPreviewService.h"
@@ -67,6 +68,7 @@ class LogViewerApplication::Implementation final
               m_ingest(m_default_profile),
               m_catalog(&m_ingest),
               m_filters(&m_views),
+              m_cache_reader(&m_cache_catalog, &m_views),
               m_history_writer(m_history.get_database_path()),
               m_pages(&m_history, &m_views),
               m_queries(&m_filters, &m_pages, &m_views),
@@ -88,6 +90,7 @@ class LogViewerApplication::Implementation final
                                            m_recent_items_adapter, m_session_controller)),
               m_app_window(std::make_unique<QtWidgetsCommonLib::AppWindow>(nullptr, m_main_window))
         {
+            m_history.set_cache_read_service(&m_cache_reader);
             m_app_window->resize(options.initial_window_size);
             m_app_window->set_app_title(options.window_title);
             m_app_window->set_app_icon(QIcon(options.window_icon_path));
@@ -110,6 +113,7 @@ class LogViewerApplication::Implementation final
         ViewRegistry m_views;
         FilterCoordinator m_filters;
         LogCacheCatalog m_cache_catalog;
+        LogCacheReadService m_cache_reader;
         LogHistoryService m_history;
         HistoryWriteService m_history_writer;
         LogPageCoordinator m_pages;

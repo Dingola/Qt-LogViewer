@@ -143,6 +143,14 @@ class LogCacheCatalog final: public QObject
             -> std::optional<LogCacheGeneration>;
 
         /**
+         * @brief Returns one generation by its catalog identifier.
+         * @param generation_id Catalog generation primary key.
+         * @return Generation metadata, or std::nullopt when unavailable or not found.
+         */
+        [[nodiscard]] auto get_generation(qint64 generation_id) const
+            -> std::optional<LogCacheGeneration>;
+
+        /**
          * @brief Atomically marks a building generation complete and records measured
          * sizes.
          * @param generation_id Catalog generation primary key.

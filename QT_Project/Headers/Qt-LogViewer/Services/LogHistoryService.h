@@ -11,6 +11,8 @@
 #include "Qt-LogViewer/Models/LogQuery.h"
 #include "Qt-LogViewer/Models/SearchFields.h"
 
+class LogCacheReadService;
+
 /**
  * @file LogHistoryService.h
  * @brief Declares the SQLite-backed full log history service.
@@ -45,6 +47,13 @@ class LogHistoryService final: public QObject
          * @param parent Optional QObject parent.
          */
         explicit LogHistoryService(const QString& database_path, QObject* parent = nullptr);
+
+        /**
+         * @brief Selects the persistent per-file cache reader used for bound views.
+         * @param cache_reader Reader owned by the application composition, or nullptr to disable
+         * cache-backed queries.
+         */
+        auto set_cache_read_service(LogCacheReadService* cache_reader) -> void;
 
         /**
          * @brief Closes the SQLite database connection.
@@ -183,5 +192,6 @@ class LogHistoryService final: public QObject
     private:
         QString m_connection_name;
         QString m_database_path;
+        LogCacheReadService* m_cache_read_service{nullptr};
         bool m_is_available{false};
 };

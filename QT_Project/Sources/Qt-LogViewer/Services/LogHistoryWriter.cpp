@@ -72,7 +72,7 @@ auto LogHistoryWriter::begin_import(
 }
 
 /**
- * @brief Stores one parsed batch for an asynchronous import.
+ * @brief Stores one parsed batch in its per-file cache or legacy history fallback.
  * @param operation_id Unique identifier of the import attempt.
  * @param view_id View that owns the imported entries.
  * @param file_path Source file used to identify one import operation.
@@ -84,22 +84,26 @@ auto LogHistoryWriter::store_batch(const QUuid& operation_id, const QUuid& view_
 {
     const QString absolute_file_path = QFileInfo(file_path).absoluteFilePath();
     const bool already_failed = m_failed_imports.contains(operation_id);
-    const bool can_store = !operation_id.isNull() && !view_id.isNull() &&
-                           !absolute_file_path.isEmpty() && !entries.isEmpty() && !already_failed &&
-                           ensure_history_service();
-    bool stored = can_store && m_history_service->add_entries(view_id, entries);
-
     const auto cache_iterator = m_cache_imports.find(operation_id);
-    if (stored && cache_iterator != m_cache_imports.end())
+    const bool writes_cache = cache_iterator != m_cache_imports.end();
+    const bool can_store = !operation_id.isNull() && !view_id.isNull() &&
+                           !absolute_file_path.isEmpty() && !entries.isEmpty() && !already_failed;
+    bool stored = false;
+
+    if (can_store && writes_cache)
     {
         stored = cache_iterator->database != nullptr &&
                  cache_iterator->database->append_entries(entries);
+    }
+    else if (can_store && ensure_history_service())
+    {
+        stored = m_history_service->add_entries(view_id, entries);
     }
 
     if (!already_failed && !stored)
     {
         m_failed_imports.insert(operation_id);
-        if (m_history_service != nullptr)
+        if (!writes_cache && m_history_service != nullptr)
         {
             m_history_service->remove_file_entries(view_id, absolute_file_path);
         }
@@ -116,9 +120,10 @@ auto LogHistoryWriter::finish_import(const QUuid& operation_id, const QUuid& vie
                                      const QString& file_path) -> void
 {
     const QString absolute_file_path = QFileInfo(file_path).absoluteFilePath();
-    const bool service_available = ensure_history_service();
-    bool write_failed = !service_available || m_failed_imports.contains(operation_id);
     const auto cache_iterator = m_cache_imports.find(operation_id);
+    const bool storage_available =
+        cache_iterator != m_cache_imports.end() || ensure_history_service();
+    bool write_failed = !storage_available || m_failed_imports.contains(operation_id);
     if (!write_failed && cache_iterator != m_cache_imports.end())
     {
         write_failed =
