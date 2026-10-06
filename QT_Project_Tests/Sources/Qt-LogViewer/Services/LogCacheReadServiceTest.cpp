@@ -161,8 +161,50 @@ TEST_F(LogCacheReadServiceTest, FiltersAndSearchesReboundCacheEntries)
     EXPECT_EQ(context->get_model()->get_entry(0).get_message(), QStringLiteral("Second"));
 }
 
-/** @test Verifies a changed source bypasses its stale generation and is parsed again. */
-TEST_F(LogCacheReadServiceTest, ReimportsChangedSourceInsteadOfUsingStaleCache)
+/**
+ * @test Verifies bounded SQL pages retain global ordering and facets across cache databases.
+ */
+TEST_F(LogCacheReadServiceTest, MergesBoundedPagesAcrossMultipleCacheDatabases)
+{
+    QTemporaryFile* first_file =
+        create_log_file({QStringLiteral("2026-01-01 10:00:00 INFO First AppA"),
+                         QStringLiteral("2026-01-01 10:03:00 ERROR Fourth AppA")});
+    QTemporaryFile* second_file =
+        create_log_file({QStringLiteral("2026-01-01 10:01:00 WARN Second AppB"),
+                         QStringLiteral("2026-01-01 10:02:00 ERROR Third AppB")});
+    ASSERT_NE(first_file, nullptr);
+    ASSERT_NE(second_file, nullptr);
+
+    const QUuid view_id = m_runtime->imports().import_files(
+        {first_file->fileName(), second_file->fileName()}, m_profile);
+    ASSERT_FALSE(view_id.isNull());
+    m_runtime->live_tailing().set_enabled(view_id, false);
+
+    LogQuery query;
+    query.view_id = view_id;
+    query.sort_field = LogField::Timestamp;
+    query.sort_order = Qt::DescendingOrder;
+
+    EXPECT_EQ(m_runtime->history().count_entries(query), 4);
+    const QVector<LogEntry> page = m_runtime->history().load_entries_page(query, 1, 2);
+    ASSERT_EQ(page.size(), 2);
+    EXPECT_EQ(page.at(0).get_message(), QStringLiteral("Third"));
+    EXPECT_EQ(page.at(1).get_message(), QStringLiteral("Second"));
+
+    query.log_levels = {QStringLiteral("error")};
+    EXPECT_EQ(m_runtime->history().count_entries(query), 2);
+    const QMap<QString, qsizetype> level_counts = m_runtime->history().get_log_level_counts(query);
+    EXPECT_EQ(level_counts.value(QStringLiteral("INFO")), 1);
+    EXPECT_EQ(level_counts.value(QStringLiteral("WARN")), 1);
+    EXPECT_EQ(level_counts.value(QStringLiteral("ERROR")), 2);
+
+    const QSet<QString> applications =
+        m_runtime->history().get_distinct_values(view_id, LogField::AppName);
+    EXPECT_EQ(applications, (QSet<QString>{QStringLiteral("AppA"), QStringLiteral("AppB")}));
+}
+
+/** @test Verifies an appended source reuses its cache prefix and imports only the suffix. */
+TEST_F(LogCacheReadServiceTest, ReusesCachedPrefixForAppendedSource)
 {
     QTemporaryFile* file =
         create_log_file({QStringLiteral("2026-01-01 10:00:00 INFO First CacheApp"),
@@ -171,6 +213,11 @@ TEST_F(LogCacheReadServiceTest, ReimportsChangedSourceInsteadOfUsingStaleCache)
 
     const QUuid initial_view = m_runtime->imports().import_file(file->fileName(), m_profile);
     ASSERT_FALSE(initial_view.isNull());
+    const auto prefix_identity = LogCacheIdentity::create(file->fileName(), m_profile);
+    ASSERT_TRUE(prefix_identity.has_value());
+    const auto prefix_generation =
+        m_runtime->cache_catalog().find_complete_generation(prefix_identity.value());
+    ASSERT_TRUE(prefix_generation.has_value());
     ASSERT_TRUE(m_runtime->lifecycle().close_view(initial_view));
 
     QFile changed_file(file->fileName());
@@ -184,11 +231,22 @@ TEST_F(LogCacheReadServiceTest, ReimportsChangedSourceInsteadOfUsingStaleCache)
     QSignalSpy finished_spy(&m_runtime->imports(), &LogImportCoordinator::finished);
     const QUuid view_id = m_runtime->imports().import_file_async(file->fileName(), m_profile, 1);
     ASSERT_FALSE(view_id.isNull());
+    const LogPageState* prefix_page_state = m_runtime->pages().get_page_state(view_id);
+    ASSERT_NE(prefix_page_state, nullptr);
+    EXPECT_EQ(prefix_page_state->get_total_entries(), 2);
     ASSERT_TRUE(wait_until([&finished_spy]() { return finished_spy.count() == 1; }));
     m_runtime->live_tailing().set_enabled(view_id, false);
 
     EXPECT_GT(progress_spy.count(), 0);
+    EXPECT_EQ(progress_spy.constFirst().at(1).toLongLong(), prefix_identity->file_size);
     const LogPageState* page_state = m_runtime->pages().get_page_state(view_id);
     ASSERT_NE(page_state, nullptr);
     EXPECT_EQ(page_state->get_total_entries(), 3);
+    const auto current_identity = LogCacheIdentity::create(file->fileName(), m_profile);
+    ASSERT_TRUE(current_identity.has_value());
+    const auto current_generation =
+        m_runtime->cache_catalog().find_complete_generation(current_identity.value());
+    ASSERT_TRUE(current_generation.has_value());
+    EXPECT_EQ(current_generation->entry_count, 3);
+    EXPECT_NE(current_generation->id, prefix_generation->id);
 }

@@ -47,18 +47,29 @@ LogHistoryWriter::~LogHistoryWriter()
  * @param operation_id Unique identifier of the import attempt.
  * @param cache_generation Building generation to populate, or no value for
  * legacy-only writing and reuse of an already complete generation.
+ * @param prefix_generation Complete generation cloned before suffix batches are appended.
  */
 auto LogHistoryWriter::begin_import(
-    const QUuid& operation_id, const std::optional<LogCacheGeneration>& cache_generation) -> void
+    const QUuid& operation_id, const std::optional<LogCacheGeneration>& cache_generation,
+    const std::optional<LogCacheGeneration>& prefix_generation) -> void
 {
     const bool should_begin = !operation_id.isNull() && cache_generation.has_value() &&
                               cache_generation->state == LogCacheGenerationState::Building;
     if (should_begin)
     {
         remove_cache_files(cache_generation->database_path);
+        const bool uses_prefix = prefix_generation.has_value() &&
+                                 prefix_generation->state == LogCacheGenerationState::Complete;
+        const bool prepared =
+            !uses_prefix || LogFileCacheDatabase::clone_generation(prefix_generation->database_path,
+                                                                   cache_generation->database_path,
+                                                                   cache_generation->identity);
         auto* database = new LogFileCacheDatabase(cache_generation->database_path,
                                                   cache_generation->identity, this);
-        if (database->is_available() && database->reset_entries())
+        const bool transaction_started =
+            prepared && database->is_available() &&
+            (uses_prefix ? database->begin_append() : database->reset_entries());
+        if (transaction_started)
         {
             m_cache_imports.insert(operation_id, CacheImport{cache_generation.value(), database});
         }

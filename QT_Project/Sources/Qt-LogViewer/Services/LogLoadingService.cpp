@@ -216,6 +216,8 @@ auto LogLoadingService::load_log_file_async(const QString& file_path, qsizetype 
         m_last_stream_profile.reset();
         m_retry_count = 0;
         m_last_batch_size = batch_size;
+        m_last_start_offset = 0;
+        m_last_end_offset = -1;
         m_timer.start();
 
         qDebug().nospace() << "Streaming started: " << file_path << " (batch=" << batch_size << ")";
@@ -235,11 +237,13 @@ auto LogLoadingService::load_log_file_async(const QString& file_path, qsizetype 
  * @brief Starts asynchronous loading with an explicitly selected profile.
  * @param file_path Absolute path of the log file.
  * @param batch_size Number of entries per emitted batch.
- *
  * @param profile Parsing profile selected for this import.
+ * @param start_offset First source byte to parse.
+ * @param end_offset Exclusive source byte boundary, or -1 for the open-time size.
  */
 auto LogLoadingService::load_log_file_async(const QString& file_path, qsizetype batch_size,
-                                            const LogParsingProfile& profile) -> void
+                                            const LogParsingProfile& profile, qint64 start_offset,
+                                            qint64 end_offset) -> void
 {
     if (validate_file(file_path))
     {
@@ -247,11 +251,13 @@ auto LogLoadingService::load_log_file_async(const QString& file_path, qsizetype 
         m_last_stream_profile = profile;
         m_retry_count = 0;
         m_last_batch_size = batch_size;
+        m_last_start_offset = start_offset;
+        m_last_end_offset = end_offset;
         m_timer.start();
 
         qDebug().nospace() << "Streaming started: " << file_path << " (batch=" << batch_size << ")";
 
-        m_loader.load_log_file_async(file_path, batch_size, profile);
+        m_loader.load_log_file_async(file_path, batch_size, profile, start_offset, end_offset);
     }
     else
     {
@@ -342,7 +348,8 @@ auto LogLoadingService::handle_error_and_maybe_retry(const QString& file_path,
             if (m_last_stream_profile.has_value())
             {
                 m_loader.load_log_file_async(file_path, m_last_batch_size,
-                                             m_last_stream_profile.value());
+                                             m_last_stream_profile.value(), m_last_start_offset,
+                                             m_last_end_offset);
             }
             else
             {
@@ -369,6 +376,8 @@ auto LogLoadingService::reset_retry_state(const QString& file_path) -> void
     {
         m_last_stream_file.clear();
         m_last_stream_profile.reset();
+        m_last_start_offset = 0;
+        m_last_end_offset = -1;
         m_retry_count = 0;
         m_last_batch_size = 1000;
         qDebug().nospace() << "[Service] reset_retry_state for \"" << file_path << '"';

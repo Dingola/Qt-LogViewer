@@ -2,6 +2,7 @@
 
 #include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QSignalSpy>
 #include <QTest>
 #include <QTextStream>
@@ -132,6 +133,43 @@ TEST_F(LogStreamWorkerTest, StreamsBatchesAndReportsProgress)
     EXPECT_EQ(last_bytes_read, total_bytes);  // final progress should equal file size
     EXPECT_EQ(total_entries, lines.size());
     EXPECT_EQ(batch_count, 3);
+}
+
+/** @test Verifies bounded streaming parses only the appended range with physical line numbers. */
+TEST_F(LogStreamWorkerTest, StreamsOnlyBoundedSuffixRange)
+{
+    const QVector<QString> lines{QStringLiteral("Info first AppX"),
+                                 QStringLiteral("Info second AppX"),
+                                 QStringLiteral("Error third AppX")};
+    QTemporaryFile* file = create_temp_file(lines);
+    const QByteArray prefix = QByteArrayLiteral("Info first AppX\nInfo second AppX\n");
+    QVector<LogEntry> entries;
+    qint64 initial_progress = -1;
+    qint64 final_progress = -1;
+    qint64 total_bytes = -1;
+
+    QObject::connect(
+        m_worker, &LogStreamWorker::entry_batch_parsed, m_worker,
+        [&entries](const QString&, const QVector<LogEntry>& batch) { entries.append(batch); });
+    QObject::connect(m_worker, &LogStreamWorker::progress, m_worker,
+                     [&initial_progress, &final_progress, &total_bytes](const QString&, qint64 read,
+                                                                        qint64 total) {
+                         if (initial_progress < 0)
+                         {
+                             initial_progress = read;
+                         }
+                         final_progress = read;
+                         total_bytes = total;
+                     });
+
+    m_worker->start(file->fileName(), 10, prefix.size(), QFileInfo(file->fileName()).size());
+
+    ASSERT_EQ(entries.size(), 1);
+    EXPECT_EQ(entries.constFirst().get_message(), QStringLiteral("third"));
+    EXPECT_EQ(entries.constFirst().get_source_line(), 3);
+    EXPECT_EQ(entries.constFirst().get_byte_offset(), prefix.size());
+    EXPECT_EQ(initial_progress, prefix.size());
+    EXPECT_EQ(final_progress, total_bytes);
 }
 
 /**

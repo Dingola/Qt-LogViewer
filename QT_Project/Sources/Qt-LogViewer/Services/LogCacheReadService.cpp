@@ -332,17 +332,133 @@ auto materialize_row(CacheRow& row) -> bool
     return matches;
 }
 
+/** @brief SQL fragments and bindings shared by cache count and page queries. */
+struct SourceSqlFilter {
+        /** @brief Optional joins required by full-text search. */
+        QString joins;
+        /** @brief Optional WHERE clause including its leading keyword. */
+        QString where;
+        /** @brief Positional values bound to predicates in declaration order. */
+        QList<QVariant> bindings;
+        /** @brief Whether file visibility permits querying this source. */
+        bool visible{false};
+};
+
+/**
+ * @brief Builds reusable SQL filtering fragments for one cached source.
+ * @param source Cache source under consideration.
+ * @param query View query containing filters and plain-text search.
+ * @return SQL fragments, bindings and source visibility.
+ */
+[[nodiscard]] auto create_source_sql_filter(const CacheSource& source,
+                                            const LogQuery& query) -> SourceSqlFilter
+{
+    SourceSqlFilter filter;
+    filter.visible = source_is_visible(source, query);
+    if (filter.visible)
+    {
+        QStringList predicates;
+        if (!query.app_name.isEmpty())
+        {
+            predicates.append(QStringLiteral("a.value=?"));
+            filter.bindings.append(query.app_name);
+        }
+        if (!query.log_levels.isEmpty())
+        {
+            QStringList placeholders;
+            for (const QString& level: query.log_levels)
+            {
+                placeholders.append(QStringLiteral("?"));
+                filter.bindings.append(level.trimmed().toCaseFolded());
+            }
+            predicates.append(QStringLiteral("l.normalized_value IN (%1)")
+                                  .arg(placeholders.join(QStringLiteral(","))));
+        }
+
+        const bool plain_search = !query.use_regex && !query.search_text.trimmed().isEmpty();
+        const bool path_selected =
+            query.search_fields.isEmpty() || query.search_fields.contains(LogField::FilePath);
+        const bool path_matches =
+            path_selected &&
+            source.file_path.contains(query.search_text.trimmed(), Qt::CaseInsensitive);
+        const bool indexed_field_selected = query.search_fields.isEmpty() ||
+                                            query.search_fields.contains(LogField::Message) ||
+                                            query.search_fields.contains(LogField::Level) ||
+                                            query.search_fields.contains(LogField::AppName);
+        const QString fts_expression =
+            plain_search && indexed_field_selected
+                ? create_fts_expression(query.search_text, query.search_fields)
+                : QString();
+        if (plain_search && !path_matches && !fts_expression.isEmpty())
+        {
+            filter.joins = QStringLiteral(" JOIN log_entries_fts f ON f.rowid=e.id");
+            predicates.append(QStringLiteral("f.log_entries_fts MATCH ?"));
+            filter.bindings.append(fts_expression);
+        }
+        else if (plain_search && !path_matches && !indexed_field_selected)
+        {
+            predicates.append(QStringLiteral("0"));
+        }
+
+        if (!predicates.isEmpty())
+        {
+            filter.where = QStringLiteral(" WHERE ") + predicates.join(QStringLiteral(" AND "));
+        }
+    }
+    return filter;
+}
+
+/**
+ * @brief Builds SQL ordering equivalent to the stable in-memory comparator.
+ * @param query Query containing the selected sort field and direction.
+ * @return ORDER BY clause for one source database.
+ */
+[[nodiscard]] auto create_source_order(const LogQuery& query) -> QString
+{
+    QString column = QStringLiteral("e.id");
+    if (query.sort_field == LogField::Timestamp)
+    {
+        column = QStringLiteral("e.timestamp_utc_ms");
+    }
+    else if (query.sort_field == LogField::Level)
+    {
+        column = QStringLiteral("l.value COLLATE NOCASE");
+    }
+    else if (query.sort_field == LogField::AppName)
+    {
+        column = QStringLiteral("a.value COLLATE NOCASE");
+    }
+    const QString direction =
+        query.sort_order == Qt::DescendingOrder ? QStringLiteral("DESC") : QStringLiteral("ASC");
+    return QStringLiteral(" ORDER BY %1 %2, e.id %2").arg(column, direction);
+}
+
+/**
+ * @brief Binds positional values to a prepared query.
+ * @param sql_query Query receiving values.
+ * @param bindings Values in placeholder order.
+ */
+auto bind_values(QSqlQuery& sql_query, const QList<QVariant>& bindings) -> void
+{
+    for (qsizetype index = 0; index < bindings.size(); ++index)
+    {
+        sql_query.bindValue(index, bindings.at(index));
+    }
+}
+
 /**
  * @brief Loads filtered metadata rows from one cache database.
  * @param source Validated cache source.
  * @param query View query.
- * @return Matching row metadata in insertion order.
+ * @param maximum_rows Maximum ordered rows to return, or -1 for every match.
+ * @return Matching row metadata in the query's requested order.
  */
-[[nodiscard]] auto load_source_rows(const CacheSource& source,
-                                    const LogQuery& query) -> QVector<CacheRow>
+[[nodiscard]] auto load_source_rows(const CacheSource& source, const LogQuery& query,
+                                    qsizetype maximum_rows = -1) -> QVector<CacheRow>
 {
     QVector<CacheRow> rows;
-    if (source_is_visible(source, query))
+    const SourceSqlFilter filter = create_source_sql_filter(source, query);
+    if (filter.visible)
     {
         const QString connection_name =
             QStringLiteral("qt_log_viewer_cache_read_%1")
@@ -359,65 +475,17 @@ auto materialize_row(CacheRow& row) -> bool
                     "e.timestamp_utc_ms, l.value, a.value "
                     "FROM log_entries e JOIN log_levels l ON l.id=e.level_id "
                     "JOIN applications a ON a.id=e.app_id");
-                QStringList predicates;
-                QList<QVariant> bindings;
-
-                if (!query.app_name.isEmpty())
+                sql += filter.joins + filter.where + create_source_order(query);
+                QList<QVariant> bindings = filter.bindings;
+                if (maximum_rows >= 0)
                 {
-                    predicates.append(QStringLiteral("a.value=?"));
-                    bindings.append(query.app_name);
+                    sql += QStringLiteral(" LIMIT ?");
+                    bindings.append(maximum_rows);
                 }
-                if (!query.log_levels.isEmpty())
-                {
-                    QStringList placeholders;
-                    for (const QString& level: query.log_levels)
-                    {
-                        placeholders.append(QStringLiteral("?"));
-                        bindings.append(level.trimmed().toCaseFolded());
-                    }
-                    predicates.append(QStringLiteral("l.normalized_value IN (%1)")
-                                          .arg(placeholders.join(QStringLiteral(","))));
-                }
-
-                const bool plain_search =
-                    !query.use_regex && !query.search_text.trimmed().isEmpty();
-                const bool path_selected = query.search_fields.isEmpty() ||
-                                           query.search_fields.contains(LogField::FilePath);
-                const bool path_matches =
-                    path_selected &&
-                    source.file_path.contains(query.search_text.trimmed(), Qt::CaseInsensitive);
-                const bool indexed_field_selected =
-                    query.search_fields.isEmpty() ||
-                    query.search_fields.contains(LogField::Message) ||
-                    query.search_fields.contains(LogField::Level) ||
-                    query.search_fields.contains(LogField::AppName);
-                const QString fts_expression =
-                    plain_search && indexed_field_selected
-                        ? create_fts_expression(query.search_text, query.search_fields)
-                        : QString();
-                if (plain_search && !path_matches && !fts_expression.isEmpty())
-                {
-                    sql += QStringLiteral(" JOIN log_entries_fts f ON f.rowid=e.id");
-                    predicates.append(QStringLiteral("f.log_entries_fts MATCH ?"));
-                    bindings.append(fts_expression);
-                }
-                else if (plain_search && !path_matches && !indexed_field_selected)
-                {
-                    predicates.append(QStringLiteral("0"));
-                }
-
-                if (!predicates.isEmpty())
-                {
-                    sql += QStringLiteral(" WHERE ") + predicates.join(QStringLiteral(" AND "));
-                }
-                sql += QStringLiteral(" ORDER BY e.id");
 
                 QSqlQuery sql_query(database);
                 sql_query.prepare(sql);
-                for (qsizetype index = 0; index < bindings.size(); ++index)
-                {
-                    sql_query.bindValue(index, bindings.at(index));
-                }
+                bind_values(sql_query, bindings);
                 if (sql_query.exec())
                 {
                     while (sql_query.next())
@@ -444,6 +512,95 @@ auto materialize_row(CacheRow& row) -> bool
         QSqlDatabase::removeDatabase(connection_name);
     }
     return rows;
+}
+
+/**
+ * @brief Counts matching rows inside one source database without materializing metadata.
+ * @param source Validated cache source.
+ * @param query View query containing SQL-compatible filters.
+ * @return Matching row count, or zero when the source is hidden or unavailable.
+ */
+[[nodiscard]] auto count_source_rows(const CacheSource& source, const LogQuery& query) -> qsizetype
+{
+    const SourceSqlFilter filter = create_source_sql_filter(source, query);
+    qsizetype count = 0;
+    if (filter.visible)
+    {
+        const QString connection_name =
+            QStringLiteral("qt_log_viewer_cache_count_%1")
+                .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+        {
+            QSqlDatabase database =
+                QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection_name);
+            database.setDatabaseName(source.generation.database_path);
+            database.setConnectOptions(QStringLiteral("QSQLITE_OPEN_READONLY"));
+            if (database.open())
+            {
+                QSqlQuery sql_query(database);
+                sql_query.prepare(QStringLiteral("SELECT COUNT(*) FROM log_entries e "
+                                                 "JOIN log_levels l ON l.id=e.level_id "
+                                                 "JOIN applications a ON a.id=e.app_id") +
+                                  filter.joins + filter.where);
+                bind_values(sql_query, filter.bindings);
+                if (sql_query.exec() && sql_query.next())
+                {
+                    count = sql_query.value(0).toLongLong();
+                }
+                database.close();
+            }
+        }
+        QSqlDatabase::removeDatabase(connection_name);
+    }
+    return count;
+}
+
+/**
+ * @brief Groups matching rows by normalized level inside one source database.
+ * @param source Validated cache source.
+ * @param query Query whose level selection has already been cleared.
+ * @return Uppercase level names and counts for this source.
+ */
+[[nodiscard]] auto get_source_level_counts(const CacheSource& source,
+                                           const LogQuery& query) -> QMap<QString, qsizetype>
+{
+    const SourceSqlFilter filter = create_source_sql_filter(source, query);
+    QMap<QString, qsizetype> counts;
+    if (filter.visible)
+    {
+        const QString connection_name =
+            QStringLiteral("qt_log_viewer_cache_facets_%1")
+                .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+        {
+            QSqlDatabase database =
+                QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection_name);
+            database.setDatabaseName(source.generation.database_path);
+            database.setConnectOptions(QStringLiteral("QSQLITE_OPEN_READONLY"));
+            if (database.open())
+            {
+                QSqlQuery sql_query(database);
+                sql_query.prepare(QStringLiteral("SELECT l.value, COUNT(*) FROM log_entries e "
+                                                 "JOIN log_levels l ON l.id=e.level_id "
+                                                 "JOIN applications a ON a.id=e.app_id") +
+                                  filter.joins + filter.where +
+                                  QStringLiteral(" GROUP BY l.normalized_value"));
+                bind_values(sql_query, filter.bindings);
+                if (sql_query.exec())
+                {
+                    while (sql_query.next())
+                    {
+                        const QString level = sql_query.value(0).toString().trimmed().toUpper();
+                        if (!level.isEmpty())
+                        {
+                            counts[level] += sql_query.value(1).toLongLong();
+                        }
+                    }
+                }
+                database.close();
+            }
+        }
+        QSqlDatabase::removeDatabase(connection_name);
+    }
+    return counts;
 }
 
 /**
@@ -563,8 +720,27 @@ auto LogCacheReadService::count_entries(const LogQuery& query) const -> qsizetyp
     const QVector<CacheSource> sources = resolve_sources(m_catalog, m_views, query.view_id);
     const QVector<QString> file_paths =
         m_views != nullptr ? m_views->get_file_paths(query.view_id) : QVector<QString>();
-    const qsizetype count =
-        collect_rows(sources, m_live_entries.value(query.view_id), file_paths, query).size();
+    const QVector<LogEntry> live_entries = m_live_entries.value(query.view_id);
+    const bool requires_materialization = query.use_regex && !query.search_text.trimmed().isEmpty();
+    qsizetype count = 0;
+    if (requires_materialization)
+    {
+        count = collect_rows(sources, live_entries, file_paths, query).size();
+    }
+    else
+    {
+        for (const CacheSource& source: sources)
+        {
+            count += count_source_rows(source, query);
+        }
+        for (const LogEntry& entry: live_entries)
+        {
+            if (live_entry_matches(entry, query))
+            {
+                ++count;
+            }
+        }
+    }
     return count;
 }
 
@@ -581,8 +757,26 @@ auto LogCacheReadService::load_entries_page(const LogQuery& query, qsizetype off
     QVector<LogEntry> entries;
     const QVector<QString> file_paths =
         m_views != nullptr ? m_views->get_file_paths(query.view_id) : QVector<QString>();
-    QVector<CacheRow> rows = collect_rows(resolve_sources(m_catalog, m_views, query.view_id),
-                                          m_live_entries.value(query.view_id), file_paths, query);
+    const QVector<CacheSource> sources = resolve_sources(m_catalog, m_views, query.view_id);
+    const QVector<LogEntry> live_entries = m_live_entries.value(query.view_id);
+    const bool requires_materialization =
+        query.sort_field == LogField::Message ||
+        (query.use_regex && !query.search_text.trimmed().isEmpty());
+    QVector<CacheRow> rows;
+    if (requires_materialization)
+    {
+        rows = collect_rows(sources, live_entries, file_paths, query);
+    }
+    else
+    {
+        const qsizetype maximum_rows =
+            std::max<qsizetype>(0, offset) + std::max<qsizetype>(0, limit);
+        for (const CacheSource& source: sources)
+        {
+            rows.append(load_source_rows(source, query, maximum_rows));
+        }
+        append_live_rows(rows, live_entries, file_paths, query);
+    }
     if (query.sort_field == LogField::Message)
     {
         for (CacheRow& row: rows)
@@ -624,17 +818,47 @@ auto LogCacheReadService::get_log_level_counts(const LogQuery& query) const
 {
     LogQuery facet_query = query;
     facet_query.log_levels.clear();
-    const QVector<CacheRow> rows = collect_rows(
-        resolve_sources(m_catalog, m_views, query.view_id), m_live_entries.value(query.view_id),
-        m_views != nullptr ? m_views->get_file_paths(query.view_id) : QVector<QString>(),
-        facet_query);
     QMap<QString, qsizetype> counts;
-    for (const CacheRow& row: rows)
+    const QVector<CacheSource> sources = resolve_sources(m_catalog, m_views, query.view_id);
+    const QVector<LogEntry> live_entries = m_live_entries.value(query.view_id);
+    const QVector<QString> file_paths =
+        m_views != nullptr ? m_views->get_file_paths(query.view_id) : QVector<QString>();
+    const bool requires_materialization =
+        facet_query.use_regex && !facet_query.search_text.trimmed().isEmpty();
+    if (requires_materialization)
     {
-        const QString level = row.level.trimmed().toUpper();
-        if (!level.isEmpty())
+        const QVector<CacheRow> rows = collect_rows(sources, live_entries, file_paths, facet_query);
+        for (const CacheRow& row: rows)
         {
-            counts[level] += 1;
+            const QString level = row.level.trimmed().toUpper();
+            if (!level.isEmpty())
+            {
+                counts[level] += 1;
+            }
+        }
+    }
+    else
+    {
+        for (const CacheSource& source: sources)
+        {
+            const QMap<QString, qsizetype> source_counts =
+                get_source_level_counts(source, facet_query);
+            for (auto iterator = source_counts.cbegin(); iterator != source_counts.cend();
+                 ++iterator)
+            {
+                counts[iterator.key()] += iterator.value();
+            }
+        }
+        for (const LogEntry& entry: live_entries)
+        {
+            if (live_entry_matches(entry, facet_query))
+            {
+                const QString level = entry.get_level().trimmed().toUpper();
+                if (!level.isEmpty())
+                {
+                    counts[level] += 1;
+                }
+            }
         }
     }
     return counts;
@@ -649,26 +873,65 @@ auto LogCacheReadService::get_log_level_counts(const LogQuery& query) const
 auto LogCacheReadService::get_distinct_values(const QUuid& view_id,
                                               const QString& field_id) const -> QSet<QString>
 {
-    LogQuery query;
-    query.view_id = view_id;
-    const QVector<CacheRow> rows = collect_rows(
-        resolve_sources(m_catalog, m_views, view_id), m_live_entries.value(view_id),
-        m_views != nullptr ? m_views->get_file_paths(view_id) : QVector<QString>(), query);
     QSet<QString> values;
-    for (const CacheRow& row: rows)
+    const QVector<CacheSource> sources = resolve_sources(m_catalog, m_views, view_id);
+    for (const CacheSource& source: sources)
+    {
+        if (field_id == LogField::FilePath)
+        {
+            values.insert(source.file_path);
+        }
+        else if (field_id == LogField::AppName || field_id == LogField::Level)
+        {
+            const QString connection_name =
+                QStringLiteral("qt_log_viewer_cache_distinct_%1")
+                    .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+            {
+                QSqlDatabase database =
+                    QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection_name);
+                database.setDatabaseName(source.generation.database_path);
+                database.setConnectOptions(QStringLiteral("QSQLITE_OPEN_READONLY"));
+                if (database.open())
+                {
+                    const QString sql = field_id == LogField::AppName
+                                            ? QStringLiteral(
+                                                  "SELECT DISTINCT a.value FROM log_entries e "
+                                                  "JOIN applications a ON a.id=e.app_id "
+                                                  "WHERE a.value<>''")
+                                            : QStringLiteral(
+                                                  "SELECT DISTINCT l.value FROM log_entries e "
+                                                  "JOIN log_levels l ON l.id=e.level_id "
+                                                  "WHERE l.value<>''");
+                    QSqlQuery sql_query(database);
+                    if (sql_query.exec(sql))
+                    {
+                        while (sql_query.next())
+                        {
+                            values.insert(sql_query.value(0).toString());
+                        }
+                    }
+                    database.close();
+                }
+            }
+            QSqlDatabase::removeDatabase(connection_name);
+        }
+    }
+
+    const QVector<LogEntry> live_entries = m_live_entries.value(view_id);
+    for (const LogEntry& entry: live_entries)
     {
         QString value;
         if (field_id == LogField::AppName)
         {
-            value = row.app_name;
+            value = entry.get_app_name();
         }
         else if (field_id == LogField::Level)
         {
-            value = row.level;
+            value = entry.get_level();
         }
         else if (field_id == LogField::FilePath)
         {
-            value = row.source.file_path;
+            value = QFileInfo(entry.get_file_info().get_file_path()).absoluteFilePath();
         }
         if (!value.isEmpty())
         {

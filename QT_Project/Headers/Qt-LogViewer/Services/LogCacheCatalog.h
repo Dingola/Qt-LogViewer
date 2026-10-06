@@ -143,6 +143,14 @@ class LogCacheCatalog final: public QObject
             -> std::optional<LogCacheGeneration>;
 
         /**
+         * @brief Finds the largest complete generation that is an unchanged source prefix.
+         * @param identity Current source and parser identity.
+         * @return Largest reusable prefix generation, or std::nullopt when none is safe.
+         */
+        [[nodiscard]] auto find_complete_prefix(const LogCacheIdentity& identity) const
+            -> std::optional<LogCacheGeneration>;
+
+        /**
          * @brief Returns one generation by its catalog identifier.
          * @param generation_id Catalog generation primary key.
          * @return Generation metadata, or std::nullopt when unavailable or not found.

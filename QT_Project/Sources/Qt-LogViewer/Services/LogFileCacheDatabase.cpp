@@ -7,6 +7,7 @@
 
 #include <QCborValue>
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QSqlDatabase>
 #include <QSqlQuery>
@@ -101,6 +102,70 @@ auto LogFileCacheDatabase::get_identity() const -> const LogCacheIdentity&
 }
 
 /**
+ * @brief Copies a finalized generation and retargets its identity for an appended source.
+ * @param source_database_path Finalized prefix database to copy.
+ * @param destination_database_path Building generation database to create.
+ * @param destination_identity Identity of the current appended source snapshot.
+ * @return True when the database was copied and its identity updated atomically.
+ */
+auto LogFileCacheDatabase::clone_generation(const QString& source_database_path,
+                                            const QString& destination_database_path,
+                                            const LogCacheIdentity& destination_identity) -> bool
+{
+    const QString source_path = QFileInfo(source_database_path).absoluteFilePath();
+    const QString destination_path = QFileInfo(destination_database_path).absoluteFilePath();
+    const QString connection_name = QStringLiteral("qt_log_viewer_cache_clone_%1")
+                                        .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+    bool cloned = destination_identity.is_valid() && QFileInfo::exists(source_path) &&
+                  source_path != destination_path &&
+                  QDir().mkpath(QFileInfo(destination_path).absolutePath());
+
+    if (cloned)
+    {
+        QFile::remove(destination_path);
+        QFile::remove(destination_path + QStringLiteral("-wal"));
+        QFile::remove(destination_path + QStringLiteral("-shm"));
+        cloned = QFile::copy(source_path, destination_path);
+    }
+
+    if (cloned)
+    {
+        {
+            QSqlDatabase database =
+                QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection_name);
+            database.setDatabaseName(destination_path);
+            cloned = database.open() && database.transaction();
+            if (cloned)
+            {
+                QSqlQuery query(database);
+                query.prepare(QStringLiteral(
+                    "UPDATE cache_identity SET cache_key=?, canonical_path=?, file_size=?, "
+                    "modified_utc_ms=?, sample_sha256=?, parser_sha256=? WHERE singleton=1"));
+                query.addBindValue(destination_identity.cache_key);
+                query.addBindValue(destination_identity.canonical_file_path);
+                query.addBindValue(destination_identity.file_size);
+                query.addBindValue(destination_identity.modified_utc_ms);
+                query.addBindValue(destination_identity.sample_sha256);
+                query.addBindValue(destination_identity.parser_sha256);
+                cloned = query.exec() && query.numRowsAffected() == 1 && database.commit();
+                if (!cloned)
+                {
+                    database.rollback();
+                }
+            }
+            database.close();
+        }
+        QSqlDatabase::removeDatabase(connection_name);
+    }
+
+    if (!cloned)
+    {
+        QFile::remove(destination_path);
+    }
+    return cloned;
+}
+
+/**
  * @brief Removes all indexed entries before a generation is rebuilt.
  * @return True when the old contents were cleared and a generation-wide
  * transaction started.
@@ -137,6 +202,21 @@ auto LogFileCacheDatabase::reset_entries() -> bool
         m_application_ids.clear();
     }
     return reset;
+}
+
+/**
+ * @brief Starts a generation-wide transaction without clearing cloned entries.
+ * @return True when the database is ready to append suffix entries.
+ */
+auto LogFileCacheDatabase::begin_append() -> bool
+{
+    bool started = m_is_available && !m_write_transaction_active;
+    if (started)
+    {
+        started = QSqlDatabase::database(m_connection_name).transaction();
+        m_write_transaction_active = started;
+    }
+    return started;
 }
 
 /**

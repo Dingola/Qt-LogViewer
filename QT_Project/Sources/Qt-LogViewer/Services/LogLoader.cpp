@@ -176,7 +176,7 @@ auto LogLoader::identify_app(const QString& file_path) -> QString
  */
 auto LogLoader::load_log_file_async(const QString& file_path, qsizetype batch_size) -> void
 {
-    load_log_file_async(file_path, batch_size, m_parser.get_profile());
+    load_log_file_async(file_path, batch_size, m_parser.get_profile(), 0, -1);
 }
 
 /**
@@ -184,9 +184,12 @@ auto LogLoader::load_log_file_async(const QString& file_path, qsizetype batch_si
  * @param file_path Path of the log file.
  * @param batch_size Number of entries per emitted batch.
  * @param profile Parsing profile selected for this import.
+ * @param start_offset First source byte to parse.
+ * @param end_offset Exclusive source byte boundary, or -1 for the open-time size.
  */
 auto LogLoader::load_log_file_async(const QString& file_path, qsizetype batch_size,
-                                    const LogParsingProfile& profile) -> void
+                                    const LogParsingProfile& profile, qint64 start_offset,
+                                    qint64 end_offset) -> void
 {
     if (m_worker_thread == nullptr)
     {
@@ -221,10 +224,10 @@ auto LogLoader::load_log_file_async(const QString& file_path, qsizetype batch_si
         // Start work in thread context.
         QObject::connect(
             m_worker_thread, &QThread::started, m_worker,
-            [this, file_path, batch_size]() {
+            [this, file_path, batch_size, start_offset, end_offset]() {
                 if (m_worker != nullptr)
                 {
-                    m_worker->start(file_path, batch_size);
+                    m_worker->start(file_path, batch_size, start_offset, end_offset);
                 }
             },
             Qt::QueuedConnection);

@@ -3,6 +3,8 @@
 #include <QApplication>
 #include <QDockWidget>
 #include <QFile>
+#include <QHeaderView>
+#include <QLabel>
 #include <QMainWindow>
 #include <QPlainTextEdit>
 #include <QStackedWidget>
@@ -14,6 +16,7 @@
 #include "Qt-LogViewer/Animations/SnapshotTransitionAnimator.h"
 #include "Qt-LogViewer/Controllers/DockController.h"
 #include "Qt-LogViewer/Controllers/LogViewContext.h"
+#include "Qt-LogViewer/Controllers/SessionController.h"
 #include "Qt-LogViewer/Models/LogModel.h"
 #include "Qt-LogViewer/Models/LogPageState.h"
 #include "Qt-LogViewer/Models/LogQuery.h"
@@ -24,6 +27,7 @@
 #include "Qt-LogViewer/Views/App/LogFilterBarWidget.h"
 #include "Qt-LogViewer/Views/App/LogLevelPieChartWidget.h"
 #include "Qt-LogViewer/Views/App/LogTabWidget.h"
+#include "Qt-LogViewer/Views/App/LogTableView.h"
 #include "Qt-LogViewer/Views/App/LogViewWidget.h"
 #include "Qt-LogViewer/Views/Shared/PaginationWidget.h"
 
@@ -47,9 +51,14 @@ void WorkspacePresenterTest::SetUp()
     m_central_stack = new QStackedWidget();
     m_central_stack->addWidget(new QWidget());
     m_central_stack->addWidget(new QWidget());
+    m_session_controller = new SessionController(
+        nullptr, m_runtime->catalog().get_model(), m_profile, &m_runtime->catalog(),
+        &m_runtime->views(), &m_runtime->filters(), &m_runtime->history(), &m_runtime->pages(),
+        &m_runtime->queries(), &m_runtime->imports(), &m_runtime->lifecycle(),
+        &m_runtime->live_tailing());
     m_presenter = new WorkspacePresenter(
         &m_runtime->views(), &m_runtime->filters(), &m_runtime->history(), &m_runtime->pages(),
-        &m_runtime->queries(), &m_runtime->imports(), &m_runtime->lifecycle(), nullptr,
+        &m_runtime->queries(), &m_runtime->imports(), &m_runtime->lifecycle(), m_session_controller,
         m_tab_widget, m_filter_bar, m_pagination, m_details_text, m_level_chart, m_central_stack,
         nullptr);
 }
@@ -61,6 +70,8 @@ void WorkspacePresenterTest::TearDown()
 {
     delete m_presenter;
     m_presenter = nullptr;
+    delete m_session_controller;
+    m_session_controller = nullptr;
     delete m_tab_widget;
     m_tab_widget = nullptr;
     delete m_filter_bar;
@@ -157,6 +168,39 @@ TEST_F(WorkspacePresenterTest, SwitchesBetweenLogViews)
     m_tab_widget->setCurrentIndex(1);
     EXPECT_EQ(m_runtime->views().get_current_view(), second_view);
     EXPECT_EQ(m_filter_bar->get_current_app_name(), QStringLiteral("SecondApp"));
+}
+
+/** @test Verifies hidden loaded views resize their columns only after becoming visible. */
+TEST_F(WorkspacePresenterTest, ResizesHiddenLoadedViewWhenActivated)
+{
+    m_tab_widget->resize(900, 500);
+    m_tab_widget->show();
+    QApplication::processEvents();
+
+    const QUuid first_view =
+        add_log_view({QStringLiteral("2024-01-01 12:00:00 INFO FirstMessage FirstApp")});
+    const QUuid second_view =
+        add_log_view({QStringLiteral("2024-01-01 12:00:01 INFO SecondMessage SecondApp")});
+    ASSERT_FALSE(first_view.isNull());
+    ASSERT_FALSE(second_view.isNull());
+
+    const int first_index = m_tab_widget->find_view_index(first_view);
+    const int second_index = m_tab_widget->find_view_index(second_view);
+    ASSERT_GE(first_index, 0);
+    ASSERT_GE(second_index, 0);
+    LogViewWidget* first_widget = m_tab_widget->log_view_at(first_index);
+    ASSERT_NE(first_widget, nullptr);
+    LogTableView* first_table = first_widget->get_table_view();
+    ASSERT_NE(first_table, nullptr);
+    first_table->setColumnWidth(0, first_table->horizontalHeader()->minimumSectionSize());
+
+    m_tab_widget->setCurrentIndex(second_index);
+    emit m_runtime->imports().finished(first_view, QStringLiteral("hidden.log"));
+    QApplication::processEvents();
+    const int hidden_width = first_table->columnWidth(0);
+
+    m_tab_widget->setCurrentIndex(first_index);
+    QTRY_VERIFY_WITH_TIMEOUT(first_table->columnWidth(0) > hidden_width, 1000);
 }
 
 /**
@@ -270,6 +314,22 @@ TEST_F(WorkspacePresenterTest, SwitchesBetweenWorkspaceAndStartPage)
 
     m_presenter->set_session_active(false);
     EXPECT_EQ(m_central_stack->currentIndex(), 1);
+}
+
+/** @test Verifies registered session views animate into the workspace before imports begin. */
+TEST_F(WorkspacePresenterTest, AnimatesSessionRestoreIntoWorkspace)
+{
+    m_central_stack->resize(480, 320);
+    m_central_stack->setCurrentIndex(1);
+    m_central_stack->show();
+    QApplication::processEvents();
+
+    emit m_session_controller->session_restore_started(QStringLiteral("restored-session"));
+    emit m_session_controller->session_views_registered(QStringLiteral("restored-session"));
+
+    EXPECT_EQ(m_central_stack->currentIndex(), 0);
+    EXPECT_GE(m_central_stack->findChildren<QLabel*>(QString(), Qt::FindDirectChildrenOnly).size(),
+              3);
 }
 
 /** @test Verifies docks are suspended when the start page is already selected. */

@@ -104,9 +104,12 @@ class LogLoadingService final: public QObject
          * @param file_path Absolute path of the log file.
          * @param batch_size Number of entries per emitted batch.
          * @param profile Parsing profile selected for this import.
+         * @param start_offset First source byte to parse.
+         * @param end_offset Exclusive source byte boundary, or -1 for the open-time size.
          */
         auto load_log_file_async(const QString& file_path, qsizetype batch_size,
-                                 const LogParsingProfile& profile) -> void;
+                                 const LogParsingProfile& profile, qint64 start_offset = 0,
+                                 qint64 end_offset = -1) -> void;
 
         /**
          * @brief Cancels any ongoing asynchronous streaming operation.
@@ -228,6 +231,10 @@ class LogLoadingService final: public QObject
         std::optional<LogParsingProfile> m_last_stream_profile;
         int m_retry_count{0};
         qsizetype m_last_batch_size{1000};
+        /** First source byte reused when retrying a bounded stream. */
+        qint64 m_last_start_offset{0};
+        /** Exclusive source boundary reused when retrying a bounded stream. */
+        qint64 m_last_end_offset{-1};
 
         // Instrumentation
         QElapsedTimer m_timer;

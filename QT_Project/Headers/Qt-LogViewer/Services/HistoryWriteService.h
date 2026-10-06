@@ -50,10 +50,12 @@ class HistoryWriteService final: public QObject
          * @param view_id View receiving the imported entries.
          * @param file_path Source file belonging to the import attempt.
          * @param cache_generation Optional building cache generation populated by the writer.
+         * @param prefix_generation Optional complete generation cloned before suffix writes.
          * @return True when the operation was registered.
          */
         auto begin_import(const QUuid& operation_id, const QUuid& view_id, const QString& file_path,
-                          std::optional<LogCacheGeneration> cache_generation = std::nullopt)
+                          std::optional<LogCacheGeneration> cache_generation = std::nullopt,
+                          std::optional<LogCacheGeneration> prefix_generation = std::nullopt)
             -> bool;
 
         /**
@@ -137,6 +139,8 @@ class HistoryWriteService final: public QObject
                 QUuid view_id;
                 QString file_path;
                 std::optional<LogCacheGeneration> cache_generation;
+                /** Complete cache generation cloned before suffix entries are written. */
+                std::optional<LogCacheGeneration> prefix_generation;
                 std::atomic_bool cancelled{false};
                 QMutex mutex;
                 QVector<LogEntry> pending_entries;

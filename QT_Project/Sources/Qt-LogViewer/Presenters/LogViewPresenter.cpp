@@ -15,6 +15,7 @@
 #include "Qt-LogViewer/Controllers/ViewLifecycleCoordinator.h"
 #include "Qt-LogViewer/Controllers/ViewRegistry.h"
 #include "Qt-LogViewer/Models/LogModel.h"
+#include "Qt-LogViewer/Models/LogPageState.h"
 #include "Qt-LogViewer/Models/LogQuery.h"
 #include "Qt-LogViewer/Models/SessionTypes.h"
 #include "Qt-LogViewer/Services/LogHistoryService.h"
@@ -69,13 +70,17 @@ LogViewPresenter::LogViewPresenter(ViewRegistry* views, FilterCoordinator* filte
         LogViewContext* context = m_views->get_context(m_view_id);
         m_widget->set_model(context != nullptr ? context->get_model() : nullptr);
 
-        if (m_pages->get_page_state(m_view_id) == nullptr)
+        const LogPageState* page_state = m_pages->get_page_state(m_view_id);
+        if (page_state == nullptr)
         {
             m_queries->apply_view_state(m_view_id, state);
+            page_state = m_pages->get_page_state(m_view_id);
         }
 
+        const bool deferred_restore = !state.loaded_files.isEmpty() && page_state != nullptr &&
+                                      page_state->get_total_entries() == 0;
         refresh_query_presentation();
-        refresh_filter_presentation();
+        refresh_filter_presentation(!deferred_restore);
         m_widget->set_view_file_paths(m_views->get_file_paths(m_view_id));
 
         connect_widget_actions();
@@ -141,7 +146,7 @@ auto LogViewPresenter::connect_view_updates() -> void
             [this](const QUuid& view_id, qsizetype, qsizetype, qsizetype) {
                 if (view_id == m_view_id)
                 {
-                    refresh_filter_presentation();
+                    refresh_filter_presentation(true);
                     refresh_query_presentation();
                 }
             });
@@ -149,17 +154,16 @@ auto LogViewPresenter::connect_view_updates() -> void
             [this](const QUuid& view_id, qsizetype, qsizetype, qsizetype) {
                 if (view_id == m_view_id)
                 {
-                    refresh_filter_presentation();
+                    refresh_filter_presentation(true);
                 }
             });
     connect(m_imports, &LogImportCoordinator::finished, this,
             [this](const QUuid& view_id, const QString&) {
                 if (view_id == m_view_id)
                 {
-                    refresh_filter_presentation();
+                    refresh_filter_presentation(true);
                     refresh_query_presentation();
                     m_widget->set_view_file_paths(m_views->get_file_paths(m_view_id));
-                    m_widget->auto_resize_columns();
                 }
             });
     connect(m_views, &ViewRegistry::view_removed, this, [this](const QUuid& view_id) {
@@ -171,19 +175,26 @@ auto LogViewPresenter::connect_view_updates() -> void
 }
 
 /**
- * @brief Refreshes filter controls and counts from current runtime state.
+ * @brief Refreshes filter controls and optionally queries persistent values and counts.
+ * @param include_history True to query stored application names and level counts.
  */
-auto LogViewPresenter::refresh_filter_presentation() -> void
+auto LogViewPresenter::refresh_filter_presentation(bool include_history) -> void
 {
     const QSignalBlocker blocker(m_widget);
-    m_widget->set_app_names(m_history->get_distinct_values(m_view_id, LogField::AppName));
+    QSet<QString> app_names;
+    QMap<QString, qsizetype> history_counts;
+    if (include_history)
+    {
+        app_names = m_history->get_distinct_values(m_view_id, LogField::AppName);
+        history_counts = m_history->get_log_level_counts(m_queries->create_query(m_view_id));
+    }
+
+    m_widget->set_app_names(app_names);
     m_widget->set_current_app_name_filter(m_filters->get_app_name(m_view_id));
     m_widget->set_available_log_levels(FilterCoordinator::get_available_log_levels());
     m_widget->set_log_levels(m_filters->get_log_levels(m_view_id));
 
     QMap<QString, int> level_counts;
-    const QMap<QString, qsizetype> history_counts =
-        m_history->get_log_level_counts(m_queries->create_query(m_view_id));
     for (auto iterator = history_counts.cbegin(); iterator != history_counts.cend(); ++iterator)
     {
         level_counts.insert(iterator.key(), static_cast<int>(iterator.value()));

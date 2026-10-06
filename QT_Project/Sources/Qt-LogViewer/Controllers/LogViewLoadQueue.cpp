@@ -22,7 +22,7 @@
  */
 auto LogViewLoadQueue::enqueue(const QUuid& view_id, const QString& file_path) -> QUuid
 {
-    return enqueue_request(view_id, file_path, std::nullopt);
+    return enqueue_request(view_id, file_path, std::nullopt, 0, -1);
 }
 
 /**
@@ -35,7 +35,23 @@ auto LogViewLoadQueue::enqueue(const QUuid& view_id, const QString& file_path) -
 auto LogViewLoadQueue::enqueue(const QUuid& view_id, const QString& file_path,
                                const LogParsingProfile& profile) -> QUuid
 {
-    return enqueue_request(view_id, file_path, profile);
+    return enqueue_request(view_id, file_path, profile, 0, -1);
+}
+
+/**
+ * @brief Enqueues a bounded source range with its parsing profile.
+ * @param view_id Target view identifier.
+ * @param file_path Absolute file path.
+ * @param profile Parsing profile used for this request.
+ * @param start_offset First source byte to parse.
+ * @param end_offset Exclusive source byte boundary.
+ * @return Unique operation identifier, or a null identifier for a duplicate request.
+ */
+auto LogViewLoadQueue::enqueue(const QUuid& view_id, const QString& file_path,
+                               const LogParsingProfile& profile, qint64 start_offset,
+                               qint64 end_offset) -> QUuid
+{
+    return enqueue_request(view_id, file_path, profile, start_offset, end_offset);
 }
 
 /**
@@ -43,10 +59,13 @@ auto LogViewLoadQueue::enqueue(const QUuid& view_id, const QString& file_path,
  * @param view_id Target view identifier.
  * @param file_path Absolute file path.
  * @param profile Optional profile overriding the loader default.
+ * @param start_offset First source byte to parse.
+ * @param end_offset Exclusive source byte boundary, or -1 for the open-time size.
  * @return Unique operation identifier, or a null identifier for a duplicate request.
  */
 auto LogViewLoadQueue::enqueue_request(const QUuid& view_id, const QString& file_path,
-                                       std::optional<LogParsingProfile> profile) -> QUuid
+                                       std::optional<LogParsingProfile> profile,
+                                       qint64 start_offset, qint64 end_offset) -> QUuid
 {
     QUuid operation_id;
     bool already_pending = false;
@@ -71,7 +90,8 @@ auto LogViewLoadQueue::enqueue_request(const QUuid& view_id, const QString& file
     if (should_enqueue)
     {
         operation_id = QUuid::createUuid();
-        m_queue.append({view_id, operation_id, file_path, std::move(profile)});
+        m_queue.append(
+            {view_id, operation_id, file_path, std::move(profile), start_offset, end_offset});
         qDebug().nospace() << "[Queue] enqueue operation=" << operation_id.toString()
                            << " view=" << view_id.toString() << " file=\"" << file_path
                            << "\" size=" << m_queue.size();
@@ -119,7 +139,8 @@ auto LogViewLoadQueue::try_start_next(LogLoadingService* loader, qsizetype batch
         if (m_active_profile.has_value())
         {
             loader->load_log_file_async(m_active_file_path, m_active_batch_size,
-                                        m_active_profile.value());
+                                        m_active_profile.value(), next_item.start_offset,
+                                        next_item.end_offset);
         }
         else
         {

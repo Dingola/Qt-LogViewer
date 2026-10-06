@@ -130,6 +130,34 @@ auto LogPageCoordinator::apply_state(const QUuid& view_id, const LogQuery& query
 }
 
 /**
+ * @brief Installs page state without querying storage or populating the model.
+ * @param view_id Target view.
+ * @param query Query describing filtering and sorting.
+ * @param page_size Positive number of entries per page.
+ * @param current_page Requested one-based page number.
+ * @return True when empty deferred state was installed for the view.
+ */
+auto LogPageCoordinator::prepare_state(const QUuid& view_id, const LogQuery& query,
+                                       qsizetype page_size, qsizetype current_page) -> bool
+{
+    LogViewContext* context = m_views != nullptr ? m_views->get_context(view_id) : nullptr;
+    const bool prepared = context != nullptr && page_size > 0 && current_page > 0;
+    if (prepared)
+    {
+        LogQuery view_query = query;
+        view_query.view_id = view_id;
+
+        LogPageState& state = m_page_states[view_id];
+        state.set_query(view_query);
+        state.set_page_size(page_size);
+        state.set_total_entries(0);
+        state.set_current_page(current_page);
+        context->replace_entries(QVector<LogEntry>());
+    }
+    return prepared;
+}
+
+/**
  * @brief Reloads the current page for a view.
  * @param view_id Target view.
  * @return True when the view and its page state are available.

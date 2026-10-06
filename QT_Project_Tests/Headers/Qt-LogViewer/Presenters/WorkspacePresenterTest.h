@@ -16,6 +16,7 @@ class PaginationWidget;
 class QPlainTextEdit;
 class QStackedWidget;
 class QTemporaryFile;
+class SessionController;
 class WorkspacePresenter;
 
 /**
@@ -54,6 +55,7 @@ class WorkspacePresenterTest: public ::testing::Test
         QPlainTextEdit* m_details_text{nullptr};
         LogLevelPieChartWidget* m_level_chart{nullptr};
         QStackedWidget* m_central_stack{nullptr};
+        SessionController* m_session_controller{nullptr};
         WorkspacePresenter* m_presenter{nullptr};
         QVector<QTemporaryFile*> m_temp_files;
 };

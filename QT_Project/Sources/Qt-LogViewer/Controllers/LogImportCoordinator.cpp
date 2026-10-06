@@ -438,6 +438,7 @@ auto LogImportCoordinator::cancel(const QUuid& view_id) -> void
             m_cache_catalog->mark_failed(generation.id, QStringLiteral("Import cancelled."));
         }
         m_operation_views.remove(operation_id);
+        m_operation_prefixes.remove(operation_id);
         m_failed_operations.remove(operation_id);
     }
 
@@ -526,6 +527,7 @@ auto LogImportCoordinator::shutdown() -> void
 
         m_operation_views.clear();
         m_operation_generations.clear();
+        m_operation_prefixes.clear();
         m_view_generations.clear();
         m_failed_operations.clear();
     }
@@ -555,6 +557,7 @@ auto LogImportCoordinator::connect_workflow() -> void
 
                         if (!accepted)
                         {
+                            const bool has_prefix = m_operation_prefixes.contains(operation_id);
                             const LogCacheGeneration generation =
                                 m_operation_generations.take(operation_id);
                             if (m_cache_catalog != nullptr && generation.id >= 0 &&
@@ -564,13 +567,17 @@ auto LogImportCoordinator::connect_workflow() -> void
                                     generation.id, QStringLiteral("Writer rejected a batch."));
                             }
                             m_operation_views.remove(operation_id);
+                            m_operation_prefixes.remove(operation_id);
                             if (m_ingest != nullptr)
                             {
                                 m_ingest->cancel_for_view(view_id);
                             }
                             emit error(view_id, absolute_file_path,
                                        tr("The imported entries could not be queued for storage."));
-                            emit file_removal_requested(view_id, absolute_file_path);
+                            if (!has_prefix)
+                            {
+                                emit file_removal_requested(view_id, absolute_file_path);
+                            }
                         }
                     }
                 });
@@ -594,6 +601,7 @@ auto LogImportCoordinator::connect_workflow() -> void
 
                     if (can_handle)
                     {
+                        const bool has_prefix = m_operation_prefixes.contains(operation_id);
                         const LogCacheGeneration generation =
                             m_operation_generations.take(operation_id);
                         if (m_cache_catalog != nullptr && generation.id >= 0 &&
@@ -603,13 +611,14 @@ auto LogImportCoordinator::connect_workflow() -> void
                                 generation.id, QStringLiteral("Reader reported an error."));
                         }
                         m_operation_views.remove(operation_id);
+                        m_operation_prefixes.remove(operation_id);
                         m_failed_operations.remove(operation_id);
                         emit error(view_id, absolute_file_path, message);
 
                         const bool registered =
                             m_views != nullptr && m_views->get_context(view_id) != nullptr &&
                             m_views->get_file_paths(view_id).contains(absolute_file_path);
-                        if (registered)
+                        if (registered && !has_prefix)
                         {
                             emit file_removal_requested(view_id, absolute_file_path);
                         }
@@ -746,16 +755,38 @@ auto LogImportCoordinator::enqueue(const QUuid& view_id, const QString& file_pat
             }
             else
             {
-                const QUuid operation_id = m_ingest->enqueue_stream(view_id, file_path, profile);
+                std::optional<LogCacheGeneration> prefix_generation;
+                if (cache_generation.has_value() && m_cache_catalog != nullptr)
+                {
+                    prefix_generation =
+                        m_cache_catalog->find_complete_prefix(cache_generation->identity);
+                    if (prefix_generation.has_value())
+                    {
+                        m_cache_catalog->touch_generation(prefix_generation->id);
+                        remember_view_generation(view_id, file_path, prefix_generation->id);
+                        const bool prefix_bound = bind_view_generations(view_id, false);
+                        if (prefix_bound)
+                        {
+                            refresh_visible_page(view_id);
+                        }
+                    }
+                }
+                const qint64 start_offset =
+                    prefix_generation.has_value() ? prefix_generation->identity.file_size : 0;
+                const qint64 end_offset =
+                    cache_generation.has_value() ? cache_generation->identity.file_size : -1;
+                const QUuid operation_id =
+                    m_ingest->enqueue_stream(view_id, file_path, profile, start_offset, end_offset);
                 std::optional<LogCacheGeneration> writer_generation;
                 if (cache_generation.has_value() &&
                     cache_generation->state == LogCacheGenerationState::Building)
                 {
                     writer_generation = cache_generation;
                 }
-                const bool registered = !operation_id.isNull() &&
-                                        m_history_writer->begin_import(
-                                            operation_id, view_id, file_path, writer_generation);
+                const bool registered =
+                    !operation_id.isNull() &&
+                    m_history_writer->begin_import(operation_id, view_id, file_path,
+                                                   writer_generation, prefix_generation);
 
                 if (!operation_id.isNull() && registered)
                 {
@@ -763,6 +794,10 @@ auto LogImportCoordinator::enqueue(const QUuid& view_id, const QString& file_pat
                     if (cache_generation.has_value())
                     {
                         m_operation_generations.insert(operation_id, cache_generation.value());
+                    }
+                    if (prefix_generation.has_value())
+                    {
+                        m_operation_prefixes.insert(operation_id, prefix_generation.value());
                     }
                 }
 
@@ -777,7 +812,11 @@ auto LogImportCoordinator::enqueue(const QUuid& view_id, const QString& file_pat
                     m_ingest->cancel_for_view(view_id);
                     emit error(view_id, file_path,
                                tr("The import could not be registered for background storage."));
-                    emit file_removal_requested(view_id, QFileInfo(file_path).absoluteFilePath());
+                    if (!prefix_generation.has_value())
+                    {
+                        emit file_removal_requested(view_id,
+                                                    QFileInfo(file_path).absoluteFilePath());
+                    }
                 }
             }
         }
@@ -850,9 +889,14 @@ auto LogImportCoordinator::handle_write_finished(const QUuid& operation_id, cons
         m_operation_generations.contains(operation_id)
             ? std::optional<LogCacheGeneration>(m_operation_generations.value(operation_id))
             : std::nullopt;
+    const std::optional<LogCacheGeneration> prefix_generation =
+        m_operation_prefixes.contains(operation_id)
+            ? std::optional<LogCacheGeneration>(m_operation_prefixes.value(operation_id))
+            : std::nullopt;
 
     m_operation_views.remove(operation_id);
     m_operation_generations.remove(operation_id);
+    m_operation_prefixes.remove(operation_id);
     m_failed_operations.remove(operation_id);
 
     if (cache_generation.has_value() &&
@@ -883,12 +927,15 @@ auto LogImportCoordinator::handle_write_finished(const QUuid& operation_id, cons
 
         if (!import_succeeded)
         {
-            m_view_generations[view_id].remove(absolute_file_path);
-            const bool registered =
-                view_exists && m_views->get_file_paths(view_id).contains(absolute_file_path);
-            if (registered)
+            if (!prefix_generation.has_value())
             {
-                emit file_removal_requested(view_id, absolute_file_path);
+                m_view_generations[view_id].remove(absolute_file_path);
+                const bool registered =
+                    view_exists && m_views->get_file_paths(view_id).contains(absolute_file_path);
+                if (registered)
+                {
+                    emit file_removal_requested(view_id, absolute_file_path);
+                }
             }
         }
         else if (view_exists)
@@ -1040,15 +1087,16 @@ auto LogImportCoordinator::remember_view_generation(const QUuid& view_id, const 
 /**
  * @brief Binds a view after all its active imports have complete generations.
  * @param view_id View whose ordered generation mapping may be published.
+ * @param require_idle Whether active imports prevent publication.
  * @return True when a complete ordered mapping was committed or caching is
  * disabled.
  */
-auto LogImportCoordinator::bind_view_generations(const QUuid& view_id) -> bool
+auto LogImportCoordinator::bind_view_generations(const QUuid& view_id, bool require_idle) -> bool
 {
     bool bound = m_cache_catalog == nullptr;
     QVector<qint64> generation_ids;
     const bool can_bind = m_cache_catalog != nullptr && m_views != nullptr &&
-                          !m_operation_views.values().contains(view_id);
+                          (!require_idle || !m_operation_views.values().contains(view_id));
     if (can_bind)
     {
         const QVector<QString> file_paths = m_views->get_file_paths(view_id);

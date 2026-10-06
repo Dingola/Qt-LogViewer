@@ -49,9 +49,11 @@ class LogHistoryWriter final: public QObject
          * @param operation_id Unique identifier of the import attempt.
          * @param cache_generation Building generation to populate, or no value for legacy-only
          * writing and reuse of an already complete generation.
+         * @param prefix_generation Complete generation cloned before suffix batches are appended.
          */
         auto begin_import(const QUuid& operation_id,
-                          const std::optional<LogCacheGeneration>& cache_generation) -> void;
+                          const std::optional<LogCacheGeneration>& cache_generation,
+                          const std::optional<LogCacheGeneration>& prefix_generation) -> void;
 
         /**
          * @brief Stores one parsed batch in its per-file cache or legacy history fallback.

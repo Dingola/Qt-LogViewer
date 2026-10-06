@@ -154,8 +154,10 @@ class SessionController: public QObject
         /**
          * @brief Restores a complete typed session through one coordinated workflow.
          *
-         * Existing views are closed, explorer files are registered, restored views are imported,
-         * and their saved query and page state is applied after all files of that view finish.
+         * Existing views are closed and restored tabs receive empty deferred query state
+         * immediately. A connected presenter may defer their imports until its workspace
+         * transition finishes. Without a presenter, imports begin on the next event-loop turn.
+         * Final query state is applied after all files of that view finish.
          *
          * @param state Typed session snapshot to restore.
          * @param available_profiles Parsing profiles available for persisted profile references.
@@ -163,6 +165,18 @@ class SessionController: public QObject
          */
         auto restore_session(const SessionState& state,
                              const QVector<LogParsingProfile>& available_profiles = {}) -> bool;
+
+        /**
+         * @brief Prevents registered restore imports from starting automatically.
+         *
+         * A presentation coordinator calls this synchronously while handling
+         * session_views_registered(), then calls start_deferred_restore_imports() after its visual
+         * transition finishes.
+         */
+        auto defer_restored_imports_until_presented() -> void;
+
+        /** @brief Starts every file import retained for the active session restoration. */
+        auto start_deferred_restore_imports() -> void;
 
         /**
          * @brief Exports the current session as typed state.
@@ -247,6 +261,15 @@ class SessionController: public QObject
         void view_restored(const QUuid& view_id, const SessionViewState& state);
 
         /**
+         * @brief Emitted after every restored view has been registered for presentation.
+         * @param session_id Session whose tabs can now be captured by the workspace transition.
+         *
+         * A synchronous receiver may call defer_restored_imports_until_presented() to retain
+         * persistent cache imports until its workspace transition has finished.
+         */
+        void session_views_registered(const QString& session_id);
+
+        /**
          * @brief Emitted after every restored view has completed its imports and state application.
          * @param session_id Restored session identifier.
          */
@@ -297,6 +320,16 @@ class SessionController: public QObject
         auto finish_session_restore_if_ready() -> void;
 
     private:
+        /** @brief File import retained until the restored workspace may query persistent data. */
+        struct PendingRestoreImport {
+                /** @brief Restored view receiving the file. */
+                QUuid view_id;
+                /** @brief Source file registered on the restored view. */
+                QString file_path;
+                /** @brief Parsing profile persisted for the source file. */
+                LogParsingProfile profile;
+        };
+
         SessionManager* m_session_manager{nullptr};
         LogFileTreeModel* m_tree_model{nullptr};
         LogParsingProfile m_default_profile;
@@ -311,6 +344,8 @@ class SessionController: public QObject
         LiveTailingCoordinator* m_live_tailing{nullptr};
         QHash<QUuid, SessionViewState> m_pending_restore_states;
         QHash<QUuid, QSet<QString>> m_pending_restore_files;
+        QVector<PendingRestoreImport> m_pending_restore_imports;
         QString m_restoring_session_id;
         bool m_registering_restored_views{false};
+        bool m_restore_imports_deferred{false};
 };

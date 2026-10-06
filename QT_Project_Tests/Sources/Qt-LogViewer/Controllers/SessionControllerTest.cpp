@@ -274,9 +274,10 @@ TEST_F(SessionControllerTest, RestoresSameSessionWithoutDuplicatingViewsOrEntrie
 }
 
 /**
- * @brief A restored view is exposed only after stale history was discarded and replaced.
+ * @test Verifies a restored view is exposed without stale history before presentation releases
+ * its deferred imports.
  */
-TEST_F(SessionControllerTest, DoesNotExposeStalePartialHistoryWhileRestoring)
+TEST_F(SessionControllerTest, ExposesEmptyRestoredViewBeforeReplacingStaleHistory)
 {
     QTemporaryFile* file =
         create_temp_file({QStringLiteral("2024-01-01 12:00:00 INFO FreshEntry RestoreApp")});
@@ -300,11 +301,28 @@ TEST_F(SessionControllerTest, DoesNotExposeStalePartialHistoryWhileRestoring)
     state.views = {view_state};
 
     QSignalSpy view_restored_spy(m_session_controller, &SessionController::view_restored);
+    QSignalSpy views_registered_spy(m_session_controller,
+                                    &SessionController::session_views_registered);
     QSignalSpy session_restored_spy(m_session_controller, &SessionController::session_restored);
+    QObject::connect(
+        m_session_controller, &SessionController::session_views_registered, m_session_controller,
+        [this](const QString&) { m_session_controller->defer_restored_imports_until_presented(); });
 
     ASSERT_TRUE(m_session_controller->restore_session(state));
-    EXPECT_EQ(view_restored_spy.count(), 0);
+    ASSERT_EQ(view_restored_spy.count(), 1);
+    ASSERT_EQ(views_registered_spy.count(), 1);
+    EXPECT_EQ(views_registered_spy.constFirst().at(0).toString(), state.id);
+    EXPECT_EQ(session_restored_spy.count(), 0);
+    const LogPageState* initial_page_state = m_runtime->pages().get_page_state(view_id);
+    ASSERT_NE(initial_page_state, nullptr);
+    EXPECT_EQ(initial_page_state->get_total_entries(), 0);
+    LogModel* initial_model = m_runtime->views().get_context(view_id)->get_model();
+    ASSERT_NE(initial_model, nullptr);
+    EXPECT_EQ(initial_model->rowCount(), 0);
 
+    QTest::qWait(50);
+    EXPECT_EQ(session_restored_spy.count(), 0);
+    m_session_controller->start_deferred_restore_imports();
     QTRY_COMPARE_WITH_TIMEOUT(session_restored_spy.count(), 1, 5000);
     ASSERT_EQ(view_restored_spy.count(), 1);
 

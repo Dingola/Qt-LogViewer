@@ -24,8 +24,11 @@ LogStreamWorker::LogStreamWorker(LogParser parser, QObject* parent)
  * @brief Starts reading and parsing the file line-by-line.
  * @param file_path File to read.
  * @param batch_size Number of entries per emitted batch.
+ * @param start_offset First source byte to parse.
+ * @param end_offset Exclusive source byte boundary, or -1 for the open-time size.
  */
-auto LogStreamWorker::start(const QString& file_path, qsizetype batch_size) -> void
+auto LogStreamWorker::start(const QString& file_path, qsizetype batch_size, qint64 start_offset,
+                            qint64 end_offset) -> void
 {
     QVector<LogEntry> batch;
     QFile file(file_path);
@@ -34,24 +37,43 @@ auto LogStreamWorker::start(const QString& file_path, qsizetype batch_size) -> v
 
     if (file.exists())
     {
-        total = file.size();
+        total = end_offset >= 0 ? qMin(end_offset, file.size()) : file.size();
     }
 
-    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+    if (!file.open(QIODevice::ReadOnly))
     {
         emit error(file_path, QStringLiteral("Failed to open file for reading."));
         emit finished(file_path);
     }
     else
     {
-        emit progress(file_path, 0, total);
-
         qsizetype line_number = 0;
+        qint64 bytes_to_count = qBound<qint64>(0, start_offset, total);
+        while (bytes_to_count > 0 && !m_cancelled.load())
+        {
+            const QByteArray prefix_block = file.read(qMin<qint64>(64 * 1024, bytes_to_count));
+            bytes_to_count -= prefix_block.size();
+            line_number += prefix_block.count('\n');
+            if (prefix_block.isEmpty())
+            {
+                bytes_to_count = 0;
+            }
+        }
+        const qint64 bounded_start = qBound<qint64>(0, start_offset, total);
+        const bool positioned = file.seek(bounded_start);
+        last_progress = bounded_start;
+        emit progress(file_path, bounded_start, total);
 
-        while (!file.atEnd() && !m_cancelled.load())
+        while (positioned && file.pos() < total && !m_cancelled.load())
         {
             const qint64 byte_offset = file.pos();
             QByteArray record_bytes = file.readLine();
+            const qint64 bytes_remaining = total - byte_offset;
+            if (record_bytes.size() > bytes_remaining)
+            {
+                record_bytes.truncate(static_cast<qsizetype>(bytes_remaining));
+                file.seek(total);
+            }
             if (record_bytes.endsWith('\n'))
             {
                 record_bytes.chop(1);
@@ -79,7 +101,7 @@ auto LogStreamWorker::start(const QString& file_path, qsizetype batch_size) -> v
             }
 
             const qint64 pos = file.pos();
-            if (pos - last_progress >= 1024 * 1024 || (file.atEnd() && pos != last_progress))
+            if (pos - last_progress >= 1024 * 1024 || (pos >= total && pos != last_progress))
             {
                 emit progress(file_path, pos, total);
                 last_progress = pos;

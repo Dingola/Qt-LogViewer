@@ -126,6 +126,14 @@ class LogQueryController final: public QObject
         auto apply_view_state(const QUuid& view_id, const SessionViewState& state) -> bool;
 
         /**
+         * @brief Restores query state without reading persistent entries yet.
+         * @param view_id Target view.
+         * @param state Complete saved state of the view.
+         * @return True when filters and empty deferred paging state were installed.
+         */
+        auto prepare_view_state(const QUuid& view_id, const SessionViewState& state) -> bool;
+
+        /**
          * @brief Builds a query from the current filter and sorting state.
          * @param view_id Source view.
          * @return Query representing the view state.

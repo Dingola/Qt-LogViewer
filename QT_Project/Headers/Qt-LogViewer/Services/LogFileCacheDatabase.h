@@ -65,11 +65,28 @@ class LogFileCacheDatabase final: public QObject
         [[nodiscard]] auto get_identity() const -> const LogCacheIdentity&;
 
         /**
+         * @brief Copies a finalized generation and retargets its identity for an appended source.
+         * @param source_database_path Finalized prefix database to copy.
+         * @param destination_database_path Building generation database to create.
+         * @param destination_identity Identity of the current appended source snapshot.
+         * @return True when the database was copied and its identity updated atomically.
+         */
+        static auto clone_generation(const QString& source_database_path,
+                                     const QString& destination_database_path,
+                                     const LogCacheIdentity& destination_identity) -> bool;
+
+        /**
          * @brief Removes all indexed entries before a generation is rebuilt.
          * @return True when the old contents were cleared and a generation-wide transaction
          * started.
          */
         auto reset_entries() -> bool;
+
+        /**
+         * @brief Starts a generation-wide transaction without clearing cloned entries.
+         * @return True when the database is ready to append suffix entries.
+         */
+        auto begin_append() -> bool;
 
         /**
          * @brief Appends one parsed batch to the normalized index and contentless FTS table.

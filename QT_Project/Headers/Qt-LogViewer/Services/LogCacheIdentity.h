@@ -46,6 +46,17 @@ struct LogCacheIdentity {
         [[nodiscard]] auto is_valid() const -> bool;
 
         /**
+         * @brief Checks whether this cached revision is an unchanged prefix of a source.
+         * @param file_path Current source file to compare with this identity.
+         *
+         * A reusable prefix must still refer to the same canonical path, fit into the
+         * current file, retain its bounded samples and end at a complete line boundary.
+         *
+         * @return True when entries cached for this identity can safely prefix the source.
+         */
+        [[nodiscard]] auto matches_source_prefix(const QString& file_path) const -> bool;
+
+        /**
          * @brief Fingerprints a readable file and parser profile.
          * @param file_path Source file to identify.
          * @param profile Effective parsing profile.

@@ -47,8 +47,11 @@ class LogStreamWorker: public QObject
          * @brief Starts reading and parsing the file line-by-line.
          * @param file_path File to read.
          * @param batch_size Number of entries per emitted batch.
+         * @param start_offset First source byte to parse.
+         * @param end_offset Exclusive source byte boundary, or -1 for the open-time size.
          */
-        auto start(const QString& file_path, qsizetype batch_size) -> void;
+        auto start(const QString& file_path, qsizetype batch_size, qint64 start_offset = 0,
+                   qint64 end_offset = -1) -> void;
 
         /**
          * @brief Requests cancellation of the ongoing operation.

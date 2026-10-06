@@ -71,8 +71,11 @@ class LogViewPresenter: public QObject
         /** @brief Connects controller updates relevant to the bound view. */
         auto connect_view_updates() -> void;
 
-        /** @brief Refreshes filter controls and counts from current runtime state. */
-        auto refresh_filter_presentation() -> void;
+        /**
+         * @brief Refreshes filter controls and optionally queries persistent values and counts.
+         * @param include_history True to query stored application names and level counts.
+         */
+        auto refresh_filter_presentation(bool include_history) -> void;
 
         /** @brief Refreshes search, file visibility, and sorting presentation. */
         auto refresh_query_presentation() -> void;

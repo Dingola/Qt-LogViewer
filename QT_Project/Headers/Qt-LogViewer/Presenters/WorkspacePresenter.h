@@ -2,6 +2,7 @@
 
 #include <QModelIndex>
 #include <QObject>
+#include <QSet>
 #include <QString>
 #include <QUuid>
 
@@ -146,6 +147,14 @@ class WorkspacePresenter: public QObject
          */
         auto update_log_details(const QUuid& view_id, const QModelIndex& current) -> void;
 
+        /**
+         * @brief Resizes the active table after its first visible layout when required.
+         *
+         * Hidden restored tabs retain a pending marker until selected, preventing zero-width
+         * viewports from collapsing their columns.
+         */
+        auto resize_active_view_columns_if_pending() -> void;
+
         ViewRegistry* m_views{nullptr};
         FilterCoordinator* m_filters{nullptr};
         LogHistoryService* m_history{nullptr};
@@ -163,4 +172,8 @@ class WorkspacePresenter: public QObject
         DockController* m_dock_controller{nullptr};
         StackedWidgetTransition* m_page_transition{nullptr};
         SnapshotTransitionAnimator* m_table_transition{nullptr};
+        /** @brief Whether restored tabs are still being registered for the current session. */
+        bool m_session_restore_in_progress{false};
+        /** @brief Views whose loaded columns have not yet been sized while visible. */
+        QSet<QUuid> m_pending_column_resize_views;
 };

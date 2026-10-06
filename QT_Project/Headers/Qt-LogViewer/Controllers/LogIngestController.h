@@ -93,6 +93,19 @@ class LogIngestController: public QObject
                             const LogParsingProfile& profile) -> QUuid;
 
         /**
+         * @brief Enqueues a bounded source range with its parsing profile.
+         * @param view_id Target view identifier.
+         * @param file_path Absolute file path to stream.
+         * @param profile Parsing profile used by the queued request.
+         * @param start_offset First source byte to parse.
+         * @param end_offset Exclusive source byte boundary.
+         * @return Unique operation identifier, or a null identifier for a duplicate request.
+         */
+        auto enqueue_stream(const QUuid& view_id, const QString& file_path,
+                            const LogParsingProfile& profile, qint64 start_offset,
+                            qint64 end_offset) -> QUuid;
+
+        /**
          * @brief Attempts to start the next asynchronous load if none is active.
          * @param batch_size Number of entries per batch appended to the model.
          */

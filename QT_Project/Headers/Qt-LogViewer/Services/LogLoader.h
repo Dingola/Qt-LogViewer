@@ -104,9 +104,12 @@ class LogLoader: public QObject
          * @param file_path Path of the log file.
          * @param batch_size Number of entries per emitted batch.
          * @param profile Parsing profile selected for this import.
+         * @param start_offset First source byte to parse.
+         * @param end_offset Exclusive source byte boundary, or -1 for the open-time size.
          */
         auto load_log_file_async(const QString& file_path, qsizetype batch_size,
-                                 const LogParsingProfile& profile) -> void;
+                                 const LogParsingProfile& profile, qint64 start_offset = 0,
+                                 qint64 end_offset = -1) -> void;
 
         /**
          * @brief Requests cancellation of the current asynchronous load (if any).

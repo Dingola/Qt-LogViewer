@@ -68,6 +68,17 @@ class LogPageCoordinator final: public QObject
                          qsizetype current_page) -> bool;
 
         /**
+         * @brief Installs page state without querying storage or populating the model.
+         * @param view_id Target view.
+         * @param query Query describing filtering and sorting.
+         * @param page_size Positive number of entries per page.
+         * @param current_page Requested one-based page number.
+         * @return True when empty deferred state was installed for the view.
+         */
+        auto prepare_state(const QUuid& view_id, const LogQuery& query, qsizetype page_size,
+                           qsizetype current_page) -> bool;
+
+        /**
          * @brief Reloads the current page for a view.
          * @param view_id Target view.
          * @return True when the view and its page state are available.

@@ -21,6 +21,11 @@ class ViewRegistry;
 /**
  * @class LogCacheReadService
  * @brief Queries complete cache generations and materializes visible source records on demand.
+ *
+ * Counts, facets, distinct values and ordinary sorted pages are constrained in SQLite so opening
+ * a cached view does not copy its complete metadata set into memory. Regular-expression searches
+ * and message sorting require parsed message contents and therefore use the full-materialization
+ * fallback.
  */
 class LogCacheReadService final
 {
@@ -41,6 +46,11 @@ class LogCacheReadService final
 
         /**
          * @brief Counts cached entries matching a view query.
+         *
+         * SQL-compatible filters are counted directly by SQLite. A regular-expression search is
+         * evaluated against materialized source records because SQLite does not implement the
+         * application's regular-expression semantics.
+         *
          * @param query Filter and search state.
          * @return Number of matching entries.
          */
@@ -48,6 +58,11 @@ class LogCacheReadService final
 
         /**
          * @brief Loads and materializes one globally sorted page from the source files.
+         *
+         * For metadata-backed sort fields, each source database returns only enough ordered rows
+         * to contribute to the requested global page. Message sorting and regular-expression
+         * searches materialize all matching records before sorting or matching.
+         *
          * @param query Filter, search and sorting state.
          * @param offset Zero-based result offset.
          * @param limit Maximum number of entries to return.

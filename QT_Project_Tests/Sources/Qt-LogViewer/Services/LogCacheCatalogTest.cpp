@@ -79,6 +79,58 @@ TEST_F(LogCacheCatalogTest, FingerprintChangesWithFileOrParserConfiguration)
 }
 
 /**
+ * @test Verifies an appended source retains its prior line-complete identity as a reusable prefix.
+ */
+TEST_F(LogCacheCatalogTest, FindsLargestUnchangedCompletePrefix)
+{
+    const QString file_path = m_temporary_directory.filePath(QStringLiteral("appended.log"));
+    ASSERT_TRUE(write_file(file_path, QStringLiteral("INFO first App\n")));
+    const LogParsingProfile profile =
+        LogParsingProfile::create_default(QStringLiteral("{level} {message} {app_name}"));
+    const auto prefix_identity = LogCacheIdentity::create(file_path, profile);
+    ASSERT_TRUE(prefix_identity.has_value());
+
+    LogCacheCatalog catalog(m_temporary_directory.filePath(QStringLiteral("prefix-cache")));
+    const auto building = catalog.begin_generation(prefix_identity.value());
+    ASSERT_TRUE(building.has_value());
+    ASSERT_TRUE(catalog.mark_complete(building->id, prefix_identity->file_size, 1, 4096));
+
+    QFile appended_file(file_path);
+    ASSERT_TRUE(appended_file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text));
+    ASSERT_GT(appended_file.write("ERROR second App\n"), 0);
+    appended_file.close();
+    const auto current_identity = LogCacheIdentity::create(file_path, profile);
+    ASSERT_TRUE(current_identity.has_value());
+
+    const auto prefix = catalog.find_complete_prefix(current_identity.value());
+    ASSERT_TRUE(prefix.has_value());
+    EXPECT_EQ(prefix->id, building->id);
+    EXPECT_TRUE(prefix_identity->matches_source_prefix(file_path));
+}
+
+/** @test Verifies changed bytes and incomplete final records reject prefix reuse. */
+TEST_F(LogCacheCatalogTest, RejectsMutatedOrLineIncompletePrefixes)
+{
+    const QString file_path = m_temporary_directory.filePath(QStringLiteral("unsafe-prefix.log"));
+    const LogParsingProfile profile =
+        LogParsingProfile::create_default(QStringLiteral("{level} {message} {app_name}"));
+    ASSERT_TRUE(write_file(file_path, QStringLiteral("INFO first App\n")));
+    const auto original_identity = LogCacheIdentity::create(file_path, profile);
+    ASSERT_TRUE(original_identity.has_value());
+    ASSERT_TRUE(write_file(file_path, QStringLiteral("ERROR changed App\nINFO appended App\n")));
+    EXPECT_FALSE(original_identity->matches_source_prefix(file_path));
+
+    ASSERT_TRUE(write_file(file_path, QStringLiteral("INFO incomplete App")));
+    const auto incomplete_identity = LogCacheIdentity::create(file_path, profile);
+    ASSERT_TRUE(incomplete_identity.has_value());
+    QFile appended_file(file_path);
+    ASSERT_TRUE(appended_file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text));
+    ASSERT_GT(appended_file.write(" continued\n"), 0);
+    appended_file.close();
+    EXPECT_FALSE(incomplete_identity->matches_source_prefix(file_path));
+}
+
+/**
  * @test Verifies the building-to-complete transition and ordered, removable
  * view mappings.
  */
@@ -338,4 +390,50 @@ TEST_F(LogCacheCatalogTest, RejectsFileCacheOpenedWithDifferentIdentity)
 
     LogFileCacheDatabase mismatched_cache(database_path, second_identity.value());
     EXPECT_FALSE(mismatched_cache.is_available());
+}
+
+/** @test Verifies a finalized file cache can be cloned and extended without altering its prefix. */
+TEST_F(LogCacheCatalogTest, ClonesCompleteGenerationAndAppendsSuffixEntries)
+{
+    const QString file_path = m_temporary_directory.filePath(QStringLiteral("clone-source.log"));
+    const LogParsingProfile profile =
+        LogParsingProfile::create_default(QStringLiteral("{level} {message} {app_name}"));
+    ASSERT_TRUE(write_file(file_path, QStringLiteral("INFO first App\nERROR second App\n")));
+    const auto prefix_identity = LogCacheIdentity::create(file_path, profile);
+    ASSERT_TRUE(prefix_identity.has_value());
+    const QVector<LogEntry> prefix_entries = LogParser(profile).parse_file(file_path);
+    ASSERT_EQ(prefix_entries.size(), 2);
+    const QString prefix_database = m_temporary_directory.filePath(QStringLiteral("prefix.sqlite"));
+    {
+        LogFileCacheDatabase cache(prefix_database, prefix_identity.value());
+        ASSERT_TRUE(cache.is_available());
+        ASSERT_TRUE(cache.reset_entries());
+        ASSERT_TRUE(cache.append_entries(prefix_entries));
+        ASSERT_TRUE(cache.finalize_writes());
+    }
+
+    QFile appended_file(file_path);
+    ASSERT_TRUE(appended_file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text));
+    ASSERT_GT(appended_file.write("WARN third App\n"), 0);
+    appended_file.close();
+    const auto current_identity = LogCacheIdentity::create(file_path, profile);
+    ASSERT_TRUE(current_identity.has_value());
+    const QVector<LogEntry> all_entries = LogParser(profile).parse_file(file_path);
+    ASSERT_EQ(all_entries.size(), 3);
+    const QString destination_database =
+        m_temporary_directory.filePath(QStringLiteral("destination.sqlite"));
+
+    ASSERT_TRUE(LogFileCacheDatabase::clone_generation(prefix_database, destination_database,
+                                                       current_identity.value()));
+    {
+        LogFileCacheDatabase cache(destination_database, current_identity.value());
+        ASSERT_TRUE(cache.is_available());
+        ASSERT_TRUE(cache.begin_append());
+        ASSERT_TRUE(cache.append_entries({all_entries.constLast()}));
+        ASSERT_TRUE(cache.finalize_writes());
+        EXPECT_EQ(cache.get_entry_count(), 3);
+    }
+    LogFileCacheDatabase prefix_cache(prefix_database, prefix_identity.value());
+    ASSERT_TRUE(prefix_cache.is_available());
+    EXPECT_EQ(prefix_cache.get_entry_count(), 2);
 }

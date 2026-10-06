@@ -247,6 +247,40 @@ auto LogCacheCatalog::find_complete_generation(const LogCacheIdentity& identity)
 }
 
 /**
+ * @brief Finds the largest complete generation that remains an unchanged source prefix.
+ * @param identity Current source and parser identity.
+ * @return Largest reusable prefix generation, or std::nullopt when none is safe.
+ */
+auto LogCacheCatalog::find_complete_prefix(const LogCacheIdentity& identity) const
+    -> std::optional<LogCacheGeneration>
+{
+    std::optional<LogCacheGeneration> generation;
+    if (m_is_available && identity.is_valid())
+    {
+        QSqlQuery query(QSqlDatabase::database(m_connection_name));
+        query.prepare(QStringLiteral(
+            "SELECT id FROM cache_generations WHERE source_id=(SELECT id FROM cache_sources "
+            "WHERE canonical_path=?) AND parser_sha256=? AND state='complete' AND file_size<? "
+            "AND indexed_bytes=file_size ORDER BY file_size DESC, last_access_utc_ms DESC"));
+        query.addBindValue(identity.canonical_file_path);
+        query.addBindValue(identity.parser_sha256);
+        query.addBindValue(identity.file_size);
+        const bool query_succeeded = query.exec();
+        while (query_succeeded && query.next() && !generation.has_value())
+        {
+            const std::optional<LogCacheGeneration> candidate =
+                load_generation(query.value(0).toLongLong());
+            if (candidate.has_value() &&
+                candidate->identity.matches_source_prefix(identity.canonical_file_path))
+            {
+                generation = candidate;
+            }
+        }
+    }
+    return generation;
+}
+
+/**
  * @brief Loads one catalog generation without restricting its lifecycle state.
  * @param generation_id Catalog generation primary key.
  * @return Reconstructed generation metadata, or std::nullopt when the catalog is unavailable or

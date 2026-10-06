@@ -5,6 +5,7 @@
 #include <QSet>
 #include <QSignalBlocker>
 #include <QStackedWidget>
+#include <QTimer>
 #include <QVector>
 
 #include "Qt-LogViewer/Animations/SnapshotTransitionAnimator.h"
@@ -90,6 +91,15 @@ WorkspacePresenter::WorkspacePresenter(
                     if (m_dock_controller != nullptr)
                     {
                         m_dock_controller->set_docks_suspended(target_index != 0);
+                    }
+                });
+        connect(m_page_transition, &StackedWidgetTransition::finished, this,
+                [this](int target_index) {
+                    if (target_index == 0 && m_session_restore_in_progress &&
+                        m_session_controller != nullptr)
+                    {
+                        m_session_restore_in_progress = false;
+                        m_session_controller->start_deferred_restore_imports();
                     }
                 });
     }
@@ -368,6 +378,7 @@ auto WorkspacePresenter::connect_workspace_actions() -> void
                 m_views->set_current_view(view_id);
             }
             refresh_active_view();
+            resize_active_view_columns_if_pending();
         });
         connect(m_tab_widget, &TabWidget::about_to_close_tab, this, [this](int index, QWidget*) {
             LogViewWidget* log_view_widget = m_tab_widget->log_view_at(index);
@@ -391,6 +402,7 @@ auto WorkspacePresenter::connect_workspace_updates() -> void
         connect(m_views, &ViewRegistry::current_view_id_changed, this,
                 [this](const QUuid&) { refresh_active_view(); });
         connect(m_views, &ViewRegistry::view_removed, this, [this](const QUuid& view_id) {
+            m_pending_column_resize_views.remove(view_id);
             if (m_tab_widget != nullptr)
             {
                 m_tab_widget->remove_view_tab_by_id(view_id);
@@ -405,9 +417,11 @@ auto WorkspacePresenter::connect_workspace_updates() -> void
                        qsizetype) { update_page_state(view_id, current_page, total_pages); });
         connect(m_imports, &LogImportCoordinator::finished, this,
                 [this](const QUuid& view_id, const QString&) {
+                    m_pending_column_resize_views.insert(view_id);
                     if (view_id == get_active_view_id())
                     {
                         refresh_active_view();
+                        resize_active_view_columns_if_pending();
                     }
                 });
     }
@@ -416,11 +430,32 @@ auto WorkspacePresenter::connect_workspace_updates() -> void
     {
         connect(
             m_session_controller, &SessionController::current_session_changed, this,
-            [this](const QString&) { refresh_start_page(); }, Qt::QueuedConnection);
+            [this](const QString& session_id) {
+                if (!m_session_restore_in_progress || session_id.isEmpty())
+                {
+                    refresh_start_page();
+                }
+            },
+            Qt::QueuedConnection);
         connect(m_session_controller, &SessionController::session_restore_started, this,
-                [this](const QString&) { set_session_active(true); });
+                [this](const QString&) { m_session_restore_in_progress = true; });
+        connect(m_session_controller, &SessionController::session_views_registered, this,
+                [this](const QString&) {
+                    m_session_controller->defer_restored_imports_until_presented();
+                    const bool page_changes =
+                        m_central_stack != nullptr && m_central_stack->currentIndex() != 0;
+                    set_session_active(true);
+                    if (!page_changes || m_page_transition == nullptr)
+                    {
+                        m_session_restore_in_progress = false;
+                        m_session_controller->start_deferred_restore_imports();
+                    }
+                });
         connect(m_session_controller, &SessionController::session_restored, this,
-                [this](const QString&) { refresh_active_view(); });
+                [this](const QString&) {
+                    m_session_restore_in_progress = false;
+                    refresh_active_view();
+                });
         connect(m_session_controller, &SessionController::all_sessions_removed, this,
                 [this] { refresh_start_page(); });
     }
@@ -522,5 +557,23 @@ auto WorkspacePresenter::update_log_details(const QUuid& view_id,
     if (m_details_text != nullptr)
     {
         m_details_text->setPlainText(details);
+    }
+}
+
+/** @brief Resizes the active table after its first visible layout when required. */
+auto WorkspacePresenter::resize_active_view_columns_if_pending() -> void
+{
+    const QUuid view_id = get_active_view_id();
+    if (!view_id.isNull() && m_pending_column_resize_views.contains(view_id) &&
+        m_tab_widget != nullptr)
+    {
+        QTimer::singleShot(0, this, [this, view_id] {
+            if (view_id == get_active_view_id() &&
+                m_pending_column_resize_views.contains(view_id) && m_tab_widget != nullptr)
+            {
+                m_tab_widget->auto_resize_current_columns();
+                m_pending_column_resize_views.remove(view_id);
+            }
+        });
     }
 }

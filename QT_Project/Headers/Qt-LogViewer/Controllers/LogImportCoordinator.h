@@ -251,9 +251,10 @@ class LogImportCoordinator final: public QObject
         /**
          * @brief Binds a view after all its active imports have complete generations.
          * @param view_id View whose ordered generation mapping may be published.
+         * @param require_idle Whether active imports prevent publication.
          * @return True when a complete ordered mapping was committed or caching is disabled.
          */
-        auto bind_view_generations(const QUuid& view_id) -> bool;
+        auto bind_view_generations(const QUuid& view_id, bool require_idle = true) -> bool;
 
     private:
         bool m_shutting_down{false};
@@ -268,6 +269,8 @@ class LogImportCoordinator final: public QObject
         LogCacheCatalog* m_cache_catalog{nullptr};
         QHash<QUuid, QUuid> m_operation_views;
         QHash<QUuid, LogCacheGeneration> m_operation_generations;
+        /** Complete prefix retained as a fallback while one suffix import is active. */
+        QHash<QUuid, LogCacheGeneration> m_operation_prefixes;
         QHash<QUuid, QHash<QString, qint64>> m_view_generations;
         QSet<QUuid> m_failed_operations;
 };

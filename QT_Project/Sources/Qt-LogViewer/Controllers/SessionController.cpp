@@ -7,6 +7,7 @@
 
 #include <QDebug>
 #include <QFileInfo>
+#include <QTimer>
 #include <QUuid>
 
 // Concrete includes for forward-declared types and value usage
@@ -497,9 +498,11 @@ auto SessionController::load_session(const QString& session_id) -> std::optional
  * @brief Restores a complete typed session through one coordinated workflow.
  *
  * Runtime views are cleared before the UI is asked to discard remaining temporary tabs. Each
- * restored view is registered immediately so its tab can be created, while its saved query,
- * sorting, page size, and page number are deferred until every file import for that view has
- * completed. Persisted profile identifiers are resolved by the import boundary.
+ * restored view and its deferred query state are registered immediately. Once all tabs exist, the
+ * UI is notified so its transition can capture the complete workspace before persistent entries
+ * are read. File imports begin on a later event-loop turn, while final query application and
+ * session completion still wait for every file result. Persisted profile identifiers are resolved
+ * by the import boundary.
  *
  * @param state Typed session snapshot to restore.
  * @param available_profiles Parsing profiles available for persisted profile references.
@@ -517,6 +520,8 @@ auto SessionController::restore_session(
     {
         m_pending_restore_states.clear();
         m_pending_restore_files.clear();
+        m_pending_restore_imports.clear();
+        m_restore_imports_deferred = false;
         m_restoring_session_id = state.id;
         m_registering_restored_views = true;
 
@@ -581,17 +586,14 @@ auto SessionController::restore_session(
                     m_catalog->add_files_to_session(state.id, paths);
                 }
 
+                m_queries->prepare_view_state(view_id, view_state);
+                emit view_restored(view_id, view_state);
+
                 for (const QString& path: paths)
                 {
                     const LogParsingProfile profile = get_session_file_profile(
                         view_state, path, available_profiles, m_default_profile);
-                    m_imports->enqueue_registered_file(view_id, path, profile, 1000);
-                }
-
-                if (pending_files.isEmpty())
-                {
-                    m_queries->apply_view_state(view_id, view_state);
-                    emit view_restored(view_id, view_state);
+                    m_pending_restore_imports.append(PendingRestoreImport{view_id, path, profile});
                 }
             }
             else
@@ -602,11 +604,50 @@ auto SessionController::restore_session(
         }
 
         m_registering_restored_views = false;
+        emit session_views_registered(state.id);
+        if (!m_restore_imports_deferred)
+        {
+            const QString restore_session_id = state.id;
+            QTimer::singleShot(0, this, [this, restore_session_id] {
+                if (m_restoring_session_id == restore_session_id && !m_restore_imports_deferred)
+                {
+                    start_deferred_restore_imports();
+                }
+            });
+        }
         finish_session_restore_if_ready();
         restored = true;
     }
 
     return restored;
+}
+
+/**
+ * @brief Prevents registered restore imports from starting automatically.
+ */
+auto SessionController::defer_restored_imports_until_presented() -> void
+{
+    if (!m_restoring_session_id.isEmpty() && !m_pending_restore_imports.isEmpty())
+    {
+        m_restore_imports_deferred = true;
+    }
+}
+
+/** @brief Starts every file import retained for the active session restoration. */
+auto SessionController::start_deferred_restore_imports() -> void
+{
+    const QVector<PendingRestoreImport> imports = m_pending_restore_imports;
+    m_pending_restore_imports.clear();
+    m_restore_imports_deferred = false;
+
+    if (m_imports != nullptr)
+    {
+        for (const PendingRestoreImport& import: imports)
+        {
+            m_imports->enqueue_registered_file(import.view_id, import.file_path, import.profile,
+                                               1000);
+        }
+    }
 }
 
 /**
@@ -866,8 +907,6 @@ auto SessionController::complete_restored_file(const QUuid& view_id,
             {
                 m_queries->apply_view_state(view_id, state);
             }
-
-            emit view_restored(view_id, state);
 
             finish_session_restore_if_ready();
         }

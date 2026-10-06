@@ -60,6 +60,19 @@ class LogViewLoadQueue
                      const LogParsingProfile& profile) -> QUuid;
 
         /**
+         * @brief Enqueues a bounded source range with its parsing profile.
+         * @param view_id Target view identifier.
+         * @param file_path Absolute file path.
+         * @param profile Parsing profile used for this request.
+         * @param start_offset First source byte to parse.
+         * @param end_offset Exclusive source byte boundary.
+         * @return Unique operation identifier, or a null identifier for a duplicate request.
+         */
+        auto enqueue(const QUuid& view_id, const QString& file_path,
+                     const LogParsingProfile& profile, qint64 start_offset,
+                     qint64 end_offset) -> QUuid;
+
+        /**
          * @brief Attempts to start the next async stream if none is active.
          * @param loader Loader service to start the stream.
          * @param batch_size Entries per emitted batch for the next stream.
@@ -145,7 +158,8 @@ class LogViewLoadQueue
          * @return Unique operation identifier, or a null identifier for a duplicate request.
          */
         [[nodiscard]] auto enqueue_request(const QUuid& view_id, const QString& file_path,
-                                           std::optional<LogParsingProfile> profile) -> QUuid;
+                                           std::optional<LogParsingProfile> profile,
+                                           qint64 start_offset, qint64 end_offset) -> QUuid;
 
         /**
          * @struct LoadRequest
@@ -163,6 +177,12 @@ class LogViewLoadQueue
 
                 /** Per-import profile, or no value when the loader default is used. */
                 std::optional<LogParsingProfile> profile;
+
+                /** First source byte included in this import. */
+                qint64 start_offset{0};
+
+                /** Exclusive source byte boundary, or -1 for the open-time size. */
+                qint64 end_offset{-1};
         };
 
         QList<LoadRequest> m_queue;

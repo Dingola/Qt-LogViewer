@@ -56,11 +56,13 @@ HistoryWriteService::~HistoryWriteService()
  * @param view_id View receiving the imported entries.
  * @param file_path Source file belonging to the import attempt.
  * @param cache_generation Optional building cache generation populated by the writer.
+ * @param prefix_generation Optional complete generation cloned before suffix writes.
  * @return True when the operation was registered.
  */
 auto HistoryWriteService::begin_import(const QUuid& operation_id, const QUuid& view_id,
                                        const QString& file_path,
-                                       std::optional<LogCacheGeneration> cache_generation) -> bool
+                                       std::optional<LogCacheGeneration> cache_generation,
+                                       std::optional<LogCacheGeneration> prefix_generation) -> bool
 {
     const QString absolute_file_path = QFileInfo(file_path).absoluteFilePath();
     const bool registered = is_running() && !operation_id.isNull() && !view_id.isNull() &&
@@ -72,14 +74,16 @@ auto HistoryWriteService::begin_import(const QUuid& operation_id, const QUuid& v
         operation->view_id = view_id;
         operation->file_path = absolute_file_path;
         operation->cache_generation = std::move(cache_generation);
+        operation->prefix_generation = std::move(prefix_generation);
         m_operations.insert(operation_id, operation);
 
         LogHistoryWriter* writer = m_writer;
         const std::optional<LogCacheGeneration> writer_generation = operation->cache_generation;
+        const std::optional<LogCacheGeneration> writer_prefix = operation->prefix_generation;
         QMetaObject::invokeMethod(
             writer,
-            [writer, operation_id, writer_generation]() {
-                writer->begin_import(operation_id, writer_generation);
+            [writer, operation_id, writer_generation, writer_prefix]() {
+                writer->begin_import(operation_id, writer_generation, writer_prefix);
             },
             Qt::QueuedConnection);
     }

@@ -75,7 +75,7 @@ auto add_hash_field(QCryptographicHash& hash, const QByteArray& value) -> void
 {
     QCryptographicHash hash(QCryptographicHash::Sha256);
     bool sampled = true;
-    const QByteArray first_sample = file.read(k_sample_size);
+    const QByteArray first_sample = file.read(qMin(k_sample_size, file_size));
     add_hash_field(hash, QByteArrayLiteral("first"));
     add_hash_field(hash, first_sample);
 
@@ -108,6 +108,39 @@ auto LogCacheIdentity::is_valid() const -> bool
            sample_sha256.size() == QCryptographicHash::hashLength(QCryptographicHash::Sha256) &&
            parser_sha256.size() == QCryptographicHash::hashLength(QCryptographicHash::Sha256) &&
            cache_key.size() == QCryptographicHash::hashLength(QCryptographicHash::Sha256) * 2;
+}
+
+/**
+ * @brief Checks whether this cached revision is an unchanged, line-complete source prefix.
+ * @param file_path Current source file to compare with this identity.
+ * @return True when entries cached for this identity can safely prefix the source.
+ */
+auto LogCacheIdentity::matches_source_prefix(const QString& file_path) const -> bool
+{
+    const QFileInfo current_file_info(file_path);
+    QFile current_file(current_file_info.absoluteFilePath());
+    bool matches = false;
+
+    if (is_valid() && current_file_info.exists() && current_file_info.isFile() &&
+        current_file_info.size() >= file_size &&
+        normalized_identity_path(current_file_info) == canonical_file_path &&
+        current_file.open(QIODevice::ReadOnly))
+    {
+        bool ends_at_line_boundary = file_size == 0;
+        if (file_size > 0 && current_file.seek(file_size - 1))
+        {
+            const QByteArray final_byte = current_file.read(1);
+            ends_at_line_boundary =
+                final_byte == QByteArrayLiteral("\n") || final_byte == QByteArrayLiteral("\r");
+        }
+
+        if (ends_at_line_boundary && current_file.seek(0))
+        {
+            matches = create_sample_hash(current_file, file_size) == sample_sha256;
+        }
+    }
+
+    return matches;
 }
 
 /**

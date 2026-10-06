@@ -253,6 +253,38 @@ auto LogQueryController::apply_view_state(const QUuid& view_id,
 }
 
 /**
+ * @brief Restores query state without reading persistent entries yet.
+ * @param view_id Target view.
+ * @param state Complete saved state of the view.
+ * @return True when filters and empty deferred paging state were installed.
+ */
+auto LogQueryController::prepare_view_state(const QUuid& view_id,
+                                            const SessionViewState& state) -> bool
+{
+    bool prepared = false;
+    LogViewContext* context = m_views != nullptr ? m_views->get_context(view_id) : nullptr;
+    LogModel* model = context != nullptr ? context->get_model() : nullptr;
+
+    if (m_filters != nullptr && m_pages != nullptr && model != nullptr)
+    {
+        m_filters->import_filters(view_id, state.filters);
+
+        LogQuery query = create_query(view_id);
+        if (model->is_column_sortable(state.sort_column))
+        {
+            query.sort_field = model->get_column_field_id(state.sort_column);
+            query.sort_order = state.sort_order;
+        }
+
+        const qsizetype page_size = state.page_size > 0 ? state.page_size : 25;
+        const qsizetype current_page = std::max(1, state.current_page);
+        prepared = m_pages->prepare_state(view_id, query, page_size, current_page);
+    }
+
+    return prepared;
+}
+
+/**
  * @brief Builds a query from the current filter and sorting state.
  * @param view_id Source view.
  * @return Query representing the view state.
