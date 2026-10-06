@@ -2,6 +2,8 @@
 
 #include <gtest/gtest.h>
 
+#include <QTemporaryDir>
+
 #include "Qt-LogViewer/Services/LogHistoryService.h"
 
 /**
@@ -49,6 +51,10 @@ class LogHistoryServiceTest: public ::testing::Test
         auto expect_single_message_result(const QString& message) const -> void;
 
     protected:
+        /** @brief Isolated directory containing the history database for one test. */
+        QTemporaryDir m_temporary_directory;
+        /** @brief History service constructed against the isolated test database. */
         LogHistoryService* m_history_service{nullptr};
+        /** @brief Unique view identifier used to scope entries created by one test. */
         QUuid m_view_id;
 };

@@ -7,7 +7,6 @@
 
 #include <QFile>
 #include <QStringList>
-#include <QTextStream>
 #include <utility>
 
 #include "Qt-LogViewer/Models/LogFieldDefinition.h"
@@ -44,18 +43,30 @@ auto LogParser::parse_file(const QString& file_path) const -> QVector<LogEntry>
 
     if (file.open(QIODevice::ReadOnly | QIODevice::Text))
     {
-        QTextStream stream(&file);
-        QString line;
         qsizetype line_number = 0;
 
-        while (stream.readLineInto(&line))
+        while (!file.atEnd())
         {
+            const qint64 byte_offset = file.pos();
+            QByteArray record_bytes = file.readLine();
+            if (record_bytes.endsWith('\n'))
+            {
+                record_bytes.chop(1);
+            }
+            if (record_bytes.endsWith('\r'))
+            {
+                record_bytes.chop(1);
+            }
+
             ++line_number;
+            const QString line = QString::fromUtf8(record_bytes);
             const LogParseOutcome outcome = parse_line(line, file_path, line_number);
 
             if (outcome.succeeded())
             {
-                entries.append(outcome.entry.value());
+                LogEntry entry = outcome.entry.value();
+                entry.set_source_range(byte_offset, record_bytes.size());
+                entries.append(std::move(entry));
             }
         }
     }

@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 #include <QDateTime>
+#include <QTemporaryDir>
 #include <QUuid>
 
 #include "Qt-LogViewer/Models/LogEntry.h"
@@ -44,6 +45,8 @@ class LogQueryControllerTest: public ::testing::Test
         [[nodiscard]] auto create_entry(int index, const QString& file_path) const -> LogEntry;
 
     protected:
+        /** @brief Isolated directory containing the history database for one test. */
+        QTemporaryDir m_temporary_directory;
         LogHistoryService* m_history{nullptr};
         ViewRegistry* m_views{nullptr};
         FilterCoordinator* m_filters{nullptr};

@@ -5,6 +5,7 @@
 
 #include "Qt-LogViewer/Services/LogFileCacheDatabase.h"
 
+#include <QCborValue>
 #include <QDir>
 #include <QFileInfo>
 #include <QSqlDatabase>
@@ -12,10 +13,14 @@
 #include <QStringList>
 #include <QUuid>
 #include <QVariant>
+#include <QVariantMap>
 #include <utility>
 
+#include "Qt-LogViewer/Models/LogFieldDefinition.h"
+
 /**
- * @brief Opens or creates a disposable cache database for one exact source generation.
+ * @brief Opens or creates a disposable cache database for one exact source
+ * generation.
  * @param database_path Destination SQLite path.
  * @param identity Exact source and parser identity represented by the database.
  * @param parent Optional QObject parent.
@@ -38,6 +43,11 @@ LogFileCacheDatabase::~LogFileCacheDatabase()
     {
         {
             QSqlDatabase database = QSqlDatabase::database(m_connection_name);
+            if (m_write_transaction_active)
+            {
+                database.rollback();
+                m_write_transaction_active = false;
+            }
             database.close();
         }
         QSqlDatabase::removeDatabase(m_connection_name);
@@ -45,7 +55,8 @@ LogFileCacheDatabase::~LogFileCacheDatabase()
 }
 
 /**
- * @brief Reports whether schema initialization and identity validation succeeded.
+ * @brief Reports whether schema initialization and identity validation
+ * succeeded.
  * @return True when the database is usable for the requested cache identity.
  */
 auto LogFileCacheDatabase::is_available() const -> bool
@@ -90,81 +101,275 @@ auto LogFileCacheDatabase::get_identity() const -> const LogCacheIdentity&
 }
 
 /**
- * @brief Opens SQLite, applies runtime pragmas and validates schema plus source identity.
- * @return True when the schema exists and its stored identity matches the expected one.
+ * @brief Removes all indexed entries before a generation is rebuilt.
+ * @return True when the old contents were cleared and a generation-wide
+ * transaction started.
+ */
+auto LogFileCacheDatabase::reset_entries() -> bool
+{
+    bool reset = m_is_available;
+    if (reset)
+    {
+        QSqlDatabase database = QSqlDatabase::database(m_connection_name);
+        reset = database.transaction();
+        QSqlQuery query(database);
+        const QStringList statements{QStringLiteral("DELETE FROM log_entries"),
+                                     QStringLiteral("DELETE FROM log_levels"),
+                                     QStringLiteral("DELETE FROM applications"),
+                                     QStringLiteral("INSERT INTO log_entries_fts(log_entries_fts) "
+                                                    "VALUES('delete-all')")};
+
+        for (qsizetype index = 0; index < statements.size() && reset; ++index)
+        {
+            reset = query.exec(statements.at(index));
+        }
+        reset = reset && database.commit();
+        reset = reset && database.transaction();
+        if (reset)
+        {
+            m_write_transaction_active = true;
+        }
+        else
+        {
+            database.rollback();
+        }
+        m_level_ids.clear();
+        m_application_ids.clear();
+    }
+    return reset;
+}
+
+/**
+ * @brief Appends one parsed batch to the normalized index and contentless FTS
+ * table.
+ * @param entries Parsed entries carrying exact source byte ranges.
+ * @return True when the complete batch was staged in the generation-wide
+ * transaction.
+ */
+auto LogFileCacheDatabase::append_entries(const QVector<LogEntry>& entries) -> bool
+{
+    const bool can_store = m_is_available && m_write_transaction_active && !entries.isEmpty();
+    bool stored = can_store;
+    if (can_store)
+    {
+        QSqlDatabase database = QSqlDatabase::database(m_connection_name);
+        QSqlQuery entry_query(database);
+        entry_query.prepare(
+            QStringLiteral("INSERT INTO log_entries(source_line, byte_offset, byte_length, "
+                           "timestamp_utc_ms, "
+                           "level_id, app_id, parsed_fields_cbor) VALUES(?, ?, ?, ?, ?, ?, ?)"));
+        QSqlQuery search_query(database);
+        search_query.prepare(
+            QStringLiteral("INSERT INTO log_entries_fts(rowid, message, level, "
+                           "app_name) VALUES(?, ?, ?, ?)"));
+
+        for (qsizetype index = 0; index < entries.size() && stored; ++index)
+        {
+            const LogEntry& entry = entries.at(index);
+            const qint64 source_line = static_cast<qint64>(entry.get_source_line());
+            const qint64 byte_offset = entry.get_byte_offset();
+            const qint64 byte_length = entry.get_byte_length();
+            const qint64 level_id = get_or_create_level_id(entry.get_level());
+            const qint64 application_id = get_or_create_application_id(entry.get_app_name());
+            stored = source_line >= 1 && byte_offset >= 0 && byte_length >= 0 && level_id >= 0 &&
+                     application_id >= 0;
+
+            QVariantMap custom_fields;
+            if (stored)
+            {
+                const LogEntry::ParsedFields& parsed_fields = entry.get_parsed_fields();
+                for (auto iterator = parsed_fields.cbegin(); iterator != parsed_fields.cend();
+                     ++iterator)
+                {
+                    if (iterator.key() != LogField::Timestamp &&
+                        iterator.key() != LogField::Level && iterator.key() != LogField::Message &&
+                        iterator.key() != LogField::AppName)
+                    {
+                        custom_fields.insert(iterator.key(), iterator.value());
+                    }
+                }
+            }
+
+            if (stored)
+            {
+                const QByteArray parsed_fields_cbor =
+                    QCborValue::fromVariant(custom_fields).toCbor();
+                entry_query.addBindValue(source_line);
+                entry_query.addBindValue(byte_offset);
+                entry_query.addBindValue(byte_length);
+                if (entry.get_timestamp().isValid())
+                {
+                    entry_query.addBindValue(entry.get_timestamp().toUTC().toMSecsSinceEpoch());
+                }
+                else
+                {
+                    entry_query.addBindValue(QVariant());
+                }
+                entry_query.addBindValue(level_id);
+                entry_query.addBindValue(application_id);
+                entry_query.addBindValue(parsed_fields_cbor);
+                stored = entry_query.exec();
+            }
+
+            if (stored)
+            {
+                search_query.addBindValue(entry_query.lastInsertId());
+                search_query.addBindValue(entry.get_message());
+                search_query.addBindValue(entry.get_level());
+                search_query.addBindValue(entry.get_app_name());
+                stored = search_query.exec();
+            }
+        }
+
+        if (!stored)
+        {
+            database.rollback();
+            m_write_transaction_active = false;
+            m_level_ids.clear();
+            m_application_ids.clear();
+        }
+    }
+    return stored;
+}
+
+/**
+ * @brief Flushes the completed index and truncates its WAL file.
+ * @return True when optimization and the final checkpoint completed
+ * successfully.
+ */
+auto LogFileCacheDatabase::finalize_writes() -> bool
+{
+    bool finalized = m_is_available && m_write_transaction_active;
+    if (finalized)
+    {
+        QSqlDatabase database = QSqlDatabase::database(m_connection_name);
+        finalized = database.commit();
+        m_write_transaction_active = false;
+        if (!finalized)
+        {
+            database.rollback();
+        }
+        else
+        {
+            QSqlQuery query(database);
+            finalized = query.exec(QStringLiteral("PRAGMA optimize")) &&
+                        query.exec(QStringLiteral("PRAGMA wal_checkpoint(TRUNCATE)"));
+        }
+    }
+    return finalized;
+}
+
+/**
+ * @brief Counts indexed records.
+ * @return Number of rows in `log_entries`, or -1 when the query fails.
+ */
+auto LogFileCacheDatabase::get_entry_count() const -> qint64
+{
+    qint64 entry_count = -1;
+    if (m_is_available)
+    {
+        QSqlQuery query(QSqlDatabase::database(m_connection_name));
+        if (query.exec(QStringLiteral("SELECT COUNT(*) FROM log_entries")) && query.next())
+        {
+            entry_count = query.value(0).toLongLong();
+        }
+    }
+    return entry_count;
+}
+
+/**
+ * @brief Measures the database and its SQLite sidecar files.
+ * @return Combined size of the database, WAL and shared-memory files in bytes.
+ */
+auto LogFileCacheDatabase::get_storage_bytes() const -> qint64
+{
+    qint64 storage_bytes = 0;
+    const QStringList paths{m_database_path, m_database_path + QStringLiteral("-wal"),
+                            m_database_path + QStringLiteral("-shm")};
+    for (const QString& path: paths)
+    {
+        const QFileInfo file_info(path);
+        if (file_info.exists())
+        {
+            storage_bytes += file_info.size();
+        }
+    }
+    return storage_bytes;
+}
+
+/**
+ * @brief Opens SQLite, applies runtime pragmas and validates schema plus source
+ * identity.
+ * @return True when the schema exists and its stored identity matches the
+ * expected one.
  */
 auto LogFileCacheDatabase::initialize_database() -> bool
 {
     const QFileInfo database_info(m_database_path);
-    if (!m_identity.is_valid() || m_database_path.isEmpty() ||
-        !QDir().mkpath(database_info.absolutePath()))
+    bool initialized = m_identity.is_valid() && !m_database_path.isEmpty() &&
+                       QDir().mkpath(database_info.absolutePath());
+    if (initialized)
     {
-        return false;
-    }
+        QSqlDatabase database =
+            QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), m_connection_name);
+        database.setDatabaseName(m_database_path);
+        database.setConnectOptions(QStringLiteral("QSQLITE_BUSY_TIMEOUT=5000"));
+        initialized = database.open();
 
-    QSqlDatabase database = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), m_connection_name);
-    database.setDatabaseName(m_database_path);
-    database.setConnectOptions(QStringLiteral("QSQLITE_BUSY_TIMEOUT=5000"));
-    if (!database.open())
-    {
-        return false;
+        if (initialized)
+        {
+            QSqlQuery query(database);
+            initialized = query.exec(QStringLiteral("PRAGMA foreign_keys=ON")) &&
+                          query.exec(QStringLiteral("PRAGMA busy_timeout=5000")) &&
+                          query.exec(QStringLiteral("PRAGMA journal_mode=WAL")) &&
+                          query.exec(QStringLiteral("PRAGMA synchronous=NORMAL")) &&
+                          query.exec(QStringLiteral("PRAGMA user_version")) && query.next();
+            if (initialized)
+            {
+                const int version = query.value(0).toInt();
+                query.finish();
+                initialized = version == SchemaVersion ? create_schema() && identity_matches()
+                                                       : rebuild_schema();
+            }
+        }
     }
-
-    QSqlQuery query(database);
-    const bool configured = query.exec(QStringLiteral("PRAGMA foreign_keys=ON")) &&
-                            query.exec(QStringLiteral("PRAGMA busy_timeout=5000")) &&
-                            query.exec(QStringLiteral("PRAGMA journal_mode=WAL")) &&
-                            query.exec(QStringLiteral("PRAGMA synchronous=NORMAL"));
-    if (!configured || !query.exec(QStringLiteral("PRAGMA user_version")) || !query.next())
-    {
-        return false;
-    }
-
-    const int version = query.value(0).toInt();
-    query.finish();
-    if (version == SchemaVersion)
-    {
-        // A schema match alone is insufficient: the database must describe the
-        // exact source and parser revision requested by the caller.
-        return create_schema() && identity_matches();
-    }
-    return rebuild_schema();
+    return initialized;
 }
 
 /**
- * @brief Replaces incompatible tables and records the identity of the new empty cache.
- * @return True when the replacement schema and identity were committed atomically.
+ * @brief Replaces incompatible tables and records the identity of the new empty
+ * cache.
+ * @return True when the replacement schema and identity were committed
+ * atomically.
  */
 auto LogFileCacheDatabase::rebuild_schema() -> bool
 {
     QSqlDatabase database = QSqlDatabase::database(m_connection_name);
-    if (!database.transaction())
+    bool rebuilt = database.transaction();
+    if (rebuilt)
     {
-        return false;
-    }
+        QSqlQuery query(database);
+        const QStringList drops{QStringLiteral("DROP TABLE IF EXISTS log_entries_fts"),
+                                QStringLiteral("DROP TABLE IF EXISTS log_entries"),
+                                QStringLiteral("DROP TABLE IF EXISTS log_levels"),
+                                QStringLiteral("DROP TABLE IF EXISTS applications"),
+                                QStringLiteral("DROP TABLE IF EXISTS cache_identity")};
+        for (qsizetype index = 0; index < drops.size() && rebuilt; ++index)
+        {
+            rebuilt = query.exec(drops.at(index));
+        }
+        rebuilt = rebuilt && create_schema();
+        rebuilt = rebuilt && store_identity();
+        rebuilt = rebuilt && query.exec(QStringLiteral("PRAGMA user_version=2"));
 
-    QSqlQuery query(database);
-    const QStringList drops{QStringLiteral("DROP TABLE IF EXISTS log_entries_fts"),
-                            QStringLiteral("DROP TABLE IF EXISTS log_entries"),
-                            QStringLiteral("DROP TABLE IF EXISTS log_levels"),
-                            QStringLiteral("DROP TABLE IF EXISTS applications"),
-                            QStringLiteral("DROP TABLE IF EXISTS cache_identity")};
-    bool rebuilt = true;
-    for (const QString& statement: drops)
-    {
-        rebuilt = rebuilt && query.exec(statement);
+        query.finish();
+        rebuilt = rebuilt && database.commit();
+        if (!rebuilt)
+        {
+            database.rollback();
+        }
     }
-    rebuilt = rebuilt && create_schema();
-    rebuilt = rebuilt && store_identity();
-    rebuilt = rebuilt && query.exec(QStringLiteral("PRAGMA user_version=2"));
-
-    query.finish();
-    if (rebuilt && database.commit())
-    {
-        return true;
-    }
-    database.rollback();
-    return false;
+    return rebuilt;
 }
 
 /**
@@ -241,24 +446,98 @@ auto LogFileCacheDatabase::store_identity() -> bool
 }
 
 /**
- * @brief Compares every persisted identity component with the expected identity.
+ * @brief Compares every persisted identity component with the expected
+ * identity.
  * @return True only when all components match exactly.
  */
 auto LogFileCacheDatabase::identity_matches() const -> bool
 {
     QSqlQuery query(QSqlDatabase::database(m_connection_name));
-    if (!query.exec(QStringLiteral("SELECT cache_key, canonical_path, file_size, modified_utc_ms, "
-                                   "sample_sha256, "
-                                   "parser_sha256 FROM cache_identity WHERE singleton=1")) ||
-        !query.next())
+    bool matches =
+        query.exec(QStringLiteral("SELECT cache_key, canonical_path, file_size, modified_utc_ms, "
+                                  "sample_sha256, "
+                                  "parser_sha256 FROM cache_identity WHERE singleton=1")) &&
+        query.next();
+    if (matches)
     {
-        return false;
+        matches = query.value(0).toString() == m_identity.cache_key &&
+                  query.value(1).toString() == m_identity.canonical_file_path &&
+                  query.value(2).toLongLong() == m_identity.file_size &&
+                  query.value(3).toLongLong() == m_identity.modified_utc_ms &&
+                  query.value(4).toByteArray() == m_identity.sample_sha256 &&
+                  query.value(5).toByteArray() == m_identity.parser_sha256;
     }
+    return matches;
+}
 
-    return query.value(0).toString() == m_identity.cache_key &&
-           query.value(1).toString() == m_identity.canonical_file_path &&
-           query.value(2).toLongLong() == m_identity.file_size &&
-           query.value(3).toLongLong() == m_identity.modified_utc_ms &&
-           query.value(4).toByteArray() == m_identity.sample_sha256 &&
-           query.value(5).toByteArray() == m_identity.parser_sha256;
+/**
+ * @brief Returns or creates a normalized log-level identifier.
+ * @param value Original log-level text.
+ * @return Positive row identifier, or -1 when lookup or insertion fails.
+ */
+auto LogFileCacheDatabase::get_or_create_level_id(const QString& value) -> qint64
+{
+    const QString stored_value = value.isNull() ? QStringLiteral("") : value;
+    const QString normalized_value = stored_value.trimmed().toCaseFolded();
+    const auto cached = m_level_ids.constFind(normalized_value);
+    qint64 id = -1;
+    if (cached != m_level_ids.cend())
+    {
+        id = cached.value();
+    }
+    else
+    {
+        QSqlDatabase database = QSqlDatabase::database(m_connection_name);
+        QSqlQuery insert_query(database);
+        insert_query.prepare(
+            QStringLiteral("INSERT OR IGNORE INTO log_levels(value, "
+                           "normalized_value) VALUES(?, ?)"));
+        insert_query.addBindValue(stored_value);
+        insert_query.addBindValue(normalized_value);
+        const bool inserted = insert_query.exec();
+
+        QSqlQuery select_query(database);
+        select_query.prepare(QStringLiteral("SELECT id FROM log_levels WHERE normalized_value=?"));
+        select_query.addBindValue(normalized_value);
+        if (inserted && select_query.exec() && select_query.next())
+        {
+            id = select_query.value(0).toLongLong();
+            m_level_ids.insert(normalized_value, id);
+        }
+    }
+    return id;
+}
+
+/**
+ * @brief Returns or creates an application identifier.
+ * @param value Original application name.
+ * @return Positive row identifier, or -1 when lookup or insertion fails.
+ */
+auto LogFileCacheDatabase::get_or_create_application_id(const QString& value) -> qint64
+{
+    const QString stored_value = value.isNull() ? QStringLiteral("") : value;
+    const auto cached = m_application_ids.constFind(stored_value);
+    qint64 id = -1;
+    if (cached != m_application_ids.cend())
+    {
+        id = cached.value();
+    }
+    else
+    {
+        QSqlDatabase database = QSqlDatabase::database(m_connection_name);
+        QSqlQuery insert_query(database);
+        insert_query.prepare(QStringLiteral("INSERT OR IGNORE INTO applications(value) VALUES(?)"));
+        insert_query.addBindValue(stored_value);
+        const bool inserted = insert_query.exec();
+
+        QSqlQuery select_query(database);
+        select_query.prepare(QStringLiteral("SELECT id FROM applications WHERE value=?"));
+        select_query.addBindValue(stored_value);
+        if (inserted && select_query.exec() && select_query.next())
+        {
+            id = select_query.value(0).toLongLong();
+            m_application_ids.insert(stored_value, id);
+        }
+    }
+    return id;
 }

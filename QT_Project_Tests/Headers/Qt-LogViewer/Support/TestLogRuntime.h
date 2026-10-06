@@ -1,5 +1,7 @@
 #pragma once
 
+#include <QTemporaryDir>
+
 #include "Qt-LogViewer/Controllers/FileCatalogController.h"
 #include "Qt-LogViewer/Controllers/FilterCoordinator.h"
 #include "Qt-LogViewer/Controllers/LiveTailingCoordinator.h"
@@ -10,6 +12,7 @@
 #include "Qt-LogViewer/Controllers/ViewLifecycleCoordinator.h"
 #include "Qt-LogViewer/Controllers/ViewRegistry.h"
 #include "Qt-LogViewer/Services/HistoryWriteService.h"
+#include "Qt-LogViewer/Services/LogCacheCatalog.h"
 #include "Qt-LogViewer/Services/LogHistoryService.h"
 #include "Qt-LogViewer/Services/LogParsingProfile.h"
 #include "Qt-LogViewer/Services/LogPreviewService.h"
@@ -50,6 +53,9 @@ class TestLogRuntime final
         /** @return Persistent history component. */
         [[nodiscard]] auto history() -> LogHistoryService&;
 
+        /** @return Persistent cache-generation catalog. */
+        [[nodiscard]] auto cache_catalog() -> LogCacheCatalog&;
+
         /** @return Import workflow component. */
         [[nodiscard]] auto imports() -> LogImportCoordinator&;
 
@@ -73,6 +79,8 @@ class TestLogRuntime final
 
     private:
         LogParsingProfile m_profile;
+        QTemporaryDir m_cache_directory;
+        LogCacheCatalog m_cache_catalog;
         LogIngestController m_ingest;
         FileCatalogController m_catalog;
         ViewRegistry m_views;

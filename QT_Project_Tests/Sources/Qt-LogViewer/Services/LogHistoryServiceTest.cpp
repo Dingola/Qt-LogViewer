@@ -9,7 +9,9 @@
  */
 void LogHistoryServiceTest::SetUp()
 {
-    m_history_service = new LogHistoryService();
+    ASSERT_TRUE(m_temporary_directory.isValid());
+    m_history_service =
+        new LogHistoryService(m_temporary_directory.filePath(QStringLiteral("history.sqlite")));
     m_view_id = QUuid::createUuid();
 }
 

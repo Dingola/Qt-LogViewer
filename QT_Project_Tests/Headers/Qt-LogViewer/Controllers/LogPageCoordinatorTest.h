@@ -2,6 +2,7 @@
 
 #include <gtest/gtest.h>
 
+#include <QTemporaryDir>
 #include <QUuid>
 
 #include "Qt-LogViewer/Models/LogEntry.h"
@@ -17,7 +18,9 @@ class ViewRegistry;
 class LogPageCoordinatorTest: public ::testing::Test
 {
     protected:
+        /** @brief Creates the isolated page-coordinator graph used by each test. */
         void SetUp() override;
+        /** @brief Destroys the page-coordinator graph and its temporary database. */
         void TearDown() override;
 
         /**
@@ -30,6 +33,8 @@ class LogPageCoordinatorTest: public ::testing::Test
                                         const QDateTime& timestamp) const -> LogEntry;
 
     protected:
+        /** @brief Isolated directory containing the history database for one test. */
+        QTemporaryDir m_temporary_directory;
         LogHistoryService* m_history_service{nullptr};
         ViewRegistry* m_views{nullptr};
         LogPageCoordinator* m_coordinator{nullptr};

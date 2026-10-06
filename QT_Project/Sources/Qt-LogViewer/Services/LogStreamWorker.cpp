@@ -7,7 +7,6 @@
 
 #include <QFile>
 #include <QMutexLocker>
-#include <QTextStream>
 #include <algorithm>
 
 /**
@@ -47,19 +46,30 @@ auto LogStreamWorker::start(const QString& file_path, qsizetype batch_size) -> v
     {
         emit progress(file_path, 0, total);
 
-        QTextStream in(&file);
-
         qsizetype line_number = 0;
 
-        while (!in.atEnd() && !m_cancelled.load())
+        while (!file.atEnd() && !m_cancelled.load())
         {
+            const qint64 byte_offset = file.pos();
+            QByteArray record_bytes = file.readLine();
+            if (record_bytes.endsWith('\n'))
+            {
+                record_bytes.chop(1);
+            }
+            if (record_bytes.endsWith('\r'))
+            {
+                record_bytes.chop(1);
+            }
+
             ++line_number;
-            const QString line = in.readLine();
+            const QString line = QString::fromUtf8(record_bytes);
             const LogParseOutcome outcome = m_parser.parse_line(line, file_path, line_number);
 
             if (outcome.succeeded())
             {
-                batch.append(outcome.entry.value());
+                LogEntry entry = outcome.entry.value();
+                entry.set_source_range(byte_offset, record_bytes.size());
+                batch.append(std::move(entry));
             }
 
             if (batch.size() >= batch_size && reserve_batch_slot())
@@ -69,7 +79,7 @@ auto LogStreamWorker::start(const QString& file_path, qsizetype batch_size) -> v
             }
 
             const qint64 pos = file.pos();
-            if (pos - last_progress >= 1024 * 1024 || (in.atEnd() && pos != last_progress))
+            if (pos - last_progress >= 1024 * 1024 || (file.atEnd() && pos != last_progress))
             {
                 emit progress(file_path, pos, total);
                 last_progress = pos;

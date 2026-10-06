@@ -8,8 +8,10 @@
 #include <QVector>
 #include <atomic>
 #include <memory>
+#include <optional>
 
 #include "Qt-LogViewer/Models/LogEntry.h"
+#include "Qt-LogViewer/Services/LogCacheCatalog.h"
 
 class LogHistoryWriter;
 class QThread;
@@ -47,10 +49,12 @@ class HistoryWriteService final: public QObject
          * @param operation_id Unique identifier of this import attempt.
          * @param view_id View receiving the imported entries.
          * @param file_path Source file belonging to the import attempt.
+         * @param cache_generation Optional building cache generation populated by the writer.
          * @return True when the operation was registered.
          */
-        auto begin_import(const QUuid& operation_id, const QUuid& view_id,
-                          const QString& file_path) -> bool;
+        auto begin_import(const QUuid& operation_id, const QUuid& view_id, const QString& file_path,
+                          std::optional<LogCacheGeneration> cache_generation = std::nullopt)
+            -> bool;
 
         /**
          * @brief Adds one parsed batch to the operation's coalesced writer buffer.
@@ -132,6 +136,7 @@ class HistoryWriteService final: public QObject
         struct ImportOperation {
                 QUuid view_id;
                 QString file_path;
+                std::optional<LogCacheGeneration> cache_generation;
                 std::atomic_bool cancelled{false};
                 QMutex mutex;
                 QVector<LogEntry> pending_entries;

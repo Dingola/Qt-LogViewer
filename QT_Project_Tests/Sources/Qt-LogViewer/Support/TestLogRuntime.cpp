@@ -13,15 +13,17 @@
  */
 TestLogRuntime::TestLogRuntime(const LogParsingProfile& profile)
     : m_profile(profile),
+      m_cache_catalog(m_cache_directory.filePath(QStringLiteral("cache"))),
       m_ingest(m_profile),
       m_catalog(&m_ingest),
       m_filters(&m_views),
+      m_history(m_cache_directory.filePath(QStringLiteral("history.sqlite"))),
       m_history_writer(m_history.get_database_path()),
       m_pages(&m_history, &m_views),
       m_queries(&m_filters, &m_pages, &m_views),
       m_live_tailing(m_profile, &m_history, &m_views, &m_queries),
       m_imports(m_profile, &m_ingest, &m_views, &m_history, &m_history_writer, &m_pages, &m_queries,
-                &m_live_tailing),
+                &m_live_tailing, &m_cache_catalog),
       m_lifecycle(&m_views, &m_filters, &m_catalog, &m_imports, &m_live_tailing, &m_history,
                   &m_history_writer, &m_pages, &m_queries),
       m_preview(m_profile)
@@ -57,6 +59,12 @@ auto TestLogRuntime::filters() -> FilterCoordinator&
 auto TestLogRuntime::history() -> LogHistoryService&
 {
     return m_history;
+}
+
+/** @return Persistent cache-generation catalog. */
+auto TestLogRuntime::cache_catalog() -> LogCacheCatalog&
+{
+    return m_cache_catalog;
 }
 
 /** @return Import workflow component. */

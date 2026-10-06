@@ -55,10 +55,12 @@ HistoryWriteService::~HistoryWriteService()
  * @param operation_id Unique identifier of this import attempt.
  * @param view_id View receiving the imported entries.
  * @param file_path Source file belonging to the import attempt.
+ * @param cache_generation Optional building cache generation populated by the writer.
  * @return True when the operation was registered.
  */
 auto HistoryWriteService::begin_import(const QUuid& operation_id, const QUuid& view_id,
-                                       const QString& file_path) -> bool
+                                       const QString& file_path,
+                                       std::optional<LogCacheGeneration> cache_generation) -> bool
 {
     const QString absolute_file_path = QFileInfo(file_path).absoluteFilePath();
     const bool registered = is_running() && !operation_id.isNull() && !view_id.isNull() &&
@@ -69,7 +71,17 @@ auto HistoryWriteService::begin_import(const QUuid& operation_id, const QUuid& v
         auto operation = std::make_shared<ImportOperation>();
         operation->view_id = view_id;
         operation->file_path = absolute_file_path;
+        operation->cache_generation = std::move(cache_generation);
         m_operations.insert(operation_id, operation);
+
+        LogHistoryWriter* writer = m_writer;
+        const std::optional<LogCacheGeneration> writer_generation = operation->cache_generation;
+        QMetaObject::invokeMethod(
+            writer,
+            [writer, operation_id, writer_generation]() {
+                writer->begin_import(operation_id, writer_generation);
+            },
+            Qt::QueuedConnection);
     }
 
     return registered;
@@ -184,6 +196,13 @@ auto HistoryWriteService::cancel_view(const QUuid& view_id) -> void
 
     for (const QUuid& operation_id: cancelled_operation_ids)
     {
+        LogHistoryWriter* writer = m_writer;
+        if (writer != nullptr)
+        {
+            QMetaObject::invokeMethod(
+                writer, [writer, operation_id]() { writer->cancel_import(operation_id); },
+                Qt::QueuedConnection);
+        }
         m_operations.remove(operation_id);
     }
 }
@@ -234,6 +253,13 @@ auto HistoryWriteService::discard_file(const QUuid& view_id, const QString& file
 
     for (const QUuid& operation_id: cancelled_operation_ids)
     {
+        LogHistoryWriter* writer = m_writer;
+        if (writer != nullptr)
+        {
+            QMetaObject::invokeMethod(
+                writer, [writer, operation_id]() { writer->cancel_import(operation_id); },
+                Qt::QueuedConnection);
+        }
         m_operations.remove(operation_id);
     }
 
@@ -326,7 +352,8 @@ auto HistoryWriteService::queue_drain(const QUuid& operation_id,
 
                 if (!entries.isEmpty() && !operation->cancelled.load(std::memory_order_acquire))
                 {
-                    writer->store_batch(operation->view_id, operation->file_path, entries);
+                    writer->store_batch(operation_id, operation->view_id, operation->file_path,
+                                        entries);
                     QMetaObject::invokeMethod(
                         service,
                         [service, operation_id, batch_count]() {

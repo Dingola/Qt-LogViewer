@@ -181,6 +181,11 @@ auto ViewLifecycleCoordinator::remove_registered_file(const QUuid& view_id,
 
         m_views->remove_entries_by_file(view_id, file_path);
 
+        if (m_imports != nullptr)
+        {
+            m_imports->discard_file_cache_binding(view_id, file_path);
+        }
+
         if (m_filters != nullptr)
         {
             m_filters->adjust_visibility_on_file_removed(view_id, file_path);

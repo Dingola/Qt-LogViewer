@@ -1,8 +1,11 @@
 #pragma once
 
+#include <QHash>
 #include <QObject>
 #include <QString>
+#include <QVector>
 
+#include "Qt-LogViewer/Models/LogEntry.h"
 #include "Qt-LogViewer/Services/LogCacheIdentity.h"
 
 /**
@@ -61,6 +64,38 @@ class LogFileCacheDatabase final: public QObject
          */
         [[nodiscard]] auto get_identity() const -> const LogCacheIdentity&;
 
+        /**
+         * @brief Removes all indexed entries before a generation is rebuilt.
+         * @return True when the old contents were cleared and a generation-wide transaction
+         * started.
+         */
+        auto reset_entries() -> bool;
+
+        /**
+         * @brief Appends one parsed batch to the normalized index and contentless FTS table.
+         * @param entries Parsed entries carrying exact source byte ranges.
+         * @return True when the complete batch was staged in the generation-wide transaction.
+         */
+        auto append_entries(const QVector<LogEntry>& entries) -> bool;
+
+        /**
+         * @brief Flushes the completed index and truncates its WAL file.
+         * @return True when optimization and the final checkpoint completed successfully.
+         */
+        auto finalize_writes() -> bool;
+
+        /**
+         * @brief Counts indexed records.
+         * @return Number of rows in `log_entries`, or -1 when the query fails.
+         */
+        [[nodiscard]] auto get_entry_count() const -> qint64;
+
+        /**
+         * @brief Measures the database and its SQLite sidecar files.
+         * @return Combined size of the database, WAL and shared-memory files in bytes.
+         */
+        [[nodiscard]] auto get_storage_bytes() const -> qint64;
+
     private:
         /**
          * @brief Opens, configures and validates the private SQLite connection.
@@ -92,6 +127,20 @@ class LogFileCacheDatabase final: public QObject
          */
         [[nodiscard]] auto identity_matches() const -> bool;
 
+        /**
+         * @brief Returns or creates a normalized log-level identifier.
+         * @param value Original log-level text.
+         * @return Positive row identifier, or -1 when lookup or insertion fails.
+         */
+        auto get_or_create_level_id(const QString& value) -> qint64;
+
+        /**
+         * @brief Returns or creates an application identifier.
+         * @param value Original application name.
+         * @return Positive row identifier, or -1 when lookup or insertion fails.
+         */
+        auto get_or_create_application_id(const QString& value) -> qint64;
+
         /** @brief Unique Qt SQL connection name owned by this instance. */
         QString m_connection_name;
         /** @brief Absolute path of the disposable per-file cache database. */
@@ -100,4 +149,10 @@ class LogFileCacheDatabase final: public QObject
         LogCacheIdentity m_identity;
         /** @brief Whether schema initialization and identity validation succeeded. */
         bool m_is_available{false};
+        /** @brief Whether a generation-wide atomic write transaction is active. */
+        bool m_write_transaction_active{false};
+        /** @brief In-memory dimension lookup avoiding repeated SELECT statements per batch. */
+        QHash<QString, qint64> m_level_ids;
+        /** @brief In-memory application lookup avoiding repeated SELECT statements per batch. */
+        QHash<QString, qint64> m_application_ids;
 };

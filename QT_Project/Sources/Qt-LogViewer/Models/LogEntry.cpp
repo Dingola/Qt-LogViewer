@@ -85,6 +85,24 @@ auto LogEntry::get_source_line() const noexcept -> qsizetype
 }
 
 /**
+ * @brief Returns the byte offset of the source record.
+ * @return Zero-based offset in the original file, or -1 when unknown.
+ */
+auto LogEntry::get_byte_offset() const noexcept -> qint64
+{
+    return m_byte_offset;
+}
+
+/**
+ * @brief Returns the byte length of the source record without its line terminator.
+ * @return Record length in the original file encoding, or -1 when unknown.
+ */
+auto LogEntry::get_byte_length() const noexcept -> qint64
+{
+    return m_byte_length;
+}
+
+/**
  * @brief Returns all dynamically named, converted parser values.
  * @return Parsed values keyed by stable field identifier.
  */
@@ -160,4 +178,15 @@ auto LogEntry::set_parse_metadata(QString raw_record, qsizetype source_line,
     m_raw_record = std::move(raw_record);
     m_source_line = source_line;
     m_parsed_fields = std::move(parsed_fields);
+}
+
+/**
+ * @brief Stores the exact byte range of this record in the original source file.
+ * @param byte_offset Zero-based byte offset of the record.
+ * @param byte_length Byte length excluding the source line terminator.
+ */
+auto LogEntry::set_source_range(qint64 byte_offset, qint64 byte_length) noexcept -> void
+{
+    m_byte_offset = byte_offset;
+    m_byte_length = byte_length;
 }

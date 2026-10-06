@@ -6,9 +6,12 @@
 #include <QString>
 #include <QUuid>
 #include <QVector>
+#include <optional>
 
 #include "Qt-LogViewer/Models/LogEntry.h"
+#include "Qt-LogViewer/Services/LogCacheCatalog.h"
 
+class LogFileCacheDatabase;
 class LogHistoryService;
 
 /**
@@ -42,12 +45,22 @@ class LogHistoryWriter final: public QObject
         ~LogHistoryWriter() override;
 
         /**
+         * @brief Prepares an optional building cache generation before its first batch arrives.
+         * @param operation_id Unique identifier of the import attempt.
+         * @param cache_generation Building generation to populate, or no value for legacy-only
+         * writing and reuse of an already complete generation.
+         */
+        auto begin_import(const QUuid& operation_id,
+                          const std::optional<LogCacheGeneration>& cache_generation) -> void;
+
+        /**
          * @brief Stores one parsed batch for an asynchronous import.
+         * @param operation_id Unique identifier of the import attempt.
          * @param view_id View that owns the imported entries.
          * @param file_path Source file used to identify one import operation.
          * @param entries Parsed entries to store.
          */
-        auto store_batch(const QUuid& view_id, const QString& file_path,
+        auto store_batch(const QUuid& operation_id, const QUuid& view_id, const QString& file_path,
                          const QVector<LogEntry>& entries) -> void;
 
         /**
@@ -58,6 +71,12 @@ class LogHistoryWriter final: public QObject
          */
         auto finish_import(const QUuid& operation_id, const QUuid& view_id,
                            const QString& file_path) -> void;
+
+        /**
+         * @brief Closes and removes an incomplete cache generation for a cancelled import.
+         * @param operation_id Unique identifier of the cancelled import attempt.
+         */
+        auto cancel_import(const QUuid& operation_id) -> void;
 
         /**
          * @brief Removes entries that may have been queued before a view was discarded.
@@ -93,14 +112,27 @@ class LogHistoryWriter final: public QObject
         auto ensure_history_service() -> bool;
 
         /**
-         * @brief Clears the failed state for one import operation.
-         * @param view_id View that owns the import.
-         * @param file_path Imported source file.
+         * @brief Closes one operation's cache connection and optionally removes its files.
+         * @param operation_id Unique identifier of the import attempt.
+         * @param remove_files Whether the SQLite database and sidecar files are deleted.
          */
-        auto clear_failed_import(const QUuid& view_id, const QString& file_path) -> void;
+        auto close_cache_import(const QUuid& operation_id, bool remove_files) -> void;
+
+        /**
+         * @brief Removes a SQLite database together with its WAL and shared-memory sidecars.
+         * @param database_path Main SQLite database path.
+         */
+        static auto remove_cache_files(const QString& database_path) -> void;
 
     private:
+        /** @brief Writer-thread state for one building per-file cache generation. */
+        struct CacheImport {
+                LogCacheGeneration generation;
+                LogFileCacheDatabase* database{nullptr};
+        };
+
         QString m_database_path;
         LogHistoryService* m_history_service{nullptr};
-        QHash<QUuid, QSet<QString>> m_failed_imports;
+        QHash<QUuid, CacheImport> m_cache_imports;
+        QSet<QUuid> m_failed_imports;
 };

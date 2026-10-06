@@ -163,6 +163,14 @@ class LogCacheCatalog final: public QObject
         auto mark_failed(qint64 generation_id, const QString& error_message) -> bool;
 
         /**
+         * @brief Marks an incomplete generation failed and removes its disposable database.
+         * @param generation_id Catalog generation primary key.
+         * @param error_message Diagnostic reason for discarding the generation.
+         * @return True when metadata was updated and all existing cache files were removed.
+         */
+        auto discard_generation(qint64 generation_id, const QString& error_message) -> bool;
+
+        /**
          * @brief Refreshes the LRU timestamp of one generation.
          * @param generation_id Catalog generation primary key.
          * @return True when the generation exists and was touched.

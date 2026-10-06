@@ -1,6 +1,7 @@
 /**
  * @file LogCacheCatalogTest.cpp
- * @brief Verifies cache fingerprints, catalog lifecycle rules and per-file schemas.
+ * @brief Verifies cache fingerprints, catalog lifecycle rules and per-file
+ * schemas.
  */
 
 #include "Qt-LogViewer/Services/LogCacheCatalogTest.h"
@@ -15,6 +16,7 @@
 #include "Qt-LogViewer/Services/LogCacheCatalog.h"
 #include "Qt-LogViewer/Services/LogCacheIdentity.h"
 #include "Qt-LogViewer/Services/LogFileCacheDatabase.h"
+#include "Qt-LogViewer/Services/LogParser.h"
 #include "Qt-LogViewer/Services/LogParsingProfile.h"
 
 namespace
@@ -23,7 +25,8 @@ namespace
  * @brief Replaces a UTF-8 text file with deterministic test contents.
  * @param path Destination file path.
  * @param contents Text written to the file.
- * @return True when the file was opened, written and flushed without stream errors.
+ * @return True when the file was opened, written and flushed without stream
+ * errors.
  */
 auto write_file(const QString& path, const QString& contents) -> bool
 {
@@ -39,8 +42,8 @@ auto write_file(const QString& path, const QString& contents) -> bool
 }  // namespace
 
 /**
- * @test Verifies deterministic fingerprints, parser-configuration sensitivity and source-change
- * detection.
+ * @test Verifies deterministic fingerprints, parser-configuration sensitivity
+ * and source-change detection.
  */
 TEST_F(LogCacheCatalogTest, FingerprintChangesWithFileOrParserConfiguration)
 {
@@ -76,7 +79,8 @@ TEST_F(LogCacheCatalogTest, FingerprintChangesWithFileOrParserConfiguration)
 }
 
 /**
- * @test Verifies the building-to-complete transition and ordered, removable view mappings.
+ * @test Verifies the building-to-complete transition and ordered, removable
+ * view mappings.
  */
 TEST_F(LogCacheCatalogTest, StoresCompleteGenerationAndOrderedViewMapping)
 {
@@ -113,7 +117,8 @@ TEST_F(LogCacheCatalogTest, StoresCompleteGenerationAndOrderedViewMapping)
 }
 
 /**
- * @test Verifies that an incompatible catalog schema and its stale cache files are rebuilt.
+ * @test Verifies that an incompatible catalog schema and its stale cache files
+ * are rebuilt.
  */
 TEST_F(LogCacheCatalogTest, RebuildsAnIncompatibleCatalogSchema)
 {
@@ -163,7 +168,8 @@ TEST_F(LogCacheCatalogTest, RebuildsAnIncompatibleCatalogSchema)
 }
 
 /**
- * @test Verifies that building or failed generations cannot become visible through a view.
+ * @test Verifies that building or failed generations cannot become visible
+ * through a view.
  */
 TEST_F(LogCacheCatalogTest, DoesNotBindIncompleteGenerationToView)
 {
@@ -185,7 +191,8 @@ TEST_F(LogCacheCatalogTest, DoesNotBindIncompleteGenerationToView)
 }
 
 /**
- * @test Verifies the normalized per-file schema stores byte ranges instead of duplicated text.
+ * @test Verifies the normalized per-file schema stores byte ranges instead of
+ * duplicated text.
  */
 TEST_F(LogCacheCatalogTest, CreatesNormalizedDisposableFileCacheSchema)
 {
@@ -231,7 +238,83 @@ TEST_F(LogCacheCatalogTest, CreatesNormalizedDisposableFileCacheSchema)
 }
 
 /**
- * @test Verifies that a per-file database cannot be reused for a different source identity.
+ * @test Verifies parsed batches persist exact source ranges, normalized
+ * dimensions and searchable FTS metadata.
+ */
+TEST_F(LogCacheCatalogTest, WritesIndexedEntriesAndSearchMetadata)
+{
+    const QString file_path = m_temporary_directory.filePath(QStringLiteral("source.log"));
+    ASSERT_TRUE(write_file(file_path, QStringLiteral("INFO first App\nERROR second App\n")));
+    const LogParsingProfile profile =
+        LogParsingProfile::create_default(QStringLiteral("{level} {message} {app_name}"));
+    const auto identity = LogCacheIdentity::create(file_path, profile);
+    ASSERT_TRUE(identity.has_value());
+    const QVector<LogEntry> entries = LogParser(profile).parse_file(file_path);
+    ASSERT_EQ(entries.size(), 2);
+    EXPECT_EQ(entries.at(0).get_byte_offset(), 0);
+    EXPECT_EQ(entries.at(0).get_byte_length(), 14);
+    EXPECT_EQ(entries.at(1).get_byte_offset(), 16);
+    EXPECT_EQ(entries.at(1).get_byte_length(), 16);
+
+    const QString database_path =
+        m_temporary_directory.filePath(QStringLiteral("indexed-cache.sqlite"));
+    {
+        LogFileCacheDatabase cache(database_path, identity.value());
+        ASSERT_TRUE(cache.is_available());
+        ASSERT_TRUE(cache.reset_entries());
+        ASSERT_TRUE(cache.append_entries(entries));
+        ASSERT_TRUE(cache.finalize_writes());
+        EXPECT_EQ(cache.get_entry_count(), 2);
+        EXPECT_GT(cache.get_storage_bytes(), 0);
+    }
+
+    const QString connection_name = QStringLiteral("indexed_cache_content_test");
+    {
+        QSqlDatabase database =
+            QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection_name);
+        database.setDatabaseName(database_path);
+        ASSERT_TRUE(database.open());
+        QSqlQuery query(database);
+        ASSERT_TRUE(
+            query.exec(QStringLiteral("SELECT COUNT(*) FROM log_entries_fts WHERE "
+                                      "log_entries_fts MATCH 'second'")));
+        ASSERT_TRUE(query.next());
+        EXPECT_EQ(query.value(0).toLongLong(), 1);
+        database.close();
+    }
+    QSqlDatabase::removeDatabase(connection_name);
+}
+
+/**
+ * @test Verifies that profiles without an application field store an empty,
+ * non-null dimension.
+ */
+TEST_F(LogCacheCatalogTest, WritesEntriesWithoutApplicationField)
+{
+    const QString file_path =
+        m_temporary_directory.filePath(QStringLiteral("source-without-application.log"));
+    ASSERT_TRUE(write_file(file_path, QStringLiteral("INFO first\nERROR second\n")));
+    const LogParsingProfile profile =
+        LogParsingProfile::create_default(QStringLiteral("{level} {message}"));
+    const auto identity = LogCacheIdentity::create(file_path, profile);
+    ASSERT_TRUE(identity.has_value());
+    const QVector<LogEntry> entries = LogParser(profile).parse_file(file_path);
+    ASSERT_EQ(entries.size(), 2);
+    EXPECT_TRUE(entries.at(0).get_app_name().isNull());
+
+    const QString database_path =
+        m_temporary_directory.filePath(QStringLiteral("cache-without-application.sqlite"));
+    LogFileCacheDatabase cache(database_path, identity.value());
+    ASSERT_TRUE(cache.is_available());
+    ASSERT_TRUE(cache.reset_entries());
+    EXPECT_TRUE(cache.append_entries(entries));
+    EXPECT_TRUE(cache.finalize_writes());
+    EXPECT_EQ(cache.get_entry_count(), 2);
+}
+
+/**
+ * @test Verifies that a per-file database cannot be reused for a different
+ * source identity.
  */
 TEST_F(LogCacheCatalogTest, RejectsFileCacheOpenedWithDifferentIdentity)
 {

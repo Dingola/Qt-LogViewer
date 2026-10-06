@@ -556,8 +556,15 @@ auto LogHistoryService::add_entries(const QUuid& view_id, const QVector<LogEntry
 
             if (!added)
             {
+                qWarning() << "Committing archived log entries failed:"
+                           << database.lastError().text();
                 database.rollback();
             }
+        }
+        else
+        {
+            qWarning() << "Starting archived log-entry transaction failed:"
+                       << database.lastError().text();
         }
     }
 

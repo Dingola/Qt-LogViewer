@@ -6,7 +6,10 @@
 #include <QString>
 #include <QUuid>
 #include <QVector>
+#include <optional>
 
+#include "Qt-LogViewer/Models/LogEntry.h"
+#include "Qt-LogViewer/Services/LogCacheCatalog.h"
 #include "Qt-LogViewer/Services/LogParsingProfile.h"
 
 class HistoryWriteService;
@@ -44,6 +47,7 @@ class LogImportCoordinator final: public QObject
          * @param pages Page state used to distinguish initial loads from refreshes.
          * @param queries Query component used to load bounded visible pages.
          * @param live_tailing Live-tail registrations started after successful imports.
+         * @param cache_catalog Persistent cache-generation catalog.
          * @param parent Optional QObject parent.
          */
         explicit LogImportCoordinator(const LogParsingProfile& default_profile,
@@ -52,7 +56,7 @@ class LogImportCoordinator final: public QObject
                                       HistoryWriteService* history_writer,
                                       LogPageCoordinator* pages, LogQueryController* queries,
                                       LiveTailingCoordinator* live_tailing,
-                                      QObject* parent = nullptr);
+                                      LogCacheCatalog* cache_catalog, QObject* parent = nullptr);
 
         /**
          * @brief Imports one file synchronously into a new view.
@@ -139,6 +143,14 @@ class LogImportCoordinator final: public QObject
         auto cancel(const QUuid& view_id) -> void;
 
         /**
+         * @brief Removes one file generation from a view's persistent cache mapping.
+         * @param view_id View that no longer contains the file.
+         * @param file_path Removed source file.
+         * @return True when the mapping was removed, rebound, or safely deferred.
+         */
+        auto discard_file_cache_binding(const QUuid& view_id, const QString& file_path) -> bool;
+
+        /**
          * @brief Queues removal of stored history belonging to one view.
          * @param view_id View whose stored history is discarded.
          * @return True when asynchronous history cleanup was queued.
@@ -201,6 +213,48 @@ class LogImportCoordinator final: public QObject
                                    const QString& file_path, bool succeeded,
                                    const QString& error_message) -> void;
 
+        /**
+         * @brief Finds or starts the cache generation matching a source and parser profile.
+         * @param file_path Readable source file.
+         * @param profile Effective parsing profile.
+         * @return Existing complete or newly building generation, or no value on failure.
+         */
+        [[nodiscard]] auto prepare_cache_generation(const QString& file_path,
+                                                    const LogParsingProfile& profile)
+            -> std::optional<LogCacheGeneration>;
+
+        /**
+         * @brief Builds and completes one cache generation during a synchronous import.
+         * @param generation Building or already complete generation.
+         * @param entries Parsed source entries carrying byte ranges.
+         * @return True when the generation is complete and reusable.
+         */
+        auto complete_synchronous_cache(const LogCacheGeneration& generation,
+                                        const QVector<LogEntry>& entries) -> bool;
+
+        /**
+         * @brief Validates writer output and atomically completes an asynchronous generation.
+         * @param generation Building generation whose writer connection has closed.
+         * @return True when counts and storage metadata were committed to the catalog.
+         */
+        auto complete_asynchronous_cache(const LogCacheGeneration& generation) -> bool;
+
+        /**
+         * @brief Retains one complete generation for later atomic view binding.
+         * @param view_id View owning the source registration.
+         * @param file_path Registered source path.
+         * @param generation_id Complete catalog generation primary key.
+         */
+        auto remember_view_generation(const QUuid& view_id, const QString& file_path,
+                                      qint64 generation_id) -> void;
+
+        /**
+         * @brief Binds a view after all its active imports have complete generations.
+         * @param view_id View whose ordered generation mapping may be published.
+         * @return True when a complete ordered mapping was committed or caching is disabled.
+         */
+        auto bind_view_generations(const QUuid& view_id) -> bool;
+
     private:
         bool m_shutting_down{false};
         LogParsingProfile m_default_profile;
@@ -211,6 +265,9 @@ class LogImportCoordinator final: public QObject
         LogPageCoordinator* m_pages{nullptr};
         LogQueryController* m_queries{nullptr};
         LiveTailingCoordinator* m_live_tailing{nullptr};
+        LogCacheCatalog* m_cache_catalog{nullptr};
         QHash<QUuid, QUuid> m_operation_views;
+        QHash<QUuid, LogCacheGeneration> m_operation_generations;
+        QHash<QUuid, QHash<QString, qint64>> m_view_generations;
         QSet<QUuid> m_failed_operations;
 };

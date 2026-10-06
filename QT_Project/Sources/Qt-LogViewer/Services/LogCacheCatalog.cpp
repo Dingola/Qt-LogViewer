@@ -8,6 +8,7 @@
 #include <QDateTime>
 #include <QDebug>
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QSqlDatabase>
 #include <QSqlError>
@@ -26,15 +27,16 @@ namespace
  */
 [[nodiscard]] auto state_from_string(const QString& state) -> LogCacheGenerationState
 {
+    LogCacheGenerationState generation_state = LogCacheGenerationState::Building;
     if (state == QStringLiteral("complete"))
     {
-        return LogCacheGenerationState::Complete;
+        generation_state = LogCacheGenerationState::Complete;
     }
-    if (state == QStringLiteral("failed"))
+    else if (state == QStringLiteral("failed"))
     {
-        return LogCacheGenerationState::Failed;
+        generation_state = LogCacheGenerationState::Failed;
     }
-    return LogCacheGenerationState::Building;
+    return generation_state;
 }
 }  // namespace
 
@@ -127,97 +129,94 @@ auto LogCacheCatalog::begin_generation(const LogCacheIdentity& identity)
     -> std::optional<LogCacheGeneration>
 {
     std::optional<LogCacheGeneration> generation;
-    if (!m_is_available || !identity.is_valid())
+    if (m_is_available && identity.is_valid())
     {
-        return generation;
-    }
-
-    // Source registration and generation creation/resumption form one
-    // transaction. Callers must never observe a generation whose source row was
-    // not committed with it.
-    QSqlDatabase database = QSqlDatabase::database(m_connection_name);
-    if (!database.transaction())
-    {
-        return generation;
-    }
-
-    QSqlQuery source_query(database);
-    source_query.prepare(
-        QStringLiteral("INSERT INTO cache_sources(canonical_path, "
-                       "last_seen_utc_ms) VALUES(?, ?) "
-                       "ON CONFLICT(canonical_path) DO UPDATE SET "
-                       "last_seen_utc_ms=excluded.last_seen_utc_ms"));
-    source_query.addBindValue(identity.canonical_file_path);
-    source_query.addBindValue(QDateTime::currentDateTimeUtc().toMSecsSinceEpoch());
-    bool succeeded = source_query.exec();
-
-    qint64 source_id = -1;
-    if (succeeded)
-    {
-        QSqlQuery id_query(database);
-        id_query.prepare(QStringLiteral("SELECT id FROM cache_sources WHERE canonical_path=?"));
-        id_query.addBindValue(identity.canonical_file_path);
-        succeeded = id_query.exec() && id_query.next();
+        // Source registration and generation creation/resumption form one
+        // transaction. Callers must never observe a generation whose source row was
+        // not committed with it.
+        QSqlDatabase database = QSqlDatabase::database(m_connection_name);
+        const bool transaction_started = database.transaction();
+        bool succeeded = transaction_started;
         if (succeeded)
         {
-            source_id = id_query.value(0).toLongLong();
+            QSqlQuery source_query(database);
+            source_query.prepare(
+                QStringLiteral("INSERT INTO cache_sources(canonical_path, "
+                               "last_seen_utc_ms) VALUES(?, ?) "
+                               "ON CONFLICT(canonical_path) DO UPDATE SET "
+                               "last_seen_utc_ms=excluded.last_seen_utc_ms"));
+            source_query.addBindValue(identity.canonical_file_path);
+            source_query.addBindValue(QDateTime::currentDateTimeUtc().toMSecsSinceEpoch());
+            succeeded = source_query.exec();
         }
-    }
 
-    qint64 generation_id = -1;
-    if (succeeded)
-    {
-        QSqlQuery existing_query(database);
-        existing_query.prepare(
-            QStringLiteral("SELECT id FROM cache_generations WHERE cache_key=?"));
-        existing_query.addBindValue(identity.cache_key);
-        succeeded = existing_query.exec();
-
-        if (succeeded && existing_query.next())
+        qint64 source_id = -1;
+        if (succeeded)
         {
-            generation_id = existing_query.value(0).toLongLong();
-            QSqlQuery resume_query(database);
-            resume_query.prepare(
-                QStringLiteral("UPDATE cache_generations SET state='building', "
-                               "indexed_bytes=0, entry_count=0, "
-                               "storage_bytes=0, completed_utc_ms=NULL, "
-                               "error_message='' WHERE id=? AND "
-                               "state<>'complete'"));
-            resume_query.addBindValue(generation_id);
-            succeeded = resume_query.exec();
+            QSqlQuery id_query(database);
+            id_query.prepare(QStringLiteral("SELECT id FROM cache_sources WHERE canonical_path=?"));
+            id_query.addBindValue(identity.canonical_file_path);
+            succeeded = id_query.exec() && id_query.next();
+            if (succeeded)
+            {
+                source_id = id_query.value(0).toLongLong();
+            }
         }
-        else if (succeeded)
-        {
-            const qint64 now = QDateTime::currentDateTimeUtc().toMSecsSinceEpoch();
-            QSqlQuery insert_query(database);
-            insert_query.prepare(
-                QStringLiteral("INSERT INTO cache_generations(source_id, cache_key, file_size, "
-                               "modified_utc_ms, sample_sha256, parser_sha256, cache_file_name, "
-                               "state, "
-                               "created_utc_ms, last_access_utc_ms) VALUES(?, ?, ?, ?, ?, ?, ?, "
-                               "'building', "
-                               "?, ?)"));
-            insert_query.addBindValue(source_id);
-            insert_query.addBindValue(identity.cache_key);
-            insert_query.addBindValue(identity.file_size);
-            insert_query.addBindValue(identity.modified_utc_ms);
-            insert_query.addBindValue(identity.sample_sha256);
-            insert_query.addBindValue(identity.parser_sha256);
-            insert_query.addBindValue(identity.cache_key + QStringLiteral(".sqlite"));
-            insert_query.addBindValue(now);
-            insert_query.addBindValue(now);
-            succeeded = insert_query.exec();
-            generation_id = insert_query.lastInsertId().toLongLong();
-        }
-    }
 
-    if (succeeded && database.commit())
-    {
-        generation = load_generation(generation_id);
-    }
-    else
-    {
-        database.rollback();
+        qint64 generation_id = -1;
+        if (succeeded)
+        {
+            QSqlQuery existing_query(database);
+            existing_query.prepare(
+                QStringLiteral("SELECT id FROM cache_generations WHERE cache_key=?"));
+            existing_query.addBindValue(identity.cache_key);
+            succeeded = existing_query.exec();
+
+            if (succeeded && existing_query.next())
+            {
+                generation_id = existing_query.value(0).toLongLong();
+                QSqlQuery resume_query(database);
+                resume_query.prepare(
+                    QStringLiteral("UPDATE cache_generations SET state='building', "
+                                   "indexed_bytes=0, entry_count=0, "
+                                   "storage_bytes=0, completed_utc_ms=NULL, "
+                                   "error_message='' WHERE id=? AND "
+                                   "state<>'complete'"));
+                resume_query.addBindValue(generation_id);
+                succeeded = resume_query.exec();
+            }
+            else if (succeeded)
+            {
+                const qint64 now = QDateTime::currentDateTimeUtc().toMSecsSinceEpoch();
+                QSqlQuery insert_query(database);
+                insert_query.prepare(QStringLiteral(
+                    "INSERT INTO cache_generations(source_id, cache_key, file_size, "
+                    "modified_utc_ms, sample_sha256, parser_sha256, cache_file_name, "
+                    "state, created_utc_ms, last_access_utc_ms) "
+                    "VALUES(?, ?, ?, ?, ?, ?, ?, 'building', ?, ?)"));
+                insert_query.addBindValue(source_id);
+                insert_query.addBindValue(identity.cache_key);
+                insert_query.addBindValue(identity.file_size);
+                insert_query.addBindValue(identity.modified_utc_ms);
+                insert_query.addBindValue(identity.sample_sha256);
+                insert_query.addBindValue(identity.parser_sha256);
+                insert_query.addBindValue(identity.cache_key + QStringLiteral(".sqlite"));
+                insert_query.addBindValue(now);
+                insert_query.addBindValue(now);
+                succeeded = insert_query.exec();
+                generation_id = insert_query.lastInsertId().toLongLong();
+            }
+        }
+
+        succeeded = succeeded && database.commit();
+        if (succeeded)
+        {
+            generation = load_generation(generation_id);
+        }
+        else if (transaction_started)
+        {
+            database.rollback();
+        }
     }
 
     return generation;
@@ -258,27 +257,28 @@ auto LogCacheCatalog::find_complete_generation(const LogCacheIdentity& identity)
 auto LogCacheCatalog::mark_complete(qint64 generation_id, qint64 indexed_bytes, qint64 entry_count,
                                     qint64 storage_bytes) -> bool
 {
-    if (!m_is_available || generation_id < 0 || indexed_bytes < 0 || entry_count < 0 ||
-        storage_bytes < 0)
+    const bool can_complete = m_is_available && generation_id >= 0 && indexed_bytes >= 0 &&
+                              entry_count >= 0 && storage_bytes >= 0;
+    bool completed = false;
+    if (can_complete)
     {
-        return false;
+        QSqlQuery query(QSqlDatabase::database(m_connection_name));
+        query.prepare(
+            QStringLiteral("UPDATE cache_generations SET state='complete', "
+                           "indexed_bytes=?, entry_count=?, "
+                           "storage_bytes=?, completed_utc_ms=?, "
+                           "last_access_utc_ms=?, error_message='' WHERE id=? "
+                           "AND state='building'"));
+        const qint64 now = QDateTime::currentDateTimeUtc().toMSecsSinceEpoch();
+        query.addBindValue(indexed_bytes);
+        query.addBindValue(entry_count);
+        query.addBindValue(storage_bytes);
+        query.addBindValue(now);
+        query.addBindValue(now);
+        query.addBindValue(generation_id);
+        completed = query.exec() && query.numRowsAffected() == 1;
     }
-
-    QSqlQuery query(QSqlDatabase::database(m_connection_name));
-    query.prepare(
-        QStringLiteral("UPDATE cache_generations SET state='complete', "
-                       "indexed_bytes=?, entry_count=?, "
-                       "storage_bytes=?, completed_utc_ms=?, "
-                       "last_access_utc_ms=?, error_message='' WHERE id=? "
-                       "AND state='building'"));
-    const qint64 now = QDateTime::currentDateTimeUtc().toMSecsSinceEpoch();
-    query.addBindValue(indexed_bytes);
-    query.addBindValue(entry_count);
-    query.addBindValue(storage_bytes);
-    query.addBindValue(now);
-    query.addBindValue(now);
-    query.addBindValue(generation_id);
-    return query.exec() && query.numRowsAffected() == 1;
+    return completed;
 }
 
 /**
@@ -289,18 +289,48 @@ auto LogCacheCatalog::mark_complete(qint64 generation_id, qint64 indexed_bytes, 
  */
 auto LogCacheCatalog::mark_failed(qint64 generation_id, const QString& error_message) -> bool
 {
-    if (!m_is_available || generation_id < 0)
+    bool failed = false;
+    if (m_is_available && generation_id >= 0)
     {
-        return false;
+        QSqlQuery query(QSqlDatabase::database(m_connection_name));
+        query.prepare(
+            QStringLiteral("UPDATE cache_generations SET state='failed', "
+                           "completed_utc_ms=NULL, error_message=? "
+                           "WHERE id=? AND state='building'"));
+        query.addBindValue(error_message);
+        query.addBindValue(generation_id);
+        failed = query.exec() && query.numRowsAffected() == 1;
     }
-    QSqlQuery query(QSqlDatabase::database(m_connection_name));
-    query.prepare(
-        QStringLiteral("UPDATE cache_generations SET state='failed', "
-                       "completed_utc_ms=NULL, error_message=? "
-                       "WHERE id=? AND state='building'"));
-    query.addBindValue(error_message);
-    query.addBindValue(generation_id);
-    return query.exec() && query.numRowsAffected() == 1;
+    return failed;
+}
+
+/**
+ * @brief Marks an incomplete generation failed and removes its disposable database.
+ * @param generation_id Catalog generation primary key.
+ * @param error_message Diagnostic reason for discarding the generation.
+ * @return True when metadata was updated and all existing cache files were removed.
+ */
+auto LogCacheCatalog::discard_generation(qint64 generation_id, const QString& error_message) -> bool
+{
+    const std::optional<LogCacheGeneration> generation = load_generation(generation_id);
+    bool discarded = false;
+    if (generation.has_value() && generation->state != LogCacheGenerationState::Complete)
+    {
+        discarded = generation->state == LogCacheGenerationState::Failed ||
+                    mark_failed(generation_id, error_message);
+        const QStringList paths{generation->database_path,
+                                generation->database_path + QStringLiteral("-wal"),
+                                generation->database_path + QStringLiteral("-shm")};
+        for (qsizetype index = 0; index < paths.size(); ++index)
+        {
+            const QString& path = paths.at(index);
+            if (QFileInfo::exists(path))
+            {
+                discarded = QFile::remove(path) && discarded;
+            }
+        }
+    }
+    return discarded;
 }
 
 /**
@@ -310,15 +340,17 @@ auto LogCacheCatalog::mark_failed(qint64 generation_id, const QString& error_mes
  */
 auto LogCacheCatalog::touch_generation(qint64 generation_id) -> bool
 {
-    if (!m_is_available || generation_id < 0)
+    bool touched = false;
+    if (m_is_available && generation_id >= 0)
     {
-        return false;
+        QSqlQuery query(QSqlDatabase::database(m_connection_name));
+        query.prepare(
+            QStringLiteral("UPDATE cache_generations SET last_access_utc_ms=? WHERE id=?"));
+        query.addBindValue(QDateTime::currentDateTimeUtc().toMSecsSinceEpoch());
+        query.addBindValue(generation_id);
+        touched = query.exec() && query.numRowsAffected() == 1;
     }
-    QSqlQuery query(QSqlDatabase::database(m_connection_name));
-    query.prepare(QStringLiteral("UPDATE cache_generations SET last_access_utc_ms=? WHERE id=?"));
-    query.addBindValue(QDateTime::currentDateTimeUtc().toMSecsSinceEpoch());
-    query.addBindValue(generation_id);
-    return query.exec() && query.numRowsAffected() == 1;
+    return touched;
 }
 
 /**
@@ -329,57 +361,56 @@ auto LogCacheCatalog::touch_generation(qint64 generation_id) -> bool
  */
 auto LogCacheCatalog::bind_view(const QUuid& view_id, const QVector<qint64>& generation_ids) -> bool
 {
-    if (!m_is_available || view_id.isNull())
+    bool bound = false;
+    if (m_is_available && !view_id.isNull())
     {
-        return false;
+        // Replacing the entire ordered mapping in one transaction prevents a restored
+        // view from seeing a mixture of old and new source generations.
+        QSqlDatabase database = QSqlDatabase::database(m_connection_name);
+        const bool transaction_started = database.transaction();
+        bool succeeded = transaction_started;
+        const QString view_text = view_id.toString(QUuid::WithoutBraces);
+
+        if (succeeded)
+        {
+            QSqlQuery view_query(database);
+            view_query.prepare(
+                QStringLiteral("INSERT INTO cache_views(view_id, updated_utc_ms) VALUES(?, ?) "
+                               "ON CONFLICT(view_id) DO UPDATE SET "
+                               "updated_utc_ms=excluded.updated_utc_ms"));
+            view_query.addBindValue(view_text);
+            view_query.addBindValue(QDateTime::currentDateTimeUtc().toMSecsSinceEpoch());
+            succeeded = view_query.exec();
+        }
+
+        if (succeeded)
+        {
+            QSqlQuery delete_query(database);
+            delete_query.prepare(
+                QStringLiteral("DELETE FROM cache_view_generations WHERE view_id=?"));
+            delete_query.addBindValue(view_text);
+            succeeded = delete_query.exec();
+        }
+
+        for (qsizetype position = 0; position < generation_ids.size() && succeeded; ++position)
+        {
+            QSqlQuery insert_query(database);
+            insert_query.prepare(QStringLiteral(
+                "INSERT INTO cache_view_generations(view_id, generation_id, position) "
+                "SELECT ?, id, ? FROM cache_generations WHERE id=? AND state='complete'"));
+            insert_query.addBindValue(view_text);
+            insert_query.addBindValue(position);
+            insert_query.addBindValue(generation_ids.at(position));
+            succeeded = insert_query.exec() && insert_query.numRowsAffected() == 1;
+        }
+
+        bound = succeeded && database.commit();
+        if (!bound && transaction_started)
+        {
+            database.rollback();
+        }
     }
-
-    // Replacing the entire ordered mapping in one transaction prevents a restored
-    // view from seeing a mixture of old and new source generations.
-    QSqlDatabase database = QSqlDatabase::database(m_connection_name);
-    bool succeeded = database.transaction();
-    const QString view_text = view_id.toString(QUuid::WithoutBraces);
-
-    if (succeeded)
-    {
-        QSqlQuery view_query(database);
-        view_query.prepare(
-            QStringLiteral("INSERT INTO cache_views(view_id, updated_utc_ms) VALUES(?, ?) "
-                           "ON CONFLICT(view_id) DO UPDATE SET "
-                           "updated_utc_ms=excluded.updated_utc_ms"));
-        view_query.addBindValue(view_text);
-        view_query.addBindValue(QDateTime::currentDateTimeUtc().toMSecsSinceEpoch());
-        succeeded = view_query.exec();
-    }
-
-    if (succeeded)
-    {
-        QSqlQuery delete_query(database);
-        delete_query.prepare(QStringLiteral("DELETE FROM cache_view_generations WHERE view_id=?"));
-        delete_query.addBindValue(view_text);
-        succeeded = delete_query.exec();
-    }
-
-    for (qsizetype position = 0; position < generation_ids.size() && succeeded; ++position)
-    {
-        QSqlQuery insert_query(database);
-        insert_query.prepare(
-            QStringLiteral("INSERT INTO cache_view_generations(view_id, generation_id, position) "
-                           "SELECT ?, id, ? FROM cache_generations WHERE id=? AND "
-                           "state='complete'"));
-        insert_query.addBindValue(view_text);
-        insert_query.addBindValue(position);
-        insert_query.addBindValue(generation_ids.at(position));
-        succeeded = insert_query.exec() && insert_query.numRowsAffected() == 1;
-    }
-
-    if (succeeded && database.commit())
-    {
-        return true;
-    }
-
-    database.rollback();
-    return false;
+    return bound;
 }
 
 /**
@@ -415,14 +446,15 @@ auto LogCacheCatalog::get_view_generations(const QUuid& view_id) const -> QVecto
  */
 auto LogCacheCatalog::remove_view(const QUuid& view_id) -> bool
 {
-    if (!m_is_available || view_id.isNull())
+    bool removed = false;
+    if (m_is_available && !view_id.isNull())
     {
-        return false;
+        QSqlQuery query(QSqlDatabase::database(m_connection_name));
+        query.prepare(QStringLiteral("DELETE FROM cache_views WHERE view_id=?"));
+        query.addBindValue(view_id.toString(QUuid::WithoutBraces));
+        removed = query.exec();
     }
-    QSqlQuery query(QSqlDatabase::database(m_connection_name));
-    query.prepare(QStringLiteral("DELETE FROM cache_views WHERE view_id=?"));
-    query.addBindValue(view_id.toString(QUuid::WithoutBraces));
-    return query.exec();
+    return removed;
 }
 
 /**
@@ -442,50 +474,60 @@ auto LogCacheCatalog::get_default_cache_root() -> QString
  */
 auto LogCacheCatalog::initialize_database() -> bool
 {
-    if (m_cache_root.isEmpty() ||
-        !QDir().mkpath(QDir(m_cache_root).filePath(QStringLiteral("files"))))
+    bool initialized = !m_cache_root.isEmpty() &&
+                       QDir().mkpath(QDir(m_cache_root).filePath(QStringLiteral("files")));
+    if (!initialized)
     {
         qWarning() << "Cache catalog directory initialization failed:" << m_cache_root;
-        return false;
     }
-
-    QSqlDatabase database = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), m_connection_name);
-    database.setDatabaseName(m_database_path);
-    database.setConnectOptions(QStringLiteral("QSQLITE_BUSY_TIMEOUT=5000"));
-    if (!database.open())
+    else
     {
-        qWarning() << "Cache catalog database open failed:" << database.lastError();
-        return false;
-    }
-
-    QSqlQuery query(database);
-    bool configured = query.exec(QStringLiteral("PRAGMA foreign_keys=ON")) &&
-                      query.exec(QStringLiteral("PRAGMA busy_timeout=5000")) &&
-                      query.exec(QStringLiteral("PRAGMA journal_mode=WAL")) &&
-                      query.exec(QStringLiteral("PRAGMA synchronous=NORMAL"));
-    if (!configured || !query.exec(QStringLiteral("PRAGMA user_version")) || !query.next())
-    {
-        qWarning() << "Cache catalog SQLite configuration failed:" << configured
-                   << query.lastError();
-        return false;
-    }
-
-    const int version = query.value(0).toInt();
-    query.finish();
-    const bool initialized = version == SchemaVersion ? create_schema() : rebuild_schema();
-    if (initialized)
-    {
-        // A process termination cannot leave a reusable partial generation.
-        // Converting stale building rows to failed preserves diagnostics while
-        // keeping them hidden from views.
-        QSqlQuery interrupted_query(database);
-        if (!interrupted_query.exec(QStringLiteral("UPDATE cache_generations SET state='failed', "
-                                                   "error_message='Interrupted cache build.' WHERE "
-                                                   "state='building'")))
+        QSqlDatabase database =
+            QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), m_connection_name);
+        database.setDatabaseName(m_database_path);
+        database.setConnectOptions(QStringLiteral("QSQLITE_BUSY_TIMEOUT=5000"));
+        initialized = database.open();
+        if (!initialized)
         {
-            qWarning() << "Cache catalog interrupted-build recovery failed:"
-                       << interrupted_query.lastError();
-            return false;
+            qWarning() << "Cache catalog database open failed:" << database.lastError();
+        }
+
+        if (initialized)
+        {
+            QSqlQuery query(database);
+            const bool configured = query.exec(QStringLiteral("PRAGMA foreign_keys=ON")) &&
+                                    query.exec(QStringLiteral("PRAGMA busy_timeout=5000")) &&
+                                    query.exec(QStringLiteral("PRAGMA journal_mode=WAL")) &&
+                                    query.exec(QStringLiteral("PRAGMA synchronous=NORMAL"));
+            initialized =
+                configured && query.exec(QStringLiteral("PRAGMA user_version")) && query.next();
+            if (!initialized)
+            {
+                qWarning() << "Cache catalog SQLite configuration failed:" << configured
+                           << query.lastError();
+            }
+            else
+            {
+                const int version = query.value(0).toInt();
+                query.finish();
+                initialized = version == SchemaVersion ? create_schema() : rebuild_schema();
+            }
+        }
+
+        if (initialized)
+        {
+            // A process termination cannot leave a reusable partial generation.
+            // Converting stale building rows to failed preserves diagnostics while
+            // keeping them hidden from views.
+            QSqlQuery interrupted_query(database);
+            initialized = interrupted_query.exec(
+                QStringLiteral("UPDATE cache_generations SET state='failed', "
+                               "error_message='Interrupted cache build.' WHERE state='building'"));
+            if (!initialized)
+            {
+                qWarning() << "Cache catalog interrupted-build recovery failed:"
+                           << interrupted_query.lastError();
+            }
         }
     }
     return initialized;
@@ -498,44 +540,51 @@ auto LogCacheCatalog::initialize_database() -> bool
 auto LogCacheCatalog::rebuild_schema() -> bool
 {
     QSqlDatabase database = QSqlDatabase::database(m_connection_name);
-    if (!database.transaction())
-    {
-        return false;
-    }
-
-    QSqlQuery query(database);
-    const QStringList drops{QStringLiteral("DROP TABLE IF EXISTS cache_view_generations"),
-                            QStringLiteral("DROP TABLE IF EXISTS cache_views"),
-                            QStringLiteral("DROP TABLE IF EXISTS cache_generations"),
-                            QStringLiteral("DROP TABLE IF EXISTS cache_sources")};
-    bool rebuilt = true;
-    for (const QString& statement: drops)
-    {
-        if (rebuilt && !query.exec(statement))
-        {
-            qWarning() << "Cache catalog schema drop failed:" << statement << query.lastError();
-            rebuilt = false;
-        }
-    }
-    rebuilt = rebuilt && create_schema();
-    if (rebuilt && !query.exec(QStringLiteral("PRAGMA user_version=2")))
-    {
-        qWarning() << "Cache catalog schema version update failed:" << query.lastError();
-        rebuilt = false;
-    }
-
-    query.finish();
-    if (rebuilt && database.commit())
-    {
-        remove_stale_cache_files();
-        return true;
-    }
+    const bool transaction_started = database.transaction();
+    bool rebuilt = transaction_started;
     if (rebuilt)
     {
-        qWarning() << "Cache catalog schema commit failed:" << database.lastError();
+        QSqlQuery query(database);
+        const QStringList drops{QStringLiteral("DROP TABLE IF EXISTS cache_view_generations"),
+                                QStringLiteral("DROP TABLE IF EXISTS cache_views"),
+                                QStringLiteral("DROP TABLE IF EXISTS cache_generations"),
+                                QStringLiteral("DROP TABLE IF EXISTS cache_sources")};
+        for (qsizetype index = 0; index < drops.size() && rebuilt; ++index)
+        {
+            const QString& statement = drops.at(index);
+            rebuilt = query.exec(statement);
+            if (!rebuilt)
+            {
+                qWarning() << "Cache catalog schema drop failed:" << statement << query.lastError();
+            }
+        }
+        rebuilt = rebuilt && create_schema();
+        if (rebuilt)
+        {
+            rebuilt = query.exec(QStringLiteral("PRAGMA user_version=2"));
+            if (!rebuilt)
+            {
+                qWarning() << "Cache catalog schema version update failed:" << query.lastError();
+            }
+        }
+
+        query.finish();
+        const bool ready_to_commit = rebuilt;
+        rebuilt = rebuilt && database.commit();
+        if (!rebuilt)
+        {
+            if (ready_to_commit)
+            {
+                qWarning() << "Cache catalog schema commit failed:" << database.lastError();
+            }
+            database.rollback();
+        }
+        else
+        {
+            remove_stale_cache_files();
+        }
     }
-    database.rollback();
-    return false;
+    return rebuilt;
 }
 
 /** Removes disposable per-file databases after their incompatible catalog was
@@ -619,42 +668,40 @@ auto LogCacheCatalog::load_generation(qint64 generation_id) const
     -> std::optional<LogCacheGeneration>
 {
     std::optional<LogCacheGeneration> generation;
-    if (!m_is_available)
+    if (m_is_available)
     {
-        return generation;
-    }
-
-    QSqlQuery query(QSqlDatabase::database(m_connection_name));
-    query.prepare(
-        QStringLiteral("SELECT g.id, g.source_id, s.canonical_path, g.file_size, "
-                       "g.modified_utc_ms, "
-                       "g.sample_sha256, g.parser_sha256, g.cache_key, "
-                       "g.cache_file_name, g.state, "
-                       "g.indexed_bytes, g.entry_count, g.storage_bytes, "
-                       "g.last_access_utc_ms, g.error_message "
-                       "FROM cache_generations g JOIN cache_sources s ON "
-                       "s.id=g.source_id WHERE g.id=?"));
-    query.addBindValue(generation_id);
-    if (query.exec() && query.next())
-    {
-        LogCacheGeneration value;
-        value.id = query.value(0).toLongLong();
-        value.source_id = query.value(1).toLongLong();
-        value.identity.canonical_file_path = query.value(2).toString();
-        value.identity.file_size = query.value(3).toLongLong();
-        value.identity.modified_utc_ms = query.value(4).toLongLong();
-        value.identity.sample_sha256 = query.value(5).toByteArray();
-        value.identity.parser_sha256 = query.value(6).toByteArray();
-        value.identity.cache_key = query.value(7).toString();
-        value.database_path =
-            get_cache_database_path(value.identity.cache_key + QStringLiteral(".sqlite"));
-        value.state = state_from_string(query.value(9).toString());
-        value.indexed_bytes = query.value(10).toLongLong();
-        value.entry_count = query.value(11).toLongLong();
-        value.storage_bytes = query.value(12).toLongLong();
-        value.last_access_utc_ms = query.value(13).toLongLong();
-        value.error_message = query.value(14).toString();
-        generation = std::move(value);
+        QSqlQuery query(QSqlDatabase::database(m_connection_name));
+        query.prepare(
+            QStringLiteral("SELECT g.id, g.source_id, s.canonical_path, g.file_size, "
+                           "g.modified_utc_ms, "
+                           "g.sample_sha256, g.parser_sha256, g.cache_key, "
+                           "g.cache_file_name, g.state, "
+                           "g.indexed_bytes, g.entry_count, g.storage_bytes, "
+                           "g.last_access_utc_ms, g.error_message "
+                           "FROM cache_generations g JOIN cache_sources s ON "
+                           "s.id=g.source_id WHERE g.id=?"));
+        query.addBindValue(generation_id);
+        if (query.exec() && query.next())
+        {
+            LogCacheGeneration value;
+            value.id = query.value(0).toLongLong();
+            value.source_id = query.value(1).toLongLong();
+            value.identity.canonical_file_path = query.value(2).toString();
+            value.identity.file_size = query.value(3).toLongLong();
+            value.identity.modified_utc_ms = query.value(4).toLongLong();
+            value.identity.sample_sha256 = query.value(5).toByteArray();
+            value.identity.parser_sha256 = query.value(6).toByteArray();
+            value.identity.cache_key = query.value(7).toString();
+            value.database_path =
+                get_cache_database_path(value.identity.cache_key + QStringLiteral(".sqlite"));
+            value.state = state_from_string(query.value(9).toString());
+            value.indexed_bytes = query.value(10).toLongLong();
+            value.entry_count = query.value(11).toLongLong();
+            value.storage_bytes = query.value(12).toLongLong();
+            value.last_access_utc_ms = query.value(13).toLongLong();
+            value.error_message = query.value(14).toString();
+            generation = std::move(value);
+        }
     }
     return generation;
 }

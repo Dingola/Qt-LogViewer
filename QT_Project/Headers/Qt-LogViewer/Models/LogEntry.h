@@ -84,6 +84,18 @@ class LogEntry
         [[nodiscard]] auto get_source_line() const noexcept -> qsizetype;
 
         /**
+         * @brief Returns the byte offset of the source record.
+         * @return Zero-based offset in the original file, or -1 when unknown.
+         */
+        [[nodiscard]] auto get_byte_offset() const noexcept -> qint64;
+
+        /**
+         * @brief Returns the byte length of the source record without its line terminator.
+         * @return Record length in the original file encoding, or -1 when unknown.
+         */
+        [[nodiscard]] auto get_byte_length() const noexcept -> qint64;
+
+        /**
          * @brief Returns all dynamically named, converted parser values.
          * @return Parsed values keyed by stable field identifier.
          */
@@ -135,6 +147,13 @@ class LogEntry
         auto set_parse_metadata(QString raw_record, qsizetype source_line,
                                 ParsedFields parsed_fields) -> void;
 
+        /**
+         * @brief Stores the exact byte range of this record in the original source file.
+         * @param byte_offset Zero-based byte offset of the record.
+         * @param byte_length Byte length excluding the source line terminator.
+         */
+        auto set_source_range(qint64 byte_offset, qint64 byte_length) noexcept -> void;
+
     private:
         QDateTime m_timestamp;
         QString m_level;
@@ -142,5 +161,7 @@ class LogEntry
         LogFileInfo m_file_info;
         QString m_raw_record;
         qsizetype m_source_line{-1};
+        qint64 m_byte_offset{-1};
+        qint64 m_byte_length{-1};
         ParsedFields m_parsed_fields;
 };

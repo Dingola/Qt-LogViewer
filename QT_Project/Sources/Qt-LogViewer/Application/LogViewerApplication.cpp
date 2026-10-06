@@ -21,6 +21,7 @@
 #include "Qt-LogViewer/Controllers/ViewLifecycleCoordinator.h"
 #include "Qt-LogViewer/Controllers/ViewRegistry.h"
 #include "Qt-LogViewer/Services/HistoryWriteService.h"
+#include "Qt-LogViewer/Services/LogCacheCatalog.h"
 #include "Qt-LogViewer/Services/LogHistoryService.h"
 #include "Qt-LogViewer/Services/LogParsingProfile.h"
 #include "Qt-LogViewer/Services/LogPreviewService.h"
@@ -71,7 +72,7 @@ class LogViewerApplication::Implementation final
               m_queries(&m_filters, &m_pages, &m_views),
               m_live_tailing(m_default_profile, &m_history, &m_views, &m_queries),
               m_imports(m_default_profile, &m_ingest, &m_views, &m_history, &m_history_writer,
-                        &m_pages, &m_queries, &m_live_tailing),
+                        &m_pages, &m_queries, &m_live_tailing, &m_cache_catalog),
               m_view_lifecycle(&m_views, &m_filters, &m_catalog, &m_imports, &m_live_tailing,
                                &m_history, &m_history_writer, &m_pages, &m_queries),
               m_preview(m_default_profile),
@@ -108,6 +109,7 @@ class LogViewerApplication::Implementation final
         FileCatalogController m_catalog;
         ViewRegistry m_views;
         FilterCoordinator m_filters;
+        LogCacheCatalog m_cache_catalog;
         LogHistoryService m_history;
         HistoryWriteService m_history_writer;
         LogPageCoordinator m_pages;

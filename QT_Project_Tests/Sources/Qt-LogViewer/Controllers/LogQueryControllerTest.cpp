@@ -21,7 +21,9 @@
  */
 void LogQueryControllerTest::SetUp()
 {
-    m_history = new LogHistoryService();
+    ASSERT_TRUE(m_temporary_directory.isValid());
+    m_history =
+        new LogHistoryService(m_temporary_directory.filePath(QStringLiteral("history.sqlite")));
     m_views = new ViewRegistry();
     m_filters = new FilterCoordinator(m_views);
     m_pages = new LogPageCoordinator(m_history, m_views);

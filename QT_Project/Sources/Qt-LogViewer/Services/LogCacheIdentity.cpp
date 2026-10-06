@@ -74,6 +74,7 @@ auto add_hash_field(QCryptographicHash& hash, const QByteArray& value) -> void
 [[nodiscard]] auto create_sample_hash(QFile& file, qint64 file_size) -> QByteArray
 {
     QCryptographicHash hash(QCryptographicHash::Sha256);
+    bool sampled = true;
     const QByteArray first_sample = file.read(k_sample_size);
     add_hash_field(hash, QByteArrayLiteral("first"));
     add_hash_field(hash, first_sample);
@@ -83,14 +84,17 @@ auto add_hash_field(QCryptographicHash& hash, const QByteArray& value) -> void
         const qint64 last_offset = qMax<qint64>(0, file_size - k_sample_size);
         if (!file.seek(last_offset))
         {
-            return {};
+            sampled = false;
         }
-
-        add_hash_field(hash, QByteArrayLiteral("last"));
-        add_hash_field(hash, file.read(k_sample_size));
+        else
+        {
+            add_hash_field(hash, QByteArrayLiteral("last"));
+            add_hash_field(hash, file.read(k_sample_size));
+        }
     }
 
-    return hash.result();
+    const QByteArray result = sampled ? hash.result() : QByteArray();
+    return result;
 }
 }  // namespace
 

@@ -14,7 +14,9 @@
  */
 void LogPageCoordinatorTest::SetUp()
 {
-    m_history_service = new LogHistoryService();
+    ASSERT_TRUE(m_temporary_directory.isValid());
+    m_history_service =
+        new LogHistoryService(m_temporary_directory.filePath(QStringLiteral("history.sqlite")));
     m_views = new ViewRegistry();
     m_view_id = m_views->create_view();
     m_coordinator = new LogPageCoordinator(m_history_service, m_views);
