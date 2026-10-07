@@ -290,8 +290,8 @@ TEST_F(LogCacheCatalogTest, CreatesNormalizedDisposableFileCacheSchema)
 }
 
 /**
- * @test Verifies parsed batches persist exact source ranges, normalized
- * dimensions and searchable FTS metadata.
+ * @test Verifies parsed batches persist exact source ranges across native line
+ * endings, normalized dimensions and searchable FTS metadata.
  */
 TEST_F(LogCacheCatalogTest, WritesIndexedEntriesAndSearchMetadata)
 {
@@ -301,11 +301,17 @@ TEST_F(LogCacheCatalogTest, WritesIndexedEntriesAndSearchMetadata)
         LogParsingProfile::create_default(QStringLiteral("{level} {message} {app_name}"));
     const auto identity = LogCacheIdentity::create(file_path, profile);
     ASSERT_TRUE(identity.has_value());
+    QFile source_file(file_path);
+    ASSERT_TRUE(source_file.open(QIODevice::ReadOnly));
+    const QByteArray source_bytes = source_file.readAll();
+    const qint64 second_entry_offset = source_bytes.indexOf(QByteArrayLiteral("ERROR second App"));
+    ASSERT_GE(second_entry_offset, 0);
+
     const QVector<LogEntry> entries = LogParser(profile).parse_file(file_path);
     ASSERT_EQ(entries.size(), 2);
     EXPECT_EQ(entries.at(0).get_byte_offset(), 0);
     EXPECT_EQ(entries.at(0).get_byte_length(), 14);
-    EXPECT_EQ(entries.at(1).get_byte_offset(), 16);
+    EXPECT_EQ(entries.at(1).get_byte_offset(), second_entry_offset);
     EXPECT_EQ(entries.at(1).get_byte_length(), 16);
 
     const QString database_path =
