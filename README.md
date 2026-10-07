@@ -44,6 +44,7 @@ The test project can be built if desired, controlled by a CMake boolean variable
 Additionally, the CMake variable `<PROJECT_NAME>_BUILD_TARGET_TYPE` must be set to `static_library` for the test project to be executed.
 
 Features:
+
 - Multi-view tabs with independent filters and paging
 - Per-view filtering by application name and log levels
 - Search filtering with optional regex and field selection
@@ -55,6 +56,11 @@ Features:
 - Theming via QSS with runtime variable substitution and theme switching
 - Basic translations infrastructure (language loading and switching)
 - Code coverage and CI workflows (Linux, macOS, Windows)
+- Reusable parsing profiles with placeholder-based formats and custom fields
+- Import preview with raw records, parsed values, and validation errors
+- Dynamic log table columns derived from the selected parsing profiles
+- Persistent per-file SQLite caches with reuse of unchanged files and indexed prefixes
+- Live tailing of appended records with file replacement and rotation detection
 
 Screenshots:
 
@@ -63,7 +69,7 @@ Screenshots:
 ![Qt-LogViewer Screenshot 2](QT_Project/Resources/Images/Qt-LogViewer_2.png)
 
 Planned TODOs:
-- Improve parser and live streaming of logs
+
 - Translation and UI design improvements
 - CSV and other import options
 - PDF export
