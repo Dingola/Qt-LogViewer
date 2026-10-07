@@ -2,6 +2,8 @@
 
 #include <QColor>
 #include <QFileInfo>
+#include <QFontMetrics>
+#include <QLayout>
 #include <QSignalSpy>
 #include <QTemporaryFile>
 #include <QTextStream>
@@ -137,33 +139,47 @@ TEST_F(FilesInViewMenuItemWidgetTest, SetFilePathUpdatesLabelAndTooltip)
 }
 
 /**
- * @brief Reserved label pixels clamps to >=0 and affects elision width.
+ * @brief Reserved label pixels clamp to zero and deterministically affect the
+ * available width.
  */
 TEST_F(FilesInViewMenuItemWidgetTest, LabelReservedPixelsClampAndAffectElision)
 {
-    QTemporaryFile temp_file;
-    ASSERT_TRUE(temp_file.open());
-    const QString path = temp_file.fileName();
-    temp_file.close();
-
-    m_widget->resize(200, 24);
-    m_widget->set_file_path(path);
-
     QLabel* label = nullptr;
     QToolButton* b1 = nullptr;
     QToolButton* b2 = nullptr;
     QToolButton* b3 = nullptr;
     std::tie(label, b1, b2, b3) = get_controls(m_widget);
     ASSERT_NE(label, nullptr);
+    ASSERT_NE(b1, nullptr);
+    ASSERT_NE(b2, nullptr);
+    ASSERT_NE(b3, nullptr);
+    ASSERT_NE(m_widget->layout(), nullptr);
 
-    const QString t1 = label->text();
+    const QMargins margins = m_widget->layout()->contentsMargins();
+    const int controls_reserved = b1->sizeHint().width() + b2->sizeHint().width() +
+                                  b3->sizeHint().width() + 3 * m_widget->layout()->spacing() +
+                                  margins.left() + margins.right();
+    constexpr int roomy_text_width = 300;
+    const QString path = QStringLiteral(
+        "a-very-long-platform-independent-log-file-name-for-"
+        "testing-label-elision.log");
+    const QFontMetrics metrics(label->font());
 
-    m_widget->set_label_reserved_px(120);
-    const QString t2 = label->text();
-    EXPECT_NE(t1, t2);
+    m_widget->resize(controls_reserved + roomy_text_width, 24);
+    m_widget->set_label_reserved_px(0);
+    m_widget->set_file_path(path);
+
+    const QString roomy_text = metrics.elidedText(path, Qt::ElideMiddle, roomy_text_width);
+    EXPECT_EQ(label->text(), roomy_text);
+
+    m_widget->set_label_reserved_px(m_widget->width() - 60);
+    const QString restricted_text = metrics.elidedText(path, Qt::ElideMiddle, 60);
+    EXPECT_EQ(label->text(), restricted_text);
+    EXPECT_NE(roomy_text, restricted_text);
 
     m_widget->set_label_reserved_px(-5);
     EXPECT_EQ(m_widget->get_label_reserved_px(), 0);
+    EXPECT_EQ(label->text(), roomy_text);
 }
 
 /**

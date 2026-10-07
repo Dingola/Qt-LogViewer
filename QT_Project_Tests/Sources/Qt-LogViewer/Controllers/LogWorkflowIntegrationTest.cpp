@@ -183,7 +183,10 @@ TEST_F(LogWorkflowIntegrationTest, StreamsProfileWithoutApplicationField)
               QVector<qint64>{generation->id});
 }
 
-/** @test Verifies a cancelled import cannot leak its profile into a reopened file. */
+/**
+ * @test Verifies an import cancelled during partial progress cannot leak its
+ * profile into a reopened file.
+ */
 TEST_F(LogWorkflowIntegrationTest, ReopensCancelledFileWithNewParsingProfile)
 {
     constexpr int record_count = 1000;
@@ -208,13 +211,36 @@ TEST_F(LogWorkflowIntegrationTest, ReopensCancelledFileWithNewParsingProfile)
     const QString cancelled_database_path =
         QDir(QDir(m_runtime->cache_catalog().get_cache_root()).filePath(QStringLiteral("files")))
             .filePath(cancelled_identity->cache_key + QStringLiteral(".sqlite"));
-    QSignalSpy progress_spy(&m_runtime->imports(), &LogImportCoordinator::progress);
+    QUuid cancelled_view_id;
+    bool cancellation_requested = false;
+    bool cancelled_view_closed = false;
+    const QMetaObject::Connection cancellation_connection = QObject::connect(
+        &m_runtime->imports(), &LogImportCoordinator::progress, &m_runtime->imports(),
+        [this, &cancelled_view_id, &cancellation_requested, &cancelled_view_closed](
+            const QUuid& progress_view_id, qint64 bytes_read, qint64 total_bytes) {
+            const bool is_partial_progress = total_bytes > 0 && bytes_read < total_bytes;
+            if (!cancellation_requested && progress_view_id == cancelled_view_id &&
+                is_partial_progress)
+            {
+                cancellation_requested = true;
+                cancelled_view_closed = m_runtime->lifecycle().close_view(cancelled_view_id);
+            }
+        });
 
-    const QUuid cancelled_view_id =
-        m_runtime->imports().import_file_async(file_path, short_profile, 1);
-    ASSERT_FALSE(cancelled_view_id.isNull());
-    ASSERT_TRUE(QtTestAwait::wait_until([&progress_spy]() { return progress_spy.count() > 0; }));
-    ASSERT_TRUE(m_runtime->lifecycle().close_view(cancelled_view_id));
+    cancelled_view_id = m_runtime->imports().import_file_async(file_path, short_profile, 1);
+    const bool valid_cancelled_view = !cancelled_view_id.isNull();
+    bool cancellation_observed = false;
+    if (valid_cancelled_view)
+    {
+        cancellation_observed =
+            QtTestAwait::wait_until([&cancellation_requested]() { return cancellation_requested; },
+                                    std::chrono::seconds(10));
+    }
+    QObject::disconnect(cancellation_connection);
+
+    ASSERT_TRUE(valid_cancelled_view);
+    ASSERT_TRUE(cancellation_observed);
+    ASSERT_TRUE(cancelled_view_closed);
     ASSERT_TRUE(QtTestAwait::wait_until(
         [&cancelled_database_path]() { return !QFileInfo::exists(cancelled_database_path); },
         std::chrono::seconds(10)));
