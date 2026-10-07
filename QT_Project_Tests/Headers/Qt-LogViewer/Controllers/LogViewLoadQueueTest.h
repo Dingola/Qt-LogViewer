@@ -7,6 +7,7 @@
 
 #include "Qt-LogViewer/Controllers/LogViewLoadQueue.h"
 #include "Qt-LogViewer/Services/LogLoadingService.h"
+#include "Qt-LogViewer/TestSupport/TestFileSystem.h"
 
 /**
  * @file LogViewLoadQueueTest.h
@@ -24,14 +25,11 @@ class LogViewLoadQueueTest: public ::testing::Test
         void SetUp() override;
         void TearDown() override;
 
-        /**
-         * @brief Builds a platform-agnostic path that is guaranteed to not exist.
-         * @return Absolute file path that does not exist at the time of call.
-         */
-        [[nodiscard]] auto make_nonexistent_path() const -> QString;
-
         LogViewLoadQueue m_queue;
         LogLoadingService* m_loader = nullptr;
+
+        /** @brief Isolated filesystem providing unique queue paths. */
+        TestFileSystem m_file_system;
 
         QUuid m_view_a;
         QUuid m_view_b;

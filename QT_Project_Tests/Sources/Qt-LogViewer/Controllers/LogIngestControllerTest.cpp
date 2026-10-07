@@ -1,12 +1,8 @@
 #include "Qt-LogViewer/Controllers/LogIngestControllerTest.h"
 
 #include <QApplication>
-#include <QDir>
-#include <QFile>
 #include <QSignalSpy>
-#include <QTemporaryFile>
 #include <QTest>
-#include <QTextStream>
 #include <QUuid>
 #include <atomic>
 
@@ -40,10 +36,6 @@ void LogIngestControllerTest::TearDown()
     delete m_ctrl;
     m_ctrl = nullptr;
 
-    if (!m_temp_log_path.isEmpty())
-    {
-        QFile::remove(m_temp_log_path);
-    }
     QApplication::processEvents();
 }
 
@@ -54,56 +46,12 @@ void LogIngestControllerTest::TearDown()
  */
 auto LogIngestControllerTest::make_temp_log_file() -> QString
 {
-    QString path;
-
-    QTemporaryFile tmp;
-    tmp.setAutoRemove(false);
-    if (tmp.open())
-    {
-        QTextStream out(&tmp);
-        out << "2024-01-01 12:34:56 Info Startup MyApp [main.cpp:1 (main)]\n";
-        out << "2024-01-01 12:35:00 Error Crash MyApp [engine.cpp:42 (run)]\n";
-        out << "2024-01-01 12:35:10 Debug Trace MyApp [util.cpp:7 (helper)]\n";
-        out.flush();
-        path = tmp.fileName();
-        tmp.close();
-    }
-
+    const QString contents = QStringLiteral(
+        "2024-01-01 12:34:56 Info Startup MyApp [main.cpp:1 (main)]\n"
+        "2024-01-01 12:35:00 Error Crash MyApp [engine.cpp:42 (run)]\n"
+        "2024-01-01 12:35:10 Debug Trace MyApp [util.cpp:7 (helper)]\n");
+    const QString path = m_file_system.write_text_file(QStringLiteral("ingest.log"), contents);
     return path;
-}
-
-/**
- * @brief Returns a unique, non-existent file path in the temp directory.
- */
-auto LogIngestControllerTest::make_nonexistent_path() const -> QString
-{
-    QString chosen_path;
-    const QString temp_dir = QDir::tempPath();
-
-    for (int i = 0; i < 5; ++i)
-    {
-        const QString candidate =
-            QDir(temp_dir).filePath(QStringLiteral("qt_ingest_nonexistent_%1.log")
-                                        .arg(QUuid::createUuid().toString(QUuid::WithoutBraces)));
-        const bool candidate_exists = QFile::exists(candidate);
-        if (!candidate_exists && chosen_path.isEmpty())
-        {
-            chosen_path = candidate;
-        }
-    }
-
-    if (chosen_path.isEmpty())
-    {
-        const QString fallback =
-            QDir(temp_dir).filePath(QStringLiteral("qt_ingest_nonexistent_fallback.log"));
-        if (QFile::exists(fallback))
-        {
-            QFile::remove(fallback);
-        }
-        chosen_path = fallback;
-    }
-
-    return chosen_path;
 }
 
 /**
@@ -126,7 +74,7 @@ TEST_F(LogIngestControllerTest, LoadFileSyncAndReadFirstEntryInvalidPath)
 {
     ASSERT_NE(m_ctrl, nullptr);
 
-    const QString invalid_path = make_nonexistent_path();
+    const QString invalid_path = m_file_system.nonexistent_path(QStringLiteral("missing.log"));
 
     const QVector<LogEntry> entries = m_ctrl->load_file_sync(invalid_path);
     EXPECT_TRUE(entries.isEmpty());
@@ -160,7 +108,7 @@ TEST_F(LogIngestControllerTest, EnqueueInvalidStartEmitsErrorAndIdleAndClearsQue
     ASSERT_NE(m_ctrl, nullptr);
 
     const QUuid view = QUuid::createUuid();
-    const QString invalid_path = make_nonexistent_path();
+    const QString invalid_path = m_file_system.nonexistent_path(QStringLiteral("missing.log"));
     const qsizetype batch = 7;
 
     QSignalSpy spy_error(m_ctrl, &LogIngestController::error);
@@ -370,7 +318,7 @@ TEST_F(LogIngestControllerTest, MixedValidThenInvalidQueueEmitsFinishedAndError)
 
     const QUuid v_valid = QUuid::createUuid();
     const QUuid v_invalid = QUuid::createUuid();
-    const QString invalid_path = make_nonexistent_path();
+    const QString invalid_path = m_file_system.nonexistent_path(QStringLiteral("missing.log"));
 
     QSignalSpy spy_finished(m_ctrl, &LogIngestController::finished);
     QSignalSpy spy_error(m_ctrl, &LogIngestController::error);

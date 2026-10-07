@@ -1,12 +1,10 @@
 #include "Qt-LogViewer/Services/LogStreamWorkerTest.h"
 
-#include <QDir>
-#include <QFile>
 #include <QFileInfo>
 #include <QSignalSpy>
 #include <QTest>
-#include <QTextStream>
 #include <QThread>
+#include <QUuid>
 
 #include "Qt-LogViewer/Services/LogParser.h"
 #include "Qt-LogViewer/Services/LogStreamWorker.h"
@@ -24,58 +22,30 @@ void LogStreamWorkerTest::SetUp()
     m_worker = new LogStreamWorker(LogParser(LogParsingProfile::create_default(m_format)));
 }
 
-/**
- * @brief Tears down the test fixture after each test.
- *
- * Deletes the worker and all created temporary files.
- */
+/** @brief Destroys the reusable worker after each test. */
 void LogStreamWorkerTest::TearDown()
 {
     delete m_worker;
     m_worker = nullptr;
-
-    for (qsizetype i = 0; i < m_temp_files.size(); ++i)
-    {
-        QTemporaryFile* f = m_temp_files.at(i);
-        if (f != nullptr)
-        {
-            if (f->isOpen())
-            {
-                f->close();
-            }
-            delete f;
-        }
-    }
-
-    m_temp_files.clear();
-    m_temp_file_names.clear();
 }
 
 /**
- * @brief Helper to create a QTemporaryFile with given log lines.
- * @param lines The log lines to write.
- * @return Pointer to the created QTemporaryFile (ownership transferred).
+ * @brief Creates an isolated UTF-8 log file with the supplied lines.
+ * @param lines Log lines written in source order.
+ * @return Absolute file path, or an empty string when creation failed.
  */
-auto LogStreamWorkerTest::create_temp_file(const QVector<QString>& lines) -> QTemporaryFile*
+auto LogStreamWorkerTest::create_temp_file(const QVector<QString>& lines) -> QString
 {
-    QTemporaryFile* temp = new QTemporaryFile();
-    bool opened = temp->open();
-
-    if (opened)
+    QString contents;
+    for (const QString& line: lines)
     {
-        QTextStream out(temp);
-        for (qsizetype i = 0; i < lines.size(); ++i)
-        {
-            out << lines.at(i) << '\n';
-        }
-        out.flush();
-        temp->close();
+        contents += line;
+        contents += QLatin1Char('\n');
     }
-
-    m_temp_files.append(temp);
-    m_temp_file_names.append(temp->fileName());
-
-    return temp;
+    const QString file_name =
+        QStringLiteral("stream-%1.log").arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+    const QString file_path = m_file_system.write_text_file(file_name, contents);
+    return file_path;
 }
 
 /**
@@ -92,7 +62,8 @@ TEST_F(LogStreamWorkerTest, StreamsBatchesAndReportsProgress)
         lines.append(QStringLiteral("Info message_%1 AppX").arg(i));
     }
 
-    QTemporaryFile* file = create_temp_file(lines);
+    const QString file_path = create_temp_file(lines);
+    ASSERT_FALSE(file_path.isEmpty());
 
     // Observed values
     int batch_count = 0;
@@ -124,7 +95,7 @@ TEST_F(LogStreamWorkerTest, StreamsBatchesAndReportsProgress)
                      [&finished_called](const QString&) { finished_called = true; });
 
     // Run synchronously in the current thread.
-    m_worker->start(file->fileName(), 1000);
+    m_worker->start(file_path, 1000);
 
     // Expectations
     EXPECT_TRUE(finished_called);
@@ -141,7 +112,8 @@ TEST_F(LogStreamWorkerTest, StreamsOnlyBoundedSuffixRange)
     const QVector<QString> lines{QStringLiteral("Info first AppX"),
                                  QStringLiteral("Info second AppX"),
                                  QStringLiteral("Error third AppX")};
-    QTemporaryFile* file = create_temp_file(lines);
+    const QString file_path = create_temp_file(lines);
+    ASSERT_FALSE(file_path.isEmpty());
     const QByteArray prefix = QByteArrayLiteral("Info first AppX\nInfo second AppX\n");
     QVector<LogEntry> entries;
     qint64 initial_progress = -1;
@@ -162,7 +134,7 @@ TEST_F(LogStreamWorkerTest, StreamsOnlyBoundedSuffixRange)
                          total_bytes = total;
                      });
 
-    m_worker->start(file->fileName(), 10, prefix.size(), QFileInfo(file->fileName()).size());
+    m_worker->start(file_path, 10, prefix.size(), QFileInfo(file_path).size());
 
     ASSERT_EQ(entries.size(), 1);
     EXPECT_EQ(entries.constFirst().get_message(), QStringLiteral("third"));
@@ -178,13 +150,7 @@ TEST_F(LogStreamWorkerTest, StreamsOnlyBoundedSuffixRange)
  */
 TEST_F(LogStreamWorkerTest, EmitsErrorOnOpenFail)
 {
-    // Use an obviously non-existent path in temp directory.
-    QString missing_path = QDir::tempPath() + "/qt_logviewer_missing_file_1234567890.log";
-    if (QFile::exists(missing_path))
-    {
-        bool removed = QFile::remove(missing_path);
-        (void)removed;
-    }
+    const QString missing_path = m_file_system.nonexistent_path(QStringLiteral("missing.log"));
 
     bool error_called = false;
     bool finished_called = false;
@@ -219,7 +185,8 @@ TEST_F(LogStreamWorkerTest, CancelHonorsRequest)
         lines.append(QStringLiteral("Debug payload_%1 AppY").arg(i));
     }
 
-    QTemporaryFile* file = create_temp_file(lines);
+    const QString file_path = create_temp_file(lines);
+    ASSERT_FALSE(file_path.isEmpty());
 
     // Create a dedicated worker moved to a background QThread for this test.
     auto* worker = new LogStreamWorker(LogParser(LogParsingProfile::create_default(m_format)));
@@ -249,7 +216,7 @@ TEST_F(LogStreamWorkerTest, CancelHonorsRequest)
 
     QObject::connect(
         &thread, &QThread::started, worker,
-        [worker, file]() { worker->start(file->fileName(), 200); }, Qt::QueuedConnection);
+        [worker, file_path]() { worker->start(file_path, 200); }, Qt::QueuedConnection);
 
     thread.start();
 
@@ -281,7 +248,8 @@ TEST_F(LogStreamWorkerTest, CancelWhileStreamingStopsSoon)
         lines.append(QStringLiteral("Info midstream_%1 AppZ").arg(i));
     }
 
-    QTemporaryFile* file = create_temp_file(lines);
+    const QString file_path = create_temp_file(lines);
+    ASSERT_FALSE(file_path.isEmpty());
 
     // Dedicated worker/thread for this test.
     auto* worker = new LogStreamWorker(LogParser(LogParsingProfile::create_default(m_format)));
@@ -323,7 +291,7 @@ TEST_F(LogStreamWorkerTest, CancelWhileStreamingStopsSoon)
     worker->moveToThread(&thread);
     QObject::connect(
         &thread, &QThread::started, worker,
-        [worker, file]() { worker->start(file->fileName(), 100); }, Qt::QueuedConnection);
+        [worker, file_path]() { worker->start(file_path, 100); }, Qt::QueuedConnection);
 
     thread.start();
 
@@ -354,7 +322,8 @@ TEST_F(LogStreamWorkerTest, WaitsForWriterCapacityBeforeEmittingMoreBatches)
         lines.append(QStringLiteral("Info bounded_%1 AppB").arg(index));
     }
 
-    QTemporaryFile* file = create_temp_file(lines);
+    const QString file_path = create_temp_file(lines);
+    ASSERT_FALSE(file_path.isEmpty());
     auto* worker = new LogStreamWorker(LogParser(LogParsingProfile::create_default(m_format)));
     QThread thread;
     QSignalSpy batch_spy(worker, &LogStreamWorker::entry_batch_parsed);
@@ -365,8 +334,8 @@ TEST_F(LogStreamWorkerTest, WaitsForWriterCapacityBeforeEmittingMoreBatches)
     QObject::connect(&thread, &QThread::finished, worker, &QObject::deleteLater);
     worker->moveToThread(&thread);
     QObject::connect(
-        &thread, &QThread::started, worker,
-        [worker, file]() { worker->start(file->fileName(), 1); }, Qt::QueuedConnection);
+        &thread, &QThread::started, worker, [worker, file_path]() { worker->start(file_path, 1); },
+        Qt::QueuedConnection);
 
     thread.start();
 
@@ -393,7 +362,8 @@ TEST_F(LogStreamWorkerTest, CancellationReleasesWriterCapacityWait)
         lines.append(QStringLiteral("Info cancel_wait_%1 AppC").arg(index));
     }
 
-    QTemporaryFile* file = create_temp_file(lines);
+    const QString file_path = create_temp_file(lines);
+    ASSERT_FALSE(file_path.isEmpty());
     auto* worker = new LogStreamWorker(LogParser(LogParsingProfile::create_default(m_format)));
     QThread thread;
     QSignalSpy batch_spy(worker, &LogStreamWorker::entry_batch_parsed);
@@ -404,8 +374,8 @@ TEST_F(LogStreamWorkerTest, CancellationReleasesWriterCapacityWait)
     QObject::connect(&thread, &QThread::finished, worker, &QObject::deleteLater);
     worker->moveToThread(&thread);
     QObject::connect(
-        &thread, &QThread::started, worker,
-        [worker, file]() { worker->start(file->fileName(), 1); }, Qt::QueuedConnection);
+        &thread, &QThread::started, worker, [worker, file_path]() { worker->start(file_path, 1); },
+        Qt::QueuedConnection);
 
     thread.start();
 

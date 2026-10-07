@@ -1,7 +1,5 @@
 #include "Qt-LogViewer/Controllers/LogViewLoadQueueTest.h"
 
-#include <QDir>
-#include <QFile>
 #include <QUuid>
 
 /**
@@ -40,40 +38,6 @@ void LogViewLoadQueueTest::TearDown()
 }
 
 /**
- * @brief Returns a unique, non-existent file path in the temp directory (cross-platform).
- */
-auto LogViewLoadQueueTest::make_nonexistent_path() const -> QString
-{
-    QString chosen_path;
-    const QString temp_dir = QDir::tempPath();
-
-    for (int i = 0; i < 5; ++i)
-    {
-        const QString candidate =
-            QDir(temp_dir).filePath(QStringLiteral("qt_lvq_nonexistent_%1.log")
-                                        .arg(QUuid::createUuid().toString(QUuid::WithoutBraces)));
-        const bool candidate_exists = QFile::exists(candidate);
-        if (!candidate_exists && chosen_path.isEmpty())
-        {
-            chosen_path = candidate;
-        }
-    }
-
-    if (chosen_path.isEmpty())
-    {
-        const QString fallback =
-            QDir(temp_dir).filePath(QStringLiteral("qt_lvq_nonexistent_fallback.log"));
-        if (QFile::exists(fallback))
-        {
-            QFile::remove(fallback);
-        }
-        chosen_path = fallback;
-    }
-
-    return chosen_path;
-}
-
-/**
  * @brief Initial state: idle with defaults.
  */
 TEST_F(LogViewLoadQueueTest, InitialStateIsIdleAndDefaults)
@@ -91,7 +55,7 @@ TEST_F(LogViewLoadQueueTest, InitialStateIsIdleAndDefaults)
  */
 TEST_F(LogViewLoadQueueTest, KeepsSelectedProfileWithQueuedRequest)
 {
-    const QString file_path = make_nonexistent_path();
+    const QString file_path = m_file_system.nonexistent_path(QStringLiteral("queue.log"));
     const LogParsingProfile profile = LogParsingProfile::create_default(
         QStringLiteral("{level}|{message}"), QStringLiteral("Pipe separated"));
 
@@ -113,8 +77,8 @@ TEST_F(LogViewLoadQueueTest, KeepsSelectedProfileWithQueuedRequest)
  */
 TEST_F(LogViewLoadQueueTest, EnqueueAddsAndSkipsDuplicates)
 {
-    const QString path1 = make_nonexistent_path();
-    const QString path2 = make_nonexistent_path();
+    const QString path1 = m_file_system.nonexistent_path(QStringLiteral("queue.log"));
+    const QString path2 = m_file_system.nonexistent_path(QStringLiteral("queue.log"));
 
     EXPECT_EQ(m_queue.get_pending_count(), 0);
 
@@ -150,7 +114,7 @@ TEST_F(LogViewLoadQueueTest, EnqueueAddsAndSkipsDuplicates)
  */
 TEST_F(LogViewLoadQueueTest, AllowsReplacementAfterActiveCancellation)
 {
-    const QString file_path = make_nonexistent_path();
+    const QString file_path = m_file_system.nonexistent_path(QStringLiteral("queue.log"));
     const QUuid cancelled_operation = m_queue.enqueue(m_view_a, file_path);
     ASSERT_FALSE(cancelled_operation.isNull());
     ASSERT_TRUE(m_queue.try_start_next(m_loader, 50));
@@ -169,8 +133,8 @@ TEST_F(LogViewLoadQueueTest, AllowsReplacementAfterActiveCancellation)
  */
 TEST_F(LogViewLoadQueueTest, TryStartNextRequiresLoaderAndIdle)
 {
-    const QString path1 = make_nonexistent_path();
-    const QString path2 = make_nonexistent_path();
+    const QString path1 = m_file_system.nonexistent_path(QStringLiteral("queue.log"));
+    const QString path2 = m_file_system.nonexistent_path(QStringLiteral("queue.log"));
 
     m_queue.enqueue(m_view_a, path1);
     m_queue.enqueue(m_view_b, path2);
@@ -197,9 +161,9 @@ TEST_F(LogViewLoadQueueTest, TryStartNextRequiresLoaderAndIdle)
  */
 TEST_F(LogViewLoadQueueTest, FifoOrderPreserved)
 {
-    const QString p1 = make_nonexistent_path();
-    const QString p2 = make_nonexistent_path();
-    const QString p3 = make_nonexistent_path();
+    const QString p1 = m_file_system.nonexistent_path(QStringLiteral("queue.log"));
+    const QString p2 = m_file_system.nonexistent_path(QStringLiteral("queue.log"));
+    const QString p3 = m_file_system.nonexistent_path(QStringLiteral("queue.log"));
 
     m_queue.enqueue(m_view_a, p1);
     m_queue.enqueue(m_view_b, p2);
@@ -232,9 +196,9 @@ TEST_F(LogViewLoadQueueTest, FifoOrderPreserved)
  */
 TEST_F(LogViewLoadQueueTest, ClearPendingForViewRemovesOnlyTargets)
 {
-    const QString pa1 = make_nonexistent_path();
-    const QString pa2 = make_nonexistent_path();
-    const QString pb1 = make_nonexistent_path();
+    const QString pa1 = m_file_system.nonexistent_path(QStringLiteral("queue.log"));
+    const QString pa2 = m_file_system.nonexistent_path(QStringLiteral("queue.log"));
+    const QString pb1 = m_file_system.nonexistent_path(QStringLiteral("queue.log"));
 
     m_queue.enqueue(m_view_a, pa1);
     m_queue.enqueue(m_view_a, pa2);
@@ -258,17 +222,13 @@ TEST_F(LogViewLoadQueueTest, CancelIfActiveKeepsAssignmentUntilIdle)
 
     const QUuid second_view_id = QUuid::createUuid();
 
-    const QString active_file_path =
-        QDir::temp().filePath(QStringLiteral("qt_lvq_nonexistent_%1.log")
-                                  .arg(QUuid::createUuid().toString(QUuid::WithoutBraces)));
+    const QString active_file_path = m_file_system.nonexistent_path(QStringLiteral("queue.log"));
 
     const QString pending_first_view_path =
-        QDir::temp().filePath(QStringLiteral("qt_lvq_nonexistent_%1.log")
-                                  .arg(QUuid::createUuid().toString(QUuid::WithoutBraces)));
+        m_file_system.nonexistent_path(QStringLiteral("queue.log"));
 
     const QString pending_second_view_path =
-        QDir::temp().filePath(QStringLiteral("qt_lvq_nonexistent_%1.log")
-                                  .arg(QUuid::createUuid().toString(QUuid::WithoutBraces)));
+        m_file_system.nonexistent_path(QStringLiteral("queue.log"));
 
     LogLoadingService loader(LogParsingProfile::create_default(
         QStringLiteral("{timestamp} {level} {message} {app_name}")));
@@ -324,9 +284,9 @@ TEST_F(LogViewLoadQueueTest, CancelIfActiveKeepsAssignmentUntilIdle)
  */
 TEST_F(LogViewLoadQueueTest, CancelIfActiveWithNullLoaderKeepsActiveButClearsPendings)
 {
-    const QString pa1 = make_nonexistent_path();
-    const QString pa2 = make_nonexistent_path();
-    const QString pb1 = make_nonexistent_path();
+    const QString pa1 = m_file_system.nonexistent_path(QStringLiteral("queue.log"));
+    const QString pa2 = m_file_system.nonexistent_path(QStringLiteral("queue.log"));
+    const QString pb1 = m_file_system.nonexistent_path(QStringLiteral("queue.log"));
 
     m_queue.enqueue(m_view_a, pa1);
     m_queue.enqueue(m_view_a, pa2);
@@ -349,8 +309,8 @@ TEST_F(LogViewLoadQueueTest, CancelIfActiveWithNullLoaderKeepsActiveButClearsPen
  */
 TEST_F(LogViewLoadQueueTest, ClearActiveIfMatchesPathOnly)
 {
-    const QString pa1 = make_nonexistent_path();
-    const QString pb1 = make_nonexistent_path();
+    const QString pa1 = m_file_system.nonexistent_path(QStringLiteral("queue.log"));
+    const QString pb1 = m_file_system.nonexistent_path(QStringLiteral("queue.log"));
 
     m_queue.enqueue(m_view_a, pa1);
     m_queue.enqueue(m_view_b, pb1);
@@ -376,7 +336,7 @@ TEST_F(LogViewLoadQueueTest, ClearActiveIfMatchesPathOnly)
  */
 TEST_F(LogViewLoadQueueTest, ClearActiveAlwaysResetsToIdle)
 {
-    const QString p1 = make_nonexistent_path();
+    const QString p1 = m_file_system.nonexistent_path(QStringLiteral("queue.log"));
 
     m_queue.enqueue(m_view_a, p1);
     const bool started = m_queue.try_start_next(m_loader, 5);
@@ -399,8 +359,8 @@ TEST_F(LogViewLoadQueueTest, ClearActiveAlwaysResetsToIdle)
  */
 TEST_F(LogViewLoadQueueTest, AccessorsReflectState)
 {
-    const QString p1 = make_nonexistent_path();
-    const QString p2 = make_nonexistent_path();
+    const QString p1 = m_file_system.nonexistent_path(QStringLiteral("queue.log"));
+    const QString p2 = m_file_system.nonexistent_path(QStringLiteral("queue.log"));
 
     EXPECT_TRUE(m_queue.get_active_view_id().isNull());
     EXPECT_TRUE(m_queue.get_active_file_path().isEmpty());

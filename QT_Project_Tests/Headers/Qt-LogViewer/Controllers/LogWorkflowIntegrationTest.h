@@ -2,10 +2,10 @@
 
 #include <gtest/gtest.h>
 
-#include <QTemporaryFile>
 #include <QVector>
 
 #include "Qt-LogViewer/Services/LogParsingProfile.h"
+#include "Qt-LogViewer/TestSupport/TestFileSystem.h"
 
 class TestLogRuntime;
 
@@ -24,19 +24,19 @@ class LogWorkflowIntegrationTest: public ::testing::Test
         /** @brief Creates the focused runtime graph used by each workflow test. */
         void SetUp() override;
 
-        /** @brief Stops the runtime graph and removes temporary files. */
+        /** @brief Stops the runtime graph after each test. */
         void TearDown() override;
 
         /**
-         * @brief Creates a persistent temporary log file.
+         * @brief Creates an isolated UTF-8 log file.
          * @param records Complete records written in source order.
-         * @return Created file, or nullptr when the file could not be opened.
+         * @return Absolute file path, or an empty string when creation failed.
          */
-        [[nodiscard]] auto create_log_file(const QVector<QString>& records) -> QTemporaryFile*;
+        [[nodiscard]] auto create_log_file(const QVector<QString>& records) -> QString;
 
         LogParsingProfile m_default_profile{LogParsingProfile::create_default(
             QStringLiteral("{timestamp} {level} {message} {app_name}"),
             QStringLiteral("Workflow integration default"))};
         TestLogRuntime* m_runtime{nullptr};
-        QVector<QTemporaryFile*> m_temp_files;
+        TestFileSystem m_file_system;
 };

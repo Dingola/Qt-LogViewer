@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 #include "Qt-LogViewer/Controllers/LogIngestController.h"
+#include "Qt-LogViewer/TestSupport/TestFileSystem.h"
 
 /**
  * @file LogIngestControllerTest.h
@@ -28,12 +29,9 @@ class LogIngestControllerTest: public ::testing::Test
          */
         [[nodiscard]] auto make_temp_log_file() -> QString;
 
-        /**
-         * @brief Builds a platform-agnostic path that is guaranteed to not exist.
-         * @return Absolute file path that does not exist at the time of call.
-         */
-        [[nodiscard]] auto make_nonexistent_path() const -> QString;
-
         LogIngestController* m_ctrl = nullptr;
         QString m_temp_log_path;
+
+        /** @brief Isolated filesystem owning the fixture's paths and files. */
+        TestFileSystem m_file_system;
 };
