@@ -3,8 +3,9 @@
 #include <QLabel>
 #include <QMap>
 #include <QSet>
-#include <QTest>
 #include <QVector>
+
+#include "QtCommonLib/TestSupport/QtTestAwait.h"
 
 /**
  * @brief Sets up the test fixture for each test.
@@ -144,7 +145,13 @@ TEST_F(LogFilterWidgetTest, ChangeAvailableLogLevelsRecreatesItems)
     ASSERT_NE(debug_item_before, nullptr);
 
     m_widget->set_available_log_levels(levels2);
-    QTest::qWait(0);
+
+    ASSERT_TRUE(QtCommonLib::QtTestAwait::wait_until([this]() {
+        return get_log_level_item(QStringLiteral("Trace")) == nullptr &&
+               get_log_level_item(QStringLiteral("Debug")) == nullptr &&
+               get_log_level_item(QStringLiteral("Info")) != nullptr &&
+               get_log_level_item(QStringLiteral("Warning")) != nullptr;
+    }));
 
     auto* trace_item_after = get_log_level_item("Trace");
     auto* debug_item_after = get_log_level_item("Debug");

@@ -4,6 +4,8 @@
 #include <QSignalSpy>
 #include <QTest>
 
+#include "QtCommonLib/TestSupport/QtTestAwait.h"
+
 /**
  * @brief Creates a temporary file system location and tailer instance.
  */
@@ -34,29 +36,6 @@ void LogTailerServiceTest::TearDown()
 }
 
 /**
- * @brief Processes watcher events until a signal spy receives the requested count.
- * @param spy Signal spy collecting entries_available emissions.
- * @param expected_count Required signal count.
- * @return True when the count was observed before timeout.
- */
-auto LogTailerServiceTest::wait_for_entries(QSignalSpy& spy, int expected_count) const -> bool
-{
-    constexpr int timeout_ms = 3000;
-    constexpr int poll_interval_ms = 25;
-
-    int elapsed_ms = 0;
-
-    while (spy.count() < expected_count && elapsed_ms < timeout_ms)
-    {
-        QTest::qWait(poll_interval_ms);
-        elapsed_ms += poll_interval_ms;
-    }
-
-    const bool received = spy.count() >= expected_count;
-    return received;
-}
-
-/**
  * @brief Appends raw UTF-8 text to the temporary log file.
  * @param text Text to append.
  */
@@ -81,7 +60,7 @@ TEST_F(LogTailerServiceTest, EmitsEntriesForAppendedCompleteLines)
     m_tailer_service->start_tailing(m_view_id, m_file_path);
     append_text(QStringLiteral("2026-01-01 12:00:01 [INFO] appended\n"));
 
-    ASSERT_TRUE(wait_for_entries(spy, 1));
+    ASSERT_TRUE(QtCommonLib::QtTestAwait::wait_until([&spy]() { return spy.count() >= 1; }));
 
     const QList<QVariant> arguments = spy.takeFirst();
     const QVector<LogEntry> entries = qvariant_cast<QVector<LogEntry>>(arguments.at(2));
@@ -105,7 +84,7 @@ TEST_F(LogTailerServiceTest, BuffersPartialLineUntilNewline)
 
     append_text(QStringLiteral(" message\n"));
 
-    ASSERT_TRUE(wait_for_entries(spy, 1));
+    ASSERT_TRUE(QtCommonLib::QtTestAwait::wait_until([&spy]() { return spy.count() >= 1; }));
 
     const QList<QVariant> arguments = spy.takeFirst();
     const QVector<LogEntry> entries = qvariant_cast<QVector<LogEntry>>(arguments.at(2));
@@ -128,7 +107,7 @@ TEST_F(LogTailerServiceTest, ReadsNewContentAfterTruncation)
     file.write("2026-01-01 12:01:00 [INFO] after truncation\n");
     file.close();
 
-    ASSERT_TRUE(wait_for_entries(spy, 1));
+    ASSERT_TRUE(QtCommonLib::QtTestAwait::wait_until([&spy]() { return spy.count() >= 1; }));
 
     const QList<QVariant> arguments = spy.takeFirst();
     const QVector<LogEntry> entries = qvariant_cast<QVector<LogEntry>>(arguments.at(2));
@@ -154,7 +133,7 @@ TEST_F(LogTailerServiceTest, ReadsReplacementFileFromBeginning)
     replacement_file.write("2026-01-01 13:00:00 [INFO] replacement record with more bytes\n");
     replacement_file.close();
 
-    ASSERT_TRUE(wait_for_entries(spy, 1));
+    ASSERT_TRUE(QtCommonLib::QtTestAwait::wait_until([&spy]() { return spy.count() >= 1; }));
 
     const QList<QVariant> arguments = spy.takeFirst();
     const QVector<LogEntry> entries = qvariant_cast<QVector<LogEntry>>(arguments.at(2));

@@ -25,14 +25,6 @@ class LogTailerServiceTest: public ::testing::Test
         void TearDown() override;
 
         /**
-         * @brief Processes watcher events until a signal spy receives the requested count.
-         * @param spy Signal spy collecting entries_available emissions.
-         * @param expected_count Required signal count.
-         * @return True when the count was observed before timeout.
-         */
-        [[nodiscard]] auto wait_for_entries(QSignalSpy& spy, int expected_count) const -> bool;
-
-        /**
          * @brief Appends raw UTF-8 text to the temporary log file.
          * @param text Text to append.
          */

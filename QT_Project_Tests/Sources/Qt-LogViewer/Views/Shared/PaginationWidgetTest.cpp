@@ -130,7 +130,6 @@ TEST_F(PaginationWidgetTest, ItemsPerPageChangedSignalEmittedByComboBox)
     QComboBox* combo = m_widget->findChild<QComboBox*>("comboBoxItemsPerPage");
     ASSERT_NE(combo, nullptr);
     combo->setCurrentIndex(1);  // Index 1 corresponds to 50
-    QTest::qWait(10);           // Allow signal to propagate
     ASSERT_GE(spy.count(), 1);
     EXPECT_EQ(spy.takeFirst().at(0).toInt(), 50);
 }
@@ -144,7 +143,6 @@ TEST_F(PaginationWidgetTest, GetItemsPerPageReturnsCorrectValue)
     ASSERT_NE(combo, nullptr);
     EXPECT_EQ(m_widget->get_items_per_page(), 25);
     combo->setCurrentIndex(2);  // Index 2 is 100
-    QTest::qWait(10);
     EXPECT_EQ(m_widget->get_items_per_page(), 100);
 }
 

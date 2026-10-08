@@ -1,7 +1,6 @@
 #include "Qt-LogViewer/Views/App/LogLevelFilterItemWidgetTest.h"
 
 #include <QSignalSpy>
-#include <QTest>
 
 /**
  * @brief Sets up the test fixture for each test.
@@ -146,11 +145,9 @@ TEST_F(LogLevelFilterItemWidgetTest, ToggledSignalEmitted)
     auto* checkbox = get_checkbox();
     ASSERT_NE(checkbox, nullptr);
     checkbox->setChecked(true);
-    QTest::qWait(10);
     ASSERT_GE(spy.count(), 1);
     EXPECT_EQ(spy.takeFirst().at(0).toBool(), true);
     checkbox->setChecked(false);
-    QTest::qWait(10);
     ASSERT_GE(spy.count(), 1);
     EXPECT_EQ(spy.takeFirst().at(0).toBool(), false);
 }
