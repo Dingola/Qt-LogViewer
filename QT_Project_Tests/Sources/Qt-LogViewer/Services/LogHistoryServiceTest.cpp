@@ -2,7 +2,28 @@
 
 #include <QDateTime>
 #include <QElapsedTimer>
+#include <QSet>
+#include <QSqlDatabase>
+#include <QSqlQuery>
 #include <iostream>
+
+namespace
+{
+/**
+ * @brief Collects the currently registered Qt SQL connection names.
+ * @return Set containing every registered connection name.
+ */
+auto get_sql_connection_names() -> QSet<QString>
+{
+    QSet<QString> connection_names;
+    const QStringList registered_names = QSqlDatabase::connectionNames();
+    for (const QString& connection_name: registered_names)
+    {
+        connection_names.insert(connection_name);
+    }
+    return connection_names;
+}
+}  // namespace
 
 /**
  * @brief Creates an isolated history-service instance.
@@ -47,6 +68,59 @@ TEST_F(LogHistoryServiceTest, SharesDatabaseAcrossServiceConnections)
     ASSERT_TRUE(second_connection.add_entries(
         m_view_id, {create_entry(QStringLiteral("second"), QStringLiteral("second.log"))}));
     EXPECT_EQ(m_history_service->count_entries(query), 2);
+}
+
+/** @test Verifies a history service unregisters its private Qt SQL connection on destruction. */
+TEST_F(LogHistoryServiceTest, ReleasesSqlConnectionOnDestruction)
+{
+    const QSet<QString> original_connections = get_sql_connection_names();
+    {
+        LogHistoryService service(
+            m_temporary_directory.filePath(QStringLiteral("second-history.sqlite")));
+        ASSERT_TRUE(service.is_available());
+        EXPECT_EQ(get_sql_connection_names().size(), original_connections.size() + 1);
+    }
+    EXPECT_TRUE(get_sql_connection_names() == original_connections);
+}
+
+/** @test Verifies a failed database open does not leave a registered Qt SQL connection. */
+TEST_F(LogHistoryServiceTest, ReleasesSqlConnectionAfterOpenFailure)
+{
+    const QSet<QString> original_connections = get_sql_connection_names();
+    {
+        LogHistoryService service(m_temporary_directory.path());
+        EXPECT_FALSE(service.is_available());
+        EXPECT_EQ(get_sql_connection_names().size(), original_connections.size() + 1);
+    }
+    EXPECT_TRUE(get_sql_connection_names() == original_connections);
+}
+
+/** @test Verifies a failed entry batch is rolled back without retaining earlier batch entries. */
+TEST_F(LogHistoryServiceTest, RollsBackFailedEntryBatch)
+{
+    const QString connection_name = QStringLiteral("history_rollback_test_%1")
+                                        .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+    {
+        QSqlDatabase database =
+            QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection_name);
+        database.setDatabaseName(m_history_service->get_database_path());
+        ASSERT_TRUE(database.open());
+        QSqlQuery query(database);
+        ASSERT_TRUE(query.exec(QStringLiteral(
+            "CREATE TRIGGER reject_history_test_entry BEFORE INSERT ON log_entries "
+            "WHEN NEW.message='rejected' BEGIN SELECT RAISE(ABORT, 'rejected'); END")));
+        database.close();
+    }
+    QSqlDatabase::removeDatabase(connection_name);
+
+    const QVector<LogEntry> entries{
+        create_entry(QStringLiteral("accepted"), QStringLiteral("first.log")),
+        create_entry(QStringLiteral("rejected"), QStringLiteral("second.log"))};
+    EXPECT_FALSE(m_history_service->add_entries(m_view_id, entries));
+
+    LogQuery query;
+    query.view_id = m_view_id;
+    EXPECT_EQ(m_history_service->count_entries(query), 0);
 }
 
 /**

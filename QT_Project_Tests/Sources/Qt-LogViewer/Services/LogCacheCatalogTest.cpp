@@ -9,6 +9,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QSet>
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QTextStream>
@@ -38,6 +39,21 @@ auto write_file(const QString& path, const QString& contents) -> bool
     QTextStream stream(&file);
     stream << contents;
     return stream.status() == QTextStream::Ok;
+}
+
+/**
+ * @brief Collects the currently registered Qt SQL connection names.
+ * @return Set containing every registered connection name.
+ */
+auto get_sql_connection_names() -> QSet<QString>
+{
+    QSet<QString> connection_names;
+    const QStringList registered_names = QSqlDatabase::connectionNames();
+    for (const QString& connection_name: registered_names)
+    {
+        connection_names.insert(connection_name);
+    }
+    return connection_names;
 }
 }  // namespace
 
@@ -168,6 +184,18 @@ TEST_F(LogCacheCatalogTest, StoresCompleteGenerationAndOrderedViewMapping)
     EXPECT_TRUE(catalog.find_complete_generation(identity.value()).has_value());
 }
 
+/** @test Verifies the catalog unregisters its private Qt SQL connection on destruction. */
+TEST_F(LogCacheCatalogTest, ReleasesCatalogSqlConnectionOnDestruction)
+{
+    const QSet<QString> original_connections = get_sql_connection_names();
+    {
+        LogCacheCatalog catalog(m_temporary_directory.filePath(QStringLiteral("cache")));
+        ASSERT_TRUE(catalog.is_available());
+        EXPECT_EQ(get_sql_connection_names().size(), original_connections.size() + 1);
+    }
+    EXPECT_TRUE(get_sql_connection_names() == original_connections);
+}
+
 /**
  * @test Verifies that an incompatible catalog schema and its stale cache files
  * are rebuilt.
@@ -287,6 +315,53 @@ TEST_F(LogCacheCatalogTest, CreatesNormalizedDisposableFileCacheSchema)
         database.close();
     }
     QSqlDatabase::removeDatabase(connection_name);
+}
+
+/** @test Verifies a file cache unregisters its private Qt SQL connection on destruction. */
+TEST_F(LogCacheCatalogTest, ReleasesFileCacheSqlConnectionOnDestruction)
+{
+    const QString file_path = m_temporary_directory.filePath(QStringLiteral("source.log"));
+    ASSERT_TRUE(write_file(file_path, QStringLiteral("INFO message App\n")));
+    const LogParsingProfile profile =
+        LogParsingProfile::create_default(QStringLiteral("{level} {message} {app_name}"));
+    const auto identity = LogCacheIdentity::create(file_path, profile);
+    ASSERT_TRUE(identity.has_value());
+    const QSet<QString> original_connections = get_sql_connection_names();
+
+    {
+        LogFileCacheDatabase cache(
+            m_temporary_directory.filePath(QStringLiteral("file-cache.sqlite")), identity.value());
+        ASSERT_TRUE(cache.is_available());
+        EXPECT_EQ(get_sql_connection_names().size(), original_connections.size() + 1);
+    }
+    EXPECT_TRUE(get_sql_connection_names() == original_connections);
+}
+
+/** @test Verifies destruction rolls back a file-cache write transaction that was not finalized. */
+TEST_F(LogCacheCatalogTest, RollsBackUnfinalizedFileCacheWritesOnDestruction)
+{
+    const QString file_path = m_temporary_directory.filePath(QStringLiteral("source.log"));
+    ASSERT_TRUE(write_file(file_path, QStringLiteral("INFO message App\n")));
+    const LogParsingProfile profile =
+        LogParsingProfile::create_default(QStringLiteral("{level} {message} {app_name}"));
+    const auto identity = LogCacheIdentity::create(file_path, profile);
+    ASSERT_TRUE(identity.has_value());
+    const QVector<LogEntry> entries = LogParser(profile).parse_file(file_path);
+    ASSERT_EQ(entries.size(), 1);
+    const QString database_path =
+        m_temporary_directory.filePath(QStringLiteral("unfinished-file-cache.sqlite"));
+
+    {
+        LogFileCacheDatabase cache(database_path, identity.value());
+        ASSERT_TRUE(cache.is_available());
+        ASSERT_TRUE(cache.reset_entries());
+        ASSERT_TRUE(cache.append_entries(entries));
+        EXPECT_EQ(cache.get_entry_count(), 1);
+    }
+
+    LogFileCacheDatabase reopened_cache(database_path, identity.value());
+    ASSERT_TRUE(reopened_cache.is_available());
+    EXPECT_EQ(reopened_cache.get_entry_count(), 0);
 }
 
 /**
