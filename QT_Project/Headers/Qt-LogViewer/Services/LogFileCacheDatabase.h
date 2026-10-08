@@ -4,9 +4,16 @@
 #include <QObject>
 #include <QString>
 #include <QVector>
+#include <memory>
 
 #include "Qt-LogViewer/Models/LogEntry.h"
 #include "Qt-LogViewer/Services/LogCacheIdentity.h"
+
+namespace QtCommonLib
+{
+class SqliteConnection;
+class SqlTransaction;
+}  // namespace QtCommonLib
 
 /**
  * @file LogFileCacheDatabase.h
@@ -36,7 +43,7 @@ class LogFileCacheDatabase final: public QObject
         LogFileCacheDatabase(QString database_path, LogCacheIdentity identity,
                              QObject* parent = nullptr);
 
-        /** @brief Closes the private SQLite connection. */
+        /** @brief Rolls back unfinished writes, then closes the private SQLite connection. */
         ~LogFileCacheDatabase() override;
 
         /**
@@ -158,16 +165,16 @@ class LogFileCacheDatabase final: public QObject
          */
         auto get_or_create_application_id(const QString& value) -> qint64;
 
-        /** @brief Unique Qt SQL connection name owned by this instance. */
-        QString m_connection_name;
+        /** @brief Scoped owner of the private Qt SQL connection. */
+        std::unique_ptr<QtCommonLib::SqliteConnection> m_connection;
         /** @brief Absolute path of the disposable per-file cache database. */
         QString m_database_path;
         /** @brief Source and parser identity that the database must represent. */
         LogCacheIdentity m_identity;
         /** @brief Whether schema initialization and identity validation succeeded. */
         bool m_is_available{false};
-        /** @brief Whether a generation-wide atomic write transaction is active. */
-        bool m_write_transaction_active{false};
+        /** @brief Generation-wide write transaction kept active across appended batches. */
+        std::unique_ptr<QtCommonLib::SqlTransaction> m_write_transaction;
         /** @brief In-memory dimension lookup avoiding repeated SELECT statements per batch. */
         QHash<QString, qint64> m_level_ids;
         /** @brief In-memory application lookup avoiding repeated SELECT statements per batch. */

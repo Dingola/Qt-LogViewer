@@ -12,12 +12,18 @@
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QStringList>
-#include <QUuid>
 #include <QVariant>
 #include <QVariantMap>
+#include <memory>
 #include <utility>
 
 #include "Qt-LogViewer/Models/LogFieldDefinition.h"
+#include "Qt-LogViewer/Sql/SqlTransaction.h"
+#include "Qt-LogViewer/Sql/SqliteConnection.h"
+
+using QtCommonLib::SqliteConnection;
+using QtCommonLib::SqliteConnectionOptions;
+using QtCommonLib::SqlTransaction;
 
 /**
  * @brief Opens or creates a disposable cache database for one exact source
@@ -29,31 +35,14 @@
 LogFileCacheDatabase::LogFileCacheDatabase(QString database_path, LogCacheIdentity identity,
                                            QObject* parent)
     : QObject(parent),
-      m_connection_name(QStringLiteral("qt_log_viewer_file_cache_%1")
-                            .arg(QUuid::createUuid().toString(QUuid::WithoutBraces))),
       m_database_path(QFileInfo(std::move(database_path)).absoluteFilePath()),
       m_identity(std::move(identity))
 {
     m_is_available = initialize_database();
 }
 
-/** Closes and unregisters the private Qt SQL connection. */
-LogFileCacheDatabase::~LogFileCacheDatabase()
-{
-    if (QSqlDatabase::contains(m_connection_name))
-    {
-        {
-            QSqlDatabase database = QSqlDatabase::database(m_connection_name);
-            if (m_write_transaction_active)
-            {
-                database.rollback();
-                m_write_transaction_active = false;
-            }
-            database.close();
-        }
-        QSqlDatabase::removeDatabase(m_connection_name);
-    }
-}
+/** Rolls back unfinished writes and closes the private Qt SQL connection. */
+LogFileCacheDatabase::~LogFileCacheDatabase() = default;
 
 /**
  * @brief Reports whether schema initialization and identity validation
@@ -83,7 +72,7 @@ auto LogFileCacheDatabase::get_schema_version() const -> int
     int version = 0;
     if (m_is_available)
     {
-        QSqlQuery query(QSqlDatabase::database(m_connection_name));
+        QSqlQuery query(m_connection->database());
         if (query.exec(QStringLiteral("PRAGMA user_version")) && query.next())
         {
             version = query.value(0).toInt();
@@ -114,8 +103,6 @@ auto LogFileCacheDatabase::clone_generation(const QString& source_database_path,
 {
     const QString source_path = QFileInfo(source_database_path).absoluteFilePath();
     const QString destination_path = QFileInfo(destination_database_path).absoluteFilePath();
-    const QString connection_name = QStringLiteral("qt_log_viewer_cache_clone_%1")
-                                        .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
     bool cloned = destination_identity.is_valid() && QFileInfo::exists(source_path) &&
                   source_path != destination_path &&
                   QDir().mkpath(QFileInfo(destination_path).absolutePath());
@@ -130,11 +117,15 @@ auto LogFileCacheDatabase::clone_generation(const QString& source_database_path,
 
     if (cloned)
     {
+        SqliteConnectionOptions options;
+        options.connection_name_prefix = QStringLiteral("qt_log_viewer_cache_clone");
+        SqliteConnection connection(destination_path, options);
+        cloned = connection.is_open();
+        if (cloned)
         {
-            QSqlDatabase database =
-                QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection_name);
-            database.setDatabaseName(destination_path);
-            cloned = database.open() && database.transaction();
+            QSqlDatabase database = connection.database();
+            SqlTransaction transaction(database);
+            cloned = transaction.is_active();
             if (cloned)
             {
                 QSqlQuery query(database);
@@ -147,15 +138,9 @@ auto LogFileCacheDatabase::clone_generation(const QString& source_database_path,
                 query.addBindValue(destination_identity.modified_utc_ms);
                 query.addBindValue(destination_identity.sample_sha256);
                 query.addBindValue(destination_identity.parser_sha256);
-                cloned = query.exec() && query.numRowsAffected() == 1 && database.commit();
-                if (!cloned)
-                {
-                    database.rollback();
-                }
+                cloned = query.exec() && query.numRowsAffected() == 1 && transaction.commit();
             }
-            database.close();
         }
-        QSqlDatabase::removeDatabase(connection_name);
     }
 
     if (!cloned)
@@ -175,8 +160,9 @@ auto LogFileCacheDatabase::reset_entries() -> bool
     bool reset = m_is_available;
     if (reset)
     {
-        QSqlDatabase database = QSqlDatabase::database(m_connection_name);
-        reset = database.transaction();
+        QSqlDatabase database = m_connection->database();
+        SqlTransaction reset_transaction(database);
+        reset = reset_transaction.is_active();
         QSqlQuery query(database);
         const QStringList statements{QStringLiteral("DELETE FROM log_entries"),
                                      QStringLiteral("DELETE FROM log_levels"),
@@ -188,15 +174,15 @@ auto LogFileCacheDatabase::reset_entries() -> bool
         {
             reset = query.exec(statements.at(index));
         }
-        reset = reset && database.commit();
-        reset = reset && database.transaction();
+        reset = reset && reset_transaction.commit();
         if (reset)
         {
-            m_write_transaction_active = true;
-        }
-        else
-        {
-            database.rollback();
+            m_write_transaction = std::make_unique<SqlTransaction>(database);
+            reset = m_write_transaction->is_active();
+            if (!reset)
+            {
+                m_write_transaction.reset();
+            }
         }
         m_level_ids.clear();
         m_application_ids.clear();
@@ -210,11 +196,15 @@ auto LogFileCacheDatabase::reset_entries() -> bool
  */
 auto LogFileCacheDatabase::begin_append() -> bool
 {
-    bool started = m_is_available && !m_write_transaction_active;
+    bool started = m_is_available && m_write_transaction == nullptr;
     if (started)
     {
-        started = QSqlDatabase::database(m_connection_name).transaction();
-        m_write_transaction_active = started;
+        m_write_transaction = std::make_unique<SqlTransaction>(m_connection->database());
+        started = m_write_transaction->is_active();
+        if (!started)
+        {
+            m_write_transaction.reset();
+        }
     }
     return started;
 }
@@ -228,11 +218,12 @@ auto LogFileCacheDatabase::begin_append() -> bool
  */
 auto LogFileCacheDatabase::append_entries(const QVector<LogEntry>& entries) -> bool
 {
-    const bool can_store = m_is_available && m_write_transaction_active && !entries.isEmpty();
+    const bool can_store = m_is_available && m_write_transaction != nullptr &&
+                           m_write_transaction->is_active() && !entries.isEmpty();
     bool stored = can_store;
     if (can_store)
     {
-        QSqlDatabase database = QSqlDatabase::database(m_connection_name);
+        QSqlDatabase database = m_connection->database();
         QSqlQuery entry_query(database);
         entry_query.prepare(
             QStringLiteral("INSERT INTO log_entries(source_line, byte_offset, byte_length, "
@@ -303,8 +294,8 @@ auto LogFileCacheDatabase::append_entries(const QVector<LogEntry>& entries) -> b
 
         if (!stored)
         {
-            database.rollback();
-            m_write_transaction_active = false;
+            static_cast<void>(m_write_transaction->rollback());
+            m_write_transaction.reset();
             m_level_ids.clear();
             m_application_ids.clear();
         }
@@ -319,17 +310,18 @@ auto LogFileCacheDatabase::append_entries(const QVector<LogEntry>& entries) -> b
  */
 auto LogFileCacheDatabase::finalize_writes() -> bool
 {
-    bool finalized = m_is_available && m_write_transaction_active;
+    bool finalized =
+        m_is_available && m_write_transaction != nullptr && m_write_transaction->is_active();
     if (finalized)
     {
-        QSqlDatabase database = QSqlDatabase::database(m_connection_name);
-        finalized = database.commit();
-        m_write_transaction_active = false;
+        QSqlDatabase database = m_connection->database();
+        finalized = m_write_transaction->commit();
         if (!finalized)
         {
-            database.rollback();
+            static_cast<void>(m_write_transaction->rollback());
         }
-        else
+        m_write_transaction.reset();
+        if (finalized)
         {
             QSqlQuery query(database);
             finalized = query.exec(QStringLiteral("PRAGMA optimize")) &&
@@ -348,7 +340,7 @@ auto LogFileCacheDatabase::get_entry_count() const -> qint64
     qint64 entry_count = -1;
     if (m_is_available)
     {
-        QSqlQuery query(QSqlDatabase::database(m_connection_name));
+        QSqlQuery query(m_connection->database());
         if (query.exec(QStringLiteral("SELECT COUNT(*) FROM log_entries")) && query.next())
         {
             entry_count = query.value(0).toLongLong();
@@ -390,20 +382,20 @@ auto LogFileCacheDatabase::initialize_database() -> bool
                        QDir().mkpath(database_info.absolutePath());
     if (initialized)
     {
-        QSqlDatabase database =
-            QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), m_connection_name);
-        database.setDatabaseName(m_database_path);
-        database.setConnectOptions(QStringLiteral("QSQLITE_BUSY_TIMEOUT=5000"));
-        initialized = database.open();
+        SqliteConnectionOptions options;
+        options.connection_name_prefix = QStringLiteral("qt_log_viewer_file_cache");
+        options.connect_options = QStringLiteral("QSQLITE_BUSY_TIMEOUT=5000");
+        options.connection_setup_statements = {
+            QStringLiteral("PRAGMA foreign_keys=ON"), QStringLiteral("PRAGMA busy_timeout=5000"),
+            QStringLiteral("PRAGMA journal_mode=WAL"), QStringLiteral("PRAGMA synchronous=NORMAL")};
+        m_connection = std::make_unique<SqliteConnection>(m_database_path, options);
+        initialized = m_connection->is_open();
 
         if (initialized)
         {
+            QSqlDatabase database = m_connection->database();
             QSqlQuery query(database);
-            initialized = query.exec(QStringLiteral("PRAGMA foreign_keys=ON")) &&
-                          query.exec(QStringLiteral("PRAGMA busy_timeout=5000")) &&
-                          query.exec(QStringLiteral("PRAGMA journal_mode=WAL")) &&
-                          query.exec(QStringLiteral("PRAGMA synchronous=NORMAL")) &&
-                          query.exec(QStringLiteral("PRAGMA user_version")) && query.next();
+            initialized = query.exec(QStringLiteral("PRAGMA user_version")) && query.next();
             if (initialized)
             {
                 const int version = query.value(0).toInt();
@@ -424,8 +416,9 @@ auto LogFileCacheDatabase::initialize_database() -> bool
  */
 auto LogFileCacheDatabase::rebuild_schema() -> bool
 {
-    QSqlDatabase database = QSqlDatabase::database(m_connection_name);
-    bool rebuilt = database.transaction();
+    QSqlDatabase database = m_connection->database();
+    SqlTransaction transaction(database);
+    bool rebuilt = transaction.is_active();
     if (rebuilt)
     {
         QSqlQuery query(database);
@@ -443,11 +436,7 @@ auto LogFileCacheDatabase::rebuild_schema() -> bool
         rebuilt = rebuilt && query.exec(QStringLiteral("PRAGMA user_version=2"));
 
         query.finish();
-        rebuilt = rebuilt && database.commit();
-        if (!rebuilt)
-        {
-            database.rollback();
-        }
+        rebuilt = rebuilt && transaction.commit();
     }
     return rebuilt;
 }
@@ -464,7 +453,7 @@ auto LogFileCacheDatabase::rebuild_schema() -> bool
  */
 auto LogFileCacheDatabase::create_schema() -> bool
 {
-    QSqlQuery query(QSqlDatabase::database(m_connection_name));
+    QSqlQuery query(m_connection->database());
     const QStringList statements{
         QStringLiteral("CREATE TABLE IF NOT EXISTS cache_identity("
                        "singleton INTEGER PRIMARY KEY CHECK(singleton=1), "
@@ -510,7 +499,7 @@ auto LogFileCacheDatabase::create_schema() -> bool
  */
 auto LogFileCacheDatabase::store_identity() -> bool
 {
-    QSqlQuery query(QSqlDatabase::database(m_connection_name));
+    QSqlQuery query(m_connection->database());
     query.prepare(
         QStringLiteral("INSERT OR REPLACE INTO cache_identity(singleton, "
                        "cache_key, canonical_path, file_size, "
@@ -532,7 +521,7 @@ auto LogFileCacheDatabase::store_identity() -> bool
  */
 auto LogFileCacheDatabase::identity_matches() const -> bool
 {
-    QSqlQuery query(QSqlDatabase::database(m_connection_name));
+    QSqlQuery query(m_connection->database());
     bool matches =
         query.exec(QStringLiteral("SELECT cache_key, canonical_path, file_size, modified_utc_ms, "
                                   "sample_sha256, "
@@ -567,7 +556,7 @@ auto LogFileCacheDatabase::get_or_create_level_id(const QString& value) -> qint6
     }
     else
     {
-        QSqlDatabase database = QSqlDatabase::database(m_connection_name);
+        QSqlDatabase database = m_connection->database();
         QSqlQuery insert_query(database);
         insert_query.prepare(
             QStringLiteral("INSERT OR IGNORE INTO log_levels(value, "
@@ -604,7 +593,7 @@ auto LogFileCacheDatabase::get_or_create_application_id(const QString& value) ->
     }
     else
     {
-        QSqlDatabase database = QSqlDatabase::database(m_connection_name);
+        QSqlDatabase database = m_connection->database();
         QSqlQuery insert_query(database);
         insert_query.prepare(QStringLiteral("INSERT OR IGNORE INTO applications(value) VALUES(?)"));
         insert_query.addBindValue(stored_value);
