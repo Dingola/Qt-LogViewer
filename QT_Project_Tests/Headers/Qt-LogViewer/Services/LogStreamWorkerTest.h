@@ -5,7 +5,7 @@
 #include <QString>
 #include <QVector>
 
-#include "Qt-LogViewer/TestSupport/TestFileSystem.h"
+#include "QtCommonLib/TestSupport/TestFileSystem.h"
 
 /**
  * @file LogStreamWorkerTest.h
@@ -39,5 +39,5 @@ class LogStreamWorkerTest: public ::testing::Test
         QString m_format;
 
         /** @brief Isolated filesystem owning all files created by the fixture. */
-        TestFileSystem m_file_system;
+        QtCommonLib::TestFileSystem m_file_system;
 };

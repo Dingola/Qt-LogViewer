@@ -17,7 +17,9 @@
 #include "Qt-LogViewer/Models/SearchFields.h"
 #include "Qt-LogViewer/Services/LogHistoryService.h"
 #include "Qt-LogViewer/Support/TestLogRuntime.h"
-#include "Qt-LogViewer/TestSupport/QtTestAwait.h"
+#include "QtCommonLib/TestSupport/QtTestAwait.h"
+
+using QtCommonLib::QtTestAwait;
 
 /** @brief Creates an isolated production component graph before each cache-read test. */
 auto LogCacheReadServiceTest::SetUp() -> void

@@ -7,7 +7,7 @@
 
 #include "Qt-LogViewer/Controllers/LogViewLoadQueue.h"
 #include "Qt-LogViewer/Services/LogLoadingService.h"
-#include "Qt-LogViewer/TestSupport/TestFileSystem.h"
+#include "QtCommonLib/TestSupport/TestFileSystem.h"
 
 /**
  * @file LogViewLoadQueueTest.h
@@ -29,7 +29,7 @@ class LogViewLoadQueueTest: public ::testing::Test
         LogLoadingService* m_loader = nullptr;
 
         /** @brief Isolated filesystem providing unique queue paths. */
-        TestFileSystem m_file_system;
+        QtCommonLib::TestFileSystem m_file_system;
 
         QUuid m_view_a;
         QUuid m_view_b;

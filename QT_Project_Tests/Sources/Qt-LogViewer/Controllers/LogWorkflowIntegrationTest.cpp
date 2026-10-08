@@ -16,7 +16,9 @@
 #include "Qt-LogViewer/Models/LogPageState.h"
 #include "Qt-LogViewer/Services/LogCacheIdentity.h"
 #include "Qt-LogViewer/Support/TestLogRuntime.h"
-#include "Qt-LogViewer/TestSupport/QtTestAwait.h"
+#include "QtCommonLib/TestSupport/QtTestAwait.h"
+
+using QtCommonLib::QtTestAwait;
 
 /** @brief Creates the focused runtime graph used by each workflow test. */
 void LogWorkflowIntegrationTest::SetUp()

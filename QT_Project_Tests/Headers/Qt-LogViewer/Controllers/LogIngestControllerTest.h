@@ -3,7 +3,7 @@
 #include <gtest/gtest.h>
 
 #include "Qt-LogViewer/Controllers/LogIngestController.h"
-#include "Qt-LogViewer/TestSupport/TestFileSystem.h"
+#include "QtCommonLib/TestSupport/TestFileSystem.h"
 
 /**
  * @file LogIngestControllerTest.h
@@ -33,5 +33,5 @@ class LogIngestControllerTest: public ::testing::Test
         QString m_temp_log_path;
 
         /** @brief Isolated filesystem owning the fixture's paths and files. */
-        TestFileSystem m_file_system;
+        QtCommonLib::TestFileSystem m_file_system;
 };

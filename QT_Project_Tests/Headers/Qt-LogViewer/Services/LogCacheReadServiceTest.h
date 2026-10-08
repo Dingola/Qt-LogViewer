@@ -5,7 +5,7 @@
 #include <QVector>
 
 #include "Qt-LogViewer/Services/LogParsingProfile.h"
-#include "Qt-LogViewer/TestSupport/TestFileSystem.h"
+#include "QtCommonLib/TestSupport/TestFileSystem.h"
 
 class TestLogRuntime;
 
@@ -38,5 +38,5 @@ class LogCacheReadServiceTest: public ::testing::Test
             QStringLiteral("{timestamp} {level} {message} {app_name}"),
             QStringLiteral("Cache read integration"))};
         TestLogRuntime* m_runtime{nullptr};
-        TestFileSystem m_file_system;
+        QtCommonLib::TestFileSystem m_file_system;
 };
