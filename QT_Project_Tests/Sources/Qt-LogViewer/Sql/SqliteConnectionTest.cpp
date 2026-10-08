@@ -26,8 +26,8 @@ TEST(SqliteConnectionTest, OpensAndInitializesDatabase)
     SqliteConnectionOptions options;
     options.connection_name_prefix = QStringLiteral("configured_connection");
     options.connect_options = QStringLiteral("QSQLITE_BUSY_TIMEOUT=2500");
-    options.initialization_statements = {QStringLiteral("PRAGMA foreign_keys=ON"),
-                                         QStringLiteral("PRAGMA busy_timeout=2500")};
+    options.connection_setup_statements = {QStringLiteral("PRAGMA foreign_keys=ON"),
+                                           QStringLiteral("PRAGMA busy_timeout=2500")};
 
     SqliteConnection connection(database_path, options);
 
@@ -90,7 +90,7 @@ TEST(SqliteConnectionTest, ReportsInitializationFailure)
         file_system.nonexistent_path(QStringLiteral("invalid-initialization.sqlite"));
     ASSERT_FALSE(database_path.isEmpty());
     SqliteConnectionOptions options;
-    options.initialization_statements = {QStringLiteral("INVALID SQL")};
+    options.connection_setup_statements = {QStringLiteral("INVALID SQL")};
 
     SqliteConnection connection(database_path, options);
 

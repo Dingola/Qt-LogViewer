@@ -24,8 +24,13 @@ struct SqliteConnectionOptions {
         /** @brief Driver-specific options passed to QSqlDatabase before opening. */
         QString connect_options;
 
-        /** @brief SQL statements executed in order immediately after opening. */
-        QStringList initialization_statements;
+        /**
+         * @brief Non-transactional connection setup statements executed after opening.
+         *
+         * This list is intended for connection-level configuration such as SQLite PRAGMAs, not
+         * for schema creation or migration.
+         */
+        QStringList connection_setup_statements;
 };
 
 /**

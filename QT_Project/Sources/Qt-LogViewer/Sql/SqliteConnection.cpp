@@ -31,11 +31,11 @@ SqliteConnection::SqliteConnection(QString database_name, const SqliteConnection
         m_last_error = sql_database.lastError();
     }
 
-    for (qsizetype index = 0; index < options.initialization_statements.size() && initialized;
+    for (qsizetype index = 0; index < options.connection_setup_statements.size() && initialized;
          ++index)
     {
         QSqlQuery query(sql_database);
-        initialized = query.exec(options.initialization_statements.at(index));
+        initialized = query.exec(options.connection_setup_statements.at(index));
         if (!initialized)
         {
             m_last_error = query.lastError();
