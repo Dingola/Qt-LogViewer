@@ -4,9 +4,15 @@
 #include <QString>
 #include <QUuid>
 #include <QVector>
+#include <memory>
 #include <optional>
 
 #include "Qt-LogViewer/Services/LogCacheIdentity.h"
+
+namespace QtCommonLib
+{
+class SqliteConnection;
+}
 
 /**
  * @file LogCacheCatalog.h
@@ -262,8 +268,8 @@ class LogCacheCatalog final: public QObject
          */
         [[nodiscard]] auto get_cache_database_path(const QString& cache_key) const -> QString;
 
-        /** @brief Unique Qt SQL connection name owned by this instance. */
-        QString m_connection_name;
+        /** @brief Scoped owner of the catalog's private Qt SQL connection. */
+        std::unique_ptr<QtCommonLib::SqliteConnection> m_connection;
         /** @brief Absolute directory containing catalog and cache files. */
         QString m_cache_root;
         /** @brief Absolute path of the catalog SQLite database. */

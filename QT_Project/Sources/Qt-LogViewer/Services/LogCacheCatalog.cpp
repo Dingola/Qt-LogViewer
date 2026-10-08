@@ -16,7 +16,15 @@
 #include <QStandardPaths>
 #include <QStringList>
 #include <QVariant>
+#include <memory>
 #include <utility>
+
+#include "Qt-LogViewer/Sql/SqlTransaction.h"
+#include "Qt-LogViewer/Sql/SqliteConnection.h"
+
+using QtCommonLib::SqliteConnection;
+using QtCommonLib::SqliteConnectionOptions;
+using QtCommonLib::SqlTransaction;
 
 namespace
 {
@@ -54,8 +62,6 @@ LogCacheCatalog::LogCacheCatalog(QObject* parent): LogCacheCatalog(get_default_c
  */
 LogCacheCatalog::LogCacheCatalog(QString cache_root, QObject* parent)
     : QObject(parent),
-      m_connection_name(QStringLiteral("qt_log_viewer_cache_catalog_%1")
-                            .arg(QUuid::createUuid().toString(QUuid::WithoutBraces))),
       m_cache_root(QFileInfo(std::move(cache_root)).absoluteFilePath()),
       m_database_path(QDir(m_cache_root).filePath(QStringLiteral("catalog.sqlite")))
 {
@@ -63,17 +69,7 @@ LogCacheCatalog::LogCacheCatalog(QString cache_root, QObject* parent)
 }
 
 /** @brief Closes and unregisters the private Qt SQL connection. */
-LogCacheCatalog::~LogCacheCatalog()
-{
-    if (QSqlDatabase::contains(m_connection_name))
-    {
-        {
-            QSqlDatabase database = QSqlDatabase::database(m_connection_name);
-            database.close();
-        }
-        QSqlDatabase::removeDatabase(m_connection_name);
-    }
-}
+LogCacheCatalog::~LogCacheCatalog() = default;
 
 /**
  * @brief Reports whether catalog initialization succeeded.
@@ -111,7 +107,7 @@ auto LogCacheCatalog::get_schema_version() const -> int
     int version = 0;
     if (m_is_available)
     {
-        QSqlQuery query(QSqlDatabase::database(m_connection_name));
+        QSqlQuery query(m_connection->database());
         if (query.exec(QStringLiteral("PRAGMA user_version")) && query.next())
         {
             version = query.value(0).toInt();
@@ -134,9 +130,9 @@ auto LogCacheCatalog::begin_generation(const LogCacheIdentity& identity)
         // Source registration and generation creation/resumption form one
         // transaction. Callers must never observe a generation whose source row was
         // not committed with it.
-        QSqlDatabase database = QSqlDatabase::database(m_connection_name);
-        const bool transaction_started = database.transaction();
-        bool succeeded = transaction_started;
+        QSqlDatabase database = m_connection->database();
+        SqlTransaction transaction(database);
+        bool succeeded = transaction.is_active();
         if (succeeded)
         {
             QSqlQuery source_query(database);
@@ -208,14 +204,10 @@ auto LogCacheCatalog::begin_generation(const LogCacheIdentity& identity)
             }
         }
 
-        succeeded = succeeded && database.commit();
+        succeeded = succeeded && transaction.commit();
         if (succeeded)
         {
             generation = load_generation(generation_id);
-        }
-        else if (transaction_started)
-        {
-            database.rollback();
         }
     }
 
@@ -233,7 +225,7 @@ auto LogCacheCatalog::find_complete_generation(const LogCacheIdentity& identity)
     std::optional<LogCacheGeneration> generation;
     if (m_is_available && identity.is_valid())
     {
-        QSqlQuery query(QSqlDatabase::database(m_connection_name));
+        QSqlQuery query(m_connection->database());
         query.prepare(
             QStringLiteral("SELECT id FROM cache_generations WHERE "
                            "cache_key=? AND state='complete'"));
@@ -257,7 +249,7 @@ auto LogCacheCatalog::find_complete_prefix(const LogCacheIdentity& identity) con
     std::optional<LogCacheGeneration> generation;
     if (m_is_available && identity.is_valid())
     {
-        QSqlQuery query(QSqlDatabase::database(m_connection_name));
+        QSqlQuery query(m_connection->database());
         query.prepare(QStringLiteral(
             "SELECT id FROM cache_generations WHERE source_id=(SELECT id FROM cache_sources "
             "WHERE canonical_path=?) AND parser_sha256=? AND state='complete' AND file_size<? "
@@ -309,7 +301,7 @@ auto LogCacheCatalog::mark_complete(qint64 generation_id, qint64 indexed_bytes, 
     bool completed = false;
     if (can_complete)
     {
-        QSqlQuery query(QSqlDatabase::database(m_connection_name));
+        QSqlQuery query(m_connection->database());
         query.prepare(
             QStringLiteral("UPDATE cache_generations SET state='complete', "
                            "indexed_bytes=?, entry_count=?, "
@@ -339,7 +331,7 @@ auto LogCacheCatalog::mark_failed(qint64 generation_id, const QString& error_mes
     bool failed = false;
     if (m_is_available && generation_id >= 0)
     {
-        QSqlQuery query(QSqlDatabase::database(m_connection_name));
+        QSqlQuery query(m_connection->database());
         query.prepare(
             QStringLiteral("UPDATE cache_generations SET state='failed', "
                            "completed_utc_ms=NULL, error_message=? "
@@ -390,7 +382,7 @@ auto LogCacheCatalog::touch_generation(qint64 generation_id) -> bool
     bool touched = false;
     if (m_is_available && generation_id >= 0)
     {
-        QSqlQuery query(QSqlDatabase::database(m_connection_name));
+        QSqlQuery query(m_connection->database());
         query.prepare(
             QStringLiteral("UPDATE cache_generations SET last_access_utc_ms=? WHERE id=?"));
         query.addBindValue(QDateTime::currentDateTimeUtc().toMSecsSinceEpoch());
@@ -413,9 +405,9 @@ auto LogCacheCatalog::bind_view(const QUuid& view_id, const QVector<qint64>& gen
     {
         // Replacing the entire ordered mapping in one transaction prevents a restored
         // view from seeing a mixture of old and new source generations.
-        QSqlDatabase database = QSqlDatabase::database(m_connection_name);
-        const bool transaction_started = database.transaction();
-        bool succeeded = transaction_started;
+        QSqlDatabase database = m_connection->database();
+        SqlTransaction transaction(database);
+        bool succeeded = transaction.is_active();
         const QString view_text = view_id.toString(QUuid::WithoutBraces);
 
         if (succeeded)
@@ -451,11 +443,7 @@ auto LogCacheCatalog::bind_view(const QUuid& view_id, const QVector<qint64>& gen
             succeeded = insert_query.exec() && insert_query.numRowsAffected() == 1;
         }
 
-        bound = succeeded && database.commit();
-        if (!bound && transaction_started)
-        {
-            database.rollback();
-        }
+        bound = succeeded && transaction.commit();
     }
     return bound;
 }
@@ -470,7 +458,7 @@ auto LogCacheCatalog::get_view_generations(const QUuid& view_id) const -> QVecto
     QVector<qint64> generation_ids;
     if (m_is_available && !view_id.isNull())
     {
-        QSqlQuery query(QSqlDatabase::database(m_connection_name));
+        QSqlQuery query(m_connection->database());
         query.prepare(
             QStringLiteral("SELECT generation_id FROM cache_view_generations WHERE "
                            "view_id=? ORDER BY position"));
@@ -496,7 +484,7 @@ auto LogCacheCatalog::remove_view(const QUuid& view_id) -> bool
     bool removed = false;
     if (m_is_available && !view_id.isNull())
     {
-        QSqlQuery query(QSqlDatabase::database(m_connection_name));
+        QSqlQuery query(m_connection->database());
         query.prepare(QStringLiteral("DELETE FROM cache_views WHERE view_id=?"));
         query.addBindValue(view_id.toString(QUuid::WithoutBraces));
         removed = query.exec();
@@ -529,29 +517,29 @@ auto LogCacheCatalog::initialize_database() -> bool
     }
     else
     {
-        QSqlDatabase database =
-            QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), m_connection_name);
-        database.setDatabaseName(m_database_path);
-        database.setConnectOptions(QStringLiteral("QSQLITE_BUSY_TIMEOUT=5000"));
-        initialized = database.open();
+        SqliteConnectionOptions options;
+        options.connection_name_prefix = QStringLiteral("qt_log_viewer_cache_catalog");
+        options.connect_options = QStringLiteral("QSQLITE_BUSY_TIMEOUT=5000");
+        options.connection_setup_statements = {
+            QStringLiteral("PRAGMA foreign_keys=ON"), QStringLiteral("PRAGMA busy_timeout=5000"),
+            QStringLiteral("PRAGMA journal_mode=WAL"), QStringLiteral("PRAGMA synchronous=NORMAL")};
+        m_connection = std::make_unique<SqliteConnection>(m_database_path, options);
+        initialized = m_connection->is_open();
         if (!initialized)
         {
-            qWarning() << "Cache catalog database open failed:" << database.lastError();
+            qWarning() << "Cache catalog database initialization failed:"
+                       << m_connection->last_error();
         }
 
+        QSqlDatabase database;
         if (initialized)
         {
+            database = m_connection->database();
             QSqlQuery query(database);
-            const bool configured = query.exec(QStringLiteral("PRAGMA foreign_keys=ON")) &&
-                                    query.exec(QStringLiteral("PRAGMA busy_timeout=5000")) &&
-                                    query.exec(QStringLiteral("PRAGMA journal_mode=WAL")) &&
-                                    query.exec(QStringLiteral("PRAGMA synchronous=NORMAL"));
-            initialized =
-                configured && query.exec(QStringLiteral("PRAGMA user_version")) && query.next();
+            initialized = query.exec(QStringLiteral("PRAGMA user_version")) && query.next();
             if (!initialized)
             {
-                qWarning() << "Cache catalog SQLite configuration failed:" << configured
-                           << query.lastError();
+                qWarning() << "Cache catalog schema version query failed:" << query.lastError();
             }
             else
             {
@@ -586,9 +574,9 @@ auto LogCacheCatalog::initialize_database() -> bool
  */
 auto LogCacheCatalog::rebuild_schema() -> bool
 {
-    QSqlDatabase database = QSqlDatabase::database(m_connection_name);
-    const bool transaction_started = database.transaction();
-    bool rebuilt = transaction_started;
+    QSqlDatabase database = m_connection->database();
+    SqlTransaction transaction(database);
+    bool rebuilt = transaction.is_active();
     if (rebuilt)
     {
         QSqlQuery query(database);
@@ -617,14 +605,13 @@ auto LogCacheCatalog::rebuild_schema() -> bool
 
         query.finish();
         const bool ready_to_commit = rebuilt;
-        rebuilt = rebuilt && database.commit();
+        rebuilt = rebuilt && transaction.commit();
         if (!rebuilt)
         {
             if (ready_to_commit)
             {
-                qWarning() << "Cache catalog schema commit failed:" << database.lastError();
+                qWarning() << "Cache catalog schema commit failed:" << transaction.last_error();
             }
-            database.rollback();
         }
         else
         {
@@ -658,7 +645,7 @@ auto LogCacheCatalog::remove_stale_cache_files() -> void
  */
 auto LogCacheCatalog::create_schema() -> bool
 {
-    QSqlQuery query(QSqlDatabase::database(m_connection_name));
+    QSqlQuery query(m_connection->database());
     const QStringList statements{
         QStringLiteral("CREATE TABLE IF NOT EXISTS cache_sources("
                        "id INTEGER PRIMARY KEY, canonical_path TEXT NOT NULL UNIQUE, "
@@ -717,7 +704,7 @@ auto LogCacheCatalog::load_generation(qint64 generation_id) const
     std::optional<LogCacheGeneration> generation;
     if (m_is_available)
     {
-        QSqlQuery query(QSqlDatabase::database(m_connection_name));
+        QSqlQuery query(m_connection->database());
         query.prepare(
             QStringLiteral("SELECT g.id, g.source_id, s.canonical_path, g.file_size, "
                            "g.modified_utc_ms, "
