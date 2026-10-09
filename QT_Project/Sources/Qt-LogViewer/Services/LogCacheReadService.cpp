@@ -25,7 +25,7 @@
 #include "Qt-LogViewer/Services/LogCacheCatalog.h"
 #include "Qt-LogViewer/Services/LogParser.h"
 #include "Qt-LogViewer/Services/LogParsingProfile.h"
-#include "Qt-LogViewer/Sql/SqliteConnection.h"
+#include "QtCommonLib/Sql/SqliteConnection.h"
 
 using QtCommonLib::SqliteConnection;
 using QtCommonLib::SqliteConnectionOptions;

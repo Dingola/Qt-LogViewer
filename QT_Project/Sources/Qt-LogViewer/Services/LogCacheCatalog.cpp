@@ -19,8 +19,8 @@
 #include <memory>
 #include <utility>
 
-#include "Qt-LogViewer/Sql/SqlTransaction.h"
-#include "Qt-LogViewer/Sql/SqliteConnection.h"
+#include "QtCommonLib/Sql/SqlTransaction.h"
+#include "QtCommonLib/Sql/SqliteConnection.h"
 
 using QtCommonLib::SqliteConnection;
 using QtCommonLib::SqliteConnectionOptions;
