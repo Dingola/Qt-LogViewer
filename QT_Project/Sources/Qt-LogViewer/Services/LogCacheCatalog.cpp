@@ -20,10 +20,12 @@
 #include <utility>
 
 #include "QtCommonLib/Sql/SqlConnection.h"
+#include "QtCommonLib/Sql/SqlStatementBatch.h"
 #include "QtCommonLib/Sql/SqlTransaction.h"
 
 using QtCommonLib::SqlConnection;
 using QtCommonLib::SqlConnectionOptions;
+using QtCommonLib::SqlStatementBatch;
 using QtCommonLib::SqlTransaction;
 
 namespace
@@ -584,14 +586,13 @@ auto LogCacheCatalog::rebuild_schema() -> bool
                                 QStringLiteral("DROP TABLE IF EXISTS cache_views"),
                                 QStringLiteral("DROP TABLE IF EXISTS cache_generations"),
                                 QStringLiteral("DROP TABLE IF EXISTS cache_sources")};
-        for (qsizetype index = 0; index < drops.size() && rebuilt; ++index)
+        const SqlStatementBatch drop_batch(drops);
+        const auto drop_result = drop_batch.execute(database);
+        rebuilt = drop_result.successful;
+        if (!rebuilt)
         {
-            const QString& statement = drops.at(index);
-            rebuilt = query.exec(statement);
-            if (!rebuilt)
-            {
-                qWarning() << "Cache catalog schema drop failed:" << statement << query.lastError();
-            }
+            qWarning() << "Cache catalog schema drop failed:" << drop_result.failed_statement
+                       << drop_result.error;
         }
         rebuilt = rebuilt && create_schema();
         if (rebuilt)
@@ -645,7 +646,6 @@ auto LogCacheCatalog::remove_stale_cache_files() -> void
  */
 auto LogCacheCatalog::create_schema() -> bool
 {
-    QSqlQuery query(m_connection->database());
     const QStringList statements{
         QStringLiteral("CREATE TABLE IF NOT EXISTS cache_sources("
                        "id INTEGER PRIMARY KEY, canonical_path TEXT NOT NULL UNIQUE, "
@@ -681,15 +681,14 @@ auto LogCacheCatalog::create_schema() -> bool
                        "generation_id), "
                        "UNIQUE(view_id, position))")};
 
-    bool created = true;
-    for (const QString& statement: statements)
+    const SqlStatementBatch batch(statements);
+    const auto batch_result = batch.execute(m_connection->database());
+    if (!batch_result.successful)
     {
-        if (created && !query.exec(statement))
-        {
-            qWarning() << "Cache catalog schema creation failed:" << statement << query.lastError();
-            created = false;
-        }
+        qWarning() << "Cache catalog schema creation failed:" << batch_result.failed_statement
+                   << batch_result.error;
     }
+    const bool created = batch_result.successful;
     return created;
 }
 

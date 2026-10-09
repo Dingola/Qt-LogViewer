@@ -24,10 +24,12 @@
 #include "Qt-LogViewer/Models/LogFieldDefinition.h"
 #include "Qt-LogViewer/Services/LogCacheReadService.h"
 #include "QtCommonLib/Sql/SqlConnection.h"
+#include "QtCommonLib/Sql/SqlStatementBatch.h"
 #include "QtCommonLib/Sql/SqlTransaction.h"
 
 using QtCommonLib::SqlConnection;
 using QtCommonLib::SqlConnectionOptions;
+using QtCommonLib::SqlStatementBatch;
 using QtCommonLib::SqlTransaction;
 
 namespace
@@ -1064,10 +1066,9 @@ auto LogHistoryService::create_schema() -> bool
             "INSERT INTO log_entries_fts(rowid, level, message, app_name, file_path) "
             "VALUES (new.id, new.level, new.message, new.app_name, new.file_path); END")};
 
-    for (qsizetype index = 0; index < statements.size() && schema_created; ++index)
-    {
-        schema_created = query.exec(statements.at(index));
-    }
+    query.finish();
+    const SqlStatementBatch schema_batch(statements);
+    schema_created = schema_created && schema_batch.execute(m_connection->database()).successful;
 
     return schema_created;
 }
@@ -1107,10 +1108,9 @@ auto LogHistoryService::ensure_parse_metadata_columns() -> bool
             "ALTER TABLE log_entries ADD COLUMN parsed_fields_cbor BLOB NOT NULL DEFAULT X'A0'"));
     }
 
-    for (qsizetype index = 0; index < migration_statements.size() && migrated; ++index)
-    {
-        migrated = query.exec(migration_statements.at(index));
-    }
+    query.finish();
+    const SqlStatementBatch migration_batch(migration_statements);
+    migrated = migrated && migration_batch.execute(m_connection->database()).successful;
 
     return migrated;
 }

@@ -19,10 +19,12 @@
 
 #include "Qt-LogViewer/Models/LogFieldDefinition.h"
 #include "QtCommonLib/Sql/SqlConnection.h"
+#include "QtCommonLib/Sql/SqlStatementBatch.h"
 #include "QtCommonLib/Sql/SqlTransaction.h"
 
 using QtCommonLib::SqlConnection;
 using QtCommonLib::SqlConnectionOptions;
+using QtCommonLib::SqlStatementBatch;
 using QtCommonLib::SqlTransaction;
 
 /**
@@ -163,17 +165,14 @@ auto LogFileCacheDatabase::reset_entries() -> bool
         QSqlDatabase database = m_connection->database();
         SqlTransaction reset_transaction(database);
         reset = reset_transaction.is_active();
-        QSqlQuery query(database);
         const QStringList statements{QStringLiteral("DELETE FROM log_entries"),
                                      QStringLiteral("DELETE FROM log_levels"),
                                      QStringLiteral("DELETE FROM applications"),
                                      QStringLiteral("INSERT INTO log_entries_fts(log_entries_fts) "
                                                     "VALUES('delete-all')")};
 
-        for (qsizetype index = 0; index < statements.size() && reset; ++index)
-        {
-            reset = query.exec(statements.at(index));
-        }
+        const SqlStatementBatch reset_batch(statements);
+        reset = reset && reset_batch.execute(database).successful;
         reset = reset && reset_transaction.commit();
         if (reset)
         {
@@ -427,10 +426,9 @@ auto LogFileCacheDatabase::rebuild_schema() -> bool
                                 QStringLiteral("DROP TABLE IF EXISTS log_levels"),
                                 QStringLiteral("DROP TABLE IF EXISTS applications"),
                                 QStringLiteral("DROP TABLE IF EXISTS cache_identity")};
-        for (qsizetype index = 0; index < drops.size() && rebuilt; ++index)
-        {
-            rebuilt = query.exec(drops.at(index));
-        }
+        const SqlStatementBatch drop_batch(drops);
+        const auto drop_result = drop_batch.execute(database);
+        rebuilt = drop_result.successful;
         rebuilt = rebuilt && create_schema();
         rebuilt = rebuilt && store_identity();
         rebuilt = rebuilt && query.exec(QStringLiteral("PRAGMA user_version=2"));
@@ -453,7 +451,6 @@ auto LogFileCacheDatabase::rebuild_schema() -> bool
  */
 auto LogFileCacheDatabase::create_schema() -> bool
 {
-    QSqlQuery query(m_connection->database());
     const QStringList statements{
         QStringLiteral("CREATE TABLE IF NOT EXISTS cache_identity("
                        "singleton INTEGER PRIMARY KEY CHECK(singleton=1), "
@@ -485,11 +482,8 @@ auto LogFileCacheDatabase::create_schema() -> bool
         QStringLiteral("CREATE VIRTUAL TABLE IF NOT EXISTS log_entries_fts USING "
                        "fts5(message, level, app_name, content='')")};
 
-    bool created = true;
-    for (const QString& statement: statements)
-    {
-        created = created && query.exec(statement);
-    }
+    const SqlStatementBatch batch(statements);
+    const bool created = batch.execute(m_connection->database()).successful;
     return created;
 }
 
