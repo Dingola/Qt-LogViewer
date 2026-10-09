@@ -6,12 +6,18 @@
 #include <QString>
 #include <QUuid>
 #include <QVector>
+#include <memory>
 
 #include "Qt-LogViewer/Models/LogEntry.h"
 #include "Qt-LogViewer/Models/LogQuery.h"
 #include "Qt-LogViewer/Models/SearchFields.h"
 
 class LogCacheReadService;
+
+namespace QtCommonLib
+{
+class SqliteConnection;
+}
 
 /**
  * @file LogHistoryService.h
@@ -190,8 +196,12 @@ class LogHistoryService final: public QObject
             qsizetype source_line, const QByteArray& parsed_fields_cbor) -> LogEntry;
 
     private:
-        QString m_connection_name;
+        /** @brief Scoped owner of the private history database connection. */
+        std::unique_ptr<QtCommonLib::SqliteConnection> m_connection;
+        /** @brief Absolute path of the history database. */
         QString m_database_path;
+        /** @brief Optional non-owning reader for persistent per-file caches. */
         LogCacheReadService* m_cache_read_service{nullptr};
+        /** @brief Whether connection setup and schema initialization succeeded. */
         bool m_is_available{false};
 };

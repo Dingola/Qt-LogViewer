@@ -19,9 +19,16 @@
 #include <QStandardPaths>
 #include <QStringList>
 #include <QVariant>
+#include <memory>
 
 #include "Qt-LogViewer/Models/LogFieldDefinition.h"
 #include "Qt-LogViewer/Services/LogCacheReadService.h"
+#include "Qt-LogViewer/Sql/SqlTransaction.h"
+#include "Qt-LogViewer/Sql/SqliteConnection.h"
+
+using QtCommonLib::SqliteConnection;
+using QtCommonLib::SqliteConnectionOptions;
+using QtCommonLib::SqlTransaction;
 
 namespace
 {
@@ -469,8 +476,6 @@ LogHistoryService::LogHistoryService(QObject* parent)
  */
 LogHistoryService::LogHistoryService(const QString& database_path, QObject* parent)
     : QObject(parent),
-      m_connection_name(QStringLiteral("qt_log_viewer_history_%1")
-                            .arg(QUuid::createUuid().toString(QUuid::WithoutBraces))),
       m_database_path(database_path.isEmpty() ? QString()
                                               : QFileInfo(database_path).absoluteFilePath()),
       m_is_available(false)
@@ -481,18 +486,7 @@ LogHistoryService::LogHistoryService(const QString& database_path, QObject* pare
 /**
  * @brief Closes and removes the private SQLite connection.
  */
-LogHistoryService::~LogHistoryService()
-{
-    if (QSqlDatabase::contains(m_connection_name))
-    {
-        {
-            QSqlDatabase database = QSqlDatabase::database(m_connection_name);
-            database.close();
-        }
-
-        QSqlDatabase::removeDatabase(m_connection_name);
-    }
-}
+LogHistoryService::~LogHistoryService() = default;
 
 /**
  * @brief Installs the non-owning cache reader used before legacy-history queries.
@@ -522,10 +516,10 @@ auto LogHistoryService::add_entries(const QUuid& view_id, const QVector<LogEntry
     }
     else if (m_is_available && !view_id.isNull() && !entries.isEmpty())
     {
-        QSqlDatabase database = QSqlDatabase::database(m_connection_name);
-        const bool transaction_started = database.transaction();
+        QSqlDatabase database = m_connection->database();
+        SqlTransaction transaction(database);
 
-        if (transaction_started)
+        if (transaction.is_active())
         {
             QSqlQuery query(database);
             query.prepare(QStringLiteral(
@@ -569,19 +563,18 @@ auto LogHistoryService::add_entries(const QUuid& view_id, const QVector<LogEntry
                 }
             }
 
-            added = inserted && database.commit();
+            added = inserted && transaction.commit();
 
-            if (!added)
+            if (inserted && !added)
             {
                 qWarning() << "Committing archived log entries failed:"
-                           << database.lastError().text();
-                database.rollback();
+                           << transaction.last_error().text();
             }
         }
         else
         {
             qWarning() << "Starting archived log-entry transaction failed:"
-                       << database.lastError().text();
+                       << transaction.last_error().text();
         }
     }
 
@@ -609,7 +602,7 @@ auto LogHistoryService::count_entries(const LogQuery& log_query) const -> qsizet
 
         if (filter.error.isEmpty())
         {
-            QSqlQuery query(QSqlDatabase::database(m_connection_name));
+            QSqlQuery query(m_connection->database());
 
             query.prepare(
                 QStringLiteral("SELECT COUNT(*) "
@@ -663,7 +656,7 @@ auto LogHistoryService::load_entries_page(const LogQuery& log_query, qsizetype o
 
         if (query_error.isEmpty())
         {
-            QSqlQuery query(QSqlDatabase::database(m_connection_name));
+            QSqlQuery query(m_connection->database());
 
             query.prepare(
                 QStringLiteral("SELECT entries.timestamp_utc, entries.level, entries.message, "
@@ -731,7 +724,7 @@ auto LogHistoryService::get_log_level_counts(const LogQuery& log_query) const
 
         if (filter.error.isEmpty())
         {
-            QSqlQuery query(QSqlDatabase::database(m_connection_name));
+            QSqlQuery query(m_connection->database());
 
             query.prepare(
                 QStringLiteral("SELECT UPPER(TRIM(entries.level)), COUNT(*) "
@@ -792,7 +785,7 @@ auto LogHistoryService::get_distinct_values(const QUuid& view_id,
     }
     else if (can_query)
     {
-        QSqlQuery query(QSqlDatabase::database(m_connection_name));
+        QSqlQuery query(m_connection->database());
 
         query.prepare(QStringLiteral("SELECT DISTINCT %1 "
                                      "FROM log_entries "
@@ -884,7 +877,7 @@ auto LogHistoryService::search_entries(const QUuid& view_id, const QString& sear
             match_expression = QStringLiteral("%1 : %2").arg(fts_column, fts_query);
         }
 
-        QSqlDatabase database = QSqlDatabase::database(m_connection_name);
+        QSqlDatabase database = m_connection->database();
         QSqlQuery query(database);
 
         query.prepare(
@@ -935,7 +928,7 @@ auto LogHistoryService::remove_view_entries(const QUuid& view_id) -> void
     }
     if (m_is_available && !view_id.isNull())
     {
-        QSqlQuery query(QSqlDatabase::database(m_connection_name));
+        QSqlQuery query(m_connection->database());
         query.prepare(QStringLiteral("DELETE FROM log_entries WHERE view_id = :view_id"));
         query.bindValue(QStringLiteral(":view_id"), view_id.toString(QUuid::WithoutBraces));
         query.exec();
@@ -955,7 +948,7 @@ auto LogHistoryService::remove_file_entries(const QUuid& view_id, const QString&
     }
     if (m_is_available && !view_id.isNull() && !file_path.isEmpty())
     {
-        QSqlQuery query(QSqlDatabase::database(m_connection_name));
+        QSqlQuery query(m_connection->database());
         query.prepare(QStringLiteral(
             "DELETE FROM log_entries WHERE view_id = :view_id AND file_path = :file_path"));
         query.bindValue(QStringLiteral(":view_id"), view_id.toString(QUuid::WithoutBraces));
@@ -1005,26 +998,16 @@ auto LogHistoryService::initialize_database() -> bool
 
     if (!m_database_path.isEmpty() && QDir().mkpath(database_info.absolutePath()))
     {
-        QSqlDatabase database =
-            QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), m_connection_name);
+        SqliteConnectionOptions options;
+        options.connection_name_prefix = QStringLiteral("qt_log_viewer_history");
+        options.connect_options = QStringLiteral("QSQLITE_ENABLE_REGEXP;QSQLITE_BUSY_TIMEOUT=5000");
+        options.connection_setup_statements = {QStringLiteral("PRAGMA busy_timeout = 5000"),
+                                               QStringLiteral("PRAGMA journal_mode = WAL")};
+        m_connection = std::make_unique<SqliteConnection>(m_database_path, options);
 
-        database.setDatabaseName(m_database_path);
-        database.setConnectOptions(
-            QStringLiteral("QSQLITE_ENABLE_REGEXP;QSQLITE_BUSY_TIMEOUT=5000"));
-
-        if (database.open())
+        if (m_connection->is_open())
         {
-            QSqlQuery configuration_query(database);
-            const bool busy_timeout_configured =
-                configuration_query.exec(QStringLiteral("PRAGMA busy_timeout = 5000"));
-            const bool write_ahead_log_enabled =
-                busy_timeout_configured &&
-                configuration_query.exec(QStringLiteral("PRAGMA journal_mode = WAL"));
-
-            if (write_ahead_log_enabled)
-            {
-                initialized = create_schema();
-            }
+            initialized = create_schema();
         }
     }
 
@@ -1037,7 +1020,7 @@ auto LogHistoryService::initialize_database() -> bool
  */
 auto LogHistoryService::create_schema() -> bool
 {
-    QSqlQuery query(QSqlDatabase::database(m_connection_name));
+    QSqlQuery query(m_connection->database());
     bool schema_created =
         query.exec(QStringLiteral("CREATE TABLE IF NOT EXISTS log_entries ("
                                   "id INTEGER PRIMARY KEY AUTOINCREMENT, "
@@ -1095,7 +1078,7 @@ auto LogHistoryService::create_schema() -> bool
  */
 auto LogHistoryService::ensure_parse_metadata_columns() -> bool
 {
-    QSqlQuery query(QSqlDatabase::database(m_connection_name));
+    QSqlQuery query(m_connection->database());
     bool migrated = query.exec(QStringLiteral("PRAGMA table_info(log_entries)"));
     QSet<QString> column_names;
 
