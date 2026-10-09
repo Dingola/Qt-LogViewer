@@ -25,10 +25,10 @@
 #include "Qt-LogViewer/Services/LogCacheCatalog.h"
 #include "Qt-LogViewer/Services/LogParser.h"
 #include "Qt-LogViewer/Services/LogParsingProfile.h"
-#include "QtCommonLib/Sql/SqliteConnection.h"
+#include "QtCommonLib/Sql/SqlConnection.h"
 
-using QtCommonLib::SqliteConnection;
-using QtCommonLib::SqliteConnectionOptions;
+using QtCommonLib::SqlConnection;
+using QtCommonLib::SqlConnectionOptions;
 
 namespace
 {
@@ -72,9 +72,9 @@ struct CacheRow {
  * @return SQLite options that prevent writes to the cache database.
  */
 [[nodiscard]] auto create_read_connection_options(const QString& connection_name_prefix)
-    -> SqliteConnectionOptions
+    -> SqlConnectionOptions
 {
-    SqliteConnectionOptions options;
+    SqlConnectionOptions options;
     options.connection_name_prefix = connection_name_prefix;
     options.connect_options = QStringLiteral("QSQLITE_OPEN_READONLY");
     return options;
@@ -478,9 +478,9 @@ auto bind_values(QSqlQuery& sql_query, const QList<QVariant>& bindings) -> void
     const SourceSqlFilter filter = create_source_sql_filter(source, query);
     if (filter.visible)
     {
-        const SqliteConnectionOptions options =
+        const SqlConnectionOptions options =
             create_read_connection_options(QStringLiteral("qt_log_viewer_cache_read"));
-        SqliteConnection connection(source.generation.database_path, options);
+        SqlConnection connection(source.generation.database_path, options);
         if (connection.is_open())
         {
             QSqlDatabase database = connection.database();
@@ -537,9 +537,9 @@ auto bind_values(QSqlQuery& sql_query, const QList<QVariant>& bindings) -> void
     qsizetype count = 0;
     if (filter.visible)
     {
-        const SqliteConnectionOptions options =
+        const SqlConnectionOptions options =
             create_read_connection_options(QStringLiteral("qt_log_viewer_cache_count"));
-        SqliteConnection connection(source.generation.database_path, options);
+        SqlConnection connection(source.generation.database_path, options);
         if (connection.is_open())
         {
             QSqlDatabase database = connection.database();
@@ -571,9 +571,9 @@ auto bind_values(QSqlQuery& sql_query, const QList<QVariant>& bindings) -> void
     QMap<QString, qsizetype> counts;
     if (filter.visible)
     {
-        const SqliteConnectionOptions options =
+        const SqlConnectionOptions options =
             create_read_connection_options(QStringLiteral("qt_log_viewer_cache_facets"));
-        SqliteConnection connection(source.generation.database_path, options);
+        SqlConnection connection(source.generation.database_path, options);
         if (connection.is_open())
         {
             QSqlDatabase database = connection.database();
@@ -880,9 +880,9 @@ auto LogCacheReadService::get_distinct_values(const QUuid& view_id,
         }
         else if (field_id == LogField::AppName || field_id == LogField::Level)
         {
-            const SqliteConnectionOptions options =
+            const SqlConnectionOptions options =
                 create_read_connection_options(QStringLiteral("qt_log_viewer_cache_distinct"));
-            SqliteConnection connection(source.generation.database_path, options);
+            SqlConnection connection(source.generation.database_path, options);
             if (connection.is_open())
             {
                 QSqlDatabase database = connection.database();

@@ -11,7 +11,7 @@
 
 namespace QtCommonLib
 {
-class SqliteConnection;
+class SqlConnection;
 class SqlTransaction;
 }  // namespace QtCommonLib
 
@@ -166,7 +166,7 @@ class LogFileCacheDatabase final: public QObject
         auto get_or_create_application_id(const QString& value) -> qint64;
 
         /** @brief Scoped owner of the private Qt SQL connection. */
-        std::unique_ptr<QtCommonLib::SqliteConnection> m_connection;
+        std::unique_ptr<QtCommonLib::SqlConnection> m_connection;
         /** @brief Absolute path of the disposable per-file cache database. */
         QString m_database_path;
         /** @brief Source and parser identity that the database must represent. */

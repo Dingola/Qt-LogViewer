@@ -18,11 +18,11 @@
 #include <utility>
 
 #include "Qt-LogViewer/Models/LogFieldDefinition.h"
+#include "QtCommonLib/Sql/SqlConnection.h"
 #include "QtCommonLib/Sql/SqlTransaction.h"
-#include "QtCommonLib/Sql/SqliteConnection.h"
 
-using QtCommonLib::SqliteConnection;
-using QtCommonLib::SqliteConnectionOptions;
+using QtCommonLib::SqlConnection;
+using QtCommonLib::SqlConnectionOptions;
 using QtCommonLib::SqlTransaction;
 
 /**
@@ -117,9 +117,9 @@ auto LogFileCacheDatabase::clone_generation(const QString& source_database_path,
 
     if (cloned)
     {
-        SqliteConnectionOptions options;
+        SqlConnectionOptions options;
         options.connection_name_prefix = QStringLiteral("qt_log_viewer_cache_clone");
-        SqliteConnection connection(destination_path, options);
+        SqlConnection connection(destination_path, options);
         cloned = connection.is_open();
         if (cloned)
         {
@@ -382,13 +382,13 @@ auto LogFileCacheDatabase::initialize_database() -> bool
                        QDir().mkpath(database_info.absolutePath());
     if (initialized)
     {
-        SqliteConnectionOptions options;
+        SqlConnectionOptions options;
         options.connection_name_prefix = QStringLiteral("qt_log_viewer_file_cache");
         options.connect_options = QStringLiteral("QSQLITE_BUSY_TIMEOUT=5000");
         options.connection_setup_statements = {
             QStringLiteral("PRAGMA foreign_keys=ON"), QStringLiteral("PRAGMA busy_timeout=5000"),
             QStringLiteral("PRAGMA journal_mode=WAL"), QStringLiteral("PRAGMA synchronous=NORMAL")};
-        m_connection = std::make_unique<SqliteConnection>(m_database_path, options);
+        m_connection = std::make_unique<SqlConnection>(m_database_path, options);
         initialized = m_connection->is_open();
 
         if (initialized)

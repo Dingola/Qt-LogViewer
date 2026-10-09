@@ -11,7 +11,7 @@
 
 namespace QtCommonLib
 {
-class SqliteConnection;
+class SqlConnection;
 }
 
 /**
@@ -269,7 +269,7 @@ class LogCacheCatalog final: public QObject
         [[nodiscard]] auto get_cache_database_path(const QString& cache_key) const -> QString;
 
         /** @brief Scoped owner of the catalog's private Qt SQL connection. */
-        std::unique_ptr<QtCommonLib::SqliteConnection> m_connection;
+        std::unique_ptr<QtCommonLib::SqlConnection> m_connection;
         /** @brief Absolute directory containing catalog and cache files. */
         QString m_cache_root;
         /** @brief Absolute path of the catalog SQLite database. */

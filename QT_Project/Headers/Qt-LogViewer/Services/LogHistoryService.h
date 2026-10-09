@@ -16,7 +16,7 @@ class LogCacheReadService;
 
 namespace QtCommonLib
 {
-class SqliteConnection;
+class SqlConnection;
 }
 
 /**
@@ -197,7 +197,7 @@ class LogHistoryService final: public QObject
 
     private:
         /** @brief Scoped owner of the private history database connection. */
-        std::unique_ptr<QtCommonLib::SqliteConnection> m_connection;
+        std::unique_ptr<QtCommonLib::SqlConnection> m_connection;
         /** @brief Absolute path of the history database. */
         QString m_database_path;
         /** @brief Optional non-owning reader for persistent per-file caches. */

@@ -19,11 +19,11 @@
 #include <memory>
 #include <utility>
 
+#include "QtCommonLib/Sql/SqlConnection.h"
 #include "QtCommonLib/Sql/SqlTransaction.h"
-#include "QtCommonLib/Sql/SqliteConnection.h"
 
-using QtCommonLib::SqliteConnection;
-using QtCommonLib::SqliteConnectionOptions;
+using QtCommonLib::SqlConnection;
+using QtCommonLib::SqlConnectionOptions;
 using QtCommonLib::SqlTransaction;
 
 namespace
@@ -517,13 +517,13 @@ auto LogCacheCatalog::initialize_database() -> bool
     }
     else
     {
-        SqliteConnectionOptions options;
+        SqlConnectionOptions options;
         options.connection_name_prefix = QStringLiteral("qt_log_viewer_cache_catalog");
         options.connect_options = QStringLiteral("QSQLITE_BUSY_TIMEOUT=5000");
         options.connection_setup_statements = {
             QStringLiteral("PRAGMA foreign_keys=ON"), QStringLiteral("PRAGMA busy_timeout=5000"),
             QStringLiteral("PRAGMA journal_mode=WAL"), QStringLiteral("PRAGMA synchronous=NORMAL")};
-        m_connection = std::make_unique<SqliteConnection>(m_database_path, options);
+        m_connection = std::make_unique<SqlConnection>(m_database_path, options);
         initialized = m_connection->is_open();
         if (!initialized)
         {

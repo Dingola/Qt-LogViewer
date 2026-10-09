@@ -23,11 +23,11 @@
 
 #include "Qt-LogViewer/Models/LogFieldDefinition.h"
 #include "Qt-LogViewer/Services/LogCacheReadService.h"
+#include "QtCommonLib/Sql/SqlConnection.h"
 #include "QtCommonLib/Sql/SqlTransaction.h"
-#include "QtCommonLib/Sql/SqliteConnection.h"
 
-using QtCommonLib::SqliteConnection;
-using QtCommonLib::SqliteConnectionOptions;
+using QtCommonLib::SqlConnection;
+using QtCommonLib::SqlConnectionOptions;
 using QtCommonLib::SqlTransaction;
 
 namespace
@@ -998,12 +998,12 @@ auto LogHistoryService::initialize_database() -> bool
 
     if (!m_database_path.isEmpty() && QDir().mkpath(database_info.absolutePath()))
     {
-        SqliteConnectionOptions options;
+        SqlConnectionOptions options;
         options.connection_name_prefix = QStringLiteral("qt_log_viewer_history");
         options.connect_options = QStringLiteral("QSQLITE_ENABLE_REGEXP;QSQLITE_BUSY_TIMEOUT=5000");
         options.connection_setup_statements = {QStringLiteral("PRAGMA busy_timeout = 5000"),
                                                QStringLiteral("PRAGMA journal_mode = WAL")};
-        m_connection = std::make_unique<SqliteConnection>(m_database_path, options);
+        m_connection = std::make_unique<SqlConnection>(m_database_path, options);
 
         if (m_connection->is_open())
         {
