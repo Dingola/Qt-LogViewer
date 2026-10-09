@@ -25,6 +25,10 @@
 #include "Qt-LogViewer/Services/LogCacheCatalog.h"
 #include "Qt-LogViewer/Services/LogParser.h"
 #include "Qt-LogViewer/Services/LogParsingProfile.h"
+#include "Qt-LogViewer/Sql/SqliteConnection.h"
+
+using QtCommonLib::SqliteConnection;
+using QtCommonLib::SqliteConnectionOptions;
 
 namespace
 {
@@ -61,6 +65,20 @@ struct CacheRow {
         /** @brief Parsed entry populated only when its complete contents are required. */
         std::optional<LogEntry> materialized_entry;
 };
+
+/**
+ * @brief Creates the shared options for a short-lived read-only cache connection.
+ * @param connection_name_prefix Descriptive prefix for the generated connection name.
+ * @return SQLite options that prevent writes to the cache database.
+ */
+[[nodiscard]] auto create_read_connection_options(const QString& connection_name_prefix)
+    -> SqliteConnectionOptions
+{
+    SqliteConnectionOptions options;
+    options.connection_name_prefix = connection_name_prefix;
+    options.connect_options = QStringLiteral("QSQLITE_OPEN_READONLY");
+    return options;
+}
 
 /**
  * @brief Escapes one FTS5 prefix-search token.
@@ -460,56 +478,49 @@ auto bind_values(QSqlQuery& sql_query, const QList<QVariant>& bindings) -> void
     const SourceSqlFilter filter = create_source_sql_filter(source, query);
     if (filter.visible)
     {
-        const QString connection_name =
-            QStringLiteral("qt_log_viewer_cache_read_%1")
-                .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+        const SqliteConnectionOptions options =
+            create_read_connection_options(QStringLiteral("qt_log_viewer_cache_read"));
+        SqliteConnection connection(source.generation.database_path, options);
+        if (connection.is_open())
         {
-            QSqlDatabase database =
-                QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection_name);
-            database.setDatabaseName(source.generation.database_path);
-            database.setConnectOptions(QStringLiteral("QSQLITE_OPEN_READONLY"));
-            if (database.open())
+            QSqlDatabase database = connection.database();
+            QString sql = QStringLiteral(
+                "SELECT e.id, e.source_line, e.byte_offset, e.byte_length, "
+                "e.timestamp_utc_ms, l.value, a.value "
+                "FROM log_entries e JOIN log_levels l ON l.id=e.level_id "
+                "JOIN applications a ON a.id=e.app_id");
+            sql += filter.joins + filter.where + create_source_order(query);
+            QList<QVariant> bindings = filter.bindings;
+            if (maximum_rows >= 0)
             {
-                QString sql = QStringLiteral(
-                    "SELECT e.id, e.source_line, e.byte_offset, e.byte_length, "
-                    "e.timestamp_utc_ms, l.value, a.value "
-                    "FROM log_entries e JOIN log_levels l ON l.id=e.level_id "
-                    "JOIN applications a ON a.id=e.app_id");
-                sql += filter.joins + filter.where + create_source_order(query);
-                QList<QVariant> bindings = filter.bindings;
-                if (maximum_rows >= 0)
-                {
-                    sql += QStringLiteral(" LIMIT ?");
-                    bindings.append(maximum_rows);
-                }
+                sql += QStringLiteral(" LIMIT ?");
+                bindings.append(maximum_rows);
+            }
 
-                QSqlQuery sql_query(database);
-                sql_query.prepare(sql);
-                bind_values(sql_query, bindings);
-                if (sql_query.exec())
+            QSqlQuery sql_query(database);
+            sql_query.prepare(sql);
+            bind_values(sql_query, bindings);
+            if (sql_query.exec())
+            {
+                while (sql_query.next())
                 {
-                    while (sql_query.next())
+                    CacheRow row;
+                    row.source = source;
+                    row.entry_id = sql_query.value(0).toLongLong();
+                    row.source_line = sql_query.value(1).toLongLong();
+                    row.byte_offset = sql_query.value(2).toLongLong();
+                    row.byte_length = sql_query.value(3).toLongLong();
+                    if (!sql_query.value(4).isNull())
                     {
-                        CacheRow row;
-                        row.source = source;
-                        row.entry_id = sql_query.value(0).toLongLong();
-                        row.source_line = sql_query.value(1).toLongLong();
-                        row.byte_offset = sql_query.value(2).toLongLong();
-                        row.byte_length = sql_query.value(3).toLongLong();
-                        if (!sql_query.value(4).isNull())
-                        {
-                            row.timestamp = QDateTime::fromMSecsSinceEpoch(
-                                sql_query.value(4).toLongLong(), QTimeZone::UTC);
-                        }
-                        row.level = sql_query.value(5).toString();
-                        row.app_name = sql_query.value(6).toString();
-                        rows.append(std::move(row));
+                        row.timestamp = QDateTime::fromMSecsSinceEpoch(
+                            sql_query.value(4).toLongLong(), QTimeZone::UTC);
                     }
+                    row.level = sql_query.value(5).toString();
+                    row.app_name = sql_query.value(6).toString();
+                    rows.append(std::move(row));
                 }
-                database.close();
             }
         }
-        QSqlDatabase::removeDatabase(connection_name);
     }
     return rows;
 }
@@ -526,30 +537,23 @@ auto bind_values(QSqlQuery& sql_query, const QList<QVariant>& bindings) -> void
     qsizetype count = 0;
     if (filter.visible)
     {
-        const QString connection_name =
-            QStringLiteral("qt_log_viewer_cache_count_%1")
-                .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+        const SqliteConnectionOptions options =
+            create_read_connection_options(QStringLiteral("qt_log_viewer_cache_count"));
+        SqliteConnection connection(source.generation.database_path, options);
+        if (connection.is_open())
         {
-            QSqlDatabase database =
-                QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection_name);
-            database.setDatabaseName(source.generation.database_path);
-            database.setConnectOptions(QStringLiteral("QSQLITE_OPEN_READONLY"));
-            if (database.open())
+            QSqlDatabase database = connection.database();
+            QSqlQuery sql_query(database);
+            sql_query.prepare(QStringLiteral("SELECT COUNT(*) FROM log_entries e "
+                                             "JOIN log_levels l ON l.id=e.level_id "
+                                             "JOIN applications a ON a.id=e.app_id") +
+                              filter.joins + filter.where);
+            bind_values(sql_query, filter.bindings);
+            if (sql_query.exec() && sql_query.next())
             {
-                QSqlQuery sql_query(database);
-                sql_query.prepare(QStringLiteral("SELECT COUNT(*) FROM log_entries e "
-                                                 "JOIN log_levels l ON l.id=e.level_id "
-                                                 "JOIN applications a ON a.id=e.app_id") +
-                                  filter.joins + filter.where);
-                bind_values(sql_query, filter.bindings);
-                if (sql_query.exec() && sql_query.next())
-                {
-                    count = sql_query.value(0).toLongLong();
-                }
-                database.close();
+                count = sql_query.value(0).toLongLong();
             }
         }
-        QSqlDatabase::removeDatabase(connection_name);
     }
     return count;
 }
@@ -567,38 +571,31 @@ auto bind_values(QSqlQuery& sql_query, const QList<QVariant>& bindings) -> void
     QMap<QString, qsizetype> counts;
     if (filter.visible)
     {
-        const QString connection_name =
-            QStringLiteral("qt_log_viewer_cache_facets_%1")
-                .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+        const SqliteConnectionOptions options =
+            create_read_connection_options(QStringLiteral("qt_log_viewer_cache_facets"));
+        SqliteConnection connection(source.generation.database_path, options);
+        if (connection.is_open())
         {
-            QSqlDatabase database =
-                QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection_name);
-            database.setDatabaseName(source.generation.database_path);
-            database.setConnectOptions(QStringLiteral("QSQLITE_OPEN_READONLY"));
-            if (database.open())
+            QSqlDatabase database = connection.database();
+            QSqlQuery sql_query(database);
+            sql_query.prepare(QStringLiteral("SELECT l.value, COUNT(*) FROM log_entries e "
+                                             "JOIN log_levels l ON l.id=e.level_id "
+                                             "JOIN applications a ON a.id=e.app_id") +
+                              filter.joins + filter.where +
+                              QStringLiteral(" GROUP BY l.normalized_value"));
+            bind_values(sql_query, filter.bindings);
+            if (sql_query.exec())
             {
-                QSqlQuery sql_query(database);
-                sql_query.prepare(QStringLiteral("SELECT l.value, COUNT(*) FROM log_entries e "
-                                                 "JOIN log_levels l ON l.id=e.level_id "
-                                                 "JOIN applications a ON a.id=e.app_id") +
-                                  filter.joins + filter.where +
-                                  QStringLiteral(" GROUP BY l.normalized_value"));
-                bind_values(sql_query, filter.bindings);
-                if (sql_query.exec())
+                while (sql_query.next())
                 {
-                    while (sql_query.next())
+                    const QString level = sql_query.value(0).toString().trimmed().toUpper();
+                    if (!level.isEmpty())
                     {
-                        const QString level = sql_query.value(0).toString().trimmed().toUpper();
-                        if (!level.isEmpty())
-                        {
-                            counts[level] += sql_query.value(1).toLongLong();
-                        }
+                        counts[level] += sql_query.value(1).toLongLong();
                     }
                 }
-                database.close();
             }
         }
-        QSqlDatabase::removeDatabase(connection_name);
     }
     return counts;
 }
@@ -883,37 +880,30 @@ auto LogCacheReadService::get_distinct_values(const QUuid& view_id,
         }
         else if (field_id == LogField::AppName || field_id == LogField::Level)
         {
-            const QString connection_name =
-                QStringLiteral("qt_log_viewer_cache_distinct_%1")
-                    .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+            const SqliteConnectionOptions options =
+                create_read_connection_options(QStringLiteral("qt_log_viewer_cache_distinct"));
+            SqliteConnection connection(source.generation.database_path, options);
+            if (connection.is_open())
             {
-                QSqlDatabase database =
-                    QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection_name);
-                database.setDatabaseName(source.generation.database_path);
-                database.setConnectOptions(QStringLiteral("QSQLITE_OPEN_READONLY"));
-                if (database.open())
+                QSqlDatabase database = connection.database();
+                const QString sql = field_id == LogField::AppName
+                                        ? QStringLiteral(
+                                              "SELECT DISTINCT a.value FROM log_entries e "
+                                              "JOIN applications a ON a.id=e.app_id "
+                                              "WHERE a.value<>''")
+                                        : QStringLiteral(
+                                              "SELECT DISTINCT l.value FROM log_entries e "
+                                              "JOIN log_levels l ON l.id=e.level_id "
+                                              "WHERE l.value<>''");
+                QSqlQuery sql_query(database);
+                if (sql_query.exec(sql))
                 {
-                    const QString sql = field_id == LogField::AppName
-                                            ? QStringLiteral(
-                                                  "SELECT DISTINCT a.value FROM log_entries e "
-                                                  "JOIN applications a ON a.id=e.app_id "
-                                                  "WHERE a.value<>''")
-                                            : QStringLiteral(
-                                                  "SELECT DISTINCT l.value FROM log_entries e "
-                                                  "JOIN log_levels l ON l.id=e.level_id "
-                                                  "WHERE l.value<>''");
-                    QSqlQuery sql_query(database);
-                    if (sql_query.exec(sql))
+                    while (sql_query.next())
                     {
-                        while (sql_query.next())
-                        {
-                            values.insert(sql_query.value(0).toString());
-                        }
+                        values.insert(sql_query.value(0).toString());
                     }
-                    database.close();
                 }
             }
-            QSqlDatabase::removeDatabase(connection_name);
         }
     }
 
