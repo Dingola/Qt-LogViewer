@@ -619,7 +619,7 @@ auto MainWindow::handle_delete_session(const QString& session_id) -> void
 }
 
 /**
- * @brief Opens a session file via file dialog.
+ * @brief Chooses, imports, and restores a session file via file dialog.
  */
 auto MainWindow::handle_open_session_dialog() -> void
 {
@@ -633,8 +633,19 @@ auto MainWindow::handle_open_session_dialog() -> void
 
         if (ok)
         {
-            const QString session_id = fi.completeBaseName();
-            handle_open_session(session_id);
+            const std::optional<SessionState> state =
+                m_session_controller->import_session_file(session_file);
+
+            if (state.has_value())
+            {
+                restore_session(*state);
+            }
+            else
+            {
+                QMessageBox::warning(
+                    this, tr("Open Session"),
+                    tr("The selected file is not a valid session:\n%1").arg(session_file));
+            }
         }
         else
         {

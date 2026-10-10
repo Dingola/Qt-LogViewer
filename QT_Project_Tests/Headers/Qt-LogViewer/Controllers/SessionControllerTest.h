@@ -2,12 +2,12 @@
 
 #include <gtest/gtest.h>
 
-#include <QTemporaryFile>
-#include <QVector>
-
 #include "Qt-LogViewer/Services/LogParsingProfile.h"
+#include "QtCommonLib/TestSupport/TestFileSystem.h"
 
 class SessionController;
+class SessionManager;
+class SessionRepository;
 class TestLogRuntime;
 
 /**
@@ -22,23 +22,23 @@ class TestLogRuntime;
 class SessionControllerTest: public ::testing::Test
 {
     protected:
-        /** @brief Creates the controller graph used by each restoration test. */
+        /** @brief Creates the controller graph and isolated session storage used by each test. */
         void SetUp() override;
 
-        /** @brief Destroys controllers and removes temporary files. */
+        /** @brief Destroys controllers and removes isolated session storage. */
         void TearDown() override;
-
-        /**
-         * @brief Creates a temporary log file containing the supplied records.
-         * @param lines Records written in source order.
-         * @return Created temporary file, or nullptr when creation fails.
-         */
-        auto create_temp_file(const QVector<QString>& lines) -> QTemporaryFile*;
 
         LogParsingProfile m_default_profile{LogParsingProfile::create_default(
             QStringLiteral("{timestamp} {level} {message} {app_name}"),
             QStringLiteral("Session test default"))};
         TestLogRuntime* m_runtime{nullptr};
         SessionController* m_session_controller{nullptr};
-        QVector<QTemporaryFile*> m_temp_files;
+        /** @brief Isolated persistence repository used by session import tests. */
+        SessionRepository* m_session_repository{nullptr};
+        /** @brief Session manager backed by the isolated test repository. */
+        SessionManager* m_session_manager{nullptr};
+        /** @brief Unique AppConfig subdirectory removed after each test. */
+        QString m_session_repository_subdir;
+        /** @brief Isolated filesystem owning source and session files created by each test. */
+        QtCommonLib::TestFileSystem m_file_system;
 };

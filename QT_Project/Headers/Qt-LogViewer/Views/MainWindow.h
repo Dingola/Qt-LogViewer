@@ -302,7 +302,7 @@ class MainWindow: public QtWidgetsCommonLib::AppMainWindow
         auto handle_delete_session(const QString& session_id) -> void;
 
         /**
-         * @brief Opens a session file via file dialog.
+         * @brief Chooses, imports, and restores a session file via file dialog.
          */
         auto handle_open_session_dialog() -> void;
 

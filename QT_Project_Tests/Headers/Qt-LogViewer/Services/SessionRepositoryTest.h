@@ -5,6 +5,7 @@
 #include <QString>
 
 #include "Qt-LogViewer/Services/SessionRepository.h"
+#include "QtCommonLib/TestSupport/TestFileSystem.h"
 
 /**
  * @file SessionRepositoryTest.h
@@ -36,4 +37,6 @@ class SessionRepositoryTest: public ::testing::Test
 
         SessionRepository* m_repo = nullptr;
         QString m_subdir;
+        /** @brief Isolated filesystem owning external session files used by tests. */
+        QtCommonLib::TestFileSystem m_file_system;
 };

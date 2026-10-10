@@ -152,6 +152,18 @@ class SessionController: public QObject
         [[nodiscard]] auto load_session(const QString& session_id) -> std::optional<SessionState>;
 
         /**
+         * @brief Imports a session document from a file into managed session storage.
+         *
+         * The imported session receives a new internal identifier so an external document cannot
+         * overwrite an existing session or influence the repository path.
+         *
+         * @param file_path Path to the external session JSON document.
+         * @return Imported typed state, or no value when the document is not a valid session.
+         */
+        [[nodiscard]] auto import_session_file(const QString& file_path)
+            -> std::optional<SessionState>;
+
+        /**
          * @brief Restores a complete typed session through one coordinated workflow.
          *
          * Existing views are closed and restored tabs receive empty deferred query state

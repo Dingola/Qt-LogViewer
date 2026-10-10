@@ -1,11 +1,12 @@
 #include "Qt-LogViewer/Controllers/SessionControllerTest.h"
 
 #include <QDateTime>
-#include <QFile>
-#include <QFileInfo>
+#include <QDir>
+#include <QJsonDocument>
 #include <QSignalSpy>
+#include <QStandardPaths>
 #include <QTest>
-#include <QTextStream>
+#include <QUuid>
 
 #include "Qt-LogViewer/Controllers/LogViewContext.h"
 #include "Qt-LogViewer/Controllers/SessionController.h"
@@ -14,6 +15,9 @@
 #include "Qt-LogViewer/Models/LogModel.h"
 #include "Qt-LogViewer/Models/LogPageState.h"
 #include "Qt-LogViewer/Models/SessionTypes.h"
+#include "Qt-LogViewer/Services/SessionCodec.h"
+#include "Qt-LogViewer/Services/SessionManager.h"
+#include "Qt-LogViewer/Services/SessionRepository.h"
 #include "Qt-LogViewer/Support/TestLogRuntime.h"
 
 /**
@@ -22,23 +26,27 @@
  */
 
 /**
- * @brief Creates the controller graph used by each restoration test.
+ * @brief Creates the controller graph and isolated session storage used by each test.
  */
 void SessionControllerTest::SetUp()
 {
     m_default_profile = LogParsingProfile::create_default(
         QStringLiteral("{timestamp} {level} {message} {app_name}"),
         QStringLiteral("Session test default"));
+    m_session_repository_subdir = QStringLiteral("Qt-LogViewer-SessionControllerTest-%1")
+                                      .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+    m_session_repository = new SessionRepository(m_session_repository_subdir);
+    m_session_manager = new SessionManager(m_session_repository);
     m_runtime = new TestLogRuntime(m_default_profile);
     m_session_controller = new SessionController(
-        nullptr, m_runtime->catalog().get_model(), m_default_profile, &m_runtime->catalog(),
-        &m_runtime->views(), &m_runtime->filters(), &m_runtime->history(), &m_runtime->pages(),
-        &m_runtime->queries(), &m_runtime->imports(), &m_runtime->lifecycle(),
+        m_session_manager, m_runtime->catalog().get_model(), m_default_profile,
+        &m_runtime->catalog(), &m_runtime->views(), &m_runtime->filters(), &m_runtime->history(),
+        &m_runtime->pages(), &m_runtime->queries(), &m_runtime->imports(), &m_runtime->lifecycle(),
         &m_runtime->live_tailing());
 }
 
 /**
- * @brief Destroys controllers and removes temporary files.
+ * @brief Destroys controllers and removes isolated session storage.
  */
 void SessionControllerTest::TearDown()
 {
@@ -46,50 +54,90 @@ void SessionControllerTest::TearDown()
     m_session_controller = nullptr;
     delete m_runtime;
     m_runtime = nullptr;
+    delete m_session_manager;
+    m_session_manager = nullptr;
+    delete m_session_repository;
+    m_session_repository = nullptr;
 
-    for (QTemporaryFile* file: m_temp_files)
-    {
-        if (file != nullptr)
-        {
-            QFile::remove(file->fileName());
-            delete file;
-        }
-    }
-
-    m_temp_files.clear();
+    const QString app_config_path =
+        QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
+    QDir repository_directory(QDir(app_config_path).filePath(m_session_repository_subdir));
+    repository_directory.removeRecursively();
+    m_session_repository_subdir.clear();
 }
 
 /**
- * @brief Creates a temporary log file containing the supplied records.
- * @param lines Records written in source order.
- * @return Created temporary file, or nullptr when creation fails.
+ * @test Verifies that an external session is loaded by path, assigned a safe identifier, and
+ * persisted as the active managed session.
  */
-auto SessionControllerTest::create_temp_file(const QVector<QString>& lines) -> QTemporaryFile*
+TEST_F(SessionControllerTest, ImportsExternalSessionFileIntoManagedStorage)
 {
-    QTemporaryFile* file = new QTemporaryFile();
-    const bool opened = file->open();
+    SessionState source_state;
+    source_state.id = QStringLiteral("../unsafe-source-id");
+    source_state.name = QStringLiteral("Imported session");
+    const QByteArray session_json =
+        QJsonDocument(SessionCodec::to_json(source_state)).toJson(QJsonDocument::Compact);
+    const QString session_file_path = m_file_system.write_text_file(
+        QStringLiteral("external-session.json"), QString::fromUtf8(session_json));
+    ASSERT_FALSE(session_file_path.isEmpty());
 
-    if (opened)
-    {
-        file->setAutoRemove(false);
-        QTextStream stream(file);
+    QSignalSpy created_spy(m_session_controller, &SessionController::session_created);
+    QSignalSpy current_spy(m_session_controller, &SessionController::current_session_changed);
 
-        for (const QString& line: lines)
-        {
-            stream << line << '\n';
-        }
+    const std::optional<SessionState> imported_state =
+        m_session_controller->import_session_file(session_file_path);
 
-        stream.flush();
-        file->close();
-        m_temp_files.append(file);
-    }
-    else
-    {
-        delete file;
-        file = nullptr;
-    }
+    ASSERT_TRUE(imported_state.has_value());
+    EXPECT_FALSE(imported_state->id.isEmpty());
+    EXPECT_NE(imported_state->id, source_state.id);
+    EXPECT_EQ(imported_state->name, source_state.name);
+    EXPECT_EQ(m_session_manager->get_current_session_id(), imported_state->id);
+    EXPECT_EQ(m_session_manager->get_last_session_id(), imported_state->id);
+    EXPECT_TRUE(m_runtime->catalog().get_model()->has_session(imported_state->id));
+    EXPECT_EQ(created_spy.count(), 1);
+    EXPECT_EQ(current_spy.count(), 1);
 
-    return file;
+    const std::optional<SessionState> persisted_state = SessionCodec::from_json(
+        m_session_manager->load_session(imported_state->id), imported_state->id);
+    ASSERT_TRUE(persisted_state.has_value());
+    EXPECT_EQ(persisted_state->id, imported_state->id);
+    EXPECT_EQ(persisted_state->name, source_state.name);
+}
+
+/**
+ * @test Verifies that a valid JSON root document without session payload is rejected.
+ */
+TEST_F(SessionControllerTest, RejectsNonSessionJsonDocument)
+{
+    const QString root_json =
+        QStringLiteral(R"({"schema_version":1,"recent_files":[],"recent_sessions":[]})");
+    const QString session_file_path =
+        m_file_system.write_text_file(QStringLiteral("root.json"), root_json);
+    ASSERT_FALSE(session_file_path.isEmpty());
+
+    const std::optional<SessionState> imported_state =
+        m_session_controller->import_session_file(session_file_path);
+
+    EXPECT_FALSE(imported_state.has_value());
+    EXPECT_FALSE(m_session_manager->has_current_session());
+}
+
+/**
+ * @test Verifies that a session document using an unsupported schema version is rejected.
+ */
+TEST_F(SessionControllerTest, RejectsUnsupportedSessionSchema)
+{
+    const QString session_json =
+        QStringLiteral(R"({"schema_version":999,"name":"Future session","views":[]})");
+    const QString session_file_path =
+        m_file_system.write_text_file(QStringLiteral("future-session.json"), session_json);
+    ASSERT_FALSE(session_file_path.isEmpty());
+
+    const std::optional<SessionState> imported_state =
+        m_session_controller->import_session_file(session_file_path);
+
+    EXPECT_FALSE(imported_state.has_value());
+    EXPECT_FALSE(m_session_manager->has_current_session());
 }
 
 /**
@@ -97,18 +145,18 @@ auto SessionControllerTest::create_temp_file(const QVector<QString>& lines) -> Q
  */
 TEST_F(SessionControllerTest, AppliesSavedQueryStateAfterImportCompletion)
 {
-    QTemporaryFile* file =
-        create_temp_file({QStringLiteral("2024-01-01 12:01:00 INFO A RestoreApp"),
-                          QStringLiteral("2024-01-01 12:02:00 INFO B RestoreApp"),
-                          QStringLiteral("2024-01-01 12:03:00 INFO C RestoreApp"),
-                          QStringLiteral("2024-01-01 12:04:00 INFO D RestoreApp"),
-                          QStringLiteral("2024-01-01 12:05:00 INFO E RestoreApp"),
-                          QStringLiteral("2024-01-01 12:06:00 INFO F RestoreApp")});
-    ASSERT_NE(file, nullptr);
+    const QString file_path = m_file_system.write_text_file(
+        QStringLiteral("paged.log"), QStringLiteral("2024-01-01 12:01:00 INFO A RestoreApp\n"
+                                                    "2024-01-01 12:02:00 INFO B RestoreApp\n"
+                                                    "2024-01-01 12:03:00 INFO C RestoreApp\n"
+                                                    "2024-01-01 12:04:00 INFO D RestoreApp\n"
+                                                    "2024-01-01 12:05:00 INFO E RestoreApp\n"
+                                                    "2024-01-01 12:06:00 INFO F RestoreApp\n"));
+    ASSERT_FALSE(file_path.isEmpty());
 
     SessionViewState view_state;
     view_state.id = QUuid::createUuid();
-    view_state.loaded_files = {LogFileInfo(file->fileName(), QStringLiteral("RestoreApp"))};
+    view_state.loaded_files = {LogFileInfo(file_path, QStringLiteral("RestoreApp"))};
     view_state.page_size = 2;
     view_state.current_page = 2;
     view_state.sort_column = LogModel::Message;
@@ -144,24 +192,26 @@ TEST_F(SessionControllerTest, AppliesSavedQueryStateAfterImportCompletion)
  */
 TEST_F(SessionControllerTest, RestoresMultipleViewsIndependently)
 {
-    QTemporaryFile* first_file =
-        create_temp_file({QStringLiteral("2024-01-01 12:00:00 INFO FirstInfo FirstApp"),
-                          QStringLiteral("2024-01-01 12:01:00 ERROR FirstError FirstApp")});
-    QTemporaryFile* second_file =
-        create_temp_file({QStringLiteral("2024-01-01 13:00:00 DEBUG SecondDebug SecondApp"),
-                          QStringLiteral("2024-01-01 13:01:00 ERROR SecondError SecondApp")});
-    ASSERT_NE(first_file, nullptr);
-    ASSERT_NE(second_file, nullptr);
+    const QString first_file_path = m_file_system.write_text_file(
+        QStringLiteral("first.log"),
+        QStringLiteral("2024-01-01 12:00:00 INFO FirstInfo FirstApp\n"
+                       "2024-01-01 12:01:00 ERROR FirstError FirstApp\n"));
+    const QString second_file_path = m_file_system.write_text_file(
+        QStringLiteral("second.log"),
+        QStringLiteral("2024-01-01 13:00:00 DEBUG SecondDebug SecondApp\n"
+                       "2024-01-01 13:01:00 ERROR SecondError SecondApp\n"));
+    ASSERT_FALSE(first_file_path.isEmpty());
+    ASSERT_FALSE(second_file_path.isEmpty());
 
     SessionViewState first_state;
     first_state.id = QUuid::createUuid();
-    first_state.loaded_files = {LogFileInfo(first_file->fileName(), QStringLiteral("FirstApp"))};
+    first_state.loaded_files = {LogFileInfo(first_file_path, QStringLiteral("FirstApp"))};
     first_state.filters.log_levels = {QStringLiteral("INFO")};
     first_state.filters.live_tailing_enabled = false;
 
     SessionViewState second_state;
     second_state.id = QUuid::createUuid();
-    second_state.loaded_files = {LogFileInfo(second_file->fileName(), QStringLiteral("SecondApp"))};
+    second_state.loaded_files = {LogFileInfo(second_file_path, QStringLiteral("SecondApp"))};
     second_state.filters.log_levels = {QStringLiteral("ERROR")};
     second_state.filters.live_tailing_enabled = false;
 
@@ -201,11 +251,10 @@ TEST_F(SessionControllerTest, RestoresMultipleViewsIndependently)
  */
 TEST_F(SessionControllerTest, FallsBackWhenPersistedProfileIsUnavailable)
 {
-    QTemporaryFile* file =
-        create_temp_file({QStringLiteral("2024-01-01 12:00:00 INFO FallbackEntry FallbackApp")});
-    ASSERT_NE(file, nullptr);
-
-    const QString file_path = QFileInfo(file->fileName()).absoluteFilePath();
+    const QString file_path = m_file_system.write_text_file(
+        QStringLiteral("fallback.log"),
+        QStringLiteral("2024-01-01 12:00:00 INFO FallbackEntry FallbackApp\n"));
+    ASSERT_FALSE(file_path.isEmpty());
     SessionViewState view_state;
     view_state.id = QUuid::createUuid();
     view_state.loaded_files = {LogFileInfo(file_path, QStringLiteral("FallbackApp"))};
@@ -239,14 +288,15 @@ TEST_F(SessionControllerTest, FallsBackWhenPersistedProfileIsUnavailable)
  */
 TEST_F(SessionControllerTest, RestoresSameSessionWithoutDuplicatingViewsOrEntries)
 {
-    QTemporaryFile* file =
-        create_temp_file({QStringLiteral("2024-01-01 12:00:00 INFO First RestoreApp"),
-                          QStringLiteral("2024-01-01 12:01:00 ERROR Second RestoreApp")});
-    ASSERT_NE(file, nullptr);
+    const QString file_path = m_file_system.write_text_file(
+        QStringLiteral("duplicate-restore.log"),
+        QStringLiteral("2024-01-01 12:00:00 INFO First RestoreApp\n"
+                       "2024-01-01 12:01:00 ERROR Second RestoreApp\n"));
+    ASSERT_FALSE(file_path.isEmpty());
 
     SessionViewState view_state;
     view_state.id = QUuid::createUuid();
-    view_state.loaded_files = {LogFileInfo(file->fileName(), QStringLiteral("RestoreApp"))};
+    view_state.loaded_files = {LogFileInfo(file_path, QStringLiteral("RestoreApp"))};
     view_state.filters.live_tailing_enabled = false;
 
     SessionState state;
@@ -279,12 +329,11 @@ TEST_F(SessionControllerTest, RestoresSameSessionWithoutDuplicatingViewsOrEntrie
  */
 TEST_F(SessionControllerTest, ExposesEmptyRestoredViewBeforeReplacingStaleHistory)
 {
-    QTemporaryFile* file =
-        create_temp_file({QStringLiteral("2024-01-01 12:00:00 INFO FreshEntry RestoreApp")});
-    ASSERT_NE(file, nullptr);
-
+    const QString file_path = m_file_system.write_text_file(
+        QStringLiteral("fresh.log"),
+        QStringLiteral("2024-01-01 12:00:00 INFO FreshEntry RestoreApp\n"));
+    ASSERT_FALSE(file_path.isEmpty());
     const QUuid view_id = QUuid::createUuid();
-    const QString file_path = QFileInfo(file->fileName()).absoluteFilePath();
     const LogEntry stale_entry(
         QDateTime::fromString(QStringLiteral("2024-01-01T11:00:00.000Z"), Qt::ISODateWithMs),
         QStringLiteral("INFO"), QStringLiteral("StalePartialEntry"),

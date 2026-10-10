@@ -22,6 +22,30 @@ constexpr auto k_recent_files_key = "recent_files";
 constexpr auto k_recent_sessions_key = "recent_sessions";
 
 /**
+ * @brief Reads one JSON object from a file.
+ * @param file_path Path to the JSON document.
+ * @return Parsed object, or an empty object when the file cannot be read or parsed as an object.
+ */
+[[nodiscard]] auto load_json_object(const QString& file_path) -> QJsonObject
+{
+    QJsonObject result;
+    QFile file(file_path);
+
+    if (file.exists() && file.open(QIODevice::ReadOnly | QIODevice::Text))
+    {
+        const QJsonDocument document = QJsonDocument::fromJson(file.readAll());
+        file.close();
+
+        if (document.isObject())
+        {
+            result = document.object();
+        }
+    }
+
+    return result;
+}
+
+/**
  * @brief Ensures a directory exists, creating it if necessary.
  * @param dir_path The directory path to ensure.
  */
@@ -202,21 +226,18 @@ auto SessionRepository::get_session_file_path(const QString& session_id) const -
 auto SessionRepository::load_session(const QString& session_id) const -> QJsonObject
 {
     const QString path = get_session_file_path(session_id);
-    QJsonObject result;
+    const QJsonObject result = load_json_object(path);
+    return result;
+}
 
-    QFile file(path);
-    if (file.exists() && file.open(QIODevice::ReadOnly | QIODevice::Text))
-    {
-        const QByteArray content = file.readAll();
-        file.close();
-
-        const QJsonDocument doc = QJsonDocument::fromJson(content);
-        if (doc.isObject())
-        {
-            result = doc.object();
-        }
-    }
-
+/**
+ * @brief Loads a session JSON document from an arbitrary file path.
+ * @param file_path Absolute or relative path to the JSON document.
+ * @return Parsed object, or an empty object when the file cannot be read or parsed as an object.
+ */
+auto SessionRepository::load_session_file(const QString& file_path) const -> QJsonObject
+{
+    const QJsonObject result = load_json_object(file_path);
     return result;
 }
 

@@ -179,13 +179,8 @@ auto StartPageWidget::setup_connections() -> void
     connect(ui->clearRecentFilesButton, &QPushButton::clicked, this,
             &StartPageWidget::clear_recent_files_requested);
 
-    connect(ui->openSessionButton, &QPushButton::clicked, this, [this]() {
-        const QString id = get_selected_recent_session_id();
-        if (!id.isEmpty())
-        {
-            emit open_session_requested(id);
-        }
-    });
+    connect(ui->openSessionButton, &QPushButton::clicked, this,
+            &StartPageWidget::open_session_requested);
 
     connect(ui->openSelectedSessionButton, &QPushButton::clicked, this, [this]() {
         const QString id = get_selected_recent_session_id();

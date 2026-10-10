@@ -30,6 +30,26 @@
 namespace
 {
 /**
+ * @brief Checks whether a JSON object has the recognizable shape of a session document.
+ * @param object Candidate session document.
+ * @return True when the object contains at least one typed session payload field.
+ */
+[[nodiscard]] auto is_session_document(const QJsonObject& object) -> bool
+{
+    const QJsonValue schema_version = object.value(QStringLiteral("schema_version"));
+    const bool schema_supported =
+        schema_version.isUndefined() ||
+        (schema_version.isDouble() &&
+         schema_version.toDouble() == static_cast<double>(SessionCodec::get_schema_version()));
+    const bool has_name = object.value(QStringLiteral("name")).isString();
+    const bool has_views = object.value(QStringLiteral("views")).isArray();
+    const bool has_explorer_files = object.value(QStringLiteral("explorer_files")).isArray();
+    const bool valid =
+        schema_supported && !object.isEmpty() && (has_name || has_views || has_explorer_files);
+    return valid;
+}
+
+/**
  * @brief Resolves the persisted parsing profile for one restored file.
  * @param state Restored view state containing profile identifiers.
  * @param file_path File whose profile is requested.
@@ -487,6 +507,60 @@ auto SessionController::load_session(const QString& session_id) -> std::optional
                 m_tree_model->add_session(session_id, session_name);
             }
 
+            emit current_session_changed(session_id);
+        }
+    }
+
+    return state;
+}
+
+/**
+ * @brief Imports a session document from a file into managed session storage.
+ *
+ * A fresh identifier isolates the imported document from repository paths and existing sessions.
+ * The canonicalized document is saved before it becomes the current and most-recent session.
+ *
+ * @param file_path Path to the external session JSON document.
+ * @return Imported typed state, or no value when the document is not a valid session.
+ */
+auto SessionController::import_session_file(const QString& file_path) -> std::optional<SessionState>
+{
+    std::optional<SessionState> state;
+    const QFileInfo file_info(file_path);
+    const bool can_import = m_session_manager != nullptr && !file_path.isEmpty() &&
+                            file_info.exists() && file_info.isFile() && file_info.isReadable();
+
+    if (can_import)
+    {
+        const QJsonObject document =
+            m_session_manager->load_session_file(file_info.absoluteFilePath());
+
+        if (is_session_document(document))
+        {
+            state = SessionCodec::from_json(document);
+        }
+
+        if (state.has_value())
+        {
+            const QString session_id = QUuid::createUuid().toString(QUuid::WithoutBraces);
+            state->id = session_id;
+
+            if (state->name.trimmed().isEmpty())
+            {
+                state->name = file_info.completeBaseName();
+            }
+
+            m_session_manager->save_session(session_id, SessionCodec::to_json(*state));
+            m_session_manager->set_current_session_id(session_id);
+            m_session_manager->set_last_session_id(session_id);
+            m_session_manager->upsert_session_metadata(session_id, state->name, true);
+
+            if (m_tree_model != nullptr && !m_tree_model->has_session(session_id))
+            {
+                m_tree_model->add_session(session_id, state->name);
+            }
+
+            emit session_created(session_id, state->name);
             emit current_session_changed(session_id);
         }
     }

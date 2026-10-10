@@ -3,6 +3,7 @@
 #include <QDir>
 #include <QFile>
 #include <QJsonArray>
+#include <QJsonDocument>
 #include <QJsonObject>
 #include <QStandardPaths>
 #include <QUuid>
@@ -294,6 +295,25 @@ TEST_F(SessionRepositoryTest, LoadSessionReturnsEmptyOnInvalidJson)
 
     const QJsonObject loaded = m_repo->load_session(sid);
     EXPECT_TRUE(loaded.isEmpty());
+}
+
+/**
+ * @test Verifies that a session JSON document can be loaded directly from an external file path.
+ */
+TEST_F(SessionRepositoryTest, LoadsSessionFromExternalFilePath)
+{
+    ASSERT_NE(m_repo, nullptr);
+
+    const QJsonObject expected{{QStringLiteral("name"), QStringLiteral("External session")},
+                               {QStringLiteral("views"), QJsonArray()}};
+    const QString file_path = m_file_system.write_text_file(
+        QStringLiteral("external-session.json"),
+        QString::fromUtf8(QJsonDocument(expected).toJson(QJsonDocument::Compact)));
+    ASSERT_FALSE(file_path.isEmpty());
+
+    const QJsonObject loaded = m_repo->load_session_file(file_path);
+
+    EXPECT_EQ(loaded, expected);
 }
 
 /**

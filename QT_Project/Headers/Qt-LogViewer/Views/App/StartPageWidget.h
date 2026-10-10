@@ -65,10 +65,9 @@ class StartPageWidget: public QWidget
         void clear_recent_files_requested();
 
         /**
-         * @brief User requested to open a specific session.
-         * @param session_id Selected session id.
+         * @brief User requested to choose and open a session file.
          */
-        void open_session_requested(const QString& session_id);
+        void open_session_requested();
 
         /**
          * @brief User requested to open a specific recent session.

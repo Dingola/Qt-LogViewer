@@ -102,6 +102,13 @@ class SessionManager: public QObject
         [[nodiscard]] auto load_session(const QString& session_id) const -> QJsonObject;
 
         /**
+         * @brief Loads a session JSON object from an arbitrary file path.
+         * @param file_path Path to the session JSON document.
+         * @return Parsed session object, or an empty object when it cannot be loaded.
+         */
+        [[nodiscard]] auto load_session_file(const QString& file_path) const -> QJsonObject;
+
+        /**
          * @brief Saves a full session JSON object under its id (atomic write).
          * @param session_id The session identifier.
          * @param session_obj The JSON object to persist.
