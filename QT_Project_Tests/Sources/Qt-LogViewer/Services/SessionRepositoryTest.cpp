@@ -5,83 +5,26 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QStandardPaths>
-#include <QUuid>
 
 /**
- * @brief Sets up a fresh, isolated repository under a unique AppConfig subdirectory.
+ * @brief Sets up a fresh repository in the isolated test filesystem.
  */
 void SessionRepositoryTest::SetUp()
 {
-    m_subdir = get_unique_subdir();
-    m_repo = new SessionRepository(m_subdir);
+    const QString marker_path =
+        m_file_system.write_text_file(QStringLiteral("repository.marker"), QString());
+    m_sessions_directory = QFileInfo(marker_path).absolutePath();
+    m_repo = new SessionRepository(m_sessions_directory);
 }
 
 /**
- * @brief Tears down and cleans the repository directory tree.
+ * @brief Tears down the repository while the test filesystem owns its files.
  */
 void SessionRepositoryTest::TearDown()
 {
     delete m_repo;
     m_repo = nullptr;
-
-    // Best-effort cleanup of the unique repository directory
-    const QString base_dir = get_base_dir();
-    remove_dir_recursive(base_dir);
-}
-
-/**
- * @brief Returns a unique subdirectory name under AppConfigLocation.
- */
-auto SessionRepositoryTest::get_unique_subdir() const -> QString
-{
-    const QString uuid = QUuid::createUuid().toString(QUuid::WithoutBraces);
-    const QString subdir = QStringLiteral("Qt-LogViewer-Test-%1").arg(uuid);
-    return subdir;
-}
-
-/**
- * @brief Computes the absolute base directory path used by the current repository.
- */
-auto SessionRepositoryTest::get_base_dir() const -> QString
-{
-    const QString base = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
-    QDir d(base);
-    const QString path = d.filePath(m_subdir);
-    return path;
-}
-
-/**
- * @brief Recursively removes a directory tree.
- */
-auto SessionRepositoryTest::remove_dir_recursive(const QString& dir_path) -> bool
-{
-    bool ok = true;
-    QDir dir(dir_path);
-
-    if (!dir.exists())
-    {
-        ok = true;
-    }
-    else
-    {
-        const QFileInfoList entries = dir.entryInfoList(QDir::NoDotAndDotDot | QDir::AllEntries |
-                                                        QDir::Hidden | QDir::System);
-        for (const QFileInfo& fi: entries)
-        {
-            if (fi.isDir())
-            {
-                ok = remove_dir_recursive(fi.absoluteFilePath()) && ok;
-            }
-            else
-            {
-                ok = QFile::remove(fi.absoluteFilePath()) && ok;
-            }
-        }
-        ok = dir.rmdir(dir.absolutePath()) && ok;
-    }
-
-    return ok;
+    m_sessions_directory.clear();
 }
 
 /**
@@ -91,19 +34,18 @@ TEST_F(SessionRepositoryTest, PathComputations)
 {
     ASSERT_NE(m_repo, nullptr);
 
-    const QString base_dir = get_base_dir();
+    const QString base_dir = m_sessions_directory;
     const QString root_path = m_repo->get_root_file_path();
     const QString sessions_dir = m_repo->get_sessions_dir_path();
 
     EXPECT_TRUE(root_path.startsWith(base_dir));
-    EXPECT_TRUE(root_path.endsWith(QStringLiteral("sessions.json")));
+    EXPECT_TRUE(root_path.endsWith(QStringLiteral("index.json")));
 
-    EXPECT_TRUE(sessions_dir.startsWith(base_dir));
-    EXPECT_TRUE(sessions_dir.endsWith(QStringLiteral("sessions")));
+    EXPECT_EQ(sessions_dir, base_dir);
 
     const QString sid = QStringLiteral("abc123");
     const QString session_path = m_repo->get_session_file_path(sid);
-    EXPECT_TRUE(session_path.contains(QStringLiteral("sessions")));
+    EXPECT_EQ(QFileInfo(session_path).absolutePath(), base_dir);
     EXPECT_TRUE(session_path.endsWith(QStringLiteral("abc123.json")));
 }
 

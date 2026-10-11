@@ -1,11 +1,34 @@
 #include "Qt-LogViewer/Views/App/Dialogs/SettingsDialog.h"
 
 #include <QDebug>
+#include <QDir>
 #include <QFileInfo>
+#include <QLineEdit>
+#include <QToolButton>
 
+#include "Qt-LogViewer/Services/ApplicationStoragePaths.h"
 #include "Qt-LogViewer/Services/DesktopServices.h"
 #include "Qt-LogViewer/Services/LogViewerSettings.h"
+#include "QtWidgetsCommonLib/Utils/UiUtils.h"
 #include "ui_SettingsDialog.h"
+
+namespace
+{
+/**
+ * @brief Presents a storage path with its distinguishing file or directory name visible.
+ * @param line_edit Read-only field displaying the path.
+ * @param path Absolute file or directory path to display.
+ */
+auto present_storage_path(QLineEdit* line_edit, const QString& path) -> void
+{
+    if (line_edit != nullptr)
+    {
+        line_edit->setText(path);
+        line_edit->setToolTip(path);
+        line_edit->setCursorPosition(path.size());
+    }
+}
+}  // namespace
 
 /**
  * @brief Constructs a SettingsDialog and initializes the UI.
@@ -47,16 +70,7 @@ SettingsDialog::SettingsDialog(LogViewerSettings* settings, QWidget* parent)
     m_applied_theme = selected_theme();
 
     ui->listWidgetCategories->setProperty("isContent", true);
-    ui->lineEditConfigLocation->setText(m_settings != nullptr ? m_settings->fileName()
-                                                              : tr("No settings file"));
-    ui->lineEditConfigLocation->setToolTip(m_settings != nullptr ? m_settings->fileName()
-                                                                 : tr("No settings file"));
-    connect(ui->toolButtonConfigLocation, &QToolButton::clicked, this, [this]() {
-        const QString settings_file = m_settings->fileName();
-        const QString config_folder = QFileInfo(settings_file).absolutePath();
-
-        DesktopServices::open_folder(config_folder);
-    });
+    setup_storage_locations();
 
     // Set initial category
     ui->listWidgetCategories->setCurrentRow(0);
@@ -78,7 +92,148 @@ auto SettingsDialog::setup_categories() -> void
 {
     ui->listWidgetCategories->clear();
     ui->listWidgetCategories->addItem(tr("General"));
+    ui->listWidgetCategories->addItem(tr("Storage"));
     ui->listWidgetCategories->addItem(tr("Appearance"));
+}
+
+/**
+ * @brief Displays canonical application storage locations and connects their open buttons.
+ */
+auto SettingsDialog::setup_storage_locations() -> void
+{
+    const ApplicationStoragePaths storage_paths;
+    const QString settings_file =
+        m_settings != nullptr ? m_settings->fileName() : tr("No settings file");
+    const QString settings_directory = m_settings != nullptr
+                                           ? QFileInfo(settings_file).absolutePath()
+                                           : storage_paths.get_application_root();
+    const QString sessions_directory = storage_paths.get_sessions_directory();
+    const QString cache_directory = storage_paths.get_cache_directory();
+    const QString diagnostics_directory = storage_paths.get_diagnostics_directory();
+
+    present_storage_path(ui->lineEditSettingsLocation, settings_file);
+    present_storage_path(ui->lineEditSessionsLocation, sessions_directory);
+    present_storage_path(ui->lineEditCacheLocation, cache_directory);
+    present_storage_path(ui->lineEditDiagnosticsLocation, diagnostics_directory);
+
+    update_storage_location_icons();
+
+    /** @brief Opens the folder containing the application settings file. */
+    connect(ui->toolButtonSettingsLocation, &QToolButton::clicked, this, [settings_directory]() {
+        QDir().mkpath(settings_directory);
+        const bool folder_opened = DesktopServices::open_folder(settings_directory);
+        Q_UNUSED(folder_opened);
+    });
+    /** @brief Opens the directory containing saved sessions. */
+    connect(ui->toolButtonSessionsLocation, &QToolButton::clicked, this, [sessions_directory]() {
+        QDir().mkpath(sessions_directory);
+        const bool folder_opened = DesktopServices::open_folder(sessions_directory);
+        Q_UNUSED(folder_opened);
+    });
+    /** @brief Opens the directory containing reconstructible cache data. */
+    connect(ui->toolButtonCacheLocation, &QToolButton::clicked, this, [cache_directory]() {
+        QDir().mkpath(cache_directory);
+        const bool folder_opened = DesktopServices::open_folder(cache_directory);
+        Q_UNUSED(folder_opened);
+    });
+    /** @brief Opens the directory containing diagnostic logs. */
+    connect(ui->toolButtonDiagnosticsLocation, &QToolButton::clicked, this,
+            [diagnostics_directory]() {
+                QDir().mkpath(diagnostics_directory);
+                const bool folder_opened = DesktopServices::open_folder(diagnostics_directory);
+                Q_UNUSED(folder_opened);
+            });
+}
+
+/**
+ * @brief Returns the normal color of the storage location icons.
+ * @return The configured normal icon color.
+ */
+auto SettingsDialog::get_storage_location_icon_color() const -> QColor
+{
+    return m_storage_location_icon_color;
+}
+
+/**
+ * @brief Sets the normal color of the storage location icons.
+ * @param color The new normal icon color.
+ */
+auto SettingsDialog::set_storage_location_icon_color(const QColor& color) -> void
+{
+    if (m_storage_location_icon_color != color)
+    {
+        m_storage_location_icon_color = color;
+        update_storage_location_icons();
+    }
+}
+
+/**
+ * @brief Returns the hover color of the storage location icons.
+ * @return The configured hover icon color.
+ */
+auto SettingsDialog::get_storage_location_icon_color_hover() const -> QColor
+{
+    return m_storage_location_icon_color_hover;
+}
+
+/**
+ * @brief Sets the hover color of the storage location icons.
+ * @param color The new hover icon color.
+ */
+auto SettingsDialog::set_storage_location_icon_color_hover(const QColor& color) -> void
+{
+    if (m_storage_location_icon_color_hover != color)
+    {
+        m_storage_location_icon_color_hover = color;
+        update_storage_location_icons();
+    }
+}
+
+/**
+ * @brief Returns the square storage location icon size.
+ * @return The icon size in pixels.
+ */
+auto SettingsDialog::get_storage_location_icon_px() const -> int
+{
+    return m_storage_location_icon_px;
+}
+
+/**
+ * @brief Sets the square storage location icon size.
+ * @param size The icon size in pixels.
+ */
+auto SettingsDialog::set_storage_location_icon_px(int size) -> void
+{
+    const int bounded_size = qMax(1, size);
+    if (m_storage_location_icon_px != bounded_size)
+    {
+        m_storage_location_icon_px = bounded_size;
+        update_storage_location_icons();
+    }
+}
+
+/** @brief Applies the configured icon appearance to every storage location button. */
+auto SettingsDialog::update_storage_location_icons() -> void
+{
+    if (ui != nullptr)
+    {
+        const QSize icon_size(m_storage_location_icon_px, m_storage_location_icon_px);
+        QIcon icon = QtWidgetsCommonLib::UiUtils::colored_svg_icon(
+            QStringLiteral(":/Resources/Icons/folder-open-external.svg"),
+            m_storage_location_icon_color, icon_size);
+        icon.addPixmap(QtWidgetsCommonLib::UiUtils::colored_svg_icon(
+                           QStringLiteral(":/Resources/Icons/folder-open-external.svg"),
+                           m_storage_location_icon_color_hover, icon_size),
+                       QIcon::Active);
+        const QList<QToolButton*> location_buttons{
+            ui->toolButtonSettingsLocation, ui->toolButtonSessionsLocation,
+            ui->toolButtonCacheLocation, ui->toolButtonDiagnosticsLocation};
+        for (QToolButton* button: location_buttons)
+        {
+            button->setIcon(icon);
+            button->setIconSize(icon_size);
+        }
+    }
 }
 
 /**

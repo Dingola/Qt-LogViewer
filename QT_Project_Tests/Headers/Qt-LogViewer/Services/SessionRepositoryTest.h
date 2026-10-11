@@ -2,8 +2,6 @@
 
 #include <gtest/gtest.h>
 
-#include <QString>
-
 #include "Qt-LogViewer/Services/SessionRepository.h"
 #include "QtCommonLib/TestSupport/TestFileSystem.h"
 
@@ -20,23 +18,9 @@ class SessionRepositoryTest: public ::testing::Test
         void SetUp() override;
         void TearDown() override;
 
-        /**
-         * @brief Returns a unique subdirectory under AppConfigLocation for isolation.
-         */
-        [[nodiscard]] auto get_unique_subdir() const -> QString;
-
-        /**
-         * @brief Returns the absolute base directory path used by the repository.
-         */
-        [[nodiscard]] auto get_base_dir() const -> QString;
-
-        /**
-         * @brief Recursively deletes a directory tree. Returns true on success.
-         */
-        static auto remove_dir_recursive(const QString& dir_path) -> bool;
-
         SessionRepository* m_repo = nullptr;
-        QString m_subdir;
+        /** @brief Absolute sessions directory owned by the isolated test filesystem. */
+        QString m_sessions_directory;
         /** @brief Isolated filesystem owning external session files used by tests. */
         QtCommonLib::TestFileSystem m_file_system;
 };

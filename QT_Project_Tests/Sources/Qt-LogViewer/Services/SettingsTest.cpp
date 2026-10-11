@@ -1,17 +1,12 @@
 #include "Qt-LogViewer/Services/SettingsTest.h"
 
-#include <QFile>
-#include <QTemporaryFile>
-#include <QTextStream>
-
 /**
  * @brief Sets up the test fixture for each test.
  */
 void SettingsTest::SetUp()
 {
-    QString settings_path =
-        Settings::settings_file_path(QStandardPaths::AppConfigLocation, "test_settings.ini");
-    QFile::remove(settings_path);  // Clean up before each test
+    const QString settings_path =
+        m_file_system.write_text_file(QStringLiteral("test_settings.ini"), QString());
     m_settings = new Settings(settings_path, QSettings::IniFormat);
 }
 
@@ -29,23 +24,14 @@ void SettingsTest::TearDown()
 }
 
 /*
- * @brief Helper to create a temporary INI file with given content.
+ * @brief Creates an isolated INI file with the given content.
+ * @param content INI content to write.
+ * @return Absolute path of the created file, or an empty string on failure.
  */
-QString SettingsTest::create_temp_ini(const QString& content)
+auto SettingsTest::create_temp_ini(const QString& content) -> QString
 {
-    QString result;
-    QTemporaryFile temp_file;
-    temp_file.setAutoRemove(false);
-
-    if (temp_file.open())
-    {
-        QTextStream out(&temp_file);
-        out << content;
-        out.flush();
-        temp_file.close();
-        result = temp_file.fileName();
-    }
-
+    const QString result =
+        m_file_system.write_text_file(QStringLiteral("temporary-settings.ini"), content);
     return result;
 }
 

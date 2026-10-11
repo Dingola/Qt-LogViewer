@@ -5,7 +5,9 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QSaveFile>
-#include <QStandardPaths>
+#include <utility>
+
+#include "Qt-LogViewer/Services/ApplicationStoragePaths.h"
 
 namespace
 {
@@ -13,8 +15,7 @@ namespace
 constexpr int k_schema_version_value = 1;
 
 // File and directory names.
-constexpr auto k_root_filename = "sessions.json";
-constexpr auto k_sessions_dirname = "sessions";
+constexpr auto k_root_filename = "index.json";
 
 // JSON keys (stable, not localized).
 constexpr auto k_schema_version_key = "schema_version";
@@ -60,21 +61,20 @@ auto ensure_dir(const QString& dir_path) -> void
 }  // namespace
 
 /**
- * @brief Constructs a repository rooted at the application configuration location.
- * @param app_config_subdir Optional subdirectory name under AppConfigLocation,
- *        defaults to "Qt-LogViewer".
+ * @brief Constructs a repository using an explicit sessions directory.
+ * @param sessions_directory Directory containing the session index and documents.
  * @param parent Optional QObject parent.
  */
-SessionRepository::SessionRepository(QString app_config_subdir, QObject* parent)
-    : QObject(parent), m_app_config_subdir(app_config_subdir)
+SessionRepository::SessionRepository(QString sessions_directory, QObject* parent)
+    : QObject(parent), m_sessions_directory(QDir(std::move(sessions_directory)).absolutePath())
 {}
 
 /**
- * @brief Convenience constructor using default subdirectory.
+ * @brief Convenience constructor using the canonical sessions directory.
  * @param parent Optional QObject parent.
  */
 SessionRepository::SessionRepository(QObject* parent)
-    : SessionRepository(QStringLiteral("Qt-LogViewer"), parent)
+    : SessionRepository(ApplicationStoragePaths().get_sessions_directory(), parent)
 {}
 
 /**
@@ -88,31 +88,12 @@ auto SessionRepository::get_schema_version() -> int
 }
 
 /**
- * @brief Returns the base writable app configuration directory.
- * @return Absolute base directory path, potentially including the configured subdir.
- */
-auto SessionRepository::get_app_config_root() const -> QString
-{
-    const QString base = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
-    QString path = base;
-
-    if (!m_app_config_subdir.isEmpty())
-    {
-        QDir dir(base);
-        path = dir.filePath(m_app_config_subdir);
-    }
-
-    return path;
-}
-
-/**
  * @brief Returns the absolute path of the root JSON file.
  * @return Absolute file path to the root document.
  */
 auto SessionRepository::get_root_file_path() const -> QString
 {
-    const QString root_dir = get_app_config_root();
-    QDir dir(root_dir);
+    QDir dir(m_sessions_directory);
     const QString path = dir.filePath(QString::fromLatin1(k_root_filename));
     return path;
 }
@@ -170,8 +151,7 @@ auto SessionRepository::load_all() const -> QJsonObject
  */
 auto SessionRepository::save_all(const QJsonObject& root) const -> void
 {
-    const QString root_dir = get_app_config_root();
-    ensure_dir(root_dir);
+    ensure_dir(m_sessions_directory);
 
     const QString path = get_root_file_path();
     QSaveFile save_file(path);
@@ -198,9 +178,7 @@ auto SessionRepository::save_all(const QJsonObject& root) const -> void
  */
 auto SessionRepository::get_sessions_dir_path() const -> QString
 {
-    const QString root_dir = get_app_config_root();
-    QDir dir(root_dir);
-    const QString path = dir.filePath(QString::fromLatin1(k_sessions_dirname));
+    const QString path = m_sessions_directory;
     return path;
 }
 

@@ -2440,6 +2440,9 @@ QScrollBar::right-arrow:disabled {
 SettingsDialog#Dialog {
     qproperty-border_color: @table-frame-color;
     qproperty-border_width: 1;
+    qproperty-storage_location_icon_color: @icon-folder-color;
+    qproperty-storage_location_icon_color_hover: @button-text-color;
+    qproperty-storage_location_icon_px: 17;
 }
 
 SettingsDialog QStackedWidget {
@@ -2471,6 +2474,51 @@ SettingsDialog QListView#listWidgetCategories::item:selected {
 SettingsDialog QGroupBox {
     border: 1px solid @table-section-border-color;
     border-radius: @log-import-group-box-border-radius;
+}
+
+/* Settings pages use a restrained hierarchy instead of the generic dialog headline style. */
+SettingsDialog QStackedWidget > QWidget QLabel {
+    font-size: @label-font-size;
+    font-weight: @label-font-weight;
+}
+
+SettingsDialog QLabel#pageGeneralTitle,
+SettingsDialog QLabel#pageStorageTitle,
+SettingsDialog QLabel#pageAppearanceTitle {
+    color: @text-color-primary;
+    font-size: 12pt;
+    font-weight: 600;
+}
+
+SettingsDialog QLabel#labelLangDesc,
+SettingsDialog QLabel#labelStorageDescription,
+SettingsDialog QLabel#labelCacheDescription,
+SettingsDialog QLabel#labelThemeDesc {
+    color: @text-color-secondary;
+    font-size: 9pt;
+    font-weight: 400;
+}
+
+SettingsDialog QGroupBox#groupBoxStorage {
+    margin-top: 2px;
+    padding: 0px;
+}
+
+SettingsDialog QWidget#pageStorage QLineEdit {
+    min-height: 24px;
+    font-size: 9pt;
+}
+
+SettingsDialog QWidget#pageStorage QToolButton {
+    min-width: 28px;
+    max-width: 28px;
+    min-height: 28px;
+    max-height: 28px;
+    padding: 0px;
+}
+
+SettingsDialog QLabel#labelCacheDescription {
+    padding: 0px 4px;
 }
 
 LogFileExplorer {

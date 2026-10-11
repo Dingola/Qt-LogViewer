@@ -13,12 +13,12 @@
 #include <QSqlDatabase>
 #include <QSqlError>
 #include <QSqlQuery>
-#include <QStandardPaths>
 #include <QStringList>
 #include <QVariant>
 #include <memory>
 #include <utility>
 
+#include "Qt-LogViewer/Services/ApplicationStoragePaths.h"
 #include "QtCommonLib/Sql/SqlConnection.h"
 #include "QtCommonLib/Sql/SqlStatementBatch.h"
 #include "QtCommonLib/Sql/SqlTransaction.h"
@@ -496,13 +496,12 @@ auto LogCacheCatalog::remove_view(const QUuid& view_id) -> bool
 
 /**
  * @brief Resolves the standard application cache root.
- * @return Absolute `history/cache-v2` path below QStandardPaths::AppConfigLocation.
+ * @return Absolute `cache/index-v2` path below QStandardPaths::AppConfigLocation.
  */
 auto LogCacheCatalog::get_default_cache_root() -> QString
 {
-    const QString config_path = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
-    return QFileInfo(QDir(config_path).filePath(QStringLiteral("history/cache-v2")))
-        .absoluteFilePath();
+    const QString path = ApplicationStoragePaths().get_log_index_directory();
+    return path;
 }
 
 /**

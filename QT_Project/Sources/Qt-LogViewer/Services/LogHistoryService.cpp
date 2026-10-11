@@ -16,12 +16,12 @@
 #include <QSqlDatabase>
 #include <QSqlError>
 #include <QSqlQuery>
-#include <QStandardPaths>
 #include <QStringList>
 #include <QVariant>
 #include <memory>
 
 #include "Qt-LogViewer/Models/LogFieldDefinition.h"
+#include "Qt-LogViewer/Services/ApplicationStoragePaths.h"
 #include "Qt-LogViewer/Services/LogCacheReadService.h"
 #include "QtCommonLib/Sql/SqlConnection.h"
 #include "QtCommonLib/Sql/SqlStatementBatch.h"
@@ -995,10 +995,8 @@ auto LogHistoryService::get_database_path() const -> QString
  */
 auto LogHistoryService::get_default_database_path() -> QString
 {
-    const QString config_path = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
-    const QString history_path = QDir(config_path).filePath(QStringLiteral("history"));
-    return QFileInfo(QDir(history_path).filePath(QStringLiteral("log_history.sqlite")))
-        .absoluteFilePath();
+    const QString path = ApplicationStoragePaths().get_history_database_file();
+    return path;
 }
 
 /**

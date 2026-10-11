@@ -37,8 +37,8 @@ class SessionControllerTest: public ::testing::Test
         SessionRepository* m_session_repository{nullptr};
         /** @brief Session manager backed by the isolated test repository. */
         SessionManager* m_session_manager{nullptr};
-        /** @brief Unique AppConfig subdirectory removed after each test. */
-        QString m_session_repository_subdir;
+        /** @brief Isolated directory containing persisted session documents. */
+        QString m_sessions_directory;
         /** @brief Isolated filesystem owning source and session files created by each test. */
         QtCommonLib::TestFileSystem m_file_system;
 };

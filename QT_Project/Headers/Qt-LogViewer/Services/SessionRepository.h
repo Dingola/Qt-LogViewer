@@ -10,9 +10,9 @@
  *        recent files and sessions as JSON using atomic writes.
  *
  * Storage location:
- * - Uses QStandardPaths::AppConfigLocation/<app_config_subdir> as base directory.
- * - Root JSON: "<base>/sessions.json"
- * - Per-session JSONs: "<base>/sessions/<session_id>.json"
+ * - Default directory: "<AppConfigLocation>/sessions"
+ * - Root JSON: "<sessions>/index.json"
+ * - Per-session JSONs: "<sessions>/<session_id>.json"
  *
  * Schema (v1):
  * {
@@ -28,21 +28,19 @@ class SessionRepository: public QObject
 
     public:
         /**
-         * @brief Constructs a repository rooted at the application configuration location.
-         * @param app_config_subdir Optional subdirectory name under AppConfigLocation,
-         *        defaults to "Qt-LogViewer".
+         * @brief Constructs a repository using an explicit sessions directory.
+         * @param sessions_directory Directory containing the session index and documents.
          * @param parent Optional QObject parent.
          *
          * The repository will create the directory structure on demand during save operations.
          */
-        explicit SessionRepository(QString app_config_subdir = QStringLiteral("Qt-LogViewer"),
-                                   QObject* parent = nullptr);
+        explicit SessionRepository(QString sessions_directory, QObject* parent = nullptr);
 
         /**
-         * @brief Convenience constructor using default subdirectory.
+         * @brief Convenience constructor using the canonical sessions directory.
          * @param parent Optional QObject parent.
          */
-        explicit SessionRepository(QObject* parent);
+        explicit SessionRepository(QObject* parent = nullptr);
 
         /**
          * @brief Returns the absolute path of the root JSON file.
@@ -73,14 +71,14 @@ class SessionRepository: public QObject
 
         /**
          * @brief Returns the absolute directory path used for per-session files.
-         * @return Absolute directory path: "<base>/sessions".
+         * @return Absolute canonical sessions directory path.
          */
         [[nodiscard]] auto get_sessions_dir_path() const -> QString;
 
         /**
          * @brief Computes the absolute file path for a specific session id.
          * @param session_id The session identifier.
-         * @return Absolute file path within the sessions directory: "<base>/sessions/<id>.json".
+         * @return Absolute file path within the sessions directory: "<sessions>/<id>.json".
          */
         [[nodiscard]] auto get_session_file_path(const QString& session_id) const -> QString;
 
@@ -123,12 +121,6 @@ class SessionRepository: public QObject
         [[nodiscard]] static auto get_schema_version() -> int;
 
     private:
-        /**
-         * @brief Returns the base writable app configuration directory.
-         * @return Absolute base directory path, potentially including the configured subdir.
-         */
-        [[nodiscard]] auto get_app_config_root() const -> QString;
-
-    private:
-        QString m_app_config_subdir;
+        /** @brief Absolute directory containing the session index and documents. */
+        QString m_sessions_directory;
 };

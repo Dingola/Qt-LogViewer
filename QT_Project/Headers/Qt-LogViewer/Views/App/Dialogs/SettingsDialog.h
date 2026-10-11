@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QColor>
 #include <QString>
 #include <QStringList>
 
@@ -22,6 +23,13 @@ class LogViewerSettings;
 class SettingsDialog: public Dialog
 {
         Q_OBJECT
+        Q_PROPERTY(QColor storage_location_icon_color READ get_storage_location_icon_color WRITE
+                       set_storage_location_icon_color)
+        Q_PROPERTY(
+            QColor storage_location_icon_color_hover READ get_storage_location_icon_color_hover
+                WRITE set_storage_location_icon_color_hover)
+        Q_PROPERTY(int storage_location_icon_px READ get_storage_location_icon_px WRITE
+                       set_storage_location_icon_px)
 
     public:
         /**
@@ -75,11 +83,57 @@ class SettingsDialog: public Dialog
          */
         [[nodiscard]] auto selected_theme() const -> QString;
 
+        /**
+         * @brief Returns the normal color of the storage location icons.
+         * @return The configured normal icon color.
+         */
+        [[nodiscard]] auto get_storage_location_icon_color() const -> QColor;
+
+        /**
+         * @brief Sets the normal color of the storage location icons.
+         * @param color The new normal icon color.
+         */
+        auto set_storage_location_icon_color(const QColor& color) -> void;
+
+        /**
+         * @brief Returns the hover color of the storage location icons.
+         * @return The configured hover icon color.
+         */
+        [[nodiscard]] auto get_storage_location_icon_color_hover() const -> QColor;
+
+        /**
+         * @brief Sets the hover color of the storage location icons.
+         * @param color The new hover icon color.
+         */
+        auto set_storage_location_icon_color_hover(const QColor& color) -> void;
+
+        /**
+         * @brief Returns the square storage location icon size.
+         * @return The icon size in pixels.
+         */
+        [[nodiscard]] auto get_storage_location_icon_px() const -> int;
+
+        /**
+         * @brief Sets the square storage location icon size.
+         * @param size The icon size in pixels.
+         */
+        auto set_storage_location_icon_px(int size) -> void;
+
     private:
         /**
          * @brief Initializes the category list with items.
          */
         auto setup_categories() -> void;
+
+        /**
+         * @brief Displays canonical application storage locations and connects their open buttons.
+         */
+        auto setup_storage_locations() -> void;
+
+        /**
+         * @brief Applies the configured icon appearance to every storage location button.
+         */
+        auto update_storage_location_icons() -> void;
 
         /**
          * @brief Populates the language combo box.
@@ -137,4 +191,9 @@ class SettingsDialog: public Dialog
         QString m_applied_theme;     ///< The theme that was applied when the dialog was opened.
         QStringList m_available_themes;          ///< List of available theme names.
         QStringList m_available_language_names;  ///< List of available language names.
+        QColor m_storage_location_icon_color =
+            QColor("#66bb6a");  ///< Normal storage location icon color.
+        QColor m_storage_location_icon_color_hover =
+            QColor("#ffffff");                ///< Hovered storage location icon color.
+        int m_storage_location_icon_px = 17;  ///< Square storage location icon size in pixels.
 };

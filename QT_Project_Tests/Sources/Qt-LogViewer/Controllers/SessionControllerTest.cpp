@@ -1,12 +1,10 @@
 #include "Qt-LogViewer/Controllers/SessionControllerTest.h"
 
 #include <QDateTime>
-#include <QDir>
+#include <QFileInfo>
 #include <QJsonDocument>
 #include <QSignalSpy>
-#include <QStandardPaths>
 #include <QTest>
-#include <QUuid>
 
 #include "Qt-LogViewer/Controllers/LogViewContext.h"
 #include "Qt-LogViewer/Controllers/SessionController.h"
@@ -33,9 +31,10 @@ void SessionControllerTest::SetUp()
     m_default_profile = LogParsingProfile::create_default(
         QStringLiteral("{timestamp} {level} {message} {app_name}"),
         QStringLiteral("Session test default"));
-    m_session_repository_subdir = QStringLiteral("Qt-LogViewer-SessionControllerTest-%1")
-                                      .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
-    m_session_repository = new SessionRepository(m_session_repository_subdir);
+    const QString repository_marker =
+        m_file_system.write_text_file(QStringLiteral("repository.marker"), QString());
+    m_sessions_directory = QFileInfo(repository_marker).absolutePath();
+    m_session_repository = new SessionRepository(m_sessions_directory);
     m_session_manager = new SessionManager(m_session_repository);
     m_runtime = new TestLogRuntime(m_default_profile);
     m_session_controller = new SessionController(
@@ -59,11 +58,7 @@ void SessionControllerTest::TearDown()
     delete m_session_repository;
     m_session_repository = nullptr;
 
-    const QString app_config_path =
-        QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
-    QDir repository_directory(QDir(app_config_path).filePath(m_session_repository_subdir));
-    repository_directory.removeRecursively();
-    m_session_repository_subdir.clear();
+    m_sessions_directory.clear();
 }
 
 /**

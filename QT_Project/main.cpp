@@ -6,13 +6,13 @@
 #include <QApplication>
 #include <QDateTime>
 #include <QDir>
-#include <QStandardPaths>
 #include <memory>
 #include <source_location>
 #include <string>
 
 #include "Qt-LogViewer/Application/LogViewerApplication.h"
 #include "Qt-LogViewer/Models/LogFileInfo.h"
+#include "Qt-LogViewer/Services/ApplicationStoragePaths.h"
 #include "Qt-LogViewer/Services/LogViewerSettings.h"
 #include "SimpleCppLogger/LogFormatter.h"
 #include "SimpleCppLogger/LogLevel.h"
@@ -47,13 +47,13 @@ class LogViewerFileFormatter final: public SimpleCppLogger::LogFormatter
 
 [[nodiscard]] auto get_application_log_file_path() -> QString
 {
-    const QString log_directory =
-        QDir(QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation))
-            .filePath(QStringLiteral("logs"));
+    const ApplicationStoragePaths storage_paths;
+    const QString log_directory = storage_paths.get_diagnostics_directory();
 
     QDir().mkpath(log_directory);
 
-    return QDir(log_directory).filePath(QStringLiteral("Qt-LogViewer.log"));
+    const QString path = storage_paths.get_diagnostics_log_file();
+    return path;
 }
 }  // namespace
 

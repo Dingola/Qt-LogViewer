@@ -3,6 +3,9 @@
 #include <QCoreApplication>
 #include <QDebug>
 #include <QDir>
+#include <QFileInfo>
+
+#include "Qt-LogViewer/Services/ApplicationStoragePaths.h"
 
 // NOLINTBEGIN(modernize-use-trailing-return-type)
 
@@ -112,5 +115,7 @@ auto Settings::settings_file_path(QStandardPaths::StandardLocation location,
  */
 auto Settings::default_settings_file_path() -> QString
 {
-    return settings_file_path(QStandardPaths::AppConfigLocation, QStringLiteral("settings.ini"));
+    const QString path = ApplicationStoragePaths().get_settings_file();
+    QDir().mkpath(QFileInfo(path).absolutePath());
+    return path;
 }

@@ -225,7 +225,7 @@ class LogCacheCatalog final: public QObject
 
         /**
          * @brief Returns the standard application cache root.
-         * @return Absolute `history/cache-v2` path below
+         * @return Absolute `cache/index-v2` path below
          * QStandardPaths::AppConfigLocation.
          */
         [[nodiscard]] static auto get_default_cache_root() -> QString;

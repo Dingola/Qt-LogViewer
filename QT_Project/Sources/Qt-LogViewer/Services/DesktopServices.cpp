@@ -3,8 +3,9 @@
 #include <QDesktopServices>
 #include <QDir>
 #include <QFileInfo>
-#include <QStandardPaths>
 #include <QUrl>
+
+#include "Qt-LogViewer/Services/ApplicationStoragePaths.h"
 
 /**
  * @brief Opens a folder in the system file manager.
@@ -93,7 +94,7 @@ auto DesktopServices::open_path(const QString& path) -> bool
  */
 auto DesktopServices::app_config_folder_path() -> QString
 {
-    QString path = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
+    const QString path = ApplicationStoragePaths().get_application_root();
     return path;
 }
 

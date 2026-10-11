@@ -5,6 +5,7 @@
 #include <QString>
 
 #include "Qt-LogViewer/Services/Settings.h"
+#include "QtCommonLib/TestSupport/TestFileSystem.h"
 
 /**
  * @file SettingsTest.h
@@ -24,7 +25,9 @@ class SettingsTest: public ::testing::Test
          * @param content The INI content to write.
          * @return The file path of the created temporary file.
          */
-        [[nodiscard]] QString create_temp_ini(const QString& content);
+        [[nodiscard]] auto create_temp_ini(const QString& content) -> QString;
 
         Settings* m_settings = nullptr;
+        /** @brief Isolated filesystem owning settings files created by each test. */
+        QtCommonLib::TestFileSystem m_file_system;
 };
