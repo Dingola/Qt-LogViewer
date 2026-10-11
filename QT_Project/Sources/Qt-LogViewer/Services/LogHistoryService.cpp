@@ -969,6 +969,18 @@ auto LogHistoryService::is_available() const -> bool
 }
 
 /**
+ * @brief Returns whether a view has a complete, readable, and current cache mapping.
+ * @param view_id View whose persistent cache mapping is validated.
+ * @return True when every registered source can be queried from its current cache.
+ */
+auto LogHistoryService::is_cache_current(const QUuid& view_id) const -> bool
+{
+    const bool current =
+        m_cache_read_service != nullptr && m_cache_read_service->can_query(view_id);
+    return current;
+}
+
+/**
  * @brief Returns the absolute SQLite database path.
  * @return Database file path.
  */

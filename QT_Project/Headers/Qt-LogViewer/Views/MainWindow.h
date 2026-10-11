@@ -45,6 +45,7 @@ class SessionManager;
 class RecentItemsAdapter;
 class LogFileExplorer;
 class LogLevelPieChartWidget;
+class LogDataStatusWidget;
 class LogViewWidget;
 class StartPageWidget;
 class DockWidget;
@@ -131,6 +132,9 @@ class MainWindow: public QtWidgetsCommonLib::AppMainWindow
          * @brief Sets up the tab widget.
          */
         auto setup_tab_widget() -> void;
+
+        /** @brief Creates the permanent compact active-view data status widget. */
+        auto setup_data_status() -> void;
 
         /**
          * @brief Initializes the dock controller and registers the application docks.
@@ -372,6 +376,7 @@ class MainWindow: public QtWidgetsCommonLib::AppMainWindow
         QPlainTextEdit* m_log_details_text_edit = nullptr;
         LogFileExplorer* m_log_file_explorer = nullptr;
         LogLevelPieChartWidget* m_log_level_pie_chart_widget = nullptr;
+        LogDataStatusWidget* m_data_status_widget = nullptr;
 
         // Start page (tab area filler)
         StartPageWidget* m_start_page_widget = nullptr;

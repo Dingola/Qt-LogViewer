@@ -2,15 +2,12 @@
 
 #include <QApplication>
 #include <QDockWidget>
-#include <QFile>
 #include <QHeaderView>
 #include <QLabel>
 #include <QMainWindow>
 #include <QPlainTextEdit>
 #include <QStackedWidget>
-#include <QTemporaryFile>
 #include <QTest>
-#include <QTextStream>
 #include <QWidget>
 
 #include "Qt-LogViewer/Animations/SnapshotTransitionAnimator.h"
@@ -24,12 +21,16 @@
 #include "Qt-LogViewer/Presenters/LogViewPresenter.h"
 #include "Qt-LogViewer/Presenters/WorkspacePresenter.h"
 #include "Qt-LogViewer/Support/TestLogRuntime.h"
+#include "Qt-LogViewer/Views/App/LogDataStatusWidget.h"
 #include "Qt-LogViewer/Views/App/LogFilterBarWidget.h"
 #include "Qt-LogViewer/Views/App/LogLevelPieChartWidget.h"
 #include "Qt-LogViewer/Views/App/LogTabWidget.h"
 #include "Qt-LogViewer/Views/App/LogTableView.h"
 #include "Qt-LogViewer/Views/App/LogViewWidget.h"
 #include "Qt-LogViewer/Views/Shared/PaginationWidget.h"
+#include "QtCommonLib/TestSupport/TestFileSystem.h"
+
+using QtCommonLib::TestFileSystem;
 
 /**
  * @file WorkspacePresenterTest.cpp
@@ -41,6 +42,7 @@
  */
 void WorkspacePresenterTest::SetUp()
 {
+    m_file_system = new TestFileSystem();
     m_runtime = new TestLogRuntime(m_profile);
     m_tab_widget = new LogTabWidget();
     m_tab_widget->setup_default_behavior();
@@ -48,6 +50,7 @@ void WorkspacePresenterTest::SetUp()
     m_pagination = new PaginationWidget();
     m_details_text = new QPlainTextEdit();
     m_level_chart = new LogLevelPieChartWidget();
+    m_data_status = new LogDataStatusWidget();
     m_central_stack = new QStackedWidget();
     m_central_stack->addWidget(new QWidget());
     m_central_stack->addWidget(new QWidget());
@@ -59,12 +62,12 @@ void WorkspacePresenterTest::SetUp()
     m_presenter = new WorkspacePresenter(
         &m_runtime->views(), &m_runtime->filters(), &m_runtime->history(), &m_runtime->pages(),
         &m_runtime->queries(), &m_runtime->imports(), &m_runtime->lifecycle(), m_session_controller,
-        m_tab_widget, m_filter_bar, m_pagination, m_details_text, m_level_chart, m_central_stack,
-        nullptr);
+        m_tab_widget, m_filter_bar, m_pagination, m_details_text, m_level_chart, m_data_status,
+        m_central_stack, nullptr);
 }
 
 /**
- * @brief Destroys the workspace object graph and temporary files.
+ * @brief Destroys the workspace object graph and isolated test filesystem.
  */
 void WorkspacePresenterTest::TearDown()
 {
@@ -82,46 +85,38 @@ void WorkspacePresenterTest::TearDown()
     m_details_text = nullptr;
     delete m_level_chart;
     m_level_chart = nullptr;
+    delete m_data_status;
+    m_data_status = nullptr;
     delete m_central_stack;
     m_central_stack = nullptr;
     delete m_runtime;
     m_runtime = nullptr;
-
-    for (QTemporaryFile* file: m_temp_files)
-    {
-        if (file != nullptr)
-        {
-            QFile::remove(file->fileName());
-            delete file;
-        }
-    }
-
-    m_temp_files.clear();
+    delete m_file_system;
+    m_file_system = nullptr;
 }
 
 /**
  * @brief Creates a runtime view, widget, and per-view presenter.
- * @param records Complete log records written to the temporary source file.
+ * @param records Complete log records written to an isolated source file.
  * @return Identifier of the added runtime view.
  */
 auto WorkspacePresenterTest::add_log_view(const QVector<QString>& records) -> QUuid
 {
     QUuid view_id;
-    auto* file = new QTemporaryFile();
-
-    if (file->open())
+    QString contents = records.join(QLatin1Char('\n'));
+    if (!contents.isEmpty())
     {
-        file->setAutoRemove(false);
-        QTextStream stream(file);
-        for (const QString& record: records)
-        {
-            stream << record << '\n';
-        }
-        stream.flush();
-        file->close();
-        m_temp_files.append(file);
+        contents.append(QLatin1Char('\n'));
+    }
+    const QString file_path =
+        m_file_system != nullptr
+            ? m_file_system->write_text_file(
+                  QStringLiteral("workspace-view-%1.log").arg(m_next_file_id++), contents)
+            : QString();
 
-        view_id = m_runtime->imports().import_file(file->fileName(), m_profile);
+    if (!file_path.isEmpty())
+    {
+        view_id = m_runtime->imports().import_file(file_path, m_profile);
 
         if (!view_id.isNull())
         {
@@ -137,11 +132,6 @@ auto WorkspacePresenterTest::add_log_view(const QVector<QString>& records) -> QU
             m_tab_widget->add_log_view_tab(widget, QStringLiteral("Test View"), false);
         }
     }
-    else
-    {
-        delete file;
-    }
-
     return view_id;
 }
 
@@ -168,6 +158,34 @@ TEST_F(WorkspacePresenterTest, SwitchesBetweenLogViews)
     m_tab_widget->setCurrentIndex(1);
     EXPECT_EQ(m_runtime->views().get_current_view(), second_view);
     EXPECT_EQ(m_filter_bar->get_current_app_name(), QStringLiteral("SecondApp"));
+}
+
+/** @test Verifies that active-view data status follows counts, filters, sources, and cache state. */
+TEST_F(WorkspacePresenterTest, PresentsActiveViewDataStatus)
+{
+    const QUuid view_id =
+        add_log_view({QStringLiteral("2024-01-01 12:00:00 INFO FirstMessage FirstApp"),
+                      QStringLiteral("2024-01-01 13:00:00 ERROR SecondMessage SecondApp")});
+    ASSERT_FALSE(view_id.isNull());
+
+    const QLabel* entries = m_data_status->findChild<QLabel*>(QStringLiteral("labelEntryStatus"));
+    const QLabel* sources = m_data_status->findChild<QLabel*>(QStringLiteral("labelSourceStatus"));
+    const QLabel* filters = m_data_status->findChild<QLabel*>(QStringLiteral("labelFilterStatus"));
+    const QLabel* cache = m_data_status->findChild<QLabel*>(QStringLiteral("labelCacheStatus"));
+    ASSERT_NE(entries, nullptr);
+    ASSERT_NE(sources, nullptr);
+    ASSERT_NE(filters, nullptr);
+    ASSERT_NE(cache, nullptr);
+    EXPECT_TRUE(entries->text().contains(QStringLiteral("2")));
+    EXPECT_TRUE(sources->text().contains(QStringLiteral("1")));
+    EXPECT_TRUE(filters->text().contains(QStringLiteral("0")));
+    EXPECT_EQ(cache->property("cacheState").toString(), QStringLiteral("current"));
+
+    m_runtime->queries().set_app_name(view_id, QStringLiteral("FirstApp"));
+
+    EXPECT_TRUE(entries->text().contains(QStringLiteral("1 visible")));
+    EXPECT_TRUE(entries->text().contains(QStringLiteral("2 total")));
+    EXPECT_TRUE(filters->text().contains(QStringLiteral("1")));
 }
 
 /** @test Verifies hidden loaded views resize their columns only after becoming visible. */
@@ -352,8 +370,8 @@ TEST_F(WorkspacePresenterTest, SuspendsDocksWithoutStartingAnotherPageTransition
     WorkspacePresenter presenter(&m_runtime->views(), &m_runtime->filters(), &m_runtime->history(),
                                  &m_runtime->pages(), &m_runtime->queries(), &m_runtime->imports(),
                                  &m_runtime->lifecycle(), nullptr, m_tab_widget, m_filter_bar,
-                                 m_pagination, m_details_text, m_level_chart, central_stack,
-                                 &dock_controller);
+                                 m_pagination, m_details_text, m_level_chart, m_data_status,
+                                 central_stack, &dock_controller);
 
     EXPECT_EQ(central_stack->currentIndex(), 1);
     EXPECT_TRUE(dock_widget->isHidden());

@@ -22,8 +22,11 @@
 #include "Qt-LogViewer/Models/LogEntry.h"
 #include "Qt-LogViewer/Models/LogModel.h"
 #include "Qt-LogViewer/Models/LogPageState.h"
+#include "Qt-LogViewer/Models/LogQuery.h"
+#include "Qt-LogViewer/Models/SessionTypes.h"
 #include "Qt-LogViewer/Presenters/LogViewPresenter.h"
 #include "Qt-LogViewer/Services/LogHistoryService.h"
+#include "Qt-LogViewer/Views/App/LogDataStatusWidget.h"
 #include "Qt-LogViewer/Views/App/LogFilterBarWidget.h"
 #include "Qt-LogViewer/Views/App/LogLevelPieChartWidget.h"
 #include "Qt-LogViewer/Views/App/LogTabWidget.h"
@@ -52,6 +55,7 @@
  * @param pagination Shared pagination controls.
  * @param details_text Shared selected-entry details output.
  * @param level_chart Shared log-level distribution widget.
+ * @param data_status Shared compact active-view data status.
  * @param central_stack Stack containing workspace and start-page pages.
  * @param dock_controller Controller used to suspend docks on the start page.
  * @param parent Optional QObject parent.
@@ -62,7 +66,8 @@ WorkspacePresenter::WorkspacePresenter(
     ViewLifecycleCoordinator* lifecycle, SessionController* session_controller,
     LogTabWidget* tab_widget, LogFilterBarWidget* filter_bar, PaginationWidget* pagination,
     QPlainTextEdit* details_text, LogLevelPieChartWidget* level_chart,
-    QStackedWidget* central_stack, DockController* dock_controller, QObject* parent)
+    LogDataStatusWidget* data_status, QStackedWidget* central_stack,
+    DockController* dock_controller, QObject* parent)
     : QObject(parent),
       m_views(views),
       m_filters(filters),
@@ -77,6 +82,7 @@ WorkspacePresenter::WorkspacePresenter(
       m_pagination(pagination),
       m_details_text(details_text),
       m_level_chart(level_chart),
+      m_data_status(data_status),
       m_central_stack(central_stack),
       m_dock_controller(dock_controller)
 {
@@ -165,6 +171,7 @@ auto WorkspacePresenter::refresh_active_view() -> void
     }
 
     refresh_pagination();
+    refresh_data_status();
 }
 
 /**
@@ -256,6 +263,11 @@ auto WorkspacePresenter::reset_presentation() -> void
     if (m_details_text != nullptr)
     {
         m_details_text->clear();
+    }
+
+    if (m_data_status != nullptr)
+    {
+        m_data_status->clear_status();
     }
 }
 
@@ -403,6 +415,7 @@ auto WorkspacePresenter::connect_workspace_updates() -> void
                 [this](const QUuid&) { refresh_active_view(); });
         connect(m_views, &ViewRegistry::view_removed, this, [this](const QUuid& view_id) {
             m_pending_column_resize_views.remove(view_id);
+            m_importing_views.remove(view_id);
             if (m_tab_widget != nullptr)
             {
                 m_tab_widget->remove_view_tab_by_id(view_id);
@@ -417,11 +430,35 @@ auto WorkspacePresenter::connect_workspace_updates() -> void
                        qsizetype) { update_page_state(view_id, current_page, total_pages); });
         connect(m_imports, &LogImportCoordinator::finished, this,
                 [this](const QUuid& view_id, const QString&) {
+                    m_importing_views.remove(view_id);
                     m_pending_column_resize_views.insert(view_id);
                     if (view_id == get_active_view_id())
                     {
                         refresh_active_view();
                         resize_active_view_columns_if_pending();
+                    }
+                });
+        connect(m_imports, &LogImportCoordinator::progress, this,
+                [this](const QUuid& view_id, qint64, qint64) {
+                    m_importing_views.insert(view_id);
+                    if (view_id == get_active_view_id())
+                    {
+                        refresh_data_status();
+                    }
+                });
+        connect(m_imports, &LogImportCoordinator::error, this,
+                [this](const QUuid& view_id, const QString&, const QString&) {
+                    m_importing_views.remove(view_id);
+                    if (view_id == get_active_view_id())
+                    {
+                        refresh_data_status();
+                    }
+                });
+        connect(m_views, &ViewRegistry::view_file_paths_changed, this,
+                [this](const QUuid& view_id, const QVector<QString>&) {
+                    if (view_id == get_active_view_id())
+                    {
+                        refresh_data_status();
                     }
                 });
     }
@@ -459,6 +496,63 @@ auto WorkspacePresenter::connect_workspace_updates() -> void
         connect(m_session_controller, &SessionController::all_sessions_removed, this,
                 [this] { refresh_start_page(); });
     }
+}
+
+/** @brief Refreshes compact counts and cache state for the active log view. */
+auto WorkspacePresenter::refresh_data_status() -> void
+{
+    const QUuid view_id = get_active_view_id();
+    const bool available = !view_id.isNull() && m_views != nullptr && m_filters != nullptr &&
+                           m_history != nullptr && m_pages != nullptr && m_data_status != nullptr;
+
+    if (available)
+    {
+        LogQuery total_query;
+        total_query.view_id = view_id;
+        const qsizetype total_entries = m_history->count_entries(total_query);
+        const LogPageState* page_state = m_pages->get_page_state(view_id);
+        const qsizetype visible_entries =
+            page_state != nullptr ? page_state->get_total_entries() : total_entries;
+        const int source_count = static_cast<int>(m_views->get_file_paths(view_id).size());
+        const int active_filter_count = get_active_filter_count(view_id);
+
+        LogCacheStatus cache_status = LogCacheStatus::Unavailable;
+        if (m_importing_views.contains(view_id))
+        {
+            cache_status = LogCacheStatus::Updating;
+        }
+        else if (m_history->is_cache_current(view_id))
+        {
+            cache_status = LogCacheStatus::Current;
+        }
+
+        m_data_status->set_status(visible_entries, total_entries, source_count, active_filter_count,
+                                  cache_status);
+    }
+    else if (m_data_status != nullptr)
+    {
+        m_data_status->clear_status();
+    }
+}
+
+/**
+ * @brief Counts active filter categories for one view.
+ * @param view_id View whose filter state is inspected.
+ * @return Number of active application, level, search, and source categories.
+ */
+auto WorkspacePresenter::get_active_filter_count(const QUuid& view_id) const -> int
+{
+    int active_filter_count = 0;
+    if (m_filters != nullptr && !view_id.isNull())
+    {
+        const FilterState state = m_filters->export_filters(view_id);
+        active_filter_count += state.app_name.trimmed().isEmpty() ? 0 : 1;
+        active_filter_count += state.log_levels.isEmpty() ? 0 : 1;
+        active_filter_count += state.search_text.trimmed().isEmpty() ? 0 : 1;
+        active_filter_count +=
+            state.show_only_file.isEmpty() && state.hidden_files.isEmpty() ? 0 : 1;
+    }
+    return active_filter_count;
 }
 
 /**
@@ -520,6 +614,8 @@ auto WorkspacePresenter::update_page_state(const QUuid& view_id, qsizetype curre
                 m_level_chart->set_log_level_counts(level_counts);
             }
         }
+
+        refresh_data_status();
     }
 }
 

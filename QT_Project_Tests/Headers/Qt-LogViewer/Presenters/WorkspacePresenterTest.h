@@ -9,15 +9,20 @@
 #include "Qt-LogViewer/Services/LogParsingProfile.h"
 
 class LogFilterBarWidget;
+class LogDataStatusWidget;
 class LogLevelPieChartWidget;
 class LogTabWidget;
 class TestLogRuntime;
 class PaginationWidget;
 class QPlainTextEdit;
 class QStackedWidget;
-class QTemporaryFile;
 class SessionController;
 class WorkspacePresenter;
+
+namespace QtCommonLib
+{
+class TestFileSystem;
+}
 
 /**
  * @file WorkspacePresenterTest.h
@@ -35,12 +40,12 @@ class WorkspacePresenterTest: public ::testing::Test
         /** @brief Creates controller state and all shared workspace widgets. */
         void SetUp() override;
 
-        /** @brief Destroys the workspace object graph and temporary files. */
+        /** @brief Destroys the workspace object graph and isolated test filesystem. */
         void TearDown() override;
 
         /**
          * @brief Creates a runtime view, widget, and per-view presenter.
-         * @param records Complete log records written to the temporary source file.
+         * @param records Complete log records written to an isolated source file.
          * @return Identifier of the added runtime view.
          */
         auto add_log_view(const QVector<QString>& records) -> QUuid;
@@ -54,8 +59,10 @@ class WorkspacePresenterTest: public ::testing::Test
         PaginationWidget* m_pagination{nullptr};
         QPlainTextEdit* m_details_text{nullptr};
         LogLevelPieChartWidget* m_level_chart{nullptr};
+        LogDataStatusWidget* m_data_status{nullptr};
         QStackedWidget* m_central_stack{nullptr};
         SessionController* m_session_controller{nullptr};
         WorkspacePresenter* m_presenter{nullptr};
-        QVector<QTemporaryFile*> m_temp_files;
+        QtCommonLib::TestFileSystem* m_file_system{nullptr};
+        int m_next_file_id{0};
 };

@@ -141,6 +141,13 @@ class LogHistoryService final: public QObject
         [[nodiscard]] auto is_available() const -> bool;
 
         /**
+         * @brief Returns whether a view has a complete, readable, and current cache mapping.
+         * @param view_id View whose persistent cache mapping is validated.
+         * @return True when every registered source can be queried from its current cache.
+         */
+        [[nodiscard]] auto is_cache_current(const QUuid& view_id) const -> bool;
+
+        /**
          * @brief Returns the absolute SQLite database path.
          * @return Database file path.
          */

@@ -12,6 +12,7 @@
 #include <QPlainTextEdit>
 #include <QResizeEvent>
 #include <QStackedWidget>
+#include <QStatusBar>
 #include <QStringList>
 #include <QTimer>
 #include <QUrl>
@@ -39,6 +40,7 @@
 #include "Qt-LogViewer/Services/LogViewerSettings.h"
 #include "Qt-LogViewer/Services/SessionManager.h"
 #include "Qt-LogViewer/Views/App/Dialogs/SettingsDialog.h"
+#include "Qt-LogViewer/Views/App/LogDataStatusWidget.h"
 #include "Qt-LogViewer/Views/App/LogFileExplorer.h"
 #include "Qt-LogViewer/Views/App/LogLevelPieChartWidget.h"
 #include "Qt-LogViewer/Views/App/LogTableView.h"
@@ -141,6 +143,7 @@ MainWindow::MainWindow(LogViewerSettings& settings, FileCatalogController& catal
     setup_log_details_dock();
     setup_filter_bar();
     setup_tab_widget();
+    setup_data_status();
 
     // Connect session controller signals
     connect(m_session_controller, &SessionController::expand_session_requested, m_log_file_explorer,
@@ -183,8 +186,8 @@ MainWindow::MainWindow(LogViewerSettings& settings, FileCatalogController& catal
     m_workspace_presenter = new WorkspacePresenter(
         m_views, m_filters, m_history, m_pages, m_queries, m_imports, m_lifecycle,
         m_session_controller, ui->tabWidgetLog, ui->logFilterBarWidget, ui->paginationWidget,
-        m_log_details_text_edit, m_log_level_pie_chart_widget, central_stack, m_dock_controller,
-        this);
+        m_log_details_text_edit, m_log_level_pie_chart_widget, m_data_status_widget, central_stack,
+        m_dock_controller, this);
     m_log_import_tab_presenter = new LogImportTabPresenter(
         *m_log_viewer_settings, *m_preview, *m_imports, *ui->tabWidgetLog,
         [this](const QUuid& view_id) {
@@ -305,6 +308,13 @@ auto MainWindow::setup_filter_bar() -> void
 auto MainWindow::setup_tab_widget() -> void
 {
     ui->tabWidgetLog->setup_default_behavior();
+}
+
+/** @brief Creates the permanent compact active-view data status widget. */
+auto MainWindow::setup_data_status() -> void
+{
+    m_data_status_widget = new LogDataStatusWidget(statusBar());
+    statusBar()->addPermanentWidget(m_data_status_widget);
 }
 
 /**

@@ -15,6 +15,7 @@ class LogImportCoordinator;
 class LogPageCoordinator;
 class LogQueryController;
 class LogFilterBarWidget;
+class LogDataStatusWidget;
 class LogLevelPieChartWidget;
 class LogTabWidget;
 class LogViewPresenter;
@@ -38,7 +39,7 @@ class StackedWidgetTransition;
  *
  * The presenter owns no widgets or application state. It maps the active
  * LogViewWidget to the shared filter bar, pagination, detail view, level chart,
- * and start-page presentation. Search operations accept an explicit view ID so
+ * data status, and start-page presentation. Search operations accept an explicit view ID so
  * their UI source can later move into each log view.
  */
 class WorkspacePresenter: public QObject
@@ -61,6 +62,7 @@ class WorkspacePresenter: public QObject
          * @param pagination Shared pagination controls.
          * @param details_text Shared selected-entry details output.
          * @param level_chart Shared log-level distribution widget.
+         * @param data_status Shared compact active-view data status.
          * @param central_stack Stack containing workspace and start-page pages.
          * @param dock_controller Controller used to suspend docks on the start page.
          * @param parent Optional QObject parent.
@@ -73,8 +75,8 @@ class WorkspacePresenter: public QObject
                                     LogFilterBarWidget* filter_bar, PaginationWidget* pagination,
                                     QPlainTextEdit* details_text,
                                     LogLevelPieChartWidget* level_chart,
-                                    QStackedWidget* central_stack, DockController* dock_controller,
-                                    QObject* parent = nullptr);
+                                    LogDataStatusWidget* data_status, QStackedWidget* central_stack,
+                                    DockController* dock_controller, QObject* parent = nullptr);
 
         /**
          * @brief Connects one per-view presenter to shared detail presentation.
@@ -125,6 +127,16 @@ class WorkspacePresenter: public QObject
         /** @brief Connects runtime and session changes to presentation refreshes. */
         auto connect_workspace_updates() -> void;
 
+        /** @brief Refreshes compact counts and cache state for the active log view. */
+        auto refresh_data_status() -> void;
+
+        /**
+         * @brief Counts active filter categories for one view.
+         * @param view_id View whose filter state is inspected.
+         * @return Number of active application, level, search, and source categories.
+         */
+        [[nodiscard]] auto get_active_filter_count(const QUuid& view_id) const -> int;
+
         /**
          * @brief Returns the view ID represented by the selected tab.
          * @return Active log-view ID, or a null ID for non-log tabs.
@@ -168,6 +180,7 @@ class WorkspacePresenter: public QObject
         PaginationWidget* m_pagination{nullptr};
         QPlainTextEdit* m_details_text{nullptr};
         LogLevelPieChartWidget* m_level_chart{nullptr};
+        LogDataStatusWidget* m_data_status{nullptr};
         QStackedWidget* m_central_stack{nullptr};
         DockController* m_dock_controller{nullptr};
         StackedWidgetTransition* m_page_transition{nullptr};
@@ -176,4 +189,6 @@ class WorkspacePresenter: public QObject
         bool m_session_restore_in_progress{false};
         /** @brief Views whose loaded columns have not yet been sized while visible. */
         QSet<QUuid> m_pending_column_resize_views;
+        /** @brief Views whose cache-backed source import is currently in progress. */
+        QSet<QUuid> m_importing_views;
 };

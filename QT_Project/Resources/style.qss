@@ -1803,6 +1803,31 @@ TabWidget#tabWidgetLog TabBar::tab {
     border-top-right-radius: @custom-tab-widget-log-tab-border-radius-top;
 }
 
+/* --- Log Data Status ------------------------------------------------------ */
+QWidget#LogDataStatusWidget {
+    background: transparent;
+}
+
+QWidget#LogDataStatusWidget QLabel {
+    min-height: 0;
+    padding: 0;
+    background: transparent;
+    color: @text-color-secondary;
+    font-size: 9pt;
+}
+
+QWidget#LogDataStatusWidget QLabel[variant="separator"] {
+    color: @border-color-primary;
+}
+
+QWidget#LogDataStatusWidget QLabel#labelCacheStatus[cacheState="current"] {
+    color: @status-success-color;
+}
+
+QWidget#LogDataStatusWidget QLabel#labelCacheStatus[cacheState="updating"] {
+    color: @action-warning-color;
+}
+
 /* --- DockWidget ----------------------------------------------------------- */
 DockWidget QWidget#dock_title_bar {
     border-bottom: @dock-widget-title-bar-border-bottom-width solid @dock-widget-title-bar-border-color;
