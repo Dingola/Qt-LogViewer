@@ -323,6 +323,47 @@ TEST_F(WorkspacePresenterTest, PresentsSelectedRowDetails)
 }
 
 /**
+ * @test Verifies that switching tabs restores the active view's selection or clears stale details.
+ */
+TEST_F(WorkspacePresenterTest, RefreshesSelectedRowDetailsWhenSwitchingTabs)
+{
+    const QUuid first_view =
+        add_log_view({QStringLiteral("2024-01-01 12:00:00 INFO FirstDetail FirstApp")});
+    const QUuid second_view =
+        add_log_view({QStringLiteral("2024-01-01 13:00:00 ERROR SecondDetail SecondApp")});
+    ASSERT_FALSE(first_view.isNull());
+    ASSERT_FALSE(second_view.isNull());
+
+    const int first_index = m_tab_widget->find_view_index(first_view);
+    const int second_index = m_tab_widget->find_view_index(second_view);
+    ASSERT_GE(first_index, 0);
+    ASSERT_GE(second_index, 0);
+    LogViewWidget* first_widget = m_tab_widget->log_view_at(first_index);
+    LogViewWidget* second_widget = m_tab_widget->log_view_at(second_index);
+    ASSERT_NE(first_widget, nullptr);
+    ASSERT_NE(second_widget, nullptr);
+    LogTableView* first_table = first_widget->get_table_view();
+    LogTableView* second_table = second_widget->get_table_view();
+    ASSERT_NE(first_table, nullptr);
+    ASSERT_NE(second_table, nullptr);
+    ASSERT_NE(first_table->model(), nullptr);
+    ASSERT_NE(second_table->model(), nullptr);
+
+    m_tab_widget->setCurrentIndex(first_index);
+    first_table->setCurrentIndex(first_table->model()->index(0, 0));
+    ASSERT_TRUE(m_details_text->toPlainText().contains(QStringLiteral("FirstDetail")));
+
+    m_tab_widget->setCurrentIndex(second_index);
+    EXPECT_TRUE(m_details_text->toPlainText().isEmpty());
+
+    second_table->setCurrentIndex(second_table->model()->index(0, 0));
+    ASSERT_TRUE(m_details_text->toPlainText().contains(QStringLiteral("SecondDetail")));
+
+    m_tab_widget->setCurrentIndex(first_index);
+    EXPECT_TRUE(m_details_text->toPlainText().contains(QStringLiteral("FirstDetail")));
+}
+
+/**
  * @test Verifies explicit workspace and start-page selection.
  */
 TEST_F(WorkspacePresenterTest, SwitchesBetweenWorkspaceAndStartPage)

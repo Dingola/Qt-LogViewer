@@ -170,6 +170,19 @@ auto WorkspacePresenter::refresh_active_view() -> void
         reset_presentation();
     }
 
+    QModelIndex current_index;
+    if (!view_id.isNull() && m_tab_widget != nullptr)
+    {
+        LogViewWidget* log_view_widget = m_tab_widget->current_log_view();
+        LogTableView* table_view =
+            log_view_widget != nullptr ? log_view_widget->get_table_view() : nullptr;
+        if (table_view != nullptr)
+        {
+            current_index = table_view->currentIndex();
+        }
+    }
+    update_log_details(view_id, current_index);
+
     refresh_pagination();
     refresh_data_status();
 }
