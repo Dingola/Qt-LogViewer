@@ -121,7 +121,7 @@ MainWindow::MainWindow(LogViewerSettings& settings, FileCatalogController& catal
 
     ui->setupUi(this);
     setContentsMargins(9, 9, 9, 9);
-    setWindowIcon(QIcon(":/Resources/Icons/App/AppIcon.svg"));
+    setWindowIcon(QIcon(":/Resources/Icons/App/AppIcon.ico"));
 
     // Replace central widget with QStackedWidget to allow Start Page
     QWidget* old_central = this->takeCentralWidget();

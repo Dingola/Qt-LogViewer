@@ -1,5 +1,7 @@
 #include "Qt-LogViewer/Views/App/StartPageWidgetTest.h"
 
+#include <QLabel>
+#include <QPixmap>
 #include <QPushButton>
 #include <QSignalSpy>
 #include <QStackedWidget>
@@ -23,6 +25,21 @@ void StartPageWidgetTest::TearDown()
 {
     delete m_widget;
     m_widget = nullptr;
+}
+
+/**
+ * @test Verifies that the welcome heading presents the application mascot at a visible size.
+ */
+TEST_F(StartPageWidgetTest, PresentsKoalaBrandMarkWithWelcomeHeading)
+{
+    const auto* brand_icon_label = m_widget->findChild<QLabel*>(QStringLiteral("brandIconLabel"));
+
+    ASSERT_NE(brand_icon_label, nullptr);
+    const QPixmap brand_pixmap = brand_icon_label->pixmap();
+    EXPECT_FALSE(brand_pixmap.isNull());
+    EXPECT_EQ(brand_pixmap.size(), QSize(40, 40));
+    EXPECT_EQ(brand_icon_label->alignment(), Qt::AlignCenter);
+    EXPECT_FALSE(brand_icon_label->accessibleName().isEmpty());
 }
 
 /**

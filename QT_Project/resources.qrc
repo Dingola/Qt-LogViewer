@@ -1,6 +1,7 @@
 <RCC>
 	<qresource prefix="/">
 		<file>Resources/style.qss</file>
+		<file>Resources/Icons/App/AppIcon.ico</file>
 		<file>Resources/Icons/App/AppIcon.svg</file>
 		<file>Resources/Icons/check-light.svg</file>
 		<file>Resources/Icons/check-dark.svg</file>

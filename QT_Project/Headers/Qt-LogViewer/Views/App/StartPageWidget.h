@@ -96,6 +96,11 @@ class StartPageWidget: public QWidget
         auto setup_table_views() -> void;
 
         /**
+         * @brief Configures the Koala brand mark shown beside the start-page welcome heading.
+         */
+        auto setup_branding() -> void;
+
+        /**
          * @brief Wire button clicks to signals.
          */
         auto setup_connections() -> void;

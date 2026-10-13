@@ -17,7 +17,7 @@ struct LogViewerApplicationOptions {
         QSize initial_window_size{1120, 800};  ///< Initial size of the outer window.
         QString window_title{QStringLiteral("Qt-LogViewer")};  ///< Title-bar text.
         QString window_icon_path{
-            QStringLiteral(":/Resources/Icons/App/AppIcon.svg")};  ///< Resource or file path.
+            QStringLiteral(":/Resources/Icons/App/AppIcon.ico")};  ///< Resource or file path.
         bool adopt_menubar{true};  ///< Whether the title bar adopts the main menu.
 };
 

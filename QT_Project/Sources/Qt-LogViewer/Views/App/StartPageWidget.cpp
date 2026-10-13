@@ -9,9 +9,12 @@
 #include <QAbstractItemView>
 #include <QAction>
 #include <QDateTime>
+#include <QIcon>
+#include <QLabel>
 #include <QListView>
 #include <QModelIndex>
 #include <QPushButton>
+#include <QSize>
 #include <QStackedWidget>
 #include <QVariant>
 
@@ -20,6 +23,12 @@
 #include "Qt-LogViewer/Views/Shared/RecentItemDelegate.h"
 #include "ui_StartPageWidget.h"
 
+namespace
+{
+constexpr int k_brand_icon_size_px = 40;
+constexpr auto k_brand_icon_path = ":/Resources/Icons/App/AppIcon.svg";
+}  // namespace
+
 /**
  * @brief Construct the StartPageWidget UI wrapper.
  * @param parent Parent widget.
@@ -27,10 +36,22 @@
 StartPageWidget::StartPageWidget(QWidget* parent): QWidget(parent), ui(new Ui::StartPageWidget)
 {
     ui->setupUi(this);
+    setup_branding();
     setup_table_views();
     setup_empty_states();
     setup_connections();
     update_buttons_state();
+}
+
+/**
+ * @brief Configures the Koala brand mark shown beside the start-page welcome heading.
+ */
+auto StartPageWidget::setup_branding() -> void
+{
+    const QIcon brand_icon(QString::fromLatin1(k_brand_icon_path));
+    ui->brandIconLabel->setPixmap(
+        brand_icon.pixmap(QSize(k_brand_icon_size_px, k_brand_icon_size_px)));
+    ui->brandIconLabel->setAccessibleName(tr("Qt-LogViewer Koala logo"));
 }
 
 /**

@@ -249,6 +249,10 @@ target_sources(${PROJECT_NAME}
         ${UI_HEADERS}
 )
 
+if (WIN32 AND ${MAIN_PROJECT_NAME}_BUILD_TARGET_TYPE STREQUAL executable)
+    target_sources(${PROJECT_NAME} PRIVATE Resources/Icons/App/AppIcon.rc)
+endif()
+
 if (WIN32)
     if (${MAIN_PROJECT_NAME}_BUILD_TARGET_TYPE STREQUAL executable)
         # Prefer Qt's deploy support if available
