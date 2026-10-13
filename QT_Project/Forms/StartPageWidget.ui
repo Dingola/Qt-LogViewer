@@ -84,6 +84,9 @@
         </property>
         <item>
          <widget class="QPushButton" name="openFileButton">
+          <property name="actionRole" stdset="0">
+           <string>primary</string>
+          </property>
           <property name="text">
            <string>Open Log File...</string>
           </property>
@@ -91,6 +94,9 @@
         </item>
         <item>
          <widget class="QPushButton" name="openSessionButton">
+          <property name="actionRole" stdset="0">
+           <string>secondary</string>
+          </property>
           <property name="text">
            <string>Open Session...</string>
           </property>
@@ -98,6 +104,9 @@
         </item>
         <item>
          <widget class="QPushButton" name="reopenSessionButton">
+          <property name="actionRole" stdset="0">
+           <string>ghost</string>
+          </property>
           <property name="text">
            <string>Reopen Last Session</string>
           </property>
@@ -166,6 +175,9 @@
             </item>
             <item>
              <widget class="QPushButton" name="openSelectedFileButton">
+              <property name="actionRole" stdset="0">
+               <string>primary</string>
+              </property>
               <property name="text">
                <string>Open Selected</string>
               </property>
@@ -173,6 +185,9 @@
             </item>
             <item>
              <widget class="QPushButton" name="clearRecentFilesButton">
+              <property name="actionRole" stdset="0">
+               <string>danger</string>
+              </property>
               <property name="text">
                <string>Clear</string>
               </property>
@@ -222,6 +237,9 @@
             </item>
             <item>
              <widget class="QPushButton" name="openSelectedSessionButton">
+              <property name="actionRole" stdset="0">
+               <string>primary</string>
+              </property>
               <property name="text">
                <string>Open Session</string>
               </property>
@@ -229,6 +247,9 @@
             </item>
             <item>
              <widget class="QPushButton" name="deleteSessionButton">
+              <property name="actionRole" stdset="0">
+               <string>danger</string>
+              </property>
               <property name="text">
                <string>Delete</string>
               </property>

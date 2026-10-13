@@ -504,9 +504,7 @@ LogImportWidget::LogImportWidget(QString file_path, LogViewerSettings& settings,
 
     ui->pushButtonNewProfile->setProperty("variant", QStringLiteral("profile-action"));
     ui->pushButtonCancel->setProperty("variant", QStringLiteral("dialog-action"));
-    ui->pushButtonCancel->setProperty("actionRole", QStringLiteral("secondary"));
     ui->pushButtonImport->setProperty("variant", QStringLiteral("dialog-action"));
-    ui->pushButtonImport->setProperty("actionRole", QStringLiteral("primary"));
     ui->labelValidation->setVisible(false);
     ui->labelPreviewSummary->setVisible(false);
     ui->gridLayout->setAlignment(ui->labelFieldHelp, Qt::AlignTop);

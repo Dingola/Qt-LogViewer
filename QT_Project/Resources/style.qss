@@ -254,9 +254,6 @@
     @log-import-action-button-font-size: @button-font-size;
     @log-import-action-button-font-weight: @button-font-weight;
     @log-import-preview-splitter-spacing: 6px;
-    @log-import-primary-bg: @status-success-color;
-    @log-import-primary-hover-bg: @status-success-color;
-    @log-import-primary-text: @Neutral-7;
     @log-import-success-text: @text-color-primary;
 
     /* LogViewWidget */
@@ -340,9 +337,6 @@
 }
 
 @Variables[Name="Dark"] {
-    @log-import-primary-bg: @button-bg-color;
-    @log-import-primary-hover-bg: @button-bg-color-hover;
-    @log-import-primary-text: @text-color-primary;
     @log-import-success-text: @status-success-color;
     /* --- GLOBAL SEMANTIC TOKENS ----------------------------------------------- */
 
@@ -424,6 +418,17 @@
     @button-bg-color-disabled: @Neutral-14;
     @button-text-color: @text-color-primary;
     @button-text-color-disabled: @text-color-disabled;
+    @button-secondary-bg-color: @Neutral-5;
+    @button-secondary-bg-color-hover: @Neutral-12;
+    @button-secondary-bg-color-pressed: @Neutral-3;
+    @button-secondary-border-color: @Neutral-12;
+    @button-secondary-text-color: @text-color-primary;
+    @button-danger-bg-color: @Neutral-5;
+    @button-danger-bg-color-hover: #623438;
+    @button-danger-bg-color-pressed: #76383c;
+    @button-danger-border-color: @action-danger-color;
+    @button-danger-text-color: #ff8a80;
+    @button-danger-text-color-hover: #ffffff;
 
     /* ToolButton */
     @tool-button-bg-color: transparent;
@@ -551,10 +556,6 @@
     @log-import-field-button-bg-color-hover: #ffb300;
     @log-import-field-button-bg-color-pressed: #ffb300;
     @log-import-field-button-text-color: @Neutral-7;
-    @log-import-secondary-button-bg-color: @Neutral-5;
-    @log-import-secondary-button-bg-color-hover: @Neutral-12;
-    @log-import-secondary-button-bg-color-pressed: @Neutral-3;
-    @log-import-secondary-button-border-color: @Neutral-12;
     @log-import-validation-bg-color: @Brand-Accent-900;
 
     /* LogViewWidget */
@@ -625,9 +626,6 @@
     @action-danger-color: #bc3838;
     @status-success-color: #27733e;
     /* Light surfaces and glyphs share the Dark theme geometry. */
-    @log-import-primary-bg: @button-bg-color;
-    @log-import-primary-hover-bg: @button-bg-color-hover;
-    @log-import-primary-text: @button-text-color;
     @log-import-success-text: #27733e;
     @table-frame-color: @border-color-primary;
     @table-grid-color: #e0e4e7;
@@ -724,6 +722,17 @@
     @button-bg-color-disabled: #e0e6eb;
     @button-text-color: #ffffff;
     @button-text-color-disabled: @text-color-disabled;
+    @button-secondary-bg-color: #f7f9fb;
+    @button-secondary-bg-color-hover: #dde4e9;
+    @button-secondary-bg-color-pressed: #d3e0ea;
+    @button-secondary-border-color: @border-color-primary;
+    @button-secondary-text-color: @text-color-primary;
+    @button-danger-bg-color: #fffafa;
+    @button-danger-bg-color-hover: #f7e1e1;
+    @button-danger-bg-color-pressed: #f0cccc;
+    @button-danger-border-color: @action-danger-color;
+    @button-danger-text-color: @action-danger-color;
+    @button-danger-text-color-hover: @action-danger-color;
 
     /* ToolButton */
     @tool-button-bg-color: #f7f9fb;
@@ -833,10 +842,6 @@
     @log-import-field-button-bg-color-hover: #ffb300;
     @log-import-field-button-bg-color-pressed: #ffb300;
     @log-import-field-button-text-color: @Neutral-7;
-    @log-import-secondary-button-bg-color: #f7f9fb;
-    @log-import-secondary-button-bg-color-hover: #dde4e9;
-    @log-import-secondary-button-bg-color-pressed: #d3e0ea;
-    @log-import-secondary-button-border-color: @border-color-primary;
     @log-import-validation-bg-color: #dce9f2;
 
     /* LogViewWidget */
@@ -1237,20 +1242,20 @@ QPushButton {
     padding: @button-padding;
     font-size: @button-font-size;
     font-weight: @button-font-weight;
-    border: 1px solid @button-border-color;
+    border: 1px solid @button-secondary-border-color;
     border-radius: @button-border-radius;
-    background-color: @button-bg-color;
-    color: @button-text-color;
+    background-color: @button-secondary-bg-color;
+    color: @button-secondary-text-color;
 }
 
 QPushButton:hover {
-    background-color: @button-bg-color-hover;
+    background-color: @button-secondary-bg-color-hover;
     border-color: @button-border-color-hover;
 }
 
 QPushButton:pressed {
-    background-color: @button-bg-color-pressed;
-    border-color: @button-border-color;
+    background-color: @button-secondary-bg-color-pressed;
+    border-color: @button-secondary-border-color;
 }
 
 QPushButton:focus {
@@ -1261,6 +1266,80 @@ QPushButton:disabled {
     background-color: @button-bg-color-disabled;
     color: @button-text-color-disabled;
     border-color: @border-color-disabled;
+}
+
+QPushButton[actionRole="primary"]:enabled {
+    border-color: @button-border-color;
+    background-color: @button-bg-color;
+    color: @button-text-color;
+    font-weight: 500;
+}
+
+QPushButton[actionRole="primary"]:enabled:hover {
+    border-color: @button-border-color-hover;
+    background-color: @button-bg-color-hover;
+}
+
+QPushButton[actionRole="primary"]:enabled:pressed {
+    border-color: @button-border-color;
+    background-color: @button-bg-color-pressed;
+}
+
+QPushButton[actionRole="secondary"]:enabled {
+    border-color: @button-secondary-border-color;
+    background-color: @button-secondary-bg-color;
+    color: @button-secondary-text-color;
+}
+
+QPushButton[actionRole="secondary"]:enabled:hover {
+    border-color: @button-border-color-hover;
+    background-color: @button-secondary-bg-color-hover;
+}
+
+QPushButton[actionRole="secondary"]:enabled:pressed {
+    border-color: @button-secondary-border-color;
+    background-color: @button-secondary-bg-color-pressed;
+}
+
+QPushButton[actionRole="ghost"]:enabled {
+    border-color: @button-secondary-border-color;
+    background-color: transparent;
+    color: @button-secondary-text-color;
+}
+
+QPushButton[actionRole="ghost"]:enabled:hover {
+    border-color: @button-secondary-border-color;
+    background-color: @button-secondary-bg-color-hover;
+}
+
+QPushButton[actionRole="ghost"]:enabled:pressed {
+    border-color: @button-secondary-border-color;
+    background-color: @button-secondary-bg-color-pressed;
+}
+
+QPushButton[actionRole="danger"]:enabled {
+    border-color: @button-danger-border-color;
+    background-color: @button-danger-bg-color;
+    color: @button-danger-text-color;
+}
+
+QPushButton[actionRole="danger"]:enabled:hover {
+    border-color: @button-danger-border-color;
+    background-color: @button-danger-bg-color-hover;
+    color: @button-danger-text-color-hover;
+}
+
+QPushButton[actionRole="danger"]:enabled:pressed {
+    border-color: @action-danger-pressed-color;
+    background-color: @button-danger-bg-color-pressed;
+    color: @button-danger-text-color-hover;
+}
+
+QPushButton[actionRole="primary"]:enabled:focus,
+QPushButton[actionRole="secondary"]:enabled:focus,
+QPushButton[actionRole="ghost"]:enabled:focus,
+QPushButton[actionRole="danger"]:enabled:focus {
+    border-color: @button-border-color-focus;
 }
 
 /* --- ToolButtons ---------------------------------------------------------- */
@@ -1920,40 +1999,6 @@ StartPageWidget QGroupBox#groupBox_3 {
     padding-top: 32px;
 }
 
-StartPageWidget QPushButton#openSessionButton:enabled,
-StartPageWidget QPushButton#reopenSessionButton:enabled,
-StartPageWidget QPushButton#clearRecentFilesButton:enabled,
-StartPageWidget QPushButton#deleteSessionButton:enabled {
-    background-color: @log-import-secondary-button-bg-color;
-    color: @text-color-primary;
-    border-color: @log-import-secondary-button-border-color;
-}
-
-StartPageWidget QPushButton#openSessionButton:enabled:hover,
-StartPageWidget QPushButton#reopenSessionButton:enabled:hover,
-StartPageWidget QPushButton#clearRecentFilesButton:enabled:hover,
-StartPageWidget QPushButton#deleteSessionButton:enabled:hover {
-    background-color: @log-import-secondary-button-bg-color-hover;
-    color: @text-color-primary;
-    border-color: @button-border-color-hover;
-}
-
-StartPageWidget QPushButton#openSessionButton:enabled:pressed,
-StartPageWidget QPushButton#reopenSessionButton:enabled:pressed,
-StartPageWidget QPushButton#clearRecentFilesButton:enabled:pressed,
-StartPageWidget QPushButton#deleteSessionButton:enabled:pressed {
-    background-color: @log-import-secondary-button-bg-color-pressed;
-    color: @text-color-primary;
-    border-color: @button-border-color;
-}
-
-StartPageWidget QPushButton#openSessionButton:enabled:focus,
-StartPageWidget QPushButton#reopenSessionButton:enabled:focus,
-StartPageWidget QPushButton#clearRecentFilesButton:enabled:focus,
-StartPageWidget QPushButton#deleteSessionButton:enabled:focus {
-    border-color: @button-border-color-focus;
-}
-
 StartPageWidget QPushButton:disabled {
     background-color: @button-bg-color-disabled;
     color: @button-text-color-disabled;
@@ -2103,45 +2148,6 @@ LogImportWidget QPushButton[variant="dialog-action"] {
     padding: @log-import-action-button-padding;
     font-size: @log-import-action-button-font-size;
     font-weight: @log-import-action-button-font-weight;
-}
-
-LogImportWidget QPushButton[actionRole="secondary"]:enabled {
-    border: 1px solid @log-import-secondary-button-border-color;
-    background-color: @log-import-secondary-button-bg-color;
-    color: @text-color-primary;
-}
-
-LogImportWidget QPushButton[actionRole="secondary"]:enabled:hover {
-    background-color: @log-import-secondary-button-bg-color-hover;
-    color: @text-color-primary;
-    border-color: @button-border-color-hover;
-}
-
-LogImportWidget QPushButton[actionRole="secondary"]:enabled:pressed {
-    background-color: @log-import-secondary-button-bg-color-pressed;
-    color: @text-color-primary;
-}
-
-LogImportWidget QPushButton[actionRole="primary"]:enabled {
-    border: 1px solid @button-border-color;
-    background-color: @log-import-primary-bg;
-    color: @log-import-primary-text;
-}
-
-LogImportWidget QPushButton[actionRole="primary"]:enabled:hover,
-LogImportWidget QPushButton[actionRole="primary"]:enabled:pressed {
-    background-color: @log-import-primary-hover-bg;
-    color: @Neutral-6;
-    border-color: @button-border-color-hover;
-}
-
-LogImportWidget QPushButton[actionRole="primary"]:enabled:pressed {
-    background-color: @button-bg-color-pressed;
-}
-
-LogImportWidget QPushButton[actionRole="primary"]:enabled:focus,
-LogImportWidget QPushButton[actionRole="secondary"]:enabled:focus {
-    border-color: @button-border-color-focus;
 }
 
 LogImportWidget QSplitter::handle:horizontal {

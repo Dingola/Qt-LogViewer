@@ -68,6 +68,9 @@
    </item>
    <item row="0" column="2">
     <widget class="QPushButton" name="pushButtonSearch">
+     <property name="actionRole" stdset="0">
+      <string>primary</string>
+     </property>
      <property name="text">
       <string>Search</string>
      </property>

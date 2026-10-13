@@ -77,6 +77,9 @@
          </item>
          <item>
           <widget class="QPushButton" name="pushButtonNewProfile">
+           <property name="actionRole" stdset="0">
+            <string>secondary</string>
+           </property>
            <property name="text">
             <string>Create Profile</string>
            </property>
@@ -318,6 +321,9 @@
         </item>
         <item>
          <widget class="QPushButton" name="pushButtonCancel">
+          <property name="actionRole" stdset="0">
+           <string>secondary</string>
+          </property>
           <property name="text">
            <string>Cancel Import</string>
           </property>
@@ -325,6 +331,9 @@
         </item>
         <item>
          <widget class="QPushButton" name="pushButtonImport">
+          <property name="actionRole" stdset="0">
+           <string>primary</string>
+          </property>
           <property name="enabled">
            <bool>false</bool>
           </property>
