@@ -18,6 +18,7 @@ class QPlainTextEdit;
 class QStackedWidget;
 class SessionController;
 class WorkspacePresenter;
+class EmptyStateWidget;
 
 namespace QtCommonLib
 {
@@ -58,6 +59,10 @@ class WorkspacePresenterTest: public ::testing::Test
         LogFilterBarWidget* m_filter_bar{nullptr};
         PaginationWidget* m_pagination{nullptr};
         QPlainTextEdit* m_details_text{nullptr};
+        QStackedWidget* m_details_stack{nullptr};
+        EmptyStateWidget* m_details_empty_state{nullptr};
+        QStackedWidget* m_workspace_content_stack{nullptr};
+        EmptyStateWidget* m_workspace_empty_state{nullptr};
         LogLevelPieChartWidget* m_level_chart{nullptr};
         LogDataStatusWidget* m_data_status{nullptr};
         QStackedWidget* m_central_stack{nullptr};

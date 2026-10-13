@@ -9,6 +9,9 @@ namespace Ui
 class StartPageWidget;
 }
 
+class EmptyStateWidget;
+class QStackedWidget;
+
 /**
  * @file StartPageWidget.h
  * @brief Declares the `StartPageWidget` used on the start page to present primary actions
@@ -97,6 +100,9 @@ class StartPageWidget: public QWidget
          */
         auto setup_connections() -> void;
 
+        /** @brief Creates empty states for both recent-item lists. */
+        auto setup_empty_states() -> void;
+
         /**
          * @brief Helper to read selected file_path from `recentFilesView`.
          * @return Selected file path or empty.
@@ -114,6 +120,14 @@ class StartPageWidget: public QWidget
          */
         auto update_buttons_state() -> void;
 
+        /** @brief Selects list or empty-state pages from the current model contents.
+         */
+        auto update_empty_states() -> void;
+
     private:
         Ui::StartPageWidget* ui{nullptr};
+        QStackedWidget* m_recent_files_stack{nullptr};
+        QStackedWidget* m_recent_sessions_stack{nullptr};
+        EmptyStateWidget* m_recent_files_empty_state{nullptr};
+        EmptyStateWidget* m_recent_sessions_empty_state{nullptr};
 };

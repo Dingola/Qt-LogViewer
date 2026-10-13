@@ -42,18 +42,18 @@ set(DOC_TARGET_NAME project)
 ### Setup Project File Includes          ###
 ############################################
 
-file(GLOB_RECURSE Headers
+file(GLOB_RECURSE Headers CONFIGURE_DEPENDS
      "Headers/*.h"
      "Headers/*/*.h"
 )
 
-file(GLOB_RECURSE Sources
+file(GLOB_RECURSE Sources CONFIGURE_DEPENDS
      "main.cpp"
      "Sources/*.cpp"
      "Headers/*/*.cpp"
 )
 
-file(GLOB_RECURSE Forms
+file(GLOB_RECURSE Forms CONFIGURE_DEPENDS
     "Forms/*.ui"
     "Forms/*/*.ui"
 )

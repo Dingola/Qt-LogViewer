@@ -15,6 +15,7 @@ class QDragEnterEvent;
 class QDropEvent;
 class QCloseEvent;
 class QEvent;
+class QStackedWidget;
 
 // Forward declarations for project types used as pointers/references
 namespace Ui
@@ -49,6 +50,7 @@ class LogDataStatusWidget;
 class LogViewWidget;
 class StartPageWidget;
 class DockWidget;
+class EmptyStateWidget;
 struct SessionViewState;
 struct SessionState;
 
@@ -353,6 +355,8 @@ class MainWindow: public QtWidgetsCommonLib::AppMainWindow
         LiveTailingCoordinator* m_live_tailing{nullptr};
         LogPreviewService* m_preview{nullptr};
         DockController* m_dock_controller = nullptr;
+        /** @brief Whether the persisted dock layout has been adopted after the initial show. */
+        bool m_dock_layout_adopted{false};
         MainMenuController* m_menu_controller = nullptr;
         LogImportTabPresenter* m_log_import_tab_presenter = nullptr;
         WorkspacePresenter* m_workspace_presenter = nullptr;
@@ -374,6 +378,10 @@ class MainWindow: public QtWidgetsCommonLib::AppMainWindow
 
         // Views
         QPlainTextEdit* m_log_details_text_edit = nullptr;
+        QStackedWidget* m_log_details_stack = nullptr;
+        EmptyStateWidget* m_log_details_empty_state = nullptr;
+        QStackedWidget* m_workspace_content_stack = nullptr;
+        EmptyStateWidget* m_workspace_empty_state = nullptr;
         LogFileExplorer* m_log_file_explorer = nullptr;
         LogLevelPieChartWidget* m_log_level_pie_chart_widget = nullptr;
         LogDataStatusWidget* m_data_status_widget = nullptr;

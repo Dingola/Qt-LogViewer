@@ -3,13 +3,16 @@
 #include <QApplication>
 #include <QItemSelectionModel>
 #include <QMenu>
+#include <QPushButton>
 #include <QSignalSpy>
+#include <QStackedWidget>
 #include <QStandardItemModel>
 #include <QTemporaryFile>
 #include <QToolButton>
 
 #include "Qt-LogViewer/Views/App/LogFilterWidget.h"
 #include "Qt-LogViewer/Views/App/LogTableView.h"
+#include "Qt-LogViewer/Views/Shared/EmptyStateWidget.h"
 
 /**
  * @brief Constructs the test fixture.
@@ -126,6 +129,28 @@ TEST_F(LogViewWidgetTest, SetModelWiresSelectionForwarding)
     EXPECT_GE(spy.count(), 1);
 }
 
+/** @test Verifies contextual empty states for missing files and filtered-out
+ * rows. */
+TEST_F(LogViewWidgetTest, PresentsContextualEmptyResultState)
+{
+    QStandardItemModel model;
+    m_widget->set_model(&model);
+    auto* stack = m_widget->findChild<QStackedWidget*>(QStringLiteral("logContentStack"));
+    auto* empty_state = m_widget->findChild<EmptyStateWidget*>(QStringLiteral("logViewEmptyState"));
+    ASSERT_NE(stack, nullptr);
+    ASSERT_NE(empty_state, nullptr);
+    EXPECT_EQ(stack->currentWidget(), empty_state);
+
+    QSignalSpy reset_spy(m_widget, &LogViewWidget::reset_filters_requested);
+    m_widget->set_view_file_paths({QStringLiteral("example.log")});
+    m_widget->set_empty_result_filtered(true);
+    QPushButton* reset_button = empty_state->findChild<QPushButton*>();
+    ASSERT_NE(reset_button, nullptr);
+    EXPECT_TRUE(reset_button->isVisibleTo(empty_state));
+    reset_button->click();
+    EXPECT_EQ(reset_spy.count(), 1);
+}
+
 /**
  * @brief set_app_names and forwarded app_filter_changed signal from filter widget.
  */
@@ -141,7 +166,8 @@ TEST_F(LogViewWidgetTest, AppFilterForwardingAndGetters)
     names.insert(QStringLiteral("AppB"));
 
     m_widget->set_app_names(names);
-    // Use filter widget API to select value and expect the LogViewWidget to forward the signal
+    // Use filter widget API to select value and expect the LogViewWidget to
+    // forward the signal
     LogFilterWidget* filter = m_widget->get_filter_widget();
     ASSERT_NE(filter, nullptr);
 
@@ -224,11 +250,13 @@ TEST_F(LogViewWidgetTest, FilterVisibilityAndClearFilters)
     EXPECT_TRUE(m_widget->get_filter_widget()->isVisible());
 
     // Clear filters should reset level selection; app names list becomes empty,
-    // but current app selection may remain non-empty depending on widget behavior.
+    // but current app selection may remain non-empty depending on widget
+    // behavior.
     m_widget->clear_filters();
     EXPECT_TRUE(m_widget->get_filter_widget()->get_current_log_levels().isEmpty());
 
-    // After clearing, attempting to select a non-existent app should not result in "AppA"
+    // After clearing, attempting to select a non-existent app should not result
+    // in "AppA"
     QSignalSpy spy_app(m_widget, &LogViewWidget::app_filter_changed);
     filter->set_current_app_name_filter(QStringLiteral("AppA"));
     QApplication::processEvents();

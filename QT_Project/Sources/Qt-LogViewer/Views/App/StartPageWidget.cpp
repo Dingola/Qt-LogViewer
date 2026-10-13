@@ -7,13 +7,16 @@
 
 #include <QAbstractItemModel>
 #include <QAbstractItemView>
+#include <QAction>
 #include <QDateTime>
 #include <QListView>
 #include <QModelIndex>
 #include <QPushButton>
+#include <QStackedWidget>
 #include <QVariant>
 
 #include "Qt-LogViewer/Models/RecentRoles.h"
+#include "Qt-LogViewer/Views/Shared/EmptyStateWidget.h"
 #include "Qt-LogViewer/Views/Shared/RecentItemDelegate.h"
 #include "ui_StartPageWidget.h"
 
@@ -25,6 +28,7 @@ StartPageWidget::StartPageWidget(QWidget* parent): QWidget(parent), ui(new Ui::S
 {
     ui->setupUi(this);
     setup_table_views();
+    setup_empty_states();
     setup_connections();
     update_buttons_state();
 }
@@ -66,15 +70,22 @@ auto StartPageWidget::set_recent_files_model(QAbstractItemModel* model) -> void
     {
         connect(ui->recentFilesView->selectionModel(), &QItemSelectionModel::selectionChanged, this,
                 [this]() { update_buttons_state(); });
-        connect(files_model, &QAbstractItemModel::modelReset, this,
-                [this]() { update_buttons_state(); });
-        connect(files_model, &QAbstractItemModel::rowsInserted, this,
-                [this]() { update_buttons_state(); });
-        connect(files_model, &QAbstractItemModel::rowsRemoved, this,
-                [this]() { update_buttons_state(); });
+        connect(files_model, &QAbstractItemModel::modelReset, this, [this]() {
+            update_buttons_state();
+            update_empty_states();
+        });
+        connect(files_model, &QAbstractItemModel::rowsInserted, this, [this]() {
+            update_buttons_state();
+            update_empty_states();
+        });
+        connect(files_model, &QAbstractItemModel::rowsRemoved, this, [this]() {
+            update_buttons_state();
+            update_empty_states();
+        });
     }
 
     update_buttons_state();
+    update_empty_states();
 }
 
 /**
@@ -106,15 +117,22 @@ auto StartPageWidget::set_recent_sessions_model(QAbstractItemModel* model) -> vo
     {
         connect(ui->recentSessionsView->selectionModel(), &QItemSelectionModel::selectionChanged,
                 this, [this]() { update_buttons_state(); });
-        connect(session_model, &QAbstractItemModel::modelReset, this,
-                [this]() { update_buttons_state(); });
-        connect(session_model, &QAbstractItemModel::rowsInserted, this,
-                [this]() { update_buttons_state(); });
-        connect(session_model, &QAbstractItemModel::rowsRemoved, this,
-                [this]() { update_buttons_state(); });
+        connect(session_model, &QAbstractItemModel::modelReset, this, [this]() {
+            update_buttons_state();
+            update_empty_states();
+        });
+        connect(session_model, &QAbstractItemModel::rowsInserted, this, [this]() {
+            update_buttons_state();
+            update_empty_states();
+        });
+        connect(session_model, &QAbstractItemModel::rowsRemoved, this, [this]() {
+            update_buttons_state();
+            update_empty_states();
+        });
     }
 
     update_buttons_state();
+    update_empty_states();
 }
 
 /**
@@ -158,6 +176,56 @@ auto StartPageWidget::setup_table_views() -> void
             lv->setSpacing(4);
         }
     }
+}
+
+/** @brief Creates compact empty states that reuse the start page's existing
+ * actions. */
+auto StartPageWidget::setup_empty_states() -> void
+{
+    m_recent_files_stack = new QStackedWidget(ui->recentFilesView->parentWidget());
+    m_recent_files_stack->setObjectName(QStringLiteral("recentFilesStack"));
+    ui->verticalLayout->replaceWidget(ui->recentFilesView, m_recent_files_stack);
+    ui->recentFilesView->setParent(m_recent_files_stack);
+    m_recent_files_stack->addWidget(ui->recentFilesView);
+
+    m_recent_files_empty_state = new EmptyStateWidget(m_recent_files_stack);
+    m_recent_files_empty_state->setObjectName(QStringLiteral("recentFilesEmptyState"));
+    m_recent_files_empty_state->set_density(EmptyStateWidget::Density::Compact);
+    m_recent_files_empty_state->set_alignment(Qt::AlignCenter);
+    m_recent_files_empty_state->set_title(tr("No recent log files"));
+    m_recent_files_empty_state->set_description(
+        tr("Files you open will appear here for quick access."));
+    m_recent_files_empty_state->set_drop_text(tr("Drop log files anywhere in this window"));
+    m_recent_files_empty_state->set_drop_space_reserved(true);
+    m_recent_files_empty_state->set_drop_state(EmptyStateWidget::DropState::Available);
+    auto* open_file_action = new QAction(tr("Open Log File..."), this);
+    connect(open_file_action, &QAction::triggered, this, &StartPageWidget::open_log_file_requested);
+    m_recent_files_empty_state->add_action(open_file_action, EmptyStateWidget::ActionRole::Primary);
+    m_recent_files_stack->addWidget(m_recent_files_empty_state);
+
+    m_recent_sessions_stack = new QStackedWidget(ui->recentSessionsView->parentWidget());
+    m_recent_sessions_stack->setObjectName(QStringLiteral("recentSessionsStack"));
+    ui->verticalLayout_2->replaceWidget(ui->recentSessionsView, m_recent_sessions_stack);
+    ui->recentSessionsView->setParent(m_recent_sessions_stack);
+    m_recent_sessions_stack->addWidget(ui->recentSessionsView);
+
+    m_recent_sessions_empty_state = new EmptyStateWidget(m_recent_sessions_stack);
+    m_recent_sessions_empty_state->setObjectName(QStringLiteral("recentSessionsEmptyState"));
+    m_recent_sessions_empty_state->set_density(EmptyStateWidget::Density::Compact);
+    m_recent_sessions_empty_state->set_alignment(Qt::AlignCenter);
+    m_recent_sessions_empty_state->set_title(tr("No saved sessions"));
+    m_recent_sessions_empty_state->set_description(
+        tr("Saved sessions let you return to the same files and views later."));
+    m_recent_sessions_empty_state->set_drop_text(tr("Drop log files anywhere in this window"));
+    m_recent_sessions_empty_state->set_drop_space_reserved(true);
+    auto* open_session_action = new QAction(tr("Open Session..."), this);
+    connect(open_session_action, &QAction::triggered, this,
+            &StartPageWidget::open_session_requested);
+    m_recent_sessions_empty_state->add_action(open_session_action,
+                                              EmptyStateWidget::ActionRole::Primary);
+    m_recent_sessions_stack->addWidget(m_recent_sessions_empty_state);
+
+    update_empty_states();
 }
 
 /**
@@ -319,4 +387,30 @@ auto StartPageWidget::update_buttons_state() -> void
 
     const bool enable_reopen_last_session = sessions_has_items;
     ui->reopenSessionButton->setEnabled(enable_reopen_last_session);
+}
+
+/** @brief Shows recent lists only while their assigned models contain rows. */
+auto StartPageWidget::update_empty_states() -> void
+{
+    const QAbstractItemModel* files_model = ui->recentFilesView->model();
+    const bool files_have_items = files_model != nullptr && files_model->rowCount() > 0;
+    if (m_recent_files_stack != nullptr)
+    {
+        m_recent_files_stack->setCurrentWidget(files_have_items
+                                                   ? static_cast<QWidget*>(ui->recentFilesView)
+                                                   : m_recent_files_empty_state);
+    }
+    ui->openSelectedFileButton->setVisible(files_have_items);
+    ui->clearRecentFilesButton->setVisible(files_have_items);
+
+    const QAbstractItemModel* sessions_model = ui->recentSessionsView->model();
+    const bool sessions_have_items = sessions_model != nullptr && sessions_model->rowCount() > 0;
+    if (m_recent_sessions_stack != nullptr)
+    {
+        m_recent_sessions_stack->setCurrentWidget(
+            sessions_have_items ? static_cast<QWidget*>(ui->recentSessionsView)
+                                : m_recent_sessions_empty_state);
+    }
+    ui->openSelectedSessionButton->setVisible(sessions_have_items);
+    ui->deleteSessionButton->setVisible(sessions_have_items);
 }

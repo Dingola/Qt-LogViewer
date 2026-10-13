@@ -37,11 +37,11 @@ set(DOC_TARGET_NAME tests)
 ### Setup Project File Includes          ###
 ############################################
 
-file(GLOB_RECURSE Headers
+file(GLOB_RECURSE Headers CONFIGURE_DEPENDS
      "Headers/*.h"
 )
 
-file(GLOB_RECURSE Sources
+file(GLOB_RECURSE Sources CONFIGURE_DEPENDS
      "main.cpp"
      "Sources/*.cpp"
 )

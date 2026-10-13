@@ -74,6 +74,15 @@ class DockController: public QObject
          */
         auto capture_current_sizes() -> void;
 
+        /**
+         * @brief Adopts a layout restored externally by QMainWindow.
+         * @param suspended True to preserve the restored layout while hiding its docks.
+         *
+         * This replaces any pre-show suspension snapshot so a later resume cannot overwrite
+         * persisted dock sizes with the construction-time layout.
+         */
+        auto adopt_restored_layout(bool suspended) -> void;
+
     protected:
         /**
          * @brief Tracks user-selected dock sizes.

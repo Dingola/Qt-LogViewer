@@ -32,6 +32,7 @@
 #include "Qt-LogViewer/Views/App/LogTabWidget.h"
 #include "Qt-LogViewer/Views/App/LogTableView.h"
 #include "Qt-LogViewer/Views/App/LogViewWidget.h"
+#include "Qt-LogViewer/Views/Shared/EmptyStateWidget.h"
 #include "Qt-LogViewer/Views/Shared/PaginationWidget.h"
 #include "Qt-LogViewer/Views/Shared/TabWidget.h"
 
@@ -54,8 +55,12 @@
  * @param filter_bar Shared filter and search controls.
  * @param pagination Shared pagination controls.
  * @param details_text Shared selected-entry details output.
+ * @param details_stack Stack containing details and their empty presentation.
+ * @param details_empty_state Empty presentation used while no row is selected.
  * @param level_chart Shared log-level distribution widget.
  * @param data_status Shared compact active-view data status.
+ * @param workspace_content_stack Stack containing log tabs and the empty
+ * workspace.
  * @param central_stack Stack containing workspace and start-page pages.
  * @param dock_controller Controller used to suspend docks on the start page.
  * @param parent Optional QObject parent.
@@ -65,9 +70,10 @@ WorkspacePresenter::WorkspacePresenter(
     LogPageCoordinator* pages, LogQueryController* queries, LogImportCoordinator* imports,
     ViewLifecycleCoordinator* lifecycle, SessionController* session_controller,
     LogTabWidget* tab_widget, LogFilterBarWidget* filter_bar, PaginationWidget* pagination,
-    QPlainTextEdit* details_text, LogLevelPieChartWidget* level_chart,
-    LogDataStatusWidget* data_status, QStackedWidget* central_stack,
-    DockController* dock_controller, QObject* parent)
+    QPlainTextEdit* details_text, QStackedWidget* details_stack,
+    EmptyStateWidget* details_empty_state, LogLevelPieChartWidget* level_chart,
+    LogDataStatusWidget* data_status, QStackedWidget* workspace_content_stack,
+    QStackedWidget* central_stack, DockController* dock_controller, QObject* parent)
     : QObject(parent),
       m_views(views),
       m_filters(filters),
@@ -81,8 +87,11 @@ WorkspacePresenter::WorkspacePresenter(
       m_filter_bar(filter_bar),
       m_pagination(pagination),
       m_details_text(details_text),
+      m_details_stack(details_stack),
+      m_details_empty_state(details_empty_state),
       m_level_chart(level_chart),
       m_data_status(data_status),
+      m_workspace_content_stack(workspace_content_stack),
       m_central_stack(central_stack),
       m_dock_controller(dock_controller)
 {
@@ -135,6 +144,11 @@ auto WorkspacePresenter::bind_log_view_presenter(LogViewPresenter* presenter) ->
 auto WorkspacePresenter::refresh_active_view() -> void
 {
     const QUuid view_id = get_active_view_id();
+
+    if (m_workspace_content_stack != nullptr && m_tab_widget != nullptr)
+    {
+        m_workspace_content_stack->setCurrentIndex(m_tab_widget->count() > 0 ? 0 : 1);
+    }
 
     if (!view_id.isNull() && m_filters != nullptr && m_history != nullptr && m_pages != nullptr &&
         m_queries != nullptr && m_filter_bar != nullptr)
@@ -276,6 +290,10 @@ auto WorkspacePresenter::reset_presentation() -> void
     if (m_details_text != nullptr)
     {
         m_details_text->clear();
+    }
+    if (m_details_stack != nullptr && m_details_empty_state != nullptr)
+    {
+        m_details_stack->setCurrentWidget(m_details_empty_state);
     }
 
     if (m_data_status != nullptr)
@@ -666,6 +684,12 @@ auto WorkspacePresenter::update_log_details(const QUuid& view_id,
     if (m_details_text != nullptr)
     {
         m_details_text->setPlainText(details);
+    }
+    if (m_details_stack != nullptr && m_details_empty_state != nullptr && m_details_text != nullptr)
+    {
+        m_details_stack->setCurrentWidget(details.isEmpty()
+                                              ? static_cast<QWidget*>(m_details_empty_state)
+                                              : static_cast<QWidget*>(m_details_text));
     }
 }
 

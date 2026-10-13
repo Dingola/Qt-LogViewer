@@ -125,6 +125,31 @@ auto DockController::capture_current_sizes() -> void
 }
 
 /**
+ * @brief Adopts a layout restored externally by QMainWindow.
+ * @param suspended True to preserve the restored layout while hiding its docks.
+ */
+auto DockController::adopt_restored_layout(bool suspended) -> void
+{
+    capture_current_sizes();
+    m_suspended_layout_state =
+        suspended && m_main_window != nullptr ? m_main_window->saveState() : QByteArray();
+    m_docks_suspended = suspended;
+
+    for (const QPointer<QDockWidget>& dock_pointer: std::as_const(m_docks))
+    {
+        QDockWidget* dock_widget = dock_pointer.data();
+        if (dock_widget != nullptr)
+        {
+            dock_widget->toggleViewAction()->setEnabled(!suspended);
+            if (suspended)
+            {
+                dock_widget->setVisible(false);
+            }
+        }
+    }
+}
+
+/**
  * @brief Requests preferred extents without constraining the layout's minimum sizes.
  * @param restore_width True to restore the preferred width of each dock.
  * @param restore_height True to restore the preferred height of each dock.

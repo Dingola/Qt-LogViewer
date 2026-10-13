@@ -27,6 +27,7 @@
 #include "Qt-LogViewer/Views/App/LogTabWidget.h"
 #include "Qt-LogViewer/Views/App/LogTableView.h"
 #include "Qt-LogViewer/Views/App/LogViewWidget.h"
+#include "Qt-LogViewer/Views/Shared/EmptyStateWidget.h"
 #include "Qt-LogViewer/Views/Shared/PaginationWidget.h"
 #include "QtCommonLib/TestSupport/TestFileSystem.h"
 
@@ -44,11 +45,19 @@ void WorkspacePresenterTest::SetUp()
 {
     m_file_system = new TestFileSystem();
     m_runtime = new TestLogRuntime(m_profile);
-    m_tab_widget = new LogTabWidget();
+    m_workspace_content_stack = new QStackedWidget();
+    m_tab_widget = new LogTabWidget(m_workspace_content_stack);
     m_tab_widget->setup_default_behavior();
+    m_workspace_content_stack->addWidget(m_tab_widget);
+    m_workspace_empty_state = new EmptyStateWidget(m_workspace_content_stack);
+    m_workspace_content_stack->addWidget(m_workspace_empty_state);
     m_filter_bar = new LogFilterBarWidget();
     m_pagination = new PaginationWidget();
-    m_details_text = new QPlainTextEdit();
+    m_details_stack = new QStackedWidget();
+    m_details_text = new QPlainTextEdit(m_details_stack);
+    m_details_stack->addWidget(m_details_text);
+    m_details_empty_state = new EmptyStateWidget(m_details_stack);
+    m_details_stack->addWidget(m_details_empty_state);
     m_level_chart = new LogLevelPieChartWidget();
     m_data_status = new LogDataStatusWidget();
     m_central_stack = new QStackedWidget();
@@ -62,7 +71,8 @@ void WorkspacePresenterTest::SetUp()
     m_presenter = new WorkspacePresenter(
         &m_runtime->views(), &m_runtime->filters(), &m_runtime->history(), &m_runtime->pages(),
         &m_runtime->queries(), &m_runtime->imports(), &m_runtime->lifecycle(), m_session_controller,
-        m_tab_widget, m_filter_bar, m_pagination, m_details_text, m_level_chart, m_data_status,
+        m_tab_widget, m_filter_bar, m_pagination, m_details_text, m_details_stack,
+        m_details_empty_state, m_level_chart, m_data_status, m_workspace_content_stack,
         m_central_stack, nullptr);
 }
 
@@ -75,14 +85,18 @@ void WorkspacePresenterTest::TearDown()
     m_presenter = nullptr;
     delete m_session_controller;
     m_session_controller = nullptr;
-    delete m_tab_widget;
+    delete m_workspace_content_stack;
+    m_workspace_content_stack = nullptr;
     m_tab_widget = nullptr;
+    m_workspace_empty_state = nullptr;
     delete m_filter_bar;
     m_filter_bar = nullptr;
     delete m_pagination;
     m_pagination = nullptr;
-    delete m_details_text;
+    delete m_details_stack;
+    m_details_stack = nullptr;
     m_details_text = nullptr;
+    m_details_empty_state = nullptr;
     delete m_level_chart;
     m_level_chart = nullptr;
     delete m_data_status;
@@ -135,6 +149,14 @@ auto WorkspacePresenterTest::add_log_view(const QVector<QString>& records) -> QU
     return view_id;
 }
 
+/** @test Verifies that a session without log views presents workspace guidance.
+ */
+TEST_F(WorkspacePresenterTest, PresentsEmptyWorkspaceWithoutLogViews)
+{
+    EXPECT_EQ(m_tab_widget->count(), 0);
+    EXPECT_EQ(m_workspace_content_stack->currentWidget(), m_workspace_empty_state);
+}
+
 /**
  * @test Verifies that switching tabs selects and presents each independent
  * runtime view.
@@ -147,6 +169,7 @@ TEST_F(WorkspacePresenterTest, SwitchesBetweenLogViews)
         add_log_view({QStringLiteral("2024-01-01 13:00:00 ERROR SecondMessage SecondApp")});
     ASSERT_FALSE(first_view.isNull());
     ASSERT_FALSE(second_view.isNull());
+    EXPECT_EQ(m_workspace_content_stack->currentWidget(), m_tab_widget);
 
     m_runtime->queries().set_app_name(first_view, QStringLiteral("FirstApp"));
     m_runtime->queries().set_app_name(second_view, QStringLiteral("SecondApp"));
@@ -272,7 +295,8 @@ TEST_F(WorkspacePresenterTest, AnimatesVisibleTablePageChanges)
                                         QStringLiteral("2024-01-01 12:02:00 INFO Third PageApp")});
     ASSERT_FALSE(view_id.isNull());
     emit m_pagination->items_per_page_changed(1);
-    m_tab_widget->show();
+    m_workspace_content_stack->resize(900, 500);
+    m_workspace_content_stack->show();
     QApplication::processEvents();
     SnapshotTransitionAnimator* table_transition =
         m_presenter->findChild<SnapshotTransitionAnimator*>(QString(), Qt::FindDirectChildrenOnly);
@@ -320,6 +344,7 @@ TEST_F(WorkspacePresenterTest, PresentsSelectedRowDetails)
     emit view_presenter->current_row_changed(view_id, model->index(0, 0));
 
     EXPECT_TRUE(m_details_text->toPlainText().contains(QStringLiteral("DetailMessage")));
+    EXPECT_EQ(m_details_stack->currentWidget(), m_details_text);
 }
 
 /**
@@ -355,6 +380,7 @@ TEST_F(WorkspacePresenterTest, RefreshesSelectedRowDetailsWhenSwitchingTabs)
 
     m_tab_widget->setCurrentIndex(second_index);
     EXPECT_TRUE(m_details_text->toPlainText().isEmpty());
+    EXPECT_EQ(m_details_stack->currentWidget(), m_details_empty_state);
 
     second_table->setCurrentIndex(second_table->model()->index(0, 0));
     ASSERT_TRUE(m_details_text->toPlainText().contains(QStringLiteral("SecondDetail")));
@@ -411,8 +437,9 @@ TEST_F(WorkspacePresenterTest, SuspendsDocksWithoutStartingAnotherPageTransition
     WorkspacePresenter presenter(&m_runtime->views(), &m_runtime->filters(), &m_runtime->history(),
                                  &m_runtime->pages(), &m_runtime->queries(), &m_runtime->imports(),
                                  &m_runtime->lifecycle(), nullptr, m_tab_widget, m_filter_bar,
-                                 m_pagination, m_details_text, m_level_chart, m_data_status,
-                                 central_stack, &dock_controller);
+                                 m_pagination, m_details_text, m_details_stack,
+                                 m_details_empty_state, m_level_chart, m_data_status,
+                                 m_workspace_content_stack, central_stack, &dock_controller);
 
     EXPECT_EQ(central_stack->currentIndex(), 1);
     EXPECT_TRUE(dock_widget->isHidden());
@@ -429,6 +456,7 @@ TEST_F(WorkspacePresenterTest, ClearsPresentationAfterLastViewCloses)
     ASSERT_TRUE(m_runtime->lifecycle().close_view(view_id));
 
     EXPECT_EQ(m_tab_widget->count(), 0);
+    EXPECT_EQ(m_workspace_content_stack->currentWidget(), m_workspace_empty_state);
     EXPECT_TRUE(m_pagination->isHidden());
     EXPECT_TRUE(m_details_text->toPlainText().isEmpty());
 }

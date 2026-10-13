@@ -27,6 +27,7 @@ class QStackedWidget;
 class SessionController;
 class SnapshotTransitionAnimator;
 class StackedWidgetTransition;
+class EmptyStateWidget;
 
 /**
  * @file WorkspacePresenter.h
@@ -61,22 +62,27 @@ class WorkspacePresenter: public QObject
          * @param filter_bar Shared filter and search controls.
          * @param pagination Shared pagination controls.
          * @param details_text Shared selected-entry details output.
+         * @param details_stack Stack containing details and their empty presentation.
+         * @param details_empty_state Empty presentation used while no row is
+         * selected.
          * @param level_chart Shared log-level distribution widget.
          * @param data_status Shared compact active-view data status.
+         * @param workspace_content_stack Stack containing log tabs and the empty
+         * workspace.
          * @param central_stack Stack containing workspace and start-page pages.
          * @param dock_controller Controller used to suspend docks on the start page.
          * @param parent Optional QObject parent.
          */
-        explicit WorkspacePresenter(ViewRegistry* views, FilterCoordinator* filters,
-                                    LogHistoryService* history, LogPageCoordinator* pages,
-                                    LogQueryController* queries, LogImportCoordinator* imports,
-                                    ViewLifecycleCoordinator* lifecycle,
-                                    SessionController* session_controller, LogTabWidget* tab_widget,
-                                    LogFilterBarWidget* filter_bar, PaginationWidget* pagination,
-                                    QPlainTextEdit* details_text,
-                                    LogLevelPieChartWidget* level_chart,
-                                    LogDataStatusWidget* data_status, QStackedWidget* central_stack,
-                                    DockController* dock_controller, QObject* parent = nullptr);
+        explicit WorkspacePresenter(
+            ViewRegistry* views, FilterCoordinator* filters, LogHistoryService* history,
+            LogPageCoordinator* pages, LogQueryController* queries, LogImportCoordinator* imports,
+            ViewLifecycleCoordinator* lifecycle, SessionController* session_controller,
+            LogTabWidget* tab_widget, LogFilterBarWidget* filter_bar, PaginationWidget* pagination,
+            QPlainTextEdit* details_text, QStackedWidget* details_stack,
+            EmptyStateWidget* details_empty_state, LogLevelPieChartWidget* level_chart,
+            LogDataStatusWidget* data_status, QStackedWidget* workspace_content_stack,
+            QStackedWidget* central_stack, DockController* dock_controller,
+            QObject* parent = nullptr);
 
         /**
          * @brief Connects one per-view presenter to shared detail presentation.
@@ -179,8 +185,11 @@ class WorkspacePresenter: public QObject
         LogFilterBarWidget* m_filter_bar{nullptr};
         PaginationWidget* m_pagination{nullptr};
         QPlainTextEdit* m_details_text{nullptr};
+        QStackedWidget* m_details_stack{nullptr};
+        EmptyStateWidget* m_details_empty_state{nullptr};
         LogLevelPieChartWidget* m_level_chart{nullptr};
         LogDataStatusWidget* m_data_status{nullptr};
+        QStackedWidget* m_workspace_content_stack{nullptr};
         QStackedWidget* m_central_stack{nullptr};
         DockController* m_dock_controller{nullptr};
         StackedWidgetTransition* m_page_transition{nullptr};

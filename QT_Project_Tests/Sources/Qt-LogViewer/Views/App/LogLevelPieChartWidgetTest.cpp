@@ -3,6 +3,8 @@
 #include <QColor>
 #include <QMap>
 
+#include "Qt-LogViewer/Views/Shared/EmptyStateWidget.h"
+
 /**
  * @brief Sets up the test fixture for each test.
  */
@@ -233,6 +235,10 @@ TEST_F(LogLevelPieChartWidgetTest, NoRowsWhenTotalZero)
     auto* levels_widget = m_widget->findChild<QWidget*>("logLevelRowsWidget");
     ASSERT_NE(levels_widget, nullptr);
     EXPECT_FALSE(levels_widget->isVisible());
+    const auto* empty_state =
+        m_widget->findChild<EmptyStateWidget*>(QStringLiteral("logLevelChartEmptyState"));
+    ASSERT_NE(empty_state, nullptr);
+    EXPECT_FALSE(empty_state->isHidden());
 }
 
 /**

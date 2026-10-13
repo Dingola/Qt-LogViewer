@@ -1,16 +1,19 @@
 #include "Qt-LogViewer/Views/App/LogViewWidget.h"
 
+#include <QAction>
 #include <QCheckBox>
 #include <QItemSelectionModel>
 #include <QLayout>
 #include <QMenu>
 #include <QPainter>
+#include <QStackedWidget>
 #include <QToolButton>
 
 #include "Qt-LogViewer/Views/App/FilesInViewMenuItemWidget.h"
 #include "Qt-LogViewer/Views/App/FilesInViewWidgetAction.h"
 #include "Qt-LogViewer/Views/App/LogFilterWidget.h"
 #include "Qt-LogViewer/Views/App/LogTableView.h"
+#include "Qt-LogViewer/Views/Shared/EmptyStateWidget.h"
 #include "QtWidgetsCommonLib/Utils/UiUtils.h"
 #include "ui_LogViewWidget.h"
 
@@ -38,6 +41,7 @@ LogViewWidget::LogViewWidget(QWidget* parent)
     ui->setupUi(this);
     setAttribute(Qt::WA_StyledBackground, true);
     ui->verticalLayout->setContentsMargins(9, 0, 9, 0);
+    setup_empty_state();
 
     // Forward filter signals
     connect(ui->logFilterWidget, &LogFilterWidget::app_filter_changed, this,
@@ -112,6 +116,14 @@ auto LogViewWidget::set_model(QAbstractItemModel* model) -> void
         connect(selection_model, &QItemSelectionModel::currentRowChanged, this,
                 &LogViewWidget::current_row_changed);
     }
+
+    if (model != nullptr)
+    {
+        connect(model, &QAbstractItemModel::modelReset, this, [this] { update_empty_state(); });
+        connect(model, &QAbstractItemModel::rowsInserted, this, [this] { update_empty_state(); });
+        connect(model, &QAbstractItemModel::rowsRemoved, this, [this] { update_empty_state(); });
+    }
+    update_empty_state();
 }
 
 /**
@@ -255,6 +267,77 @@ auto LogViewWidget::set_view_file_paths(const QVector<QString>& file_paths) -> v
 {
     m_view_file_paths = file_paths;
     rebuild_files_menu();
+    update_empty_state();
+}
+
+/**
+ * @brief Updates whether an empty model represents an active filter result.
+ * @param filtered True when filters are active.
+ */
+auto LogViewWidget::set_empty_result_filtered(bool filtered) -> void
+{
+    m_empty_result_filtered = filtered;
+    update_empty_state();
+}
+
+/** @brief Creates the stacked table presentation and reusable empty state. */
+auto LogViewWidget::setup_empty_state() -> void
+{
+    m_content_stack = new QStackedWidget(ui->logTableView->parentWidget());
+    m_content_stack->setObjectName(QStringLiteral("logContentStack"));
+    ui->verticalLayout->replaceWidget(ui->logTableView, m_content_stack);
+    ui->logTableView->setParent(m_content_stack);
+    m_content_stack->addWidget(ui->logTableView);
+
+    m_empty_state = new EmptyStateWidget(m_content_stack);
+    m_empty_state->setObjectName(QStringLiteral("logViewEmptyState"));
+    m_empty_state->set_drop_text(tr("Drop log files anywhere in this window"));
+    m_reset_filters_action = new QAction(tr("Reset Filters"), this);
+    connect(m_reset_filters_action, &QAction::triggered, this,
+            &LogViewWidget::reset_filters_requested);
+    m_empty_state->add_action(m_reset_filters_action, EmptyStateWidget::ActionRole::Secondary);
+    m_content_stack->addWidget(m_empty_state);
+    update_empty_state();
+}
+
+/** @brief Selects the table or explains why the current log view has no rows.
+ */
+auto LogViewWidget::update_empty_state() -> void
+{
+    const QAbstractItemModel* model = ui->logTableView->model();
+    const bool has_rows = model != nullptr && model->rowCount() > 0;
+    const bool has_files = !m_view_file_paths.isEmpty();
+
+    if (m_content_stack != nullptr && m_empty_state != nullptr)
+    {
+        m_content_stack->setCurrentWidget(has_rows ? static_cast<QWidget*>(ui->logTableView)
+                                                   : m_empty_state);
+        if (!has_rows)
+        {
+            if (!has_files)
+            {
+                m_empty_state->set_title(tr("No log files in this view"));
+                m_empty_state->set_description(
+                    tr("Add files from the explorer or drag log files into the window."));
+                m_empty_state->set_drop_state(EmptyStateWidget::DropState::Available);
+            }
+            else if (m_empty_result_filtered)
+            {
+                m_empty_state->set_title(tr("No matching log entries"));
+                m_empty_state->set_description(
+                    tr("The current filters exclude all available entries."));
+                m_empty_state->set_drop_state(EmptyStateWidget::DropState::Hidden);
+            }
+            else
+            {
+                m_empty_state->set_title(tr("No log entries available"));
+                m_empty_state->set_description(
+                    tr("The loaded files do not contain entries that can be displayed."));
+                m_empty_state->set_drop_state(EmptyStateWidget::DropState::Hidden);
+            }
+            m_reset_filters_action->setVisible(has_files && m_empty_result_filtered);
+        }
+    }
 }
 
 /**
@@ -321,7 +404,8 @@ auto LogViewWidget::rebuild_files_menu() -> void
                 auto* widget_action = new FilesInViewWidgetAction(m_files_menu);
                 widget_action->set_file_path(path);
 
-                // Effective hidden: explicitly hidden OR hidden by active show-only on another file
+                // Effective hidden: explicitly hidden OR hidden by active show-only on
+                // another file
                 const bool hidden_effective =
                     m_hidden_files.contains(path) ||
                     (!m_show_only_file.isEmpty() && path != m_show_only_file);
@@ -343,7 +427,8 @@ auto LogViewWidget::rebuild_files_menu() -> void
                 m_files_menu->addAction(widget_action);
             }
 
-            // Ensure the freshly built menu reflects any runtime changes from proxies afterwards
+            // Ensure the freshly built menu reflects any runtime changes from proxies
+            // afterwards
             refresh_files_menu_states();
         }
     }

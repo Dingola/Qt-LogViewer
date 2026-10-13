@@ -128,6 +128,13 @@ auto LogViewPresenter::connect_widget_actions() -> void
             [this](const QString& file_path) { m_lifecycle->remove_file(m_view_id, file_path); });
     connect(m_widget, &LogViewWidget::live_tailing_toggled, this,
             [this](bool enabled) { m_live_tailing->set_enabled(m_view_id, enabled); });
+    connect(m_widget, &LogViewWidget::reset_filters_requested, this, [this] {
+        FilterState cleared_filters;
+        m_filters->import_filters(m_view_id, cleared_filters);
+        m_queries->reload_query(m_view_id);
+        refresh_filter_presentation(true);
+        refresh_query_presentation();
+    });
 }
 
 /**
@@ -212,6 +219,10 @@ auto LogViewPresenter::refresh_query_presentation() -> void
     m_widget->set_search_highlight(query.search_text, m_filters->get_search_field(m_view_id),
                                    query.use_regex);
     m_widget->set_file_visibility_state(query.show_only_file, query.hidden_files);
+    const bool has_active_filters =
+        !query.app_name.isEmpty() || !query.log_levels.isEmpty() || !query.search_text.isEmpty() ||
+        !query.show_only_file.isEmpty() || !query.hidden_files.isEmpty();
+    m_widget->set_empty_result_filtered(has_active_filters);
     restore_sort_indicator();
 }
 

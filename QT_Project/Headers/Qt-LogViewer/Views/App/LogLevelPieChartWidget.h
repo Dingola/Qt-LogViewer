@@ -16,6 +16,8 @@ namespace QtWidgetsCommonLib
 class FlowLayout;
 }
 
+class EmptyStateWidget;
+
 /**
  * @class LogLevelPieChartWidget
  * @brief Displays the percentage distribution of log levels for a log file using PieChart.
@@ -113,4 +115,5 @@ class LogLevelPieChartWidget: public QWidget
         QWidget* m_levels_widget;                         ///< Container for log level rows
         QtWidgetsCommonLib::FlowLayout* m_levels_layout;  ///< Layout for stacking log level rows
         QMap<QString, QWidget*> m_level_row_widgets;      ///< Map log level to row widget
+        EmptyStateWidget* m_empty_state{nullptr};         ///< Explanation shown without chart data.
 };

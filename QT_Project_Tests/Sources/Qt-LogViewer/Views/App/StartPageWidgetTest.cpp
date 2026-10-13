@@ -2,8 +2,10 @@
 
 #include <QPushButton>
 #include <QSignalSpy>
+#include <QStackedWidget>
 
 #include "Qt-LogViewer/Views/App/StartPageWidget.h"
+#include "Qt-LogViewer/Views/Shared/EmptyStateWidget.h"
 
 /**
  * @file StartPageWidgetTest.cpp
@@ -36,6 +38,35 @@ TEST_F(StartPageWidgetTest, OpenSessionDoesNotRequireRecentSelection)
     open_session_button->click();
 
     EXPECT_EQ(open_session_spy.count(), 1);
+}
+
+/** @test Verifies that missing recent data is explained and offers relevant
+ * actions. */
+TEST_F(StartPageWidgetTest, PresentsEmptyRecentLists)
+{
+    const auto* files_stack =
+        m_widget->findChild<QStackedWidget*>(QStringLiteral("recentFilesStack"));
+    const auto* sessions_stack =
+        m_widget->findChild<QStackedWidget*>(QStringLiteral("recentSessionsStack"));
+    const auto* files_empty =
+        m_widget->findChild<EmptyStateWidget*>(QStringLiteral("recentFilesEmptyState"));
+    const auto* sessions_empty =
+        m_widget->findChild<EmptyStateWidget*>(QStringLiteral("recentSessionsEmptyState"));
+
+    ASSERT_NE(files_stack, nullptr);
+    ASSERT_NE(sessions_stack, nullptr);
+    ASSERT_NE(files_empty, nullptr);
+    ASSERT_NE(sessions_empty, nullptr);
+    EXPECT_EQ(files_stack->currentWidget(), files_empty);
+    EXPECT_EQ(sessions_stack->currentWidget(), sessions_empty);
+    const QList<QPushButton*> file_actions = files_empty->findChildren<QPushButton*>();
+    const QList<QPushButton*> session_actions = sessions_empty->findChildren<QPushButton*>();
+    ASSERT_EQ(file_actions.size(), 1);
+    ASSERT_EQ(session_actions.size(), 1);
+    EXPECT_EQ(file_actions.constFirst()->property("actionRole").toString(),
+              QStringLiteral("primary"));
+    EXPECT_EQ(session_actions.constFirst()->property("actionRole").toString(),
+              QStringLiteral("primary"));
 }
 
 /**

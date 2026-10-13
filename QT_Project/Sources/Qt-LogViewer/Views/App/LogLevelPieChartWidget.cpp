@@ -8,6 +8,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 
+#include "Qt-LogViewer/Views/Shared/EmptyStateWidget.h"
 #include "QtWidgetsCommonLib/Layouts/FlowLayout.h"
 
 using QtWidgetsCommonLib::FlowLayout;
@@ -30,7 +31,8 @@ LogLevelPieChartWidget::LogLevelPieChartWidget(QWidget* parent)
       m_fatal_color("#ff1744"),
       m_pie_chart(new PieChart(this)),
       m_levels_widget(new QWidget(this)),
-      m_levels_layout(new FlowLayout(m_levels_widget, 0, 12, 6))
+      m_levels_layout(new FlowLayout(m_levels_widget, 0, 12, 6)),
+      m_empty_state(new EmptyStateWidget(this))
 {
     setAttribute(Qt::WA_StyledBackground, true);
 
@@ -46,6 +48,7 @@ LogLevelPieChartWidget::LogLevelPieChartWidget(QWidget* parent)
     auto* main_layout = new QVBoxLayout(this);
     main_layout->addWidget(m_pie_chart, 1);
     main_layout->addWidget(m_levels_widget, 0);
+    main_layout->addWidget(m_empty_state, 1);
     main_layout->setContentsMargins(24, 24, 24, 24);
     setLayout(main_layout);
 
@@ -56,6 +59,13 @@ LogLevelPieChartWidget::LogLevelPieChartWidget(QWidget* parent)
     m_pie_chart->set_segment_color("warning", m_warning_color);
     m_pie_chart->set_segment_color("error", m_error_color);
     m_pie_chart->set_segment_color("fatal", m_fatal_color);
+
+    m_empty_state->setObjectName(QStringLiteral("logLevelChartEmptyState"));
+    m_empty_state->set_density(EmptyStateWidget::Density::Compact);
+    m_empty_state->set_title(tr("No level data yet"));
+    m_empty_state->set_description(
+        tr("The distribution appears when the active view contains log entries."));
+    update_log_level_rows();
 }
 
 /**
@@ -264,11 +274,15 @@ auto LogLevelPieChartWidget::update_log_level_rows() -> void
 
     if (total == 0)
     {
+        m_pie_chart->setVisible(false);
         m_levels_widget->setVisible(false);
+        m_empty_state->setVisible(true);
     }
     else
     {
+        m_pie_chart->setVisible(true);
         m_levels_widget->setVisible(true);
+        m_empty_state->setVisible(false);
 
         const QStringList levels = {"trace", "debug", "info", "warning", "error", "fatal"};
         const QMap<QString, QColor> color_map = {

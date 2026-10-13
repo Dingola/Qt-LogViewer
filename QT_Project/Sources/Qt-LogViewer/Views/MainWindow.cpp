@@ -1,5 +1,6 @@
 #include "Qt-LogViewer/Views/MainWindow.h"
 
+#include <QAction>
 #include <QApplication>
 #include <QCoreApplication>
 #include <QDragEnterEvent>
@@ -47,6 +48,7 @@
 #include "Qt-LogViewer/Views/App/LogViewWidget.h"
 #include "Qt-LogViewer/Views/App/StartPageWidget.h"
 #include "Qt-LogViewer/Views/Shared/DockWidget.h"
+#include "Qt-LogViewer/Views/Shared/EmptyStateWidget.h"
 #include "QtWidgetsCommonLib/Services/Translator.h"
 #include "QtWidgetsCommonLib/Utils/StylesheetLoader.h"
 #include "ui_MainWindow.h"
@@ -186,8 +188,9 @@ MainWindow::MainWindow(LogViewerSettings& settings, FileCatalogController& catal
     m_workspace_presenter = new WorkspacePresenter(
         m_views, m_filters, m_history, m_pages, m_queries, m_imports, m_lifecycle,
         m_session_controller, ui->tabWidgetLog, ui->logFilterBarWidget, ui->paginationWidget,
-        m_log_details_text_edit, m_log_level_pie_chart_widget, m_data_status_widget, central_stack,
-        m_dock_controller, this);
+        m_log_details_text_edit, m_log_details_stack, m_log_details_empty_state,
+        m_log_level_pie_chart_widget, m_data_status_widget, m_workspace_content_stack,
+        central_stack, m_dock_controller, this);
     m_log_import_tab_presenter = new LogImportTabPresenter(
         *m_log_viewer_settings, *m_preview, *m_imports, *ui->tabWidgetLog,
         [this](const QUuid& view_id) {
@@ -283,10 +286,21 @@ auto MainWindow::setup_log_details_dock() -> void
     m_log_details_dock_widget->setObjectName("logDetailsDockWidget");
     m_log_details_dock_widget->setTitleBarWidget(
         DockWidget::create_dock_title_bar(m_log_details_dock_widget));
-    m_log_details_text_edit = new QPlainTextEdit(m_log_details_dock_widget);
+    m_log_details_stack = new QStackedWidget(m_log_details_dock_widget);
+    m_log_details_stack->setObjectName(QStringLiteral("logDetailsStack"));
+    m_log_details_text_edit = new QPlainTextEdit(m_log_details_stack);
     m_log_details_text_edit->setObjectName("logDetailsTextEdit");
     m_log_details_text_edit->setReadOnly(true);
-    m_log_details_dock_widget->setWidget(m_log_details_text_edit);
+    m_log_details_stack->addWidget(m_log_details_text_edit);
+    m_log_details_empty_state = new EmptyStateWidget(m_log_details_stack);
+    m_log_details_empty_state->setObjectName(QStringLiteral("logDetailsEmptyState"));
+    m_log_details_empty_state->set_density(EmptyStateWidget::Density::Compact);
+    m_log_details_empty_state->set_title(tr("No log entry selected"));
+    m_log_details_empty_state->set_description(
+        tr("Select a row in the active log view to inspect its complete details."));
+    m_log_details_stack->addWidget(m_log_details_empty_state);
+    m_log_details_stack->setCurrentWidget(m_log_details_empty_state);
+    m_log_details_dock_widget->setWidget(m_log_details_stack);
     addDockWidget(Qt::BottomDockWidgetArea, m_log_details_dock_widget);
 }
 
@@ -308,6 +322,17 @@ auto MainWindow::setup_filter_bar() -> void
 auto MainWindow::setup_tab_widget() -> void
 {
     ui->tabWidgetLog->setup_default_behavior();
+    m_workspace_content_stack = new QStackedWidget(ui->tabWidgetLog->parentWidget());
+    m_workspace_content_stack->setObjectName(QStringLiteral("workspaceContentStack"));
+    ui->verticalLayoutViewLog->replaceWidget(ui->tabWidgetLog, m_workspace_content_stack);
+    ui->tabWidgetLog->setParent(m_workspace_content_stack);
+    m_workspace_content_stack->addWidget(ui->tabWidgetLog);
+
+    m_workspace_empty_state = new EmptyStateWidget(m_workspace_content_stack);
+    m_workspace_empty_state->setObjectName(QStringLiteral("workspaceEmptyState"));
+    m_workspace_empty_state->set_title(tr("Import a log file to create a log view."));
+    m_workspace_content_stack->addWidget(m_workspace_empty_state);
+    m_workspace_content_stack->setCurrentWidget(m_workspace_empty_state);
 }
 
 /** @brief Creates the permanent compact active-view data status widget. */
@@ -458,7 +483,11 @@ auto MainWindow::changeEvent(QEvent* event) -> void
 void MainWindow::showEvent(QShowEvent* event)
 {
     AppMainWindow::showEvent(event);
-    m_dock_controller->capture_current_sizes();
+    if (!m_dock_layout_adopted)
+    {
+        m_dock_controller->adopt_restored_layout(!m_session_controller->has_current_session());
+        m_dock_layout_adopted = true;
+    }
     m_workspace_presenter->refresh_start_page();
 }
 

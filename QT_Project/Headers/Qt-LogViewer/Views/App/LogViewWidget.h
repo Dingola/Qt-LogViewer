@@ -21,6 +21,9 @@ class LogViewWidget;
 
 class LogFilterWidget;
 class LogTableView;
+class EmptyStateWidget;
+class QAction;
+class QStackedWidget;
 
 /**
  * @class LogViewWidget
@@ -213,6 +216,12 @@ class LogViewWidget: public QWidget
          */
         auto set_search_highlight(const QString& text, SearchField field, bool use_regex) -> void;
 
+        /**
+         * @brief Tells the empty-result presentation whether filters are active.
+         * @param filtered True when clearing filters can reveal log entries.
+         */
+        auto set_empty_result_filtered(bool filtered) -> void;
+
     signals:
         /**
          * @brief Emitted when the application filter selection changes.
@@ -263,6 +272,10 @@ class LogViewWidget: public QWidget
          */
         void live_tailing_toggled(bool enabled);
 
+        /** @brief Emitted when the empty-result action requests clearing all view
+         * filters. */
+        void reset_filters_requested();
+
     protected:
         /**
          * @brief Handles language change and other UI change events.
@@ -291,6 +304,12 @@ class LogViewWidget: public QWidget
          */
         auto refresh_files_menu_states() -> void;
 
+        /** @brief Creates the table/empty-state stack and its context action. */
+        auto setup_empty_state() -> void;
+
+        /** @brief Selects the table or the appropriate empty-result presentation. */
+        auto update_empty_state() -> void;
+
     private:
         /** @brief Refreshes the Files button decoration from stylesheet properties. */
         auto update_files_icon() -> void;
@@ -303,4 +322,8 @@ class LogViewWidget: public QWidget
         QVector<QString> m_view_file_paths;
         QString m_show_only_file;
         QSet<QString> m_hidden_files;
+        QStackedWidget* m_content_stack{nullptr};
+        EmptyStateWidget* m_empty_state{nullptr};
+        QAction* m_reset_filters_action{nullptr};
+        bool m_empty_result_filtered{false};
 };
