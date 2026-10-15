@@ -15,7 +15,6 @@
 #include <QStatusBar>
 #include <QStringList>
 #include <QTimer>
-#include <QUrl>
 #include <optional>
 
 #include "Qt-LogViewer/Adapters/RecentItemsAdapter.h"
@@ -38,6 +37,7 @@
 #include "Qt-LogViewer/Presenters/WorkspacePresenter.h"
 #include "Qt-LogViewer/Services/LogHistoryService.h"
 #include "Qt-LogViewer/Services/LogPreviewService.h"
+#include "Qt-LogViewer/Services/LogViewerDropValidator.h"
 #include "Qt-LogViewer/Services/LogViewerSettings.h"
 #include "Qt-LogViewer/Services/SessionManager.h"
 #include "Qt-LogViewer/Views/App/Dialogs/SettingsDialog.h"
@@ -390,39 +390,74 @@ auto MainWindow::initialize_menu() -> void
 }
 
 /**
- * @brief Handles drag enter events to allow dropping log files.
+ * @brief Accepts only actionable local log or session files while a drag enters the window.
  * @param event The drag enter event.
  */
 void MainWindow::dragEnterEvent(QDragEnterEvent* event)
 {
-    qDebug() << "Drag enter event with URLs:" << event->mimeData()->urls();
-
-    if (event->mimeData()->hasUrls())
+    const LogViewerDropValidationResult validation = LogViewerDropValidator::validate(
+        *event->mimeData(), m_session_controller->get_current_session_file_paths());
+    if (validation.is_accepted())
     {
         event->acceptProposedAction();
+    }
+    else
+    {
+        event->ignore();
     }
 }
 
 /**
- * @brief Handles drop events to load log files via drag and drop.
+ * @brief Processes a previously validated log-file or session-file drop.
  * @param event The drop event.
  */
 void MainWindow::dropEvent(QDropEvent* event)
 {
-    QStringList files;
+    const LogViewerDropValidationResult validation = LogViewerDropValidator::validate(
+        *event->mimeData(), m_session_controller->get_current_session_file_paths());
 
-    for (const QUrl& url: event->mimeData()->urls())
+    if (validation.content_type == LogViewerDropContentType::LogFiles)
     {
-        files << url.toLocalFile();
+        const QString session_id =
+            m_session_controller->ensure_current_session(tr(k_untitled_session_text));
+        m_session_controller->add_files_to_current_session(validation.accepted_paths);
+        for (const QString& file_path: validation.accepted_paths)
+        {
+            m_session_controller->add_recent_log_file(LogFileInfo(file_path));
+        }
+        m_session_controller->request_expand_session(session_id);
+        m_session_controller->save_current_session();
+        m_menu_controller->rebuild_recent_menus();
+        m_workspace_presenter->refresh_start_page();
+        event->acceptProposedAction();
+    }
+    else if (validation.content_type == LogViewerDropContentType::SessionFile)
+    {
+        const std::optional<SessionState> state =
+            m_session_controller->import_session_file(validation.accepted_paths.constFirst());
+        if (state.has_value())
+        {
+            restore_session(*state);
+            event->acceptProposedAction();
+        }
+        else
+        {
+            event->ignore();
+        }
+    }
+    else
+    {
+        event->ignore();
     }
 
-    qDebug() << "Files dropped:" << files;
-
-    const QString session_id =
-        m_session_controller->ensure_current_session(tr(k_untitled_session_text));
-    m_session_controller->add_files_to_current_session(files);
-    m_session_controller->request_expand_session(session_id);
-    m_workspace_presenter->refresh_start_page();
+    if (!validation.rejected_entries.isEmpty())
+    {
+        statusBar()->showMessage(
+            tr("%1 dragged item(s) were skipped because they are invalid, unsupported, "
+               "duplicate, or already loaded.")
+                .arg(validation.rejected_entries.size()),
+            5000);
+    }
 }
 
 /**

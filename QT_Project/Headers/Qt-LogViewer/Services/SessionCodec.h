@@ -27,6 +27,13 @@ class SessionCodec final
         [[nodiscard]] static auto get_schema_version() -> int;
 
         /**
+         * @brief Checks whether a JSON object has the recognizable session-document shape.
+         * @param object Candidate session document.
+         * @return True when the schema is supported and typed session payload fields are present.
+         */
+        [[nodiscard]] static auto is_session_document(const QJsonObject& object) -> bool;
+
+        /**
          * @brief Serializes a typed session state.
          * @param state Runtime session state.
          * @return JSON document using the current schema.

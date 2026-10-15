@@ -152,13 +152,13 @@ class MainWindow: public QtWidgetsCommonLib::AppMainWindow
         auto initialize_menu() -> void;
 
         /**
-         * @brief Handles drag enter events to allow dropping log files.
+         * @brief Accepts only actionable local log or session files during drag entry.
          * @param event The drag enter event.
          */
         void dragEnterEvent(QDragEnterEvent* event) override;
 
         /**
-         * @brief Handles drop events to load log files via drag and drop.
+         * @brief Processes a validated log-file or session-file drop.
          * @param event The drop event.
          */
         void dropEvent(QDropEvent* event) override;

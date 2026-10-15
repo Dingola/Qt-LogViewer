@@ -88,6 +88,12 @@ class SessionController: public QObject
         [[nodiscard]] auto get_current_session_id() const -> QString;
 
         /**
+         * @brief Returns normalized file paths already present in the current session explorer.
+         * @return Absolute paths belonging to the active session.
+         */
+        [[nodiscard]] auto get_current_session_file_paths() const -> QSet<QString>;
+
+        /**
          * @brief Returns the last session ID from storage.
          * @return The last session ID, or empty if none.
          */

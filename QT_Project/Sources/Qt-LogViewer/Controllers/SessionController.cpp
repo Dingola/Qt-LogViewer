@@ -30,26 +30,6 @@
 namespace
 {
 /**
- * @brief Checks whether a JSON object has the recognizable shape of a session document.
- * @param object Candidate session document.
- * @return True when the object contains at least one typed session payload field.
- */
-[[nodiscard]] auto is_session_document(const QJsonObject& object) -> bool
-{
-    const QJsonValue schema_version = object.value(QStringLiteral("schema_version"));
-    const bool schema_supported =
-        schema_version.isUndefined() ||
-        (schema_version.isDouble() &&
-         schema_version.toDouble() == static_cast<double>(SessionCodec::get_schema_version()));
-    const bool has_name = object.value(QStringLiteral("name")).isString();
-    const bool has_views = object.value(QStringLiteral("views")).isArray();
-    const bool has_explorer_files = object.value(QStringLiteral("explorer_files")).isArray();
-    const bool valid =
-        schema_supported && !object.isEmpty() && (has_name || has_views || has_explorer_files);
-    return valid;
-}
-
-/**
  * @brief Resolves the persisted parsing profile for one restored file.
  * @param state Restored view state containing profile identifiers.
  * @param file_path File whose profile is requested.
@@ -221,6 +201,25 @@ auto SessionController::get_current_session_id() const -> QString
     }
 
     return session_id;
+}
+
+/**
+ * @brief Returns normalized file paths already present in the current session explorer.
+ * @return Absolute paths belonging to the active session.
+ */
+auto SessionController::get_current_session_file_paths() const -> QSet<QString>
+{
+    QSet<QString> file_paths;
+    const QList<LogFileInfo> files = collect_session_files_from_tree(get_current_session_id());
+    for (const LogFileInfo& file_info: files)
+    {
+        const QString file_path = QFileInfo(file_info.get_file_path()).absoluteFilePath();
+        if (!file_path.isEmpty())
+        {
+            file_paths.insert(file_path);
+        }
+    }
+    return file_paths;
 }
 
 /**
@@ -535,7 +534,7 @@ auto SessionController::import_session_file(const QString& file_path) -> std::op
         const QJsonObject document =
             m_session_manager->load_session_file(file_info.absoluteFilePath());
 
-        if (is_session_document(document))
+        if (SessionCodec::is_session_document(document))
         {
             state = SessionCodec::from_json(document);
         }

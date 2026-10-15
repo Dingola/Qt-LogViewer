@@ -37,6 +37,26 @@ auto SessionCodec::get_schema_version() -> int
 }
 
 /**
+ * @brief Checks whether a JSON object has the recognizable session-document shape.
+ * @param object Candidate session document.
+ * @return True when the schema is supported and typed session payload fields are present.
+ */
+auto SessionCodec::is_session_document(const QJsonObject& object) -> bool
+{
+    const QJsonValue schema_version = object.value(QStringLiteral("schema_version"));
+    const bool schema_supported =
+        schema_version.isUndefined() ||
+        (schema_version.isDouble() &&
+         schema_version.toDouble() == static_cast<double>(get_schema_version()));
+    const bool has_name = object.value(QStringLiteral("name")).isString();
+    const bool has_views = object.value(QStringLiteral("views")).isArray();
+    const bool has_explorer_files = object.value(QStringLiteral("explorer_files")).isArray();
+    const bool result =
+        schema_supported && !object.isEmpty() && (has_name || has_views || has_explorer_files);
+    return result;
+}
+
+/**
  * @brief Serializes a complete typed session state to JSON.
  * @param state Runtime session state.
  * @return JSON document using the current session schema.
