@@ -16,18 +16,17 @@ class LogPageCoordinator;
 class LogQueryController;
 class LogFilterBarWidget;
 class LogDataStatusWidget;
+class LogDetailsWidget;
 class LogLevelPieChartWidget;
 class LogTabWidget;
 class LogViewPresenter;
 class ViewLifecycleCoordinator;
 class ViewRegistry;
 class PaginationWidget;
-class QPlainTextEdit;
 class QStackedWidget;
 class SessionController;
 class SnapshotTransitionAnimator;
 class StackedWidgetTransition;
-class EmptyStateWidget;
 
 /**
  * @file WorkspacePresenter.h
@@ -61,10 +60,7 @@ class WorkspacePresenter: public QObject
          * @param tab_widget Workspace tab container.
          * @param filter_bar Shared filter and search controls.
          * @param pagination Shared pagination controls.
-         * @param details_text Shared selected-entry details output.
-         * @param details_stack Stack containing details and their empty presentation.
-         * @param details_empty_state Empty presentation used while no row is
-         * selected.
+         * @param details_widget Shared structured selected-entry inspector.
          * @param level_chart Shared log-level distribution widget.
          * @param data_status Shared compact active-view data status.
          * @param workspace_content_stack Stack containing log tabs and the empty
@@ -78,8 +74,7 @@ class WorkspacePresenter: public QObject
             LogPageCoordinator* pages, LogQueryController* queries, LogImportCoordinator* imports,
             ViewLifecycleCoordinator* lifecycle, SessionController* session_controller,
             LogTabWidget* tab_widget, LogFilterBarWidget* filter_bar, PaginationWidget* pagination,
-            QPlainTextEdit* details_text, QStackedWidget* details_stack,
-            EmptyStateWidget* details_empty_state, LogLevelPieChartWidget* level_chart,
+            LogDetailsWidget* details_widget, LogLevelPieChartWidget* level_chart,
             LogDataStatusWidget* data_status, QStackedWidget* workspace_content_stack,
             QStackedWidget* central_stack, DockController* dock_controller,
             QObject* parent = nullptr);
@@ -184,9 +179,7 @@ class WorkspacePresenter: public QObject
         LogTabWidget* m_tab_widget{nullptr};
         LogFilterBarWidget* m_filter_bar{nullptr};
         PaginationWidget* m_pagination{nullptr};
-        QPlainTextEdit* m_details_text{nullptr};
-        QStackedWidget* m_details_stack{nullptr};
-        EmptyStateWidget* m_details_empty_state{nullptr};
+        LogDetailsWidget* m_details_widget{nullptr};
         LogLevelPieChartWidget* m_level_chart{nullptr};
         LogDataStatusWidget* m_data_status{nullptr};
         QStackedWidget* m_workspace_content_stack{nullptr};

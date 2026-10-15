@@ -5,6 +5,7 @@
 #include <QPainter>
 #include <QStyle>
 
+#include "Qt-LogViewer/Models/LogLevelMapping.h"
 #include "Qt-LogViewer/Models/LogModel.h"
 #include "Qt-LogViewer/Views/Shared/TableView.h"
 
@@ -33,28 +34,33 @@ void HoverRowDelegate::initStyleOption(QStyleOptionViewItem* option, const QMode
           model->get_column_field_id(index.column()) != LogField::Level))
     {
         const char* color_property = nullptr;
-        switch (LogModel::map_log_level(index.data(LogModel::LevelRole).toString()))
+        const std::optional<SimpleCppLogger::LogLevel> level =
+            LogLevels::from_text(index.data(LogModel::LevelRole).toString());
+        if (level.has_value())
         {
-        case SimpleCppLogger::LogLevel::Trace:
-            color_property = "trace_color";
-            break;
-        case SimpleCppLogger::LogLevel::Debug:
-            color_property = "debug_color";
-            break;
-        case SimpleCppLogger::LogLevel::Info:
-            color_property = "info_color";
-            break;
-        case SimpleCppLogger::LogLevel::Warning:
-            color_property = "warning_color";
-            break;
-        case SimpleCppLogger::LogLevel::Error:
-            color_property = "error_color";
-            break;
-        case SimpleCppLogger::LogLevel::Fatal:
-            color_property = "fatal_color";
-            break;
-        default:
-            break;
+            switch (level.value())
+            {
+            case SimpleCppLogger::LogLevel::Trace:
+                color_property = "trace_color";
+                break;
+            case SimpleCppLogger::LogLevel::Debug:
+                color_property = "debug_color";
+                break;
+            case SimpleCppLogger::LogLevel::Info:
+                color_property = "info_color";
+                break;
+            case SimpleCppLogger::LogLevel::Warning:
+                color_property = "warning_color";
+                break;
+            case SimpleCppLogger::LogLevel::Error:
+                color_property = "error_color";
+                break;
+            case SimpleCppLogger::LogLevel::Fatal:
+                color_property = "fatal_color";
+                break;
+            default:
+                break;
+            }
         }
         if (color_property != nullptr)
         {

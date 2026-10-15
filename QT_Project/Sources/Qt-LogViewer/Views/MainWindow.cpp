@@ -10,7 +10,6 @@
 #include <QIcon>
 #include <QMessageBox>
 #include <QMimeData>
-#include <QPlainTextEdit>
 #include <QResizeEvent>
 #include <QStackedWidget>
 #include <QStatusBar>
@@ -42,6 +41,7 @@
 #include "Qt-LogViewer/Services/SessionManager.h"
 #include "Qt-LogViewer/Views/App/Dialogs/SettingsDialog.h"
 #include "Qt-LogViewer/Views/App/LogDataStatusWidget.h"
+#include "Qt-LogViewer/Views/App/LogDetailsWidget.h"
 #include "Qt-LogViewer/Views/App/LogFileExplorer.h"
 #include "Qt-LogViewer/Views/App/LogLevelPieChartWidget.h"
 #include "Qt-LogViewer/Views/App/LogTableView.h"
@@ -188,9 +188,8 @@ MainWindow::MainWindow(LogViewerSettings& settings, FileCatalogController& catal
     m_workspace_presenter = new WorkspacePresenter(
         m_views, m_filters, m_history, m_pages, m_queries, m_imports, m_lifecycle,
         m_session_controller, ui->tabWidgetLog, ui->logFilterBarWidget, ui->paginationWidget,
-        m_log_details_text_edit, m_log_details_stack, m_log_details_empty_state,
-        m_log_level_pie_chart_widget, m_data_status_widget, m_workspace_content_stack,
-        central_stack, m_dock_controller, this);
+        m_log_details_widget, m_log_level_pie_chart_widget, m_data_status_widget,
+        m_workspace_content_stack, central_stack, m_dock_controller, this);
     m_log_import_tab_presenter = new LogImportTabPresenter(
         *m_log_viewer_settings, *m_preview, *m_imports, *ui->tabWidgetLog,
         [this](const QUuid& view_id) {
@@ -286,21 +285,9 @@ auto MainWindow::setup_log_details_dock() -> void
     m_log_details_dock_widget->setObjectName("logDetailsDockWidget");
     m_log_details_dock_widget->setTitleBarWidget(
         DockWidget::create_dock_title_bar(m_log_details_dock_widget));
-    m_log_details_stack = new QStackedWidget(m_log_details_dock_widget);
-    m_log_details_stack->setObjectName(QStringLiteral("logDetailsStack"));
-    m_log_details_text_edit = new QPlainTextEdit(m_log_details_stack);
-    m_log_details_text_edit->setObjectName("logDetailsTextEdit");
-    m_log_details_text_edit->setReadOnly(true);
-    m_log_details_stack->addWidget(m_log_details_text_edit);
-    m_log_details_empty_state = new EmptyStateWidget(m_log_details_stack);
-    m_log_details_empty_state->setObjectName(QStringLiteral("logDetailsEmptyState"));
-    m_log_details_empty_state->set_density(EmptyStateWidget::Density::Compact);
-    m_log_details_empty_state->set_title(tr("No log entry selected"));
-    m_log_details_empty_state->set_description(
-        tr("Select a row in the active log view to inspect its complete details."));
-    m_log_details_stack->addWidget(m_log_details_empty_state);
-    m_log_details_stack->setCurrentWidget(m_log_details_empty_state);
-    m_log_details_dock_widget->setWidget(m_log_details_stack);
+    m_log_details_widget = new LogDetailsWidget(m_log_details_dock_widget);
+    m_log_details_widget->setObjectName(QStringLiteral("logDetailsWidget"));
+    m_log_details_dock_widget->setWidget(m_log_details_widget);
     addDockWidget(Qt::BottomDockWidgetArea, m_log_details_dock_widget);
 }
 

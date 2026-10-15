@@ -10,11 +10,11 @@
 
 class LogFilterBarWidget;
 class LogDataStatusWidget;
+class LogDetailsWidget;
 class LogLevelPieChartWidget;
 class LogTabWidget;
 class TestLogRuntime;
 class PaginationWidget;
-class QPlainTextEdit;
 class QStackedWidget;
 class SessionController;
 class WorkspacePresenter;
@@ -58,9 +58,7 @@ class WorkspacePresenterTest: public ::testing::Test
         LogTabWidget* m_tab_widget{nullptr};
         LogFilterBarWidget* m_filter_bar{nullptr};
         PaginationWidget* m_pagination{nullptr};
-        QPlainTextEdit* m_details_text{nullptr};
-        QStackedWidget* m_details_stack{nullptr};
-        EmptyStateWidget* m_details_empty_state{nullptr};
+        LogDetailsWidget* m_details_widget{nullptr};
         QStackedWidget* m_workspace_content_stack{nullptr};
         EmptyStateWidget* m_workspace_empty_state{nullptr};
         LogLevelPieChartWidget* m_level_chart{nullptr};

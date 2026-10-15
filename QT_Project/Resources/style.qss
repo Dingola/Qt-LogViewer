@@ -140,7 +140,7 @@
     @table-header-border-radius: 0;
     @table-frame-color: @border-color-primary;
     @table-grid-color: @border-color-primary;
-    @table-section-padding: 5px 8px;
+    @table-section-padding: 3px 8px;
     @table-section-bg-color: @table-header-bg-color;
     @table-section-border-color: @border-color-primary;
 
@@ -2557,6 +2557,320 @@ TreeView {
     qproperty-file_icon: ":/Resources/Icons/file.svg";
     qproperty-folder_icon: ":/Resources/Icons/folder.svg";
     qproperty-session_icon: ":/Resources/Icons/session.svg";
+}
+
+/* --- LogDetailsWidget ---------------------------------------------------- */
+LogDetailsWidget {
+    qproperty-action_icon_color: @text-color-secondary;
+    qproperty-action_icon_color_hover: @text-color-primary;
+    qproperty-action_icon_px: 16;
+    background-color: @log-level-pie-chart-bg-color;
+}
+
+LogDetailsWidget QWidget#emptyPage,
+LogDetailsWidget QWidget#detailsPage,
+LogDetailsWidget QStackedWidget#detailsStateStack,
+LogDetailsWidget QWidget#detailsHeaderWidget,
+LogDetailsWidget QFrame#frameMessageField,
+LogDetailsWidget QFrame#framePathField,
+LogDetailsWidget QFrame#frameRawField,
+LogDetailsWidget QWidget#sourceSection,
+LogDetailsWidget QWidget#additionalFieldsSection {
+    background-color: transparent;
+}
+
+LogDetailsWidget QSplitter#detailsSplitter {
+    background-color: transparent;
+}
+
+LogDetailsWidget QSplitter#detailsSplitter::handle:horizontal {
+    width: 8px;
+    margin: 10px 3px;
+    border-radius: 1px;
+    background-color: @border-color-primary;
+}
+
+LogDetailsWidget QSplitter#detailsSplitter::handle:horizontal:hover {
+    background-color: @Brand-Accent-500;
+}
+
+LogDetailsWidget QFrame[detailsSection="true"] {
+    border: 1px solid @table-frame-color;
+    border-radius: 4px;
+    background-color: @table-bg-color;
+}
+
+LogDetailsWidget QFrame#detailsHeaderWidget[detailsHeader="true"] {
+    border: 1px solid @table-frame-color;
+    border-radius: 4px;
+    background-color: @table-section-bg-color;
+}
+
+LogDetailsWidget QFrame#lineHeaderSeparator,
+LogDetailsWidget QFrame#lineHeaderActionsSeparator {
+    min-width: 1px;
+    max-width: 1px;
+    min-height: 16px;
+    max-height: 16px;
+    margin: 2px 1px;
+    border: none;
+    background-color: @table-frame-color;
+}
+
+LogDetailsWidget QLabel#labelTimestampValue,
+LogDetailsWidget QLabel#labelApplicationValue {
+    color: @text-color-secondary;
+    background-color: transparent;
+}
+
+LogDetailsWidget QLabel#labelApplicationValue {
+    font-weight: 600;
+}
+
+LogDetailsWidget QLabel#labelSeverityBadge {
+    min-width: 54px;
+    padding: 3px 8px;
+    border-radius: 3px;
+    color: @Neutral-6;
+    background-color: @Severity-Unknown;
+    font-size: 8pt;
+    font-weight: 700;
+}
+
+LogDetailsWidget QLabel#labelSeverityBadge[severity="trace"] {
+    color: @Neutral-2;
+    background-color: @Severity-Trace;
+}
+
+LogDetailsWidget QLabel#labelSeverityBadge[severity="debug"] {
+    background-color: @Severity-Debug;
+}
+
+LogDetailsWidget QLabel#labelSeverityBadge[severity="info"] {
+    background-color: @Severity-Info;
+}
+
+LogDetailsWidget QLabel#labelSeverityBadge[severity="warning"] {
+    color: @Neutral-2;
+    background-color: @Severity-Warning;
+}
+
+LogDetailsWidget QLabel#labelSeverityBadge[severity="error"] {
+    background-color: @Severity-Error;
+}
+
+LogDetailsWidget QLabel#labelSeverityBadge[severity="fatal"] {
+    background-color: @Severity-Fatal;
+}
+
+LogDetailsWidget QTabWidget#detailsTabWidget::pane {
+    border: 1px solid @table-frame-color;
+    border-radius: 0px;
+    background-color: @table-bg-color;
+}
+
+LogDetailsWidget QTabWidget#detailsTabWidget > QWidget {
+    padding-top: 0px;
+    background-color: @table-bg-color;
+}
+
+LogDetailsWidget QTabWidget#detailsTabWidget QTabBar::tab {
+    min-height: 26px;
+    padding: 0px 12px;
+    border: 1px solid @table-frame-color;
+    border-bottom: none;
+    border-top-left-radius: 0px;
+    border-top-right-radius: 0px;
+    background-color: @table-section-bg-color;
+}
+
+LogDetailsWidget QTabWidget#detailsTabWidget QTabBar::tab:hover {
+    background-color: @table-hover-row-color;
+}
+
+LogDetailsWidget QTabWidget#detailsTabWidget QTabBar::tab:selected {
+    border-top: 2px solid @Brand-Accent-600;
+    background-color: @table-bg-color;
+    color: @tab-bar-tab-text-color-active;
+}
+
+LogDetailsWidget QLabel#labelMessageTitle,
+LogDetailsWidget QLabel#labelSourceTitle,
+LogDetailsWidget QLabel#labelAdditionalFieldsTitle,
+LogDetailsWidget QLabel#labelRawTitle {
+    color: @text-color-primary;
+    font-weight: 600;
+    background-color: transparent;
+}
+
+LogDetailsWidget QLabel#labelFileValue {
+    color: @text-color-primary;
+    font-weight: 500;
+    background-color: transparent;
+}
+
+LogDetailsWidget QLabel#labelSourceMetaValue {
+    color: @text-color-secondary;
+    background-color: transparent;
+}
+
+LogDetailsWidget QPlainTextEdit#plainTextEditMessage,
+LogDetailsWidget QPlainTextEdit#plainTextEditRaw {
+    padding: 4px 30px 4px 6px;
+    border: @line-edit-border-width solid @line-edit-border-color;
+    border-radius: @line-edit-border-radius;
+    background-color: @line-edit-bg-color;
+    color: @line-edit-text-color;
+}
+
+LogDetailsWidget QLineEdit#lineEditPath {
+    padding: 4px 34px 4px 6px;
+    border: @line-edit-border-width solid @line-edit-border-color;
+    border-radius: @line-edit-border-radius;
+    background-color: @line-edit-bg-color;
+    color: @line-edit-text-color;
+}
+
+LogDetailsWidget QPlainTextEdit#plainTextEditMessage:hover,
+LogDetailsWidget QPlainTextEdit#plainTextEditRaw:hover,
+LogDetailsWidget QLineEdit#lineEditPath:hover {
+    border-color: @line-edit-border-color-hover;
+    background-color: @line-edit-bg-color-hover;
+}
+
+LogDetailsWidget QPlainTextEdit#plainTextEditMessage:focus,
+LogDetailsWidget QPlainTextEdit#plainTextEditRaw:focus,
+LogDetailsWidget QLineEdit#lineEditPath:focus {
+    border-color: @line-edit-border-color-focus;
+    background-color: @line-edit-bg-color-focus;
+}
+
+LogDetailsWidget QPlainTextEdit#plainTextEditRaw {
+    font-family: "Cascadia Mono", "Consolas", monospace;
+}
+
+LogDetailsWidget QToolButton[detailsAction="true"] {
+    min-width: 24px;
+    max-width: 24px;
+    min-height: 24px;
+    max-height: 24px;
+    padding: 0px;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    background-color: transparent;
+}
+
+LogDetailsWidget QToolButton#toolButtonCopyAll[headerAction="true"] {
+    min-width: 88px;
+    max-width: 104px;
+    min-height: 20px;
+    max-height: 20px;
+    padding: 0px 6px;
+    border-color: @border-color-primary;
+    border-radius: 3px;
+    background-color: @tool-button-bg-color;
+    color: @text-color-secondary;
+    font-size: 8pt;
+    font-weight: 500;
+}
+
+LogDetailsWidget QToolButton#toolButtonCopyAll[headerAction="true"][compact="true"] {
+    min-width: 24px;
+    max-width: 24px;
+    min-height: 24px;
+    max-height: 24px;
+    padding: 0px;
+}
+
+LogDetailsWidget QToolButton[detailsAction="true"]:hover,
+LogDetailsWidget QToolButton[detailsAction="true"]:focus {
+    border-color: @tool-button-border-color-hover;
+    background-color: @tool-button-inline-bg-color-hover;
+}
+
+LogDetailsWidget QToolButton[detailsAction="true"]:pressed {
+    border-color: @button-border-color-focus;
+    background-color: @tool-button-inline-bg-color-pressed;
+}
+
+LogDetailsWidget QToolButton[detailsAction="true"]:disabled {
+    border-color: transparent;
+    background-color: transparent;
+}
+
+LogDetailsWidget QToolButton[fieldAction="true"] {
+    min-width: 26px;
+    max-width: 26px;
+    min-height: 22px;
+    max-height: 22px;
+    margin: 3px 4px 3px 3px;
+    border: none;
+    border-radius: 11px;
+    background-color: @tool-button-inline-bg-color;
+}
+
+LogDetailsWidget QToolButton[fieldAction="true"]:hover,
+LogDetailsWidget QToolButton[fieldAction="true"]:focus {
+    border: none;
+    background-color: @tool-button-inline-bg-color-hover;
+}
+
+LogDetailsWidget QToolButton[fieldAction="true"]:pressed {
+    border: none;
+    background-color: @tool-button-inline-bg-color-pressed;
+}
+
+LogDetailsWidget QToolButton[copyConfirmed="true"] {
+    border: none;
+    background-color: @status-success-color;
+}
+
+LogDetailsWidget QToolButton#toolButtonCopyAll[headerAction="true"][copyConfirmed="true"] {
+    border: 1px solid @status-success-color;
+}
+
+LogDetailsWidget QToolButton[externalLocationAction="true"] {
+    min-width: 28px;
+    max-width: 28px;
+    min-height: 28px;
+    max-height: 28px;
+    padding: 0px;
+}
+
+LogDetailsWidget QTableWidget#tableWidgetFields {
+    border: 1px solid @table-frame-color;
+    border-radius: 4px;
+    gridline-color: @table-grid-color;
+    background-color: @table-bg-color;
+    alternate-background-color: @table-alternate-bg-color;
+    selection-background-color: @table-selection-bg-color;
+}
+
+LogDetailsWidget QTableWidget#tableWidgetFields::item {
+    padding: 5px 8px;
+    border: none;
+    background-color: @table-alternate-bg-color;
+}
+
+LogDetailsWidget QTableWidget#tableWidgetFields::item:alternate {
+    background-color: @table-bg-color;
+}
+
+LogDetailsWidget QTableWidget#tableWidgetFields::item:hover {
+    background-color: @table-hover-row-color;
+}
+
+LogDetailsWidget QTableWidget#tableWidgetFields::item:selected {
+    background-color: @table-selection-bg-color;
+}
+
+LogDetailsWidget QTableWidget#tableWidgetFields QHeaderView::section {
+    padding: @table-section-padding;
+    border: none;
+    border-right: 1px solid @table-frame-color;
+    border-bottom: 1px solid @table-frame-color;
+    border-radius: 0px;
+    background-color: @table-section-bg-color;
 }
 
 /* --- EmptyStateWidget ---------------------------------------------------- */

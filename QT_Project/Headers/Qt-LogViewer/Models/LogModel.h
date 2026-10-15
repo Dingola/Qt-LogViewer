@@ -5,7 +5,6 @@
 
 #include "Qt-LogViewer/Models/LogEntry.h"
 #include "Qt-LogViewer/Models/LogFieldDefinition.h"
-#include "SimpleCppLogger/LogLevel.h"
 
 // LogModel: Model for displaying and managing log entries in a QTableView.
 class LogModel: public QAbstractTableModel
@@ -93,13 +92,6 @@ class LogModel: public QAbstractTableModel
          * @param file_path The file path whose log entries should be removed.
          */
         auto remove_entries_by_file_path(const QString& file_path) -> void;
-
-        /**
-         * @brief Resolves a level string using the model's supported severity aliases.
-         * @param level_str Log level text to classify.
-         * @return Corresponding severity, defaulting to Info for unrecognized text.
-         */
-        static auto map_log_level(const QString& level_str) -> SimpleCppLogger::LogLevel;
 
     private:
         QVector<LogEntry> m_entries;

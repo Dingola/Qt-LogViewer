@@ -9,7 +9,6 @@
 
 // Forward declarations for Qt types used as pointers/references
 class QDockWidget;
-class QPlainTextEdit;
 class QResizeEvent;
 class QDragEnterEvent;
 class QDropEvent;
@@ -47,6 +46,7 @@ class RecentItemsAdapter;
 class LogFileExplorer;
 class LogLevelPieChartWidget;
 class LogDataStatusWidget;
+class LogDetailsWidget;
 class LogViewWidget;
 class StartPageWidget;
 class DockWidget;
@@ -377,9 +377,7 @@ class MainWindow: public QtWidgetsCommonLib::AppMainWindow
         DockWidget* m_log_level_pie_chart_dock_widget = nullptr;
 
         // Views
-        QPlainTextEdit* m_log_details_text_edit = nullptr;
-        QStackedWidget* m_log_details_stack = nullptr;
-        EmptyStateWidget* m_log_details_empty_state = nullptr;
+        LogDetailsWidget* m_log_details_widget = nullptr;
         QStackedWidget* m_workspace_content_stack = nullptr;
         EmptyStateWidget* m_workspace_empty_state = nullptr;
         LogFileExplorer* m_log_file_explorer = nullptr;

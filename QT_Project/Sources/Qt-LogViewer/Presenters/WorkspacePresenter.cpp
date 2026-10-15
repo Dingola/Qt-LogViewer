@@ -1,7 +1,6 @@
 #include "Qt-LogViewer/Presenters/WorkspacePresenter.h"
 
 #include <QMap>
-#include <QPlainTextEdit>
 #include <QSet>
 #include <QSignalBlocker>
 #include <QStackedWidget>
@@ -27,12 +26,12 @@
 #include "Qt-LogViewer/Presenters/LogViewPresenter.h"
 #include "Qt-LogViewer/Services/LogHistoryService.h"
 #include "Qt-LogViewer/Views/App/LogDataStatusWidget.h"
+#include "Qt-LogViewer/Views/App/LogDetailsWidget.h"
 #include "Qt-LogViewer/Views/App/LogFilterBarWidget.h"
 #include "Qt-LogViewer/Views/App/LogLevelPieChartWidget.h"
 #include "Qt-LogViewer/Views/App/LogTabWidget.h"
 #include "Qt-LogViewer/Views/App/LogTableView.h"
 #include "Qt-LogViewer/Views/App/LogViewWidget.h"
-#include "Qt-LogViewer/Views/Shared/EmptyStateWidget.h"
 #include "Qt-LogViewer/Views/Shared/PaginationWidget.h"
 #include "Qt-LogViewer/Views/Shared/TabWidget.h"
 
@@ -54,9 +53,7 @@
  * @param tab_widget Workspace tab container.
  * @param filter_bar Shared filter and search controls.
  * @param pagination Shared pagination controls.
- * @param details_text Shared selected-entry details output.
- * @param details_stack Stack containing details and their empty presentation.
- * @param details_empty_state Empty presentation used while no row is selected.
+ * @param details_widget Shared structured selected-entry inspector.
  * @param level_chart Shared log-level distribution widget.
  * @param data_status Shared compact active-view data status.
  * @param workspace_content_stack Stack containing log tabs and the empty
@@ -70,8 +67,7 @@ WorkspacePresenter::WorkspacePresenter(
     LogPageCoordinator* pages, LogQueryController* queries, LogImportCoordinator* imports,
     ViewLifecycleCoordinator* lifecycle, SessionController* session_controller,
     LogTabWidget* tab_widget, LogFilterBarWidget* filter_bar, PaginationWidget* pagination,
-    QPlainTextEdit* details_text, QStackedWidget* details_stack,
-    EmptyStateWidget* details_empty_state, LogLevelPieChartWidget* level_chart,
+    LogDetailsWidget* details_widget, LogLevelPieChartWidget* level_chart,
     LogDataStatusWidget* data_status, QStackedWidget* workspace_content_stack,
     QStackedWidget* central_stack, DockController* dock_controller, QObject* parent)
     : QObject(parent),
@@ -86,9 +82,7 @@ WorkspacePresenter::WorkspacePresenter(
       m_tab_widget(tab_widget),
       m_filter_bar(filter_bar),
       m_pagination(pagination),
-      m_details_text(details_text),
-      m_details_stack(details_stack),
-      m_details_empty_state(details_empty_state),
+      m_details_widget(details_widget),
       m_level_chart(level_chart),
       m_data_status(data_status),
       m_workspace_content_stack(workspace_content_stack),
@@ -287,13 +281,9 @@ auto WorkspacePresenter::reset_presentation() -> void
         m_level_chart->set_log_level_counts({});
     }
 
-    if (m_details_text != nullptr)
+    if (m_details_widget != nullptr)
     {
-        m_details_text->clear();
-    }
-    if (m_details_stack != nullptr && m_details_empty_state != nullptr)
-    {
-        m_details_stack->setCurrentWidget(m_details_empty_state);
+        m_details_widget->clear_log_entry();
     }
 
     if (m_data_status != nullptr)
@@ -658,9 +648,10 @@ auto WorkspacePresenter::update_page_state(const QUuid& view_id, qsizetype curre
 auto WorkspacePresenter::update_log_details(const QUuid& view_id,
                                             const QModelIndex& current) -> void
 {
-    QString details;
+    bool entry_presented = false;
 
-    if (view_id == get_active_view_id() && current.isValid() && m_views != nullptr)
+    if (m_details_widget != nullptr && view_id == get_active_view_id() && current.isValid() &&
+        m_views != nullptr)
     {
         LogViewContext* context = m_views->get_context(view_id);
         LogModel* model = context != nullptr ? context->get_model() : nullptr;
@@ -668,28 +659,14 @@ auto WorkspacePresenter::update_log_details(const QUuid& view_id,
         if (model != nullptr)
         {
             const LogEntry entry = model->get_entry(current.row());
-            details =
-                QStringLiteral(
-                    "Timestamp: %1\n"
-                    "Level: %2\n"
-                    "App: %3\n"
-                    "Message: %4")
-                    .arg(entry.get_timestamp().toString(QStringLiteral("yyyy-MM-dd HH:mm:ss")))
-                    .arg(entry.get_level())
-                    .arg(entry.get_app_name())
-                    .arg(entry.get_message());
+            m_details_widget->set_log_entry(entry);
+            entry_presented = true;
         }
     }
 
-    if (m_details_text != nullptr)
+    if (m_details_widget != nullptr && !entry_presented)
     {
-        m_details_text->setPlainText(details);
-    }
-    if (m_details_stack != nullptr && m_details_empty_state != nullptr && m_details_text != nullptr)
-    {
-        m_details_stack->setCurrentWidget(details.isEmpty()
-                                              ? static_cast<QWidget*>(m_details_empty_state)
-                                              : static_cast<QWidget*>(m_details_text));
+        m_details_widget->clear_log_entry();
     }
 }
 
