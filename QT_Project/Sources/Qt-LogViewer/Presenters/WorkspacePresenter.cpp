@@ -393,12 +393,18 @@ auto WorkspacePresenter::connect_workspace_actions() -> void
                     apply_search(get_active_view_id(), text, field, use_regex);
                 });
         connect(m_filter_bar, &LogFilterBarWidget::search_field_changed, this, [this](SearchField) {
-            apply_search(get_active_view_id(), m_filter_bar->get_search_text(),
-                         m_filter_bar->get_search_field(), m_filter_bar->get_use_regex());
+            if (m_filter_bar->has_valid_search_pattern())
+            {
+                apply_search(get_active_view_id(), m_filter_bar->get_search_text(),
+                             m_filter_bar->get_search_field(), m_filter_bar->get_use_regex());
+            }
         });
         connect(m_filter_bar, &LogFilterBarWidget::regex_toggled, this, [this](bool) {
-            apply_search(get_active_view_id(), m_filter_bar->get_search_text(),
-                         m_filter_bar->get_search_field(), m_filter_bar->get_use_regex());
+            if (m_filter_bar->has_valid_search_pattern())
+            {
+                apply_search(get_active_view_id(), m_filter_bar->get_search_text(),
+                             m_filter_bar->get_search_field(), m_filter_bar->get_use_regex());
+            }
         });
     }
 

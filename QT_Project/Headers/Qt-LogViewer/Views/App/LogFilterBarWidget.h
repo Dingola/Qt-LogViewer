@@ -162,6 +162,12 @@ class LogFilterBarWidget: public QWidget
         [[nodiscard]] auto get_use_live_search() const -> bool;
 
         /**
+         * @brief Reports whether the current search text can be executed safely.
+         * @return True unless regex mode contains an invalid regular expression.
+         */
+        [[nodiscard]] auto has_valid_search_pattern() const noexcept -> bool;
+
+        /**
          * @brief Returns a pointer to the contained LogFilterWidget.
          *
          * @return Pointer to LogFilterWidget.

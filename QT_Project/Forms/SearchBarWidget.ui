@@ -61,6 +61,31 @@
        </property>
       </spacer>
      </item>
+     <item>
+      <widget class="QLabel" name="labelRegexError">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Ignored" vsizetype="Preferred">
+         <horstretch>1</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+       <property name="minimumSize">
+        <size>
+         <width>0</width>
+         <height>0</height>
+        </size>
+       </property>
+       <property name="text">
+        <string/>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignVCenter</set>
+       </property>
+       <property name="visible">
+        <bool>false</bool>
+       </property>
+      </widget>
+     </item>
     </layout>
    </item>
    <item row="0" column="1">

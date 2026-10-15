@@ -5,7 +5,9 @@
 #include <QEvent>
 #include <QFontMetrics>
 #include <QLineEdit>
+#include <QLocale>
 #include <QPushButton>
+#include <QRegularExpression>
 #include <QResizeEvent>
 #include <QSize>
 #include <QStyle>
@@ -53,34 +55,33 @@ SearchBarWidget::SearchBarWidget(QWidget* parent): QWidget(parent), ui(new Ui::S
     init_clear_button();
     update_clear_button_visibility(ui->lineEditSearch->text());
 
-    // Connect search button and text changes (existing behavior preserved).
-    connect(ui->lineEditSearch, &QLineEdit::textChanged,
-            [=] { style()->polish(ui->lineEditSearch); });
-    connect(ui->pushButtonSearch, &QPushButton::clicked, this, [this] {
-        emit search_requested(get_search_text(), get_search_field(), get_use_regex());
-    });
-    connect(ui->lineEditSearch, &QLineEdit::returnPressed, this, [this] {
-        emit search_requested(get_search_text(), get_search_field(), get_use_regex());
-    });
+    connect(ui->pushButtonSearch, &QPushButton::clicked, this,
+            &SearchBarWidget::request_search_if_valid);
+    connect(ui->lineEditSearch, &QLineEdit::returnPressed, this,
+            &SearchBarWidget::request_search_if_valid);
     connect(ui->lineEditSearch, &QLineEdit::textChanged, this, [this](const QString& new_text) {
         emit search_text_changed(get_search_text());
         update_clear_button_visibility(new_text);
-        if (get_use_live_search())
+        const bool valid = validate_search_pattern();
+        if (get_use_live_search() && valid)
         {
             emit search_requested(get_search_text(), get_search_field(), get_use_regex());
         }
     });
     connect(ui->comboBoxSearchArea, qOverload<int>(&QComboBox::currentIndexChanged), this,
             [this](int) { emit search_field_changed(get_search_field()); });
-    connect(ui->checkBoxRegEx, &QCheckBox::toggled, this,
-            [this] { emit regex_toggled(get_use_regex()); });
+    connect(ui->checkBoxRegEx, &QCheckBox::toggled, this, [this] {
+        validate_search_pattern();
+        emit regex_toggled(get_use_regex());
+    });
     connect(ui->checkBoxLiveSearch, &QCheckBox::toggled, this, [this] {
         emit live_search_toggled(get_use_live_search());
         if (get_use_live_search())
         {
-            emit search_requested(get_search_text(), get_search_field(), get_use_regex());
+            request_search_if_valid();
         }
     });
+    validate_search_pattern();
 }
 
 /**
@@ -173,11 +174,6 @@ auto SearchBarWidget::init_clear_button() -> void
 
     connect(m_clear_button, &QToolButton::clicked, this, [this] {
         ui->lineEditSearch->clear();
-        emit search_text_changed(get_search_text());
-        if (get_use_live_search())
-        {
-            emit search_requested(get_search_text(), get_search_field(), get_use_regex());
-        }
         ui->lineEditSearch->setFocus();
     });
 
@@ -300,6 +296,63 @@ auto SearchBarWidget::update_clear_button_icon() -> void
         UiUtils::colored_svg_icon(":/Resources/Icons/close.svg", m_clear_icon_color, icon_sz));
     m_clear_button->setIcon(icon);
     m_clear_button->setIconSize(icon_sz);
+}
+
+/**
+ * @brief Validates the current regex and updates the inline validation presentation.
+ * @return True when searching with the current controls is valid.
+ */
+auto SearchBarWidget::validate_search_pattern() -> bool
+{
+    bool valid = true;
+    QString error_message;
+
+    if (get_use_regex() && !get_search_text().isEmpty())
+    {
+        const QRegularExpression expression(get_search_text());
+        valid = expression.isValid();
+        if (!valid)
+        {
+            const qsizetype error_offset = expression.patternErrorOffset();
+            if (error_offset >= 0)
+            {
+                error_message =
+                    tr("Invalid regular expression at position %1: %2")
+                        .arg(QLocale().toString(error_offset + 1), expression.errorString());
+            }
+            else
+            {
+                error_message = tr("Invalid regular expression: %1").arg(expression.errorString());
+            }
+        }
+    }
+
+    const QString validation_state = valid ? QStringLiteral("valid") : QStringLiteral("invalid");
+    if (ui->lineEditSearch->property("validationState").toString() != validation_state)
+    {
+        ui->lineEditSearch->setProperty("validationState", validation_state);
+        ui->lineEditSearch->style()->unpolish(ui->lineEditSearch);
+        ui->lineEditSearch->style()->polish(ui->lineEditSearch);
+    }
+    ui->lineEditSearch->setToolTip(error_message);
+    ui->lineEditSearch->setAccessibleDescription(error_message);
+    ui->labelRegexError->setText(error_message);
+    ui->labelRegexError->setToolTip(error_message);
+    ui->labelRegexError->setVisible(!valid);
+    ui->pushButtonSearch->setEnabled(valid);
+    m_search_pattern_valid = valid;
+
+    return valid;
+}
+
+/** @brief Emits a search request only when the current pattern is valid. */
+auto SearchBarWidget::request_search_if_valid() -> void
+{
+    const bool valid = validate_search_pattern();
+    if (valid)
+    {
+        emit search_requested(get_search_text(), get_search_field(), get_use_regex());
+    }
 }
 
 /**
@@ -442,6 +495,7 @@ auto SearchBarWidget::changeEvent(QEvent* event) -> void
         {
             m_clear_button->setToolTip(tr("Clear"));
         }
+        validate_search_pattern();
     }
     else
     {
@@ -569,5 +623,15 @@ auto SearchBarWidget::get_use_regex() const -> bool
 auto SearchBarWidget::get_use_live_search() const -> bool
 {
     bool result = ui->checkBoxLiveSearch->isChecked();
+    return result;
+}
+
+/**
+ * @brief Reports whether the current text is a valid search pattern.
+ * @return True for plain text, disabled regex mode, or a valid regular expression.
+ */
+auto SearchBarWidget::has_valid_search_pattern() const noexcept -> bool
+{
+    const bool result = m_search_pattern_valid;
     return result;
 }

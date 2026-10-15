@@ -2224,6 +2224,15 @@ QLineEdit#lineEditSearch {
     max-height: @search-bar-line-edit-max-height;
 }
 
+QLineEdit#lineEditSearch[validationState="invalid"] {
+    border-color: @action-warning-color;
+}
+
+SearchBarWidget QLabel#labelRegexError {
+    color: @action-warning-color;
+    font-size: 8pt;
+}
+
 QPushButton#pushButtonSearch {
     min-height: @search-bar-line-edit-min-height;
     max-height: @search-bar-line-edit-max-height;

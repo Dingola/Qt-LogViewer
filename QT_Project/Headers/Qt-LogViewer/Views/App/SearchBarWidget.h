@@ -122,6 +122,12 @@ class SearchBarWidget: public QWidget
         [[nodiscard]] auto get_use_live_search() const -> bool;
 
         /**
+         * @brief Reports whether the current text is a valid search pattern.
+         * @return True for plain text, disabled regex mode, or a valid regular expression.
+         */
+        [[nodiscard]] auto has_valid_search_pattern() const noexcept -> bool;
+
+        /**
          * @brief Gets the normal (non-hover) clear icon color.
          * @return The current color.
          */
@@ -261,6 +267,15 @@ class SearchBarWidget: public QWidget
          */
         auto update_clear_button_icon() -> void;
 
+        /**
+         * @brief Validates the current regex and updates the inline validation presentation.
+         * @return True when searching with the current controls is valid.
+         */
+        auto validate_search_pattern() -> bool;
+
+        /** @brief Emits a search request only when the current pattern is valid. */
+        auto request_search_if_valid() -> void;
+
     private:
         Ui::SearchBarWidget* ui;
 
@@ -278,4 +293,5 @@ class SearchBarWidget: public QWidget
 
         QVector<QPair<QString, SearchField>> m_search_fields;
         bool m_use_default_search_fields = true;
+        bool m_search_pattern_valid = true;
 };

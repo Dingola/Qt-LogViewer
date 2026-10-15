@@ -224,6 +224,16 @@ auto LogFilterBarWidget::get_use_live_search() const -> bool
 }
 
 /**
+ * @brief Reports whether the current search text can be executed safely.
+ * @return True unless regex mode contains an invalid regular expression.
+ */
+auto LogFilterBarWidget::has_valid_search_pattern() const noexcept -> bool
+{
+    const bool result = ui->searchBarWidget->has_valid_search_pattern();
+    return result;
+}
+
+/**
  * @brief Returns a pointer to the contained LogFilterWidget.
  *
  * @return Pointer to LogFilterWidget.
