@@ -58,5 +58,8 @@ class LogTableView: public TableView
         auto set_search_highlight(const QString& text, SearchField field, bool use_regex) -> void;
 
     private:
+        /** @brief Copies the current cell value to the system clipboard. */
+        auto copy_current_cell() const -> void;
+
         HoverRowDelegate* m_hover_delegate{nullptr};
 };

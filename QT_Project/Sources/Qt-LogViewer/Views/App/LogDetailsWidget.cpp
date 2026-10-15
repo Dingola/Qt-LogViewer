@@ -118,6 +118,16 @@ auto LogDetailsWidget::has_log_entry() const noexcept -> bool
     return result;
 }
 
+/** @brief Copies all details of the current entry and shows action feedback. */
+auto LogDetailsWidget::copy_current_details() -> void
+{
+    if (m_entry.has_value())
+    {
+        copy_text(build_complete_details_text());
+        show_copy_feedback(ui->toolButtonCopyAll);
+    }
+}
+
 /**
  * @brief Returns no preferred extent so the inspector cannot resize its dock.
  * @return An empty preferred size.
@@ -262,10 +272,8 @@ auto LogDetailsWidget::connect_actions() -> void
             show_copy_feedback(ui->toolButtonCopyRaw);
         }
     });
-    connect(ui->toolButtonCopyAll, &QToolButton::clicked, this, [this] {
-        copy_text(build_complete_details_text());
-        show_copy_feedback(ui->toolButtonCopyAll);
-    });
+    connect(ui->toolButtonCopyAll, &QToolButton::clicked, this,
+            &LogDetailsWidget::copy_current_details);
     connect(ui->toolButtonCopyPath, &QToolButton::clicked, this, [this] {
         copy_text(ui->lineEditPath->text());
         show_copy_feedback(ui->toolButtonCopyPath);

@@ -36,6 +36,7 @@ class ViewLifecycleCoordinator;
 class ViewRegistry;
 class DockController;
 class MainMenuController;
+class WorkspaceShortcutController;
 class SessionController;
 class LogImportTabPresenter;
 class WorkspacePresenter;
@@ -358,6 +359,7 @@ class MainWindow: public QtWidgetsCommonLib::AppMainWindow
         /** @brief Whether the persisted dock layout has been adopted after the initial show. */
         bool m_dock_layout_adopted{false};
         MainMenuController* m_menu_controller = nullptr;
+        WorkspaceShortcutController* m_workspace_shortcut_controller = nullptr;
         LogImportTabPresenter* m_log_import_tab_presenter = nullptr;
         WorkspacePresenter* m_workspace_presenter = nullptr;
 

@@ -129,6 +129,12 @@ class SearchBarWidget: public QWidget
          */
         [[nodiscard]] auto has_valid_search_pattern() const noexcept -> bool;
 
+        /** @brief Focuses the search input and selects its current text. */
+        auto focus_search_input() -> void;
+
+        /** @brief Clears the search text and immediately applies the empty search. */
+        auto clear_search() -> void;
+
         /**
          * @brief Gets the normal (non-hover) clear icon color.
          * @return The current color.

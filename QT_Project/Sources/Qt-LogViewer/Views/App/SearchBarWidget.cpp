@@ -650,6 +650,21 @@ auto SearchBarWidget::get_use_live_search() const -> bool
     return result;
 }
 
+/** @brief Focuses the search input and selects its current text. */
+auto SearchBarWidget::focus_search_input() -> void
+{
+    ui->lineEditSearch->setFocus(Qt::ShortcutFocusReason);
+    ui->lineEditSearch->selectAll();
+}
+
+/** @brief Clears the search text and immediately applies the empty search. */
+auto SearchBarWidget::clear_search() -> void
+{
+    m_live_search_timer->stop();
+    ui->lineEditSearch->clear();
+    request_search_if_valid();
+}
+
 /**
  * @brief Reports whether the current text is a valid search pattern.
  * @return True for plain text, disabled regex mode, or a valid regular expression.

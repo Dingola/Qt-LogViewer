@@ -1,7 +1,11 @@
 #include "Qt-LogViewer/Views/App/LogTableView.h"
 
 #include <QAbstractItemView>
+#include <QApplication>
+#include <QClipboard>
 #include <QHeaderView>
+#include <QKeySequence>
+#include <QShortcut>
 
 /**
  * @file LogTableView.cpp
@@ -31,6 +35,11 @@ LogTableView::LogTableView(QWidget* parent): TableView(parent)
             });
 
     setSortingEnabled(true);
+
+    auto* copy_shortcut = new QShortcut(QKeySequence::Copy, this);
+    copy_shortcut->setContext(Qt::WidgetWithChildrenShortcut);
+    copy_shortcut->setObjectName(QStringLiteral("shortcutCopyCurrentCell"));
+    connect(copy_shortcut, &QShortcut::activated, this, &LogTableView::copy_current_cell);
 }
 
 /**
@@ -139,5 +148,15 @@ auto LogTableView::set_search_highlight(const QString& text, SearchField field,
     {
         m_hover_delegate->set_search_highlight(text, field, use_regex);
         viewport()->update();
+    }
+}
+
+/** @brief Copies the current cell value to the system clipboard. */
+auto LogTableView::copy_current_cell() const -> void
+{
+    const QModelIndex index = currentIndex();
+    if (index.isValid())
+    {
+        QApplication::clipboard()->setText(index.data(Qt::DisplayRole).toString());
     }
 }

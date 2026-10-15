@@ -115,6 +115,9 @@ class TabWidget: public QTabWidget
          */
         auto set_enable_default_context_menu(bool enabled) -> void;
 
+        /** @brief Closes the currently selected tab through the standard close workflow. */
+        auto close_current_tab() -> void;
+
     signals:
         /**
          * @brief Forwarded: emitted before the tab context menu is shown.

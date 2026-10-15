@@ -59,6 +59,9 @@ class LogDetailsWidget: public QWidget
          */
         [[nodiscard]] auto has_log_entry() const noexcept -> bool;
 
+        /** @brief Copies all details of the current entry and shows action feedback. */
+        auto copy_current_details() -> void;
+
         /**
          * @brief Returns no preferred extent so the inspector cannot resize its dock.
          * @return An empty preferred size.

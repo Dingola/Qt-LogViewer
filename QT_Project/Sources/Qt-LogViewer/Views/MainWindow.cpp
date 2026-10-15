@@ -30,6 +30,7 @@
 #include "Qt-LogViewer/Controllers/SessionController.h"
 #include "Qt-LogViewer/Controllers/ViewLifecycleCoordinator.h"
 #include "Qt-LogViewer/Controllers/ViewRegistry.h"
+#include "Qt-LogViewer/Controllers/WorkspaceShortcutController.h"
 #include "Qt-LogViewer/Models/LogFileTreeModel.h"
 #include "Qt-LogViewer/Models/RecentItemsModel.h"
 #include "Qt-LogViewer/Presenters/LogImportTabPresenter.h"
@@ -190,6 +191,8 @@ MainWindow::MainWindow(LogViewerSettings& settings, FileCatalogController& catal
         m_session_controller, ui->tabWidgetLog, ui->logFilterBarWidget, ui->paginationWidget,
         m_log_details_widget, m_log_level_pie_chart_widget, m_data_status_widget,
         m_workspace_content_stack, central_stack, m_dock_controller, this);
+    m_workspace_shortcut_controller = new WorkspaceShortcutController(
+        m_pages, ui->tabWidgetLog, ui->logFilterBarWidget, m_log_details_widget, this);
     m_log_import_tab_presenter = new LogImportTabPresenter(
         *m_log_viewer_settings, *m_preview, *m_imports, *ui->tabWidgetLog,
         [this](const QUuid& view_id) {

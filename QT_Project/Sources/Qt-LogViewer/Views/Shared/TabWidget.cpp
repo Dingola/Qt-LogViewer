@@ -167,6 +167,12 @@ auto TabWidget::set_enable_default_context_menu(bool enabled) -> void
     }
 }
 
+/** @brief Closes the currently selected tab through the standard close workflow. */
+auto TabWidget::close_current_tab() -> void
+{
+    handle_close_tab_requested(currentIndex());
+}
+
 /**
  * @brief Re-translates persistent UI texts on language changes.
  * @param event The change event.
