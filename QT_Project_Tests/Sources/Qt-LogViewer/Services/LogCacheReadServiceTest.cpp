@@ -90,7 +90,7 @@ TEST_F(LogCacheReadServiceTest, ReopensExactCacheWithoutParsingOrLegacyCopy)
     EXPECT_EQ(legacy_history.count_entries(reopened_query), 0);
 }
 
-/** @test Verifies filters and searches use the rebound per-file cache data source. */
+/** @test Verifies filters, plain searches and regex searches use the rebound cache source. */
 TEST_F(LogCacheReadServiceTest, FiltersAndSearchesReboundCacheEntries)
 {
     const QString file_path =
@@ -117,6 +117,11 @@ TEST_F(LogCacheReadServiceTest, FiltersAndSearchesReboundCacheEntries)
     ASSERT_NE(context, nullptr);
     ASSERT_EQ(context->get_model()->rowCount(), 1);
     EXPECT_EQ(context->get_model()->get_entry(0).get_message(), QStringLiteral("Second"));
+
+    ASSERT_TRUE(m_runtime->queries().set_search(view_id, QStringLiteral("^F\\w+$"),
+                                                SearchField::Message, true));
+    ASSERT_EQ(context->get_model()->rowCount(), 1);
+    EXPECT_EQ(context->get_model()->get_entry(0).get_message(), QStringLiteral("First"));
 }
 
 /**

@@ -15,6 +15,8 @@ namespace Ui
 class SearchBarWidget;
 }
 
+class QTimer;
+
 /**
  * @class SearchBarWidget
  * @brief Widget for searching log entries by text, field, and regex.
@@ -114,7 +116,7 @@ class SearchBarWidget: public QWidget
         /**
          * @brief Returns whether live search is enabled.
          *
-         * When enabled, a search is requested automatically while typing without
+         * When enabled, a search is requested automatically after a short typing pause without
          * pressing Enter or the Search button.
          *
          * @return True if live search is enabled, false otherwise.
@@ -294,4 +296,6 @@ class SearchBarWidget: public QWidget
         QVector<QPair<QString, SearchField>> m_search_fields;
         bool m_use_default_search_fields = true;
         bool m_search_pattern_valid = true;
+        /** @brief Delays live searches until the user pauses typing. */
+        QTimer* m_live_search_timer = nullptr;
 };

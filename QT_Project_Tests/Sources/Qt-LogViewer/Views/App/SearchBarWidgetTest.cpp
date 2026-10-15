@@ -10,8 +10,12 @@
 #include <QLineEdit>
 #include <QPushButton>
 #include <QSignalSpy>
+#include <chrono>
 
 #include "Qt-LogViewer/Views/App/SearchBarWidget.h"
+#include "QtCommonLib/TestSupport/QtTestAwait.h"
+
+using QtCommonLib::QtTestAwait;
 
 /** @test Verifies that an invalid regex is explained and cannot start a search. */
 TEST_F(SearchBarWidgetTest, RejectsInvalidRegularExpression)
@@ -62,6 +66,7 @@ TEST_F(SearchBarWidgetTest, AcceptsCorrectedRegularExpression)
     EXPECT_EQ(search_edit->property("validationState").toString(), QStringLiteral("valid"));
     EXPECT_TRUE(search_button->isEnabled());
     EXPECT_TRUE(error_label->isHidden());
-    ASSERT_EQ(search_spy.count(), 1);
+    ASSERT_TRUE(QtTestAwait::wait_until([&search_spy]() { return search_spy.count() == 1; },
+                                        std::chrono::seconds(1)));
     EXPECT_EQ(search_spy.takeFirst().at(0).toString(), QStringLiteral("error.*"));
 }

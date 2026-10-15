@@ -284,27 +284,27 @@ auto append_live_rows(QVector<CacheRow>& rows, const QVector<LogEntry>& entries,
 }
 
 /**
- * @brief Materializes one cached row by parsing only its original source record.
- * @param row Row containing source byte coordinates and profile.
- * @return True when the source record was read and parsed successfully.
+ * @brief Materializes one cached row through an already opened source and parser.
+ * @param row Row containing source byte coordinates.
+ * @param source_file Open source file shared by the current scan.
+ * @param parser Parser shared by rows belonging to the same source.
+ * @return True when the row was already materialized or was parsed successfully.
  */
-auto materialize_row(CacheRow& row) -> bool
+auto materialize_row(CacheRow& row, QFile& source_file, const LogParser& parser) -> bool
 {
     bool materialized = row.materialized_entry.has_value();
     if (!materialized && row.byte_offset >= 0 && row.byte_length >= 0)
     {
-        QFile file(row.source.file_path);
-        materialized = file.open(QIODevice::ReadOnly) && file.seek(row.byte_offset);
+        materialized = source_file.isOpen() && source_file.seek(row.byte_offset);
         if (materialized)
         {
-            const QByteArray record_bytes = file.read(row.byte_length);
+            const QByteArray record_bytes = source_file.read(row.byte_length);
             materialized = record_bytes.size() == row.byte_length;
             if (materialized)
             {
                 const QString record = QString::fromUtf8(record_bytes);
                 const LogParseOutcome outcome =
-                    LogParser(row.source.profile.value())
-                        .parse_line(record, row.source.file_path, row.source_line);
+                    parser.parse_line(record, row.source.file_path, row.source_line);
                 materialized = outcome.succeeded();
                 if (materialized)
                 {
@@ -319,29 +319,49 @@ auto materialize_row(CacheRow& row) -> bool
 }
 
 /**
- * @brief Tests a materialized row against a regular expression and selected fields.
- * @param row Materialized cache row.
+ * @brief Materializes one cached row by opening its source for an isolated read.
+ * @param row Row containing source byte coordinates and profile.
+ * @return True when the source record was read and parsed successfully.
+ */
+auto materialize_row(CacheRow& row) -> bool
+{
+    bool materialized = row.materialized_entry.has_value();
+    if (!materialized && row.source.profile.has_value())
+    {
+        QFile source_file(row.source.file_path);
+        const LogParser parser(row.source.profile.value());
+        if (source_file.open(QIODevice::ReadOnly))
+        {
+            materialized = materialize_row(row, source_file, parser);
+        }
+    }
+    return materialized;
+}
+
+/**
+ * @brief Tests a cache row against a compiled regular expression and selected fields.
+ * @param row Cache row with materialized message content when message matching is required.
  * @param query Query containing the expression and field selection.
+ * @param expression Compiled expression shared by the complete scan.
  * @return True when at least one selected value matches.
  */
-[[nodiscard]] auto matches_regex(const CacheRow& row, const LogQuery& query) -> bool
+[[nodiscard]] auto matches_regex(const CacheRow& row, const LogQuery& query,
+                                 const QRegularExpression& expression) -> bool
 {
-    const QRegularExpression expression(query.search_text,
-                                        QRegularExpression::CaseInsensitiveOption);
-    const LogEntry& entry = row.materialized_entry.value();
     const bool all_fields = query.search_fields.isEmpty();
     bool matches = false;
-    if (all_fields || query.search_fields.contains(LogField::Message))
+    if ((all_fields || query.search_fields.contains(LogField::Message)) &&
+        row.materialized_entry.has_value())
     {
-        matches = expression.match(entry.get_message()).hasMatch();
+        matches = expression.match(row.materialized_entry->get_message()).hasMatch();
     }
     if (!matches && (all_fields || query.search_fields.contains(LogField::Level)))
     {
-        matches = expression.match(entry.get_level()).hasMatch();
+        matches = expression.match(row.level).hasMatch();
     }
     if (!matches && (all_fields || query.search_fields.contains(LogField::AppName)))
     {
-        matches = expression.match(entry.get_app_name()).hasMatch();
+        matches = expression.match(row.app_name).hasMatch();
     }
     if (!matches && (all_fields || query.search_fields.contains(LogField::FilePath)))
     {
@@ -603,6 +623,8 @@ auto bind_values(QSqlQuery& sql_query, const QList<QVariant>& bindings) -> void
 /**
  * @brief Collects matching metadata rows from all files and applies regex filtering if required.
  * @param sources Validated cache sources.
+ * @param live_entries Parsed live records layered above the persistent cache.
+ * @param file_paths Ordered paths used to retain stable source ordering.
  * @param query View query.
  * @return Globally collected matching rows.
  */
@@ -620,14 +642,40 @@ auto bind_values(QSqlQuery& sql_query, const QList<QVariant>& bindings) -> void
 
     if (query.use_regex && !query.search_text.trimmed().isEmpty())
     {
-        const QRegularExpression expression(query.search_text,
-                                            QRegularExpression::CaseInsensitiveOption);
+        QRegularExpression expression(query.search_text, QRegularExpression::CaseInsensitiveOption);
         QVector<CacheRow> matching_rows;
         if (expression.isValid())
         {
+            expression.optimize();
+            const bool requires_materialization =
+                query.search_fields.isEmpty() || query.search_fields.contains(LogField::Message);
+            QString active_file_path;
+            QFile source_file;
+            std::optional<LogParser> parser;
+            bool source_ready = false;
             for (CacheRow& row: rows)
             {
-                if (materialize_row(row) && matches_regex(row, query))
+                const bool cached_entry = row.materialized_entry.has_value();
+                if (requires_materialization && !cached_entry &&
+                    row.source.file_path != active_file_path)
+                {
+                    active_file_path = row.source.file_path;
+                    source_file.close();
+                    source_file.setFileName(active_file_path);
+                    parser.reset();
+                    if (row.source.profile.has_value())
+                    {
+                        parser.emplace(row.source.profile.value());
+                    }
+                    source_ready = parser.has_value() && source_file.open(QIODevice::ReadOnly);
+                }
+
+                bool materialized = !requires_materialization || cached_entry;
+                if (!materialized && source_ready && parser.has_value())
+                {
+                    materialized = materialize_row(row, source_file, parser.value());
+                }
+                if (materialized && matches_regex(row, query, expression))
                 {
                     matching_rows.append(std::move(row));
                 }
@@ -718,9 +766,9 @@ auto LogCacheReadService::count_entries(const LogQuery& query) const -> qsizetyp
     const QVector<QString> file_paths =
         m_views != nullptr ? m_views->get_file_paths(query.view_id) : QVector<QString>();
     const QVector<LogEntry> live_entries = m_live_entries.value(query.view_id);
-    const bool requires_materialization = query.use_regex && !query.search_text.trimmed().isEmpty();
+    const bool requires_full_scan = query.use_regex && !query.search_text.trimmed().isEmpty();
     qsizetype count = 0;
-    if (requires_materialization)
+    if (requires_full_scan)
     {
         count = collect_rows(sources, live_entries, file_paths, query).size();
     }
@@ -756,11 +804,10 @@ auto LogCacheReadService::load_entries_page(const LogQuery& query, qsizetype off
         m_views != nullptr ? m_views->get_file_paths(query.view_id) : QVector<QString>();
     const QVector<CacheSource> sources = resolve_sources(m_catalog, m_views, query.view_id);
     const QVector<LogEntry> live_entries = m_live_entries.value(query.view_id);
-    const bool requires_materialization =
-        query.sort_field == LogField::Message ||
-        (query.use_regex && !query.search_text.trimmed().isEmpty());
+    const bool requires_full_scan = query.sort_field == LogField::Message ||
+                                    (query.use_regex && !query.search_text.trimmed().isEmpty());
     QVector<CacheRow> rows;
-    if (requires_materialization)
+    if (requires_full_scan)
     {
         rows = collect_rows(sources, live_entries, file_paths, query);
     }
@@ -820,9 +867,9 @@ auto LogCacheReadService::get_log_level_counts(const LogQuery& query) const
     const QVector<LogEntry> live_entries = m_live_entries.value(query.view_id);
     const QVector<QString> file_paths =
         m_views != nullptr ? m_views->get_file_paths(query.view_id) : QVector<QString>();
-    const bool requires_materialization =
+    const bool requires_full_scan =
         facet_query.use_regex && !facet_query.search_text.trimmed().isEmpty();
-    if (requires_materialization)
+    if (requires_full_scan)
     {
         const QVector<CacheRow> rows = collect_rows(sources, live_entries, file_paths, facet_query);
         for (const CacheRow& row: rows)

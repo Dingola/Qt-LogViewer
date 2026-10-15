@@ -12,6 +12,7 @@
 #include <QSize>
 #include <QStyle>
 #include <QStyleOptionFrame>
+#include <QTimer>
 #include <QToolButton>
 #include <QVariant>
 
@@ -27,6 +28,8 @@ constexpr auto k_all_fields_text = QT_TRANSLATE_NOOP("SearchBarWidget", "All Fie
 constexpr auto k_message_text = QT_TRANSLATE_NOOP("SearchBarWidget", "Message");
 constexpr auto k_level_text = QT_TRANSLATE_NOOP("SearchBarWidget", "Level");
 constexpr auto k_app_name_text = QT_TRANSLATE_NOOP("SearchBarWidget", "AppName");
+/** @brief Quiet period after typing before a live search is executed. */
+constexpr int k_live_search_delay_ms = 300;
 }  // namespace
 
 /**
@@ -39,6 +42,11 @@ constexpr auto k_app_name_text = QT_TRANSLATE_NOOP("SearchBarWidget", "AppName")
 SearchBarWidget::SearchBarWidget(QWidget* parent): QWidget(parent), ui(new Ui::SearchBarWidget)
 {
     ui->setupUi(this);
+
+    m_live_search_timer = new QTimer(this);
+    m_live_search_timer->setSingleShot(true);
+    m_live_search_timer->setInterval(k_live_search_delay_ms);
+    connect(m_live_search_timer, &QTimer::timeout, this, &SearchBarWidget::request_search_if_valid);
 
     qRegisterMetaType<SearchField>("SearchField");
     populate_default_search_fields();
@@ -65,12 +73,20 @@ SearchBarWidget::SearchBarWidget(QWidget* parent): QWidget(parent), ui(new Ui::S
         const bool valid = validate_search_pattern();
         if (get_use_live_search() && valid)
         {
-            emit search_requested(get_search_text(), get_search_field(), get_use_regex());
+            m_live_search_timer->start();
+        }
+        else
+        {
+            m_live_search_timer->stop();
         }
     });
     connect(ui->comboBoxSearchArea, qOverload<int>(&QComboBox::currentIndexChanged), this,
-            [this](int) { emit search_field_changed(get_search_field()); });
+            [this](int) {
+                m_live_search_timer->stop();
+                emit search_field_changed(get_search_field());
+            });
     connect(ui->checkBoxRegEx, &QCheckBox::toggled, this, [this] {
+        m_live_search_timer->stop();
         validate_search_pattern();
         emit regex_toggled(get_use_regex());
     });
@@ -79,6 +95,10 @@ SearchBarWidget::SearchBarWidget(QWidget* parent): QWidget(parent), ui(new Ui::S
         if (get_use_live_search())
         {
             request_search_if_valid();
+        }
+        else
+        {
+            m_live_search_timer->stop();
         }
     });
     validate_search_pattern();
@@ -348,6 +368,7 @@ auto SearchBarWidget::validate_search_pattern() -> bool
 /** @brief Emits a search request only when the current pattern is valid. */
 auto SearchBarWidget::request_search_if_valid() -> void
 {
+    m_live_search_timer->stop();
     const bool valid = validate_search_pattern();
     if (valid)
     {
@@ -618,6 +639,9 @@ auto SearchBarWidget::get_use_regex() const -> bool
 
 /**
  * @brief Returns whether live search is enabled.
+ *
+ * Enabled live searches are debounced while text is being entered.
+ *
  * @return True if live search is enabled, false otherwise.
  */
 auto SearchBarWidget::get_use_live_search() const -> bool
