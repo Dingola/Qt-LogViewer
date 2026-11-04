@@ -1,7 +1,8 @@
 #include "Qt-LogViewer/Services/LocalFileInputValidator.h"
 
-#include <QFileInfo>
 #include <QUrl>
+
+#include "Qt-LogViewer/Services/LocalFileStatus.h"
 
 /**
  * @file LocalFileInputValidator.cpp
@@ -60,11 +61,11 @@ auto LocalFileInputValidator::validate(const QList<QUrl>& candidates,
  */
 auto LocalFileInputValidator::normalize_readable_file(const QString& path) -> QString
 {
-    const QFileInfo file_info(path);
+    const QtCommonLib::LocalFileStatus status = QtCommonLib::inspect_local_file(path);
     QString result;
-    if (file_info.exists() && file_info.isFile() && file_info.isReadable())
+    if (status.availability == QtCommonLib::LocalFileAvailability::Available)
     {
-        result = file_info.canonicalFilePath();
+        result = status.normalized_path;
     }
     return result;
 }
