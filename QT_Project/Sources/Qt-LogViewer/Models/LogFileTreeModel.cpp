@@ -151,6 +151,16 @@ auto LogFileTreeModel::get_session_count() const -> int
 }
 
 /**
+ * @brief Returns the identifiers of all sessions currently displayed by the model.
+ * @return Session identifiers in unspecified order.
+ */
+auto LogFileTreeModel::get_session_ids() const -> QVector<QString>
+{
+    const QVector<QString> result = m_session_items.keys().toVector();
+    return result;
+}
+
+/**
  * @brief Returns the model index for a session.
  * @param session_id The session identifier.
  * @return The model index, or invalid if not found.

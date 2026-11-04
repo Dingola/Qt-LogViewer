@@ -2882,6 +2882,66 @@ LogDetailsWidget QTableWidget#tableWidgetFields QHeaderView::section {
     background-color: @table-section-bg-color;
 }
 
+/* --- DropOverlayWidget --------------------------------------------------- */
+DropOverlayWidget#dropOverlayWidget {
+    color: @text-color-primary;
+    background-color: rgba(12, 16, 22, 88);
+}
+
+DropOverlayWidget QWidget#dropOverlayCard {
+    border: 2px solid @Brand-Accent-500;
+    border-radius: 10px;
+    background-color: @dialog-bg-color;
+}
+
+DropOverlayWidget[dropState="neutral"] QWidget#dropOverlayCard {
+    border-color: @border-color-primary;
+}
+
+DropOverlayWidget[dropState="accepted"] QWidget#dropOverlayCard {
+    border-color: @Brand-Accent-500;
+}
+
+DropOverlayWidget[dropState="warning"] QWidget#dropOverlayCard {
+    border-color: @action-warning-color;
+}
+
+DropOverlayWidget[dropState="rejected"] QWidget#dropOverlayCard {
+    border-color: @action-danger-color;
+}
+
+DropOverlayWidget QLabel#dropOverlayIcon,
+DropOverlayWidget QLabel#dropOverlayTitle,
+DropOverlayWidget QLabel#dropOverlayDescription,
+DropOverlayWidget QLabel#dropOverlayDetail {
+    border: none;
+    background-color: transparent;
+}
+
+DropOverlayWidget QLabel#dropOverlayTitle {
+    color: @text-color-primary;
+    font-size: 13pt;
+    font-weight: 600;
+}
+
+DropOverlayWidget QLabel#dropOverlayDescription {
+    color: @text-color-secondary;
+    font-size: 10pt;
+}
+
+DropOverlayWidget QLabel#dropOverlayDetail {
+    color: @text-color-tertiary;
+    font-size: 9pt;
+}
+
+DropOverlayWidget[dropState="warning"] QLabel#dropOverlayDetail {
+    color: @action-warning-color;
+}
+
+DropOverlayWidget[dropState="rejected"] QLabel#dropOverlayDetail {
+    color: @action-danger-color;
+}
+
 /* --- EmptyStateWidget ---------------------------------------------------- */
 EmptyStateWidget {
     background-color: transparent;

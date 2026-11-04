@@ -11,6 +11,8 @@
 class QDockWidget;
 class QResizeEvent;
 class QDragEnterEvent;
+class QDragLeaveEvent;
+class QDragMoveEvent;
 class QDropEvent;
 class QCloseEvent;
 class QEvent;
@@ -39,6 +41,7 @@ class MainMenuController;
 class WorkspaceShortcutController;
 class SessionController;
 class LogImportTabPresenter;
+class LogViewerDropOverlayPresenter;
 class WorkspacePresenter;
 class LogFileInfo;
 class RecentItemsModel;
@@ -52,6 +55,8 @@ class LogViewWidget;
 class StartPageWidget;
 class DockWidget;
 class EmptyStateWidget;
+class DropOverlayWidget;
+struct LogViewerDropTarget;
 struct SessionViewState;
 struct SessionState;
 
@@ -136,6 +141,10 @@ class MainWindow: public QtWidgetsCommonLib::AppMainWindow
          */
         auto setup_tab_widget() -> void;
 
+        /** @brief Creates the reusable drop overlay and its application-specific
+         * presenter. */
+        auto setup_drop_overlay() -> void;
+
         /** @brief Creates the permanent compact active-view data status widget. */
         auto setup_data_status() -> void;
 
@@ -158,10 +167,35 @@ class MainWindow: public QtWidgetsCommonLib::AppMainWindow
         void dragEnterEvent(QDragEnterEvent* event) override;
 
         /**
+         * @brief Updates drop guidance as the pointer moves between semantic
+         * destinations.
+         * @param event The drag move event.
+         */
+        void dragMoveEvent(QDragMoveEvent* event) override;
+
+        /**
+         * @brief Hides drop guidance when the drag leaves the window.
+         * @param event The drag leave event.
+         */
+        void dragLeaveEvent(QDragLeaveEvent* event) override;
+
+        /**
          * @brief Processes a validated log-file or session-file drop.
          * @param event The drop event.
          */
         void dropEvent(QDropEvent* event) override;
+
+        /**
+         * @brief Resolves whether dropped log files target the current or a new session.
+         * @return Effective session destination for the drop.
+         */
+        [[nodiscard]] auto get_log_drop_destination() const -> LogViewerDropTarget;
+
+        /**
+         * @brief Adds dropped logs to the current or a newly created session.
+         * @param file_paths Validated canonical log file paths.
+         */
+        auto process_log_file_drop(const QVector<QString>& file_paths) -> void;
 
         /**
          * @brief Handles resize events to adjust the layout.
@@ -361,6 +395,7 @@ class MainWindow: public QtWidgetsCommonLib::AppMainWindow
         MainMenuController* m_menu_controller = nullptr;
         WorkspaceShortcutController* m_workspace_shortcut_controller = nullptr;
         LogImportTabPresenter* m_log_import_tab_presenter = nullptr;
+        LogViewerDropOverlayPresenter* m_drop_overlay_presenter = nullptr;
         WorkspacePresenter* m_workspace_presenter = nullptr;
 
         // Session-related
@@ -382,6 +417,7 @@ class MainWindow: public QtWidgetsCommonLib::AppMainWindow
         LogDetailsWidget* m_log_details_widget = nullptr;
         QStackedWidget* m_workspace_content_stack = nullptr;
         EmptyStateWidget* m_workspace_empty_state = nullptr;
+        DropOverlayWidget* m_drop_overlay = nullptr;
         LogFileExplorer* m_log_file_explorer = nullptr;
         LogLevelPieChartWidget* m_log_level_pie_chart_widget = nullptr;
         LogDataStatusWidget* m_data_status_widget = nullptr;

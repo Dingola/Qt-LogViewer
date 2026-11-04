@@ -158,6 +158,18 @@ class SessionController: public QObject
         [[nodiscard]] auto load_session(const QString& session_id) -> std::optional<SessionState>;
 
         /**
+         * @brief Opens a managed session document or imports an external one.
+         *
+         * A document already owned by the session repository retains its identifier and is loaded
+         * directly. Other valid documents are imported into managed storage with a fresh id.
+         *
+         * @param file_path Path to the session JSON document.
+         * @return Opened typed state, or no value when the document is not a valid session.
+         */
+        [[nodiscard]] auto open_session_file(const QString& file_path)
+            -> std::optional<SessionState>;
+
+        /**
          * @brief Imports a session document from a file into managed session storage.
          *
          * The imported session receives a new internal identifier so an external document cannot
@@ -294,6 +306,12 @@ class SessionController: public QObject
         void session_restored(const QString& session_id);
 
     private:
+        /**
+         * @brief Saves and removes every displayed session except the next active session.
+         * @param next_session_id Session that will become active after preparation.
+         */
+        auto prepare_single_session_activation(const QString& next_session_id) -> void;
+
         /**
          * @brief Creates a new session with the given name.
          * @param session_name The session name.

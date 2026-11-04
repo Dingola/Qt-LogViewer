@@ -96,6 +96,12 @@ class LogFileTreeModel: public QAbstractItemModel
         [[nodiscard]] auto get_session_count() const -> int;
 
         /**
+         * @brief Returns the identifiers of all sessions currently displayed by the model.
+         * @return Session identifiers in unspecified order.
+         */
+        [[nodiscard]] auto get_session_ids() const -> QVector<QString>;
+
+        /**
          * @brief Returns the model index for a session.
          * @param session_id The session identifier.
          * @return The model index, or invalid if not found.

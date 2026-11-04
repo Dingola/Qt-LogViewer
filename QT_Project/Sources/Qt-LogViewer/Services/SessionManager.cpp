@@ -272,6 +272,33 @@ auto SessionManager::load_session_file(const QString& file_path) const -> QJsonO
 }
 
 /**
+ * @brief Resolves a file path belonging to an indexed managed session.
+ * @param file_path Path to a possible managed session document.
+ * @return Existing session identifier, or an empty string for an external file.
+ */
+auto SessionManager::get_managed_session_id_for_file(const QString& file_path) const -> QString
+{
+    QString session_id;
+    const QString candidate_path = QFileInfo(file_path).canonicalFilePath();
+    const bool can_resolve = m_repository != nullptr && !candidate_path.isEmpty();
+
+    if (can_resolve)
+    {
+        for (const RecentSessionRecord& session: m_recent_sessions)
+        {
+            const QString managed_path =
+                QFileInfo(m_repository->get_session_file_path(session.id)).canonicalFilePath();
+            if (!managed_path.isEmpty() && managed_path == candidate_path)
+            {
+                session_id = session.id;
+            }
+        }
+    }
+
+    return session_id;
+}
+
+/**
  * @brief Saves a full session JSON object under its id (atomic write).
  * @param session_id The session identifier.
  * @param session_obj The JSON object to persist.

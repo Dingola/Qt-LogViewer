@@ -100,6 +100,62 @@ TEST_F(SessionControllerTest, ImportsExternalSessionFileIntoManagedStorage)
 }
 
 /**
+ * @test Verifies that opening a managed session document loads its existing identifier instead of
+ * creating a duplicate session.
+ */
+TEST_F(SessionControllerTest, OpensManagedSessionFileWithoutDuplicatingIt)
+{
+    const QString session_id =
+        m_session_controller->ensure_current_session(QStringLiteral("Managed session"));
+    ASSERT_FALSE(session_id.isEmpty());
+    m_session_controller->save_current_session();
+
+    const QString session_file_path = m_session_repository->get_session_file_path(session_id);
+    ASSERT_TRUE(QFileInfo::exists(session_file_path));
+    const int session_count_before = m_session_manager->get_recent_sessions().size();
+
+    QSignalSpy created_spy(m_session_controller, &SessionController::session_created);
+    const std::optional<SessionState> opened_state =
+        m_session_controller->open_session_file(session_file_path);
+
+    ASSERT_TRUE(opened_state.has_value());
+    EXPECT_EQ(opened_state->id, session_id);
+    EXPECT_EQ(m_session_manager->get_current_session_id(), session_id);
+    EXPECT_EQ(m_session_manager->get_recent_sessions().size(), session_count_before);
+    EXPECT_EQ(created_spy.count(), 0);
+}
+
+/**
+ * @test Verifies that importing a session replaces every previously displayed session while
+ * preserving the previous session in managed storage.
+ */
+TEST_F(SessionControllerTest, ImportReplacesDisplayedSessionWithoutDeletingPersistence)
+{
+    const QString previous_session_id =
+        m_session_controller->ensure_current_session(QStringLiteral("Previous session"));
+    ASSERT_FALSE(previous_session_id.isEmpty());
+    ASSERT_TRUE(m_runtime->catalog().get_model()->has_session(previous_session_id));
+
+    SessionState source_state;
+    source_state.name = QStringLiteral("Dropped session");
+    const QByteArray session_json =
+        QJsonDocument(SessionCodec::to_json(source_state)).toJson(QJsonDocument::Compact);
+    const QString session_file_path = m_file_system.write_text_file(
+        QStringLiteral("dropped-session.json"), QString::fromUtf8(session_json));
+    ASSERT_FALSE(session_file_path.isEmpty());
+
+    const std::optional<SessionState> imported_state =
+        m_session_controller->import_session_file(session_file_path);
+
+    ASSERT_TRUE(imported_state.has_value());
+    EXPECT_EQ(m_runtime->catalog().get_model()->get_session_count(), 1);
+    EXPECT_FALSE(m_runtime->catalog().get_model()->has_session(previous_session_id));
+    EXPECT_TRUE(m_runtime->catalog().get_model()->has_session(imported_state->id));
+    EXPECT_TRUE(
+        SessionCodec::is_session_document(m_session_manager->load_session(previous_session_id)));
+}
+
+/**
  * @test Verifies that a valid JSON root document without session payload is rejected.
  */
 TEST_F(SessionControllerTest, RejectsNonSessionJsonDocument)

@@ -494,6 +494,7 @@ auto SessionController::load_session(const QString& session_id) -> std::optional
         if (state.has_value())
         {
             state->id = session_id;
+            prepare_single_session_activation(session_id);
             m_session_manager->set_current_session_id(session_id);
             m_session_manager->set_last_session_id(session_id);
 
@@ -507,6 +508,36 @@ auto SessionController::load_session(const QString& session_id) -> std::optional
             }
 
             emit current_session_changed(session_id);
+        }
+    }
+
+    return state;
+}
+
+/**
+ * @brief Opens a managed session document or imports an external one.
+ *
+ * A repository-owned document is loaded through its existing identifier. An external document is
+ * imported with a fresh identifier so it cannot overwrite managed state.
+ *
+ * @param file_path Path to the session JSON document.
+ * @return Opened typed state, or no value when the document is not a valid session.
+ */
+auto SessionController::open_session_file(const QString& file_path) -> std::optional<SessionState>
+{
+    std::optional<SessionState> state;
+
+    if (m_session_manager != nullptr && !file_path.isEmpty())
+    {
+        const QString managed_session_id =
+            m_session_manager->get_managed_session_id_for_file(file_path);
+        if (!managed_session_id.isEmpty())
+        {
+            state = load_session(managed_session_id);
+        }
+        else
+        {
+            state = import_session_file(file_path);
         }
     }
 
@@ -549,6 +580,7 @@ auto SessionController::import_session_file(const QString& file_path) -> std::op
                 state->name = file_info.completeBaseName();
             }
 
+            prepare_single_session_activation(session_id);
             m_session_manager->save_session(session_id, SessionCodec::to_json(*state));
             m_session_manager->set_current_session_id(session_id);
             m_session_manager->set_last_session_id(session_id);
@@ -795,6 +827,39 @@ auto SessionController::clear_all_views() -> void
 }
 
 /**
+ * @brief Saves and removes every displayed session except the next active session.
+ * @param next_session_id Session that will become active after preparation.
+ */
+auto SessionController::prepare_single_session_activation(const QString& next_session_id) -> void
+{
+    QString current_session_id;
+    if (m_session_manager != nullptr)
+    {
+        current_session_id = m_session_manager->get_current_session_id();
+        if (!current_session_id.isEmpty() && current_session_id != next_session_id)
+        {
+            save_current_session();
+        }
+    }
+
+    if (m_tree_model != nullptr)
+    {
+        const QVector<QString> displayed_session_ids = m_tree_model->get_session_ids();
+        for (const QString& displayed_session_id: displayed_session_ids)
+        {
+            if (displayed_session_id != next_session_id)
+            {
+                const bool removed = m_tree_model->remove_session(displayed_session_id);
+                if (removed)
+                {
+                    emit session_closed(displayed_session_id);
+                }
+            }
+        }
+    }
+}
+
+/**
  * @brief Creates a new session with the given name.
  * @param session_name The session name.
  * @return The new session ID.
@@ -802,6 +867,7 @@ auto SessionController::clear_all_views() -> void
 auto SessionController::create_session(const QString& session_name) -> QString
 {
     const QString session_id = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    prepare_single_session_activation(session_id);
 
     if (m_session_manager != nullptr)
     {

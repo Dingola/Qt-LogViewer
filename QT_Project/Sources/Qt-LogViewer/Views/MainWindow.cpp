@@ -4,6 +4,8 @@
 #include <QApplication>
 #include <QCoreApplication>
 #include <QDragEnterEvent>
+#include <QDragLeaveEvent>
+#include <QDragMoveEvent>
 #include <QDropEvent>
 #include <QFileDialog>
 #include <QFileInfo>
@@ -34,6 +36,7 @@
 #include "Qt-LogViewer/Models/RecentItemsModel.h"
 #include "Qt-LogViewer/Presenters/LogImportTabPresenter.h"
 #include "Qt-LogViewer/Presenters/LogViewPresenter.h"
+#include "Qt-LogViewer/Presenters/LogViewerDropOverlayPresenter.h"
 #include "Qt-LogViewer/Presenters/WorkspacePresenter.h"
 #include "Qt-LogViewer/Services/LogHistoryService.h"
 #include "Qt-LogViewer/Services/LogPreviewService.h"
@@ -49,6 +52,7 @@
 #include "Qt-LogViewer/Views/App/LogViewWidget.h"
 #include "Qt-LogViewer/Views/App/StartPageWidget.h"
 #include "Qt-LogViewer/Views/Shared/DockWidget.h"
+#include "Qt-LogViewer/Views/Shared/DropOverlayWidget.h"
 #include "Qt-LogViewer/Views/Shared/EmptyStateWidget.h"
 #include "QtWidgetsCommonLib/Services/Translator.h"
 #include "QtWidgetsCommonLib/Utils/StylesheetLoader.h"
@@ -123,6 +127,7 @@ MainWindow::MainWindow(LogViewerSettings& settings, FileCatalogController& catal
     ui->setupUi(this);
     setContentsMargins(9, 9, 9, 9);
     setWindowIcon(QIcon(":/Resources/Icons/App/AppIcon.ico"));
+    setAcceptDrops(true);
 
     // Replace central widget with QStackedWidget to allow Start Page
     QWidget* old_central = this->takeCentralWidget();
@@ -146,6 +151,7 @@ MainWindow::MainWindow(LogViewerSettings& settings, FileCatalogController& catal
     setup_log_details_dock();
     setup_filter_bar();
     setup_tab_widget();
+    setup_drop_overlay();
     setup_data_status();
 
     // Connect session controller signals
@@ -325,6 +331,14 @@ auto MainWindow::setup_tab_widget() -> void
     m_workspace_content_stack->setCurrentWidget(m_workspace_empty_state);
 }
 
+/** @brief Creates the reusable drop overlay and its application-specific
+ * presenter. */
+auto MainWindow::setup_drop_overlay() -> void
+{
+    m_drop_overlay = new DropOverlayWidget(centralWidget());
+    m_drop_overlay_presenter = new LogViewerDropOverlayPresenter(*m_drop_overlay, this);
+}
+
 /** @brief Creates the permanent compact active-view data status widget. */
 auto MainWindow::setup_data_status() -> void
 {
@@ -397,14 +411,49 @@ void MainWindow::dragEnterEvent(QDragEnterEvent* event)
 {
     const LogViewerDropValidationResult validation = LogViewerDropValidator::validate(
         *event->mimeData(), m_session_controller->get_current_session_file_paths());
+    const LogViewerDropTarget target = get_log_drop_destination();
+    m_drop_overlay_presenter->show(validation, target);
     if (validation.is_accepted())
     {
         event->acceptProposedAction();
     }
     else
     {
-        event->ignore();
+        event->setDropAction(Qt::IgnoreAction);
+        event->accept();
     }
+}
+
+/**
+ * @brief Updates drop guidance as the pointer moves between semantic
+ * destinations.
+ * @param event The drag move event.
+ */
+void MainWindow::dragMoveEvent(QDragMoveEvent* event)
+{
+    const LogViewerDropValidationResult validation = LogViewerDropValidator::validate(
+        *event->mimeData(), m_session_controller->get_current_session_file_paths());
+    const LogViewerDropTarget target = get_log_drop_destination();
+    m_drop_overlay_presenter->show(validation, target);
+    if (validation.is_accepted())
+    {
+        event->acceptProposedAction();
+    }
+    else
+    {
+        event->setDropAction(Qt::IgnoreAction);
+        event->accept();
+    }
+}
+
+/**
+ * @brief Hides drop guidance when the drag leaves the window.
+ * @param event The drag leave event.
+ */
+void MainWindow::dragLeaveEvent(QDragLeaveEvent* event)
+{
+    m_drop_overlay_presenter->hide();
+    event->accept();
 }
 
 /**
@@ -415,26 +464,18 @@ void MainWindow::dropEvent(QDropEvent* event)
 {
     const LogViewerDropValidationResult validation = LogViewerDropValidator::validate(
         *event->mimeData(), m_session_controller->get_current_session_file_paths());
+    const LogViewerDropTarget target = get_log_drop_destination();
+    m_drop_overlay_presenter->hide();
 
     if (validation.content_type == LogViewerDropContentType::LogFiles)
     {
-        const QString session_id =
-            m_session_controller->ensure_current_session(tr(k_untitled_session_text));
-        m_session_controller->add_files_to_current_session(validation.accepted_paths);
-        for (const QString& file_path: validation.accepted_paths)
-        {
-            m_session_controller->add_recent_log_file(LogFileInfo(file_path));
-        }
-        m_session_controller->request_expand_session(session_id);
-        m_session_controller->save_current_session();
-        m_menu_controller->rebuild_recent_menus();
-        m_workspace_presenter->refresh_start_page();
+        process_log_file_drop(validation.accepted_paths);
         event->acceptProposedAction();
     }
     else if (validation.content_type == LogViewerDropContentType::SessionFile)
     {
         const std::optional<SessionState> state =
-            m_session_controller->import_session_file(validation.accepted_paths.constFirst());
+            m_session_controller->open_session_file(validation.accepted_paths.constFirst());
         if (state.has_value())
         {
             restore_session(*state);
@@ -460,6 +501,38 @@ void MainWindow::dropEvent(QDropEvent* event)
     }
 }
 
+/**
+ * @brief Resolves whether dropped log files target the current or a new session.
+ * @return Effective session destination for the drop.
+ */
+auto MainWindow::get_log_drop_destination() const -> LogViewerDropTarget
+{
+    LogViewerDropTarget result;
+    if (m_session_controller->has_current_session())
+    {
+        result.destination = LogViewerDropDestination::CurrentSession;
+    }
+    return result;
+}
+
+/**
+ * @brief Adds dropped logs to the current or a newly created session.
+ * @param file_paths Validated canonical log file paths.
+ */
+auto MainWindow::process_log_file_drop(const QVector<QString>& file_paths) -> void
+{
+    const QString session_id =
+        m_session_controller->ensure_current_session(tr(k_untitled_session_text));
+    m_session_controller->add_files_to_current_session(file_paths);
+    for (const QString& file_path: file_paths)
+    {
+        m_session_controller->add_recent_log_file(LogFileInfo(file_path));
+    }
+    m_session_controller->request_expand_session(session_id);
+    m_session_controller->save_current_session();
+    m_menu_controller->rebuild_recent_menus();
+    m_workspace_presenter->refresh_start_page();
+}
 /**
  * @brief Handles resize events to adjust the layout.
  * @param event The resize event.
@@ -698,7 +771,7 @@ auto MainWindow::handle_open_session_dialog() -> void
         if (ok)
         {
             const std::optional<SessionState> state =
-                m_session_controller->import_session_file(session_file);
+                m_session_controller->open_session_file(session_file);
 
             if (state.has_value())
             {
