@@ -39,8 +39,7 @@ class StartPageWidget: public QWidget
 
         /**
          * @brief Assign the model for the recent files list view.
-         * @param model QAbstractItemModel exposing roles: file_path, file_name, app_name,
-         * last_opened.
+         * @param model QAbstractItemModel exposing file presentation, status, and enabled roles.
          */
         auto set_recent_files_model(QAbstractItemModel* model) -> void;
 

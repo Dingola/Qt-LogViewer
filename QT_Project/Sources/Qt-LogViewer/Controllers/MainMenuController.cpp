@@ -36,6 +36,7 @@ constexpr auto k_about_text = QT_TRANSLATE_NOOP("MainMenuController", "About %1"
 constexpr auto k_about_qt_text = QT_TRANSLATE_NOOP("MainMenuController", "About Qt");
 constexpr auto k_clear_recent_files_text =
     QT_TRANSLATE_NOOP("MainMenuController", "Clear Recent Files");
+constexpr auto k_unavailable_recent_file_text = QT_TRANSLATE_NOOP("MainMenuController", "%1 — %2");
 
 /**
  * @brief Translates menu text using the MainMenuController translation context.
@@ -164,11 +165,16 @@ auto MainMenuController::rebuild_recent_menus() -> void
                 m_recent_files_model->data(index, to_role_id(RecentFileRole::FileName)).toString();
             const QString path =
                 m_recent_files_model->data(index, to_role_id(RecentFileRole::FilePath)).toString();
-            QAction* action = m_recent_files_menu->addAction(title);
+            const QString status_text =
+                index.data(to_role_id(RecentFileRole::StatusText)).toString();
+            const bool enabled = index.flags().testFlag(Qt::ItemIsEnabled);
+            const QString action_title =
+                enabled ? title : translate(k_unavailable_recent_file_text).arg(title, status_text);
+            QAction* action = m_recent_files_menu->addAction(action_title);
             const QString tooltip = index.data(Qt::ToolTipRole).toString();
-            action->setEnabled(index.flags().testFlag(Qt::ItemIsEnabled));
+            action->setEnabled(enabled);
             action->setToolTip(tooltip);
-            action->setStatusTip(index.data(to_role_id(RecentFileRole::StatusText)).toString());
+            action->setStatusTip(status_text);
             action->setWhatsThis(tooltip);
             connect(action, &QAction::triggered, this,
                     [this, path]() { emit open_recent_file_requested(path); });

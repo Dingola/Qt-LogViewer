@@ -64,7 +64,7 @@ StartPageWidget::~StartPageWidget()
 
 /**
  * @brief Assign the model for the recent files table view.
- * @param model QAbstractItemModel exposing roles: file_path, file_name, app_name, last_opened.
+ * @param model QAbstractItemModel exposing file presentation, status, and enabled roles.
  */
 auto StartPageWidget::set_recent_files_model(QAbstractItemModel* model) -> void
 {
@@ -72,9 +72,11 @@ auto StartPageWidget::set_recent_files_model(QAbstractItemModel* model) -> void
 
     if (auto* lv = qobject_cast<QListView*>(ui->recentFilesView); lv != nullptr)
     {
-        lv->setItemDelegate(new RecentItemDelegate(to_role_id(RecentFileRole::FileName),
-                                                   to_role_id(RecentFileRole::FilePath),
-                                                   to_role_id(RecentFileRole::LastOpened), lv));
+        auto* delegate = new RecentItemDelegate(to_role_id(RecentFileRole::FileName),
+                                                to_role_id(RecentFileRole::FilePath),
+                                                to_role_id(RecentFileRole::LastOpened), lv);
+        delegate->set_status_role(to_role_id(RecentFileRole::StatusText));
+        lv->setItemDelegate(delegate);
         lv->setUniformItemSizes(true);
         lv->setSpacing(4);
     }
@@ -82,9 +84,20 @@ auto StartPageWidget::set_recent_files_model(QAbstractItemModel* model) -> void
     QAbstractItemModel* files_model = ui->recentFilesView->model();
     if (files_model != nullptr && files_model->rowCount() > 0)
     {
-        const QModelIndex first = files_model->index(0, 0);
-        ui->recentFilesView->selectionModel()->setCurrentIndex(first,
-                                                               QItemSelectionModel::ClearAndSelect);
+        QModelIndex first_enabled;
+        for (int row = 0; row < files_model->rowCount() && !first_enabled.isValid(); ++row)
+        {
+            const QModelIndex candidate = files_model->index(row, 0);
+            if (candidate.flags().testFlag(Qt::ItemIsEnabled))
+            {
+                first_enabled = candidate;
+            }
+        }
+        if (first_enabled.isValid())
+        {
+            ui->recentFilesView->selectionModel()->setCurrentIndex(
+                first_enabled, QItemSelectionModel::ClearAndSelect);
+        }
     }
 
     if (ui->recentFilesView->selectionModel() != nullptr)
@@ -291,7 +304,8 @@ auto StartPageWidget::setup_connections() -> void
     });
 
     connect(ui->recentFilesView, &QListView::doubleClicked, this, [this](const QModelIndex& index) {
-        if (index.isValid() && ui->recentFilesView->model() != nullptr)
+        if (index.isValid() && index.flags().testFlag(Qt::ItemIsEnabled) &&
+            ui->recentFilesView->model() != nullptr)
         {
             const QVariant file_path_data =
                 ui->recentFilesView->model()->data(index, to_role_id(RecentFileRole::FilePath));
@@ -333,7 +347,8 @@ auto StartPageWidget::get_selected_recent_file_path() const -> QString
         if (files_selection_model != nullptr)
         {
             const QModelIndex index = files_selection_model->currentIndex();
-            if (index.isValid() && view->model() != nullptr)
+            if (index.isValid() && index.flags().testFlag(Qt::ItemIsEnabled) &&
+                view->model() != nullptr)
             {
                 const QVariant v = view->model()->data(index, to_role_id(RecentFileRole::FilePath));
                 path = v.toString();
@@ -382,8 +397,11 @@ auto StartPageWidget::update_buttons_state() -> void
     files_has_items = (files_model != nullptr) && (files_model->rowCount() > 0);
 
     const QItemSelectionModel* files_selection_model = ui->recentFilesView->selectionModel();
-    files_has_selection =
-        (files_selection_model != nullptr) && files_selection_model->hasSelection();
+    const QModelIndex selected_file_index =
+        files_selection_model != nullptr ? files_selection_model->currentIndex() : QModelIndex();
+    files_has_selection = files_selection_model != nullptr &&
+                          files_selection_model->hasSelection() &&
+                          selected_file_index.flags().testFlag(Qt::ItemIsEnabled);
 
     bool sessions_has_items = false;
     bool sessions_has_selection = false;

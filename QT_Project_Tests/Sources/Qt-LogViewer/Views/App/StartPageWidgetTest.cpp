@@ -1,11 +1,14 @@
 #include "Qt-LogViewer/Views/App/StartPageWidgetTest.h"
 
 #include <QLabel>
+#include <QListView>
 #include <QPixmap>
 #include <QPushButton>
 #include <QSignalSpy>
 #include <QStackedWidget>
 
+#include "Qt-LogViewer/Models/RecentItemsModel.h"
+#include "Qt-LogViewer/Models/RecentListSchema.h"
 #include "Qt-LogViewer/Views/App/StartPageWidget.h"
 #include "Qt-LogViewer/Views/Shared/EmptyStateWidget.h"
 
@@ -123,4 +126,38 @@ TEST_F(StartPageWidgetTest, ExposesSemanticActionHierarchy)
     EXPECT_EQ(open_selected_session_button->property("actionRole").toString(),
               QStringLiteral("primary"));
     EXPECT_EQ(delete_session_button->property("actionRole").toString(), QStringLiteral("danger"));
+}
+
+/** @test Keeps an unavailable recent file visible and prevents primary activation. */
+TEST_F(StartPageWidgetTest, PresentsUnavailableRecentFileWithoutOpeningIt)
+{
+    RecentItemsModel model(RecentListSchemas::make_recent_files_schema());
+    QHash<int, QVariant> row;
+    row.insert(to_role_id(RecentFileRole::FileName), QStringLiteral("missing.log"));
+    row.insert(to_role_id(RecentFileRole::FilePath), QStringLiteral("C:/logs/missing.log"));
+    row.insert(to_role_id(RecentFileRole::LastOpened), QDateTime::currentDateTime());
+    row.insert(to_role_id(RecentFileRole::StatusText), QStringLiteral("File not found"));
+    row.insert(to_role_id(RecentFileRole::Enabled), false);
+    row.insert(Qt::ToolTipRole, QStringLiteral("File not found: C:/logs/missing.log"));
+    row.insert(Qt::AccessibleDescriptionRole,
+               QStringLiteral("File not found: C:/logs/missing.log"));
+    model.set_rows({row});
+
+    m_widget->set_recent_files_model(&model);
+
+    auto* recent_files_view = m_widget->findChild<QListView*>(QStringLiteral("recentFilesView"));
+    auto* open_selected_button =
+        m_widget->findChild<QPushButton*>(QStringLiteral("openSelectedFileButton"));
+    QSignalSpy open_spy(m_widget, &StartPageWidget::open_recent_file_requested);
+    ASSERT_NE(recent_files_view, nullptr);
+    ASSERT_NE(open_selected_button, nullptr);
+
+    const QModelIndex index = model.index(0, 0);
+    EXPECT_FALSE(index.flags().testFlag(Qt::ItemIsEnabled));
+    EXPECT_FALSE(open_selected_button->isEnabled());
+    EXPECT_EQ(index.data(Qt::AccessibleDescriptionRole), index.data(Qt::ToolTipRole));
+
+    QMetaObject::invokeMethod(recent_files_view, "doubleClicked", Qt::DirectConnection,
+                              Q_ARG(QModelIndex, index));
+    EXPECT_EQ(open_spy.count(), 0);
 }

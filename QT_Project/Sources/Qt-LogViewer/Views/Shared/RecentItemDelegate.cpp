@@ -29,6 +29,16 @@ RecentItemDelegate::RecentItemDelegate(int title_role, int secondary_role, int d
 {}
 
 /**
+ * @brief Configures an optional status role rendered as a compact trailing badge.
+ * @param status_role Qt role id providing visible status text, or a negative value to disable the
+ * badge.
+ */
+auto RecentItemDelegate::set_status_role(int status_role) -> void
+{
+    m_status_role = status_role;
+}
+
+/**
  * @brief Paints the two-row entry with title/date on the top and secondary text on the bottom.
  * @param painter Painter to draw with.
  * @param option Style option (includes selection/hover state).
@@ -54,7 +64,8 @@ auto RecentItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& op
     QString title;
     QString secondary;
     QString date_text;
-    extract_texts(index, title, secondary, date_text);
+    QString status_text;
+    extract_texts(index, title, secondary, date_text, status_text);
 
     // Keep metadata readable; separate it by tone rather than tiny type.
     QFont title_font = opt.font;
@@ -62,7 +73,10 @@ auto RecentItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& op
 
     QFont secondary_font = opt.font;
     const bool selected = opt.state.testFlag(QStyle::State_Selected);
-    const QColor text_color = pal.color(selected ? QPalette::HighlightedText : QPalette::Text);
+    const bool enabled = opt.state.testFlag(QStyle::State_Enabled);
+    const QPalette::ColorGroup color_group = enabled ? QPalette::Active : QPalette::Disabled;
+    const QColor text_color =
+        pal.color(color_group, selected ? QPalette::HighlightedText : QPalette::Text);
     QColor secondary_color(text_color);
     secondary_color.setAlphaF(selected ? 0.9 : 0.75);
 
@@ -91,12 +105,38 @@ auto RecentItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& op
     painter->drawText(date_rect, Qt::AlignVCenter | Qt::AlignRight | Qt::TextSingleLine,
                       opt.fontMetrics.elidedText(date_text, Qt::ElideRight, date_width));
 
+    QRect secondary_rect = bottom_row;
+    if (!status_text.isEmpty())
+    {
+        QFont status_font = opt.font;
+        status_font.setWeight(QFont::Medium);
+        const QFontMetrics status_metrics(status_font);
+        const int desired_status_width = status_metrics.horizontalAdvance(status_text) + 16;
+        const int status_width = qMin(desired_status_width, qMax(0, bottom_row.width() / 2));
+        const QRect status_rect(bottom_row.right() - status_width + 1, bottom_row.top(),
+                                status_width, bottom_row.height());
+        secondary_rect.setRight(status_rect.left() - 9);
+
+        QColor status_background = pal.color(color_group, QPalette::Mid);
+        status_background.setAlphaF(selected ? 0.35 : 0.55);
+        painter->setPen(Qt::NoPen);
+        painter->setBrush(status_background);
+        painter->drawRoundedRect(status_rect, 4, 4);
+
+        painter->setFont(status_font);
+        painter->setPen(pal.color(color_group, QPalette::Text));
+        painter->drawText(status_rect.adjusted(8, 0, -8, 0),
+                          Qt::AlignVCenter | Qt::AlignHCenter | Qt::TextSingleLine,
+                          status_metrics.elidedText(status_text, Qt::ElideRight,
+                                                    qMax(0, status_rect.width() - 16)));
+    }
+
     // Secondary (elided)
     painter->setFont(secondary_font);
     painter->setPen(secondary_color);
     const QString elided_secondary =
-        opt.fontMetrics.elidedText(secondary, Qt::ElideMiddle, bottom_row.width());
-    painter->drawText(bottom_row, Qt::AlignVCenter | Qt::AlignLeft, elided_secondary);
+        opt.fontMetrics.elidedText(secondary, Qt::ElideMiddle, qMax(0, secondary_rect.width()));
+    painter->drawText(secondary_rect, Qt::AlignVCenter | Qt::AlignLeft, elided_secondary);
 
     painter->restore();
 }
@@ -113,7 +153,7 @@ auto RecentItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& op
     Q_UNUSED(index);
     QSize s(option.rect.width(), 0);
     const int line_height = option.fontMetrics.height();
-    const int height = (line_height * 2) + 16;
+    const int height = (line_height * 2) + 24;
     s.setHeight(height);
     return s;
 }
@@ -124,9 +164,11 @@ auto RecentItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& op
  * @param out_title Title string.
  * @param out_secondary Secondary string.
  * @param out_date_text Formatted date string ("yyyy-MM-dd HH:mm") if valid.
+ * @param out_status_text Optional visible status text.
  */
 auto RecentItemDelegate::extract_texts(const QModelIndex& index, QString& out_title,
-                                       QString& out_secondary, QString& out_date_text) const -> void
+                                       QString& out_secondary, QString& out_date_text,
+                                       QString& out_status_text) const -> void
 {
     out_title = index.data(m_title_role).toString();
     out_secondary = index.data(m_secondary_role).toString();
@@ -140,4 +182,8 @@ auto RecentItemDelegate::extract_texts(const QModelIndex& index, QString& out_ti
     {
         out_date_text.clear();
     }
+
+    out_status_text = m_status_role >= 0 && !index.flags().testFlag(Qt::ItemIsEnabled)
+                          ? index.data(m_status_role).toString()
+                          : QString();
 }

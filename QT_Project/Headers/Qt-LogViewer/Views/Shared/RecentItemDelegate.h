@@ -12,10 +12,11 @@
  * - Top row: bold title (left), formatted date (right)
  * - Bottom row: secondary text (elided in the middle)
  *
- * It is generic and reads values from three configurable roles:
+ * It is generic and reads values from three required and one optional configurable role:
  * - `title_role`     (QString)
  * - `secondary_role` (QString)
  * - `date_role`      (QDateTime)
+ * - optional status role (QString)
  *
  * Styling (hover/selected backgrounds and borders) is driven by QSS. The delegate respects the
  * current palette and the `QStyle::PE_PanelItemViewItem` primitive so your QSS item states apply
@@ -38,6 +39,13 @@ class RecentItemDelegate final: public QStyledItemDelegate
                                     QObject* parent = nullptr);
 
         /**
+         * @brief Configures an optional status role rendered as a compact trailing badge.
+         * @param status_role Qt role id providing visible status text, or a negative value to
+         * disable the badge.
+         */
+        auto set_status_role(int status_role) -> void;
+
+        /**
          * @brief Paint the item using a consistent two-row layout.
          * @param painter Painter to draw with.
          * @param option Style option (includes state and rect).
@@ -57,18 +65,19 @@ class RecentItemDelegate final: public QStyledItemDelegate
 
     private:
         /**
-         * @brief Extract display texts (title, secondary, date) from the model index using
-         * configured roles.
+         * @brief Extracts display texts from the configured model roles.
          * @param index Model index.
          * @param out_title Bold title text.
          * @param out_secondary Secondary text, elided when drawn.
          * @param out_date_text Right-aligned date text (formatted).
+         * @param out_status_text Optional visible status text.
          */
         auto extract_texts(const QModelIndex& index, QString& out_title, QString& out_secondary,
-                           QString& out_date_text) const -> void;
+                           QString& out_date_text, QString& out_status_text) const -> void;
 
     private:
         int m_title_role;
         int m_secondary_role;
         int m_date_role;
+        int m_status_role{-1};
 };
