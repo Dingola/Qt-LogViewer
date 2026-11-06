@@ -5,6 +5,7 @@
 #include <QString>
 
 #include "Qt-LogViewer/Models/RecentListSchema.h"
+#include "Qt-LogViewer/Services/LocalFileStatus.h"
 
 /**
  * @brief Verifies recent files schema role names and columns.
@@ -14,7 +15,7 @@ TEST_F(RecentListSchemaTest, MakeRecentFilesSchemaDefinesRolesAndColumns)
     const auto schema = RecentListSchemas::make_recent_files_schema();
 
     // Roles
-    ASSERT_EQ(schema.role_names.size(), 4);
+    ASSERT_EQ(schema.role_names.size(), 7);
     EXPECT_EQ(schema.role_names.value(to_role_id(RecentFileRole::FilePath)),
               QByteArray("file_path"));
     EXPECT_EQ(schema.role_names.value(to_role_id(RecentFileRole::FileName)),
@@ -22,6 +23,12 @@ TEST_F(RecentListSchemaTest, MakeRecentFilesSchemaDefinesRolesAndColumns)
     EXPECT_EQ(schema.role_names.value(to_role_id(RecentFileRole::AppName)), QByteArray("app_name"));
     EXPECT_EQ(schema.role_names.value(to_role_id(RecentFileRole::LastOpened)),
               QByteArray("last_opened"));
+    EXPECT_EQ(schema.role_names.value(to_role_id(RecentFileRole::Availability)),
+              QByteArray("availability"));
+    EXPECT_EQ(schema.role_names.value(to_role_id(RecentFileRole::StatusText)),
+              QByteArray("status_text"));
+    EXPECT_EQ(schema.role_names.value(to_role_id(RecentFileRole::Enabled)), QByteArray("enabled"));
+    EXPECT_EQ(schema.enabled_role, to_role_id(RecentFileRole::Enabled));
 
     // Columns: File Name, File Path, Last Opened
     ASSERT_EQ(schema.columns.size(), 3);
@@ -62,7 +69,7 @@ TEST_F(RecentListSchemaTest, MakeRecentSessionsSchemaDefinesRolesAndColumns)
 }
 
 /**
- * @brief Ensures file row builder fills all roles and derives `file_name` from `file_path`.
+ * @brief Ensures the file row builder combines persisted data with transient availability.
  */
 TEST_F(RecentListSchemaTest, BuildRecentFileRowPopulatesAllRolesAndDerivesFileName)
 {
@@ -70,12 +77,20 @@ TEST_F(RecentListSchemaTest, BuildRecentFileRowPopulatesAllRolesAndDerivesFileNa
         QStringLiteral("C:/logs/app/test.log"), QStringLiteral("LogViewerApp"),
         QDateTime::fromString(QStringLiteral("2025-03-10T12:34:56"), Qt::ISODate)};
 
-    const auto row = RecentListSchemas::build_recent_file_row(rec);
+    const QtCommonLib::LocalFileStatus status{rec.file_path, rec.file_path,
+                                              QtCommonLib::LocalFileAvailability::Available};
+    const auto row = RecentListSchemas::build_recent_file_row(rec, status);
 
-    ASSERT_EQ(row.size(), 4);
+    ASSERT_EQ(row.size(), 9);
     EXPECT_EQ(row.value(to_role_id(RecentFileRole::FilePath)).toString(), rec.file_path);
     EXPECT_EQ(row.value(to_role_id(RecentFileRole::AppName)).toString(), rec.app_name);
     EXPECT_EQ(row.value(to_role_id(RecentFileRole::LastOpened)).toDateTime(), rec.last_opened);
+    EXPECT_EQ(row.value(to_role_id(RecentFileRole::Availability)).toInt(),
+              static_cast<int>(QtCommonLib::LocalFileAvailability::Available));
+    EXPECT_TRUE(row.value(to_role_id(RecentFileRole::Enabled)).toBool());
+    EXPECT_FALSE(row.value(to_role_id(RecentFileRole::StatusText)).toString().isEmpty());
+    EXPECT_FALSE(row.value(Qt::ToolTipRole).toString().isEmpty());
+    EXPECT_EQ(row.value(Qt::AccessibleDescriptionRole), row.value(Qt::ToolTipRole));
 
     const QString expected_name = QFileInfo(rec.file_path).fileName();
     EXPECT_EQ(row.value(to_role_id(RecentFileRole::FileName)).toString(), expected_name);

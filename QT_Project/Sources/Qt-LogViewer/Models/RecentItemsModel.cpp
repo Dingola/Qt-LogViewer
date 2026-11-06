@@ -111,7 +111,7 @@ auto RecentItemsModel::headerData(int section, Qt::Orientation orientation,
 /**
  * @brief Returns item flags for a given index.
  * @param index Model index.
- * @return Selectable and enabled flags for valid indices; Qt::NoItemFlags otherwise.
+ * @return Selectable flags and, when allowed by the schema, enabled flags for valid indices.
  */
 auto RecentItemsModel::flags(const QModelIndex& index) const -> Qt::ItemFlags
 {
@@ -119,7 +119,13 @@ auto RecentItemsModel::flags(const QModelIndex& index) const -> Qt::ItemFlags
 
     if (index.isValid())
     {
-        item_flags = (Qt::ItemIsSelectable | Qt::ItemIsEnabled);
+        const bool enabled =
+            m_schema.enabled_role < 0 || data(index, m_schema.enabled_role).toBool();
+        item_flags = Qt::ItemIsSelectable;
+        if (enabled)
+        {
+            item_flags |= Qt::ItemIsEnabled;
+        }
     }
 
     return item_flags;

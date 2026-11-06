@@ -21,10 +21,13 @@
  */
 enum class RecentFileRole
 {
-    FilePath,   ///< Absolute file path (QString).
-    FileName,   ///< File name derived from path (QString).
-    AppName,    ///< Application name associated to the file (QString).
-    LastOpened  ///< Last-opened timestamp (QDateTime).
+    FilePath,      ///< Absolute file path (QString).
+    FileName,      ///< File name derived from path (QString).
+    AppName,       ///< Application name associated to the file (QString).
+    LastOpened,    ///< Last-opened timestamp (QDateTime).
+    Availability,  ///< LocalFileAvailability represented as an integer.
+    StatusText,    ///< Localized description of the current availability.
+    Enabled        ///< Whether the entry can currently be activated.
 };
 
 /**
@@ -45,19 +48,32 @@ enum class RecentSessionRole
  */
 [[nodiscard]] constexpr auto to_role_id(RecentFileRole role) -> int
 {
-    // Reserve a contiguous block for file roles
+    int role_id = Qt::UserRole + 199;
     switch (role)
     {
     case RecentFileRole::FilePath:
-        return Qt::UserRole + 101;
+        role_id = Qt::UserRole + 101;
+        break;
     case RecentFileRole::FileName:
-        return Qt::UserRole + 102;
+        role_id = Qt::UserRole + 102;
+        break;
     case RecentFileRole::AppName:
-        return Qt::UserRole + 103;
+        role_id = Qt::UserRole + 103;
+        break;
     case RecentFileRole::LastOpened:
-        return Qt::UserRole + 104;
+        role_id = Qt::UserRole + 104;
+        break;
+    case RecentFileRole::Availability:
+        role_id = Qt::UserRole + 105;
+        break;
+    case RecentFileRole::StatusText:
+        role_id = Qt::UserRole + 106;
+        break;
+    case RecentFileRole::Enabled:
+        role_id = Qt::UserRole + 107;
+        break;
     }
-    return Qt::UserRole + 199;  // fallback, should never be reached
+    return role_id;
 }
 
 /**

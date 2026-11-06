@@ -43,6 +43,11 @@ class RecentItemsAdapter final: public QObject
          */
         [[nodiscard]] auto get_recent_sessions_model() -> RecentItemsModel*;
 
+        /**
+         * @brief Re-evaluates transient file availability for all persisted recent-file records.
+         */
+        auto refresh_file_availability() -> void;
+
     signals:
         /**
          * @brief Emitted after either recent-items model has been updated.

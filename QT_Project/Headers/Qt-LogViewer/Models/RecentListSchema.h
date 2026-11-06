@@ -7,6 +7,11 @@
 #include "Qt-LogViewer/Models/RecentRoles.h"
 #include "Qt-LogViewer/Models/SessionTypes.h"
 
+namespace QtCommonLib
+{
+struct LocalFileStatus;
+}
+
 /**
  * @file RecentListSchema.h
  * @brief Declares a generic, data-driven schema for recent lists and row builders.
@@ -34,6 +39,7 @@ struct RecentListSchemaColumn {
 struct RecentListSchema {
         QHash<int, QByteArray> role_names;        ///< Exported role ids to role names.
         QVector<RecentListSchemaColumn> columns;  ///< Ordered columns for view presentation.
+        int enabled_role{-1};  ///< Optional role controlling whether rows are enabled.
 };
 
 /**
@@ -55,11 +61,14 @@ namespace RecentListSchemas
 [[nodiscard]] auto make_recent_sessions_schema() -> RecentListSchema;
 
 /**
- * @brief Convert a RecentLogFileRecord into a role->QVariant row per the files schema.
+ * @brief Convert a recent-file record and runtime status into a presentation row.
  * @param record The recent log file record to convert.
+ * @param file_status Current, non-persisted local file status.
  * @return Role->QVariant map representing the row.
  */
-[[nodiscard]] auto build_recent_file_row(const RecentLogFileRecord& record) -> QHash<int, QVariant>;
+[[nodiscard]] auto build_recent_file_row(const RecentLogFileRecord& record,
+                                         const QtCommonLib::LocalFileStatus& file_status)
+    -> QHash<int, QVariant>;
 
 /**
  * @brief Convert a RecentSessionRecord into a role->QVariant row per the sessions schema.

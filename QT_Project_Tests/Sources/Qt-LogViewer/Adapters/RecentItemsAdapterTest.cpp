@@ -6,10 +6,14 @@
 #include "Qt-LogViewer/Adapters/RecentItemsAdapterTest.h"
 
 #include <QDateTime>
+#include <QFile>
+#include <QFileInfo>
 #include <QSignalSpy>
 
 #include "Qt-LogViewer/Adapters/RecentItemsAdapter.h"
+#include "Qt-LogViewer/Models/LogFileInfo.h"
 #include "Qt-LogViewer/Models/RecentListSchema.h"
+#include "Qt-LogViewer/Services/LocalFileStatus.h"
 #include "Qt-LogViewer/Services/SessionManager.h"
 #include "Qt-LogViewer/Services/SessionRepository.h"
 
@@ -18,7 +22,9 @@
  */
 TEST_F(RecentItemsAdapterTest, SynchronizesModelsWhenRecentItemsChange)
 {
-    SessionRepository repository(QStringLiteral("RecentItemsAdapterTest"));
+    const QString marker_path =
+        m_file_system.write_text_file(QStringLiteral("adapter.marker"), QString());
+    SessionRepository repository(QFileInfo(marker_path).absolutePath());
     SessionManager session_manager(&repository);
     RecentItemsAdapter adapter(&session_manager);
     QSignalSpy changed_spy(&adapter, &RecentItemsAdapter::recent_items_changed);
@@ -43,4 +49,34 @@ TEST_F(RecentItemsAdapterTest, SynchronizesModelsWhenRecentItemsChange)
     EXPECT_EQ(sessions_model->data(sessions_model->index(0, 0), to_role_id(RecentSessionRole::Id)),
               sessions.front().id);
     EXPECT_EQ(changed_spy.count(), 2);
+}
+
+/** @test Re-evaluates availability without persisting derived filesystem state. */
+TEST_F(RecentItemsAdapterTest, RefreshesTransientRecentFileAvailability)
+{
+    const QString file_path =
+        m_file_system.write_text_file(QStringLiteral("recent.log"), QStringLiteral("entry"));
+    SessionRepository repository(QFileInfo(file_path).absolutePath());
+    SessionManager session_manager(&repository);
+    RecentItemsAdapter adapter(&session_manager);
+
+    session_manager.add_recent_log_file(LogFileInfo(file_path));
+
+    RecentItemsModel* model = adapter.get_recent_files_model();
+    ASSERT_EQ(model->rowCount(), 1);
+    const QModelIndex available_index = model->index(0, 0);
+    EXPECT_TRUE(available_index.flags().testFlag(Qt::ItemIsEnabled));
+    EXPECT_EQ(model->data(available_index, to_role_id(RecentFileRole::Availability)).toInt(),
+              static_cast<int>(QtCommonLib::LocalFileAvailability::Available));
+
+    ASSERT_TRUE(QFile::remove(file_path));
+    adapter.refresh_file_availability();
+
+    const QModelIndex missing_index = model->index(0, 0);
+    EXPECT_FALSE(missing_index.flags().testFlag(Qt::ItemIsEnabled));
+    EXPECT_EQ(model->data(missing_index, to_role_id(RecentFileRole::Availability)).toInt(),
+              static_cast<int>(QtCommonLib::LocalFileAvailability::Missing));
+    EXPECT_FALSE(model->data(missing_index, Qt::ToolTipRole).toString().isEmpty());
+    EXPECT_EQ(model->data(missing_index, Qt::AccessibleDescriptionRole),
+              model->data(missing_index, Qt::ToolTipRole));
 }

@@ -140,6 +140,8 @@ auto MainMenuController::initialize_menu() -> void
         connect(m_action_about, &QAction::triggered, this, &MainMenuController::about_requested);
         connect(m_action_about_qt, &QAction::triggered, this,
                 &MainMenuController::about_qt_requested);
+        connect(m_recent_files_menu, &QMenu::aboutToShow, this,
+                &MainMenuController::recent_files_refresh_requested);
 
         retranslate();
     }
@@ -163,6 +165,11 @@ auto MainMenuController::rebuild_recent_menus() -> void
             const QString path =
                 m_recent_files_model->data(index, to_role_id(RecentFileRole::FilePath)).toString();
             QAction* action = m_recent_files_menu->addAction(title);
+            const QString tooltip = index.data(Qt::ToolTipRole).toString();
+            action->setEnabled(index.flags().testFlag(Qt::ItemIsEnabled));
+            action->setToolTip(tooltip);
+            action->setStatusTip(index.data(to_role_id(RecentFileRole::StatusText)).toString());
+            action->setWhatsThis(tooltip);
             connect(action, &QAction::triggered, this,
                     [this, path]() { emit open_recent_file_requested(path); });
         }

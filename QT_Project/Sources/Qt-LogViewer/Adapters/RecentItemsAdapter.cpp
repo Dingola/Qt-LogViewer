@@ -5,11 +5,14 @@
 
 #include "Qt-LogViewer/Adapters/RecentItemsAdapter.h"
 
+#include <QCoreApplication>
+#include <QGuiApplication>
 #include <QHash>
 #include <QVariant>
 #include <QVector>
 
 #include "Qt-LogViewer/Models/RecentListSchema.h"
+#include "Qt-LogViewer/Services/LocalFileStatus.h"
 #include "Qt-LogViewer/Services/SessionManager.h"
 
 /**
@@ -36,6 +39,18 @@ RecentItemsAdapter::RecentItemsAdapter(SessionManager* session_manager, QObject*
                 update_recent_sessions(records);
                 emit recent_items_changed();
             });
+
+    QGuiApplication* application = qobject_cast<QGuiApplication*>(QCoreApplication::instance());
+    if (application != nullptr)
+    {
+        connect(application, &QGuiApplication::applicationStateChanged, this,
+                [this](Qt::ApplicationState state) {
+                    if (state == Qt::ApplicationActive)
+                    {
+                        refresh_file_availability();
+                    }
+                });
+    }
 }
 
 /**
@@ -59,6 +74,15 @@ auto RecentItemsAdapter::get_recent_sessions_model() -> RecentItemsModel*
 }
 
 /**
+ * @brief Re-evaluates transient file availability for all persisted recent-file records.
+ */
+auto RecentItemsAdapter::refresh_file_availability() -> void
+{
+    update_recent_files(m_session_manager->get_recent_log_files());
+    emit recent_items_changed();
+}
+
+/**
  * @brief Replaces recent-file model rows with mapped session records.
  * @param records Recent-file records in display order.
  */
@@ -69,7 +93,9 @@ auto RecentItemsAdapter::update_recent_files(const QVector<RecentLogFileRecord>&
 
     for (const RecentLogFileRecord& record: records)
     {
-        rows.push_back(RecentListSchemas::build_recent_file_row(record));
+        const QtCommonLib::LocalFileStatus file_status =
+            QtCommonLib::inspect_local_file(record.file_path);
+        rows.push_back(RecentListSchemas::build_recent_file_row(record, file_status));
     }
 
     m_recent_files_model.set_rows(std::move(rows));

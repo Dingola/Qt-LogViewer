@@ -57,8 +57,9 @@ class RecentItemsModel: public QAbstractTableModel
                         int role = Qt::DisplayRole) const -> QVariant override;
 
         /**
-         * @brief Item flags: selectable and enabled for valid rows.
+         * @brief Returns selectable flags and the schema-controlled enabled state.
          * @param index Model index.
+         * @return Flags for the requested row.
          */
         auto flags(const QModelIndex& index) const -> Qt::ItemFlags override;
 

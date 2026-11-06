@@ -373,6 +373,8 @@ auto MainWindow::initialize_menu() -> void
 
     connect(m_menu_controller, &MainMenuController::open_log_file_requested, this,
             &MainWindow::handle_open_log_file_dialog_requested);
+    connect(m_menu_controller, &MainMenuController::recent_files_refresh_requested,
+            m_recent_items_adapter, &RecentItemsAdapter::refresh_file_availability);
     connect(m_menu_controller, &MainMenuController::open_recent_file_requested, this,
             &MainWindow::handle_open_recent_file);
     connect(m_menu_controller, &MainMenuController::clear_recent_files_requested, this,

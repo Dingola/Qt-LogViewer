@@ -55,6 +55,9 @@ class MainMenuController: public QObject
         auto add_view_action(QAction* action) -> void;
 
     signals:
+        /** @brief Emitted before recent files are shown so transient status can be refreshed. */
+        void recent_files_refresh_requested();
+
         /** @brief Emitted when opening log files is requested. */
         void open_log_file_requested();
 
