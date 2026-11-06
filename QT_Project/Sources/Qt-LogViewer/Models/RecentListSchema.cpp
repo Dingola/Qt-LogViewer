@@ -5,78 +5,8 @@
 
 #include "Qt-LogViewer/Models/RecentListSchema.h"
 
-#include <QCoreApplication>
-#include <QFileInfo>
-
+#include "Qt-LogViewer/Models/RecentItemPresentationMapper.h"
 #include "Qt-LogViewer/Services/LocalFileStatus.h"
-
-namespace
-{
-constexpr auto k_translation_context = "RecentListSchemas";
-constexpr auto k_available_text = QT_TRANSLATE_NOOP("RecentListSchemas", "Available");
-constexpr auto k_available_tooltip = QT_TRANSLATE_NOOP("RecentListSchemas", "Available: %1");
-constexpr auto k_missing_text = QT_TRANSLATE_NOOP("RecentListSchemas", "File not found");
-constexpr auto k_missing_tooltip = QT_TRANSLATE_NOOP("RecentListSchemas", "File not found: %1");
-constexpr auto k_not_readable_text = QT_TRANSLATE_NOOP("RecentListSchemas", "File is not readable");
-constexpr auto k_not_readable_tooltip =
-    QT_TRANSLATE_NOOP("RecentListSchemas", "File is not readable: %1");
-constexpr auto k_not_a_file_text = QT_TRANSLATE_NOOP("RecentListSchemas", "Path is not a file");
-constexpr auto k_not_a_file_tooltip =
-    QT_TRANSLATE_NOOP("RecentListSchemas", "Path is not a file: %1");
-
-/**
- * @struct FileAvailabilityPresentation
- * @brief Contains localized presentation values derived from a local file status.
- */
-struct FileAvailabilityPresentation {
-        QString status_text;
-        QString tooltip;
-        bool enabled{false};
-};
-
-/**
- * @brief Translates presentation text for recent-item schemas.
- * @param source_text Source text registered in the translation catalog.
- * @return Localized text.
- */
-[[nodiscard]] auto translate(const char* source_text) -> QString
-{
-    const QString result = QCoreApplication::translate(k_translation_context, source_text);
-    return result;
-}
-
-/**
- * @brief Maps a filesystem status to localized, presentation-only values.
- * @param file_status Current status of the recent file.
- * @return Status text, tooltip, and activation state.
- */
-[[nodiscard]] auto make_availability_presentation(const QtCommonLib::LocalFileStatus& file_status)
-    -> FileAvailabilityPresentation
-{
-    FileAvailabilityPresentation result;
-    switch (file_status.availability)
-    {
-    case QtCommonLib::LocalFileAvailability::Available:
-        result.status_text = translate(k_available_text);
-        result.tooltip = translate(k_available_tooltip).arg(file_status.normalized_path);
-        result.enabled = true;
-        break;
-    case QtCommonLib::LocalFileAvailability::Missing:
-        result.status_text = translate(k_missing_text);
-        result.tooltip = translate(k_missing_tooltip).arg(file_status.normalized_path);
-        break;
-    case QtCommonLib::LocalFileAvailability::NotReadable:
-        result.status_text = translate(k_not_readable_text);
-        result.tooltip = translate(k_not_readable_tooltip).arg(file_status.normalized_path);
-        break;
-    case QtCommonLib::LocalFileAvailability::NotAFile:
-        result.status_text = translate(k_not_a_file_text);
-        result.tooltip = translate(k_not_a_file_tooltip).arg(file_status.normalized_path);
-        break;
-    }
-    return result;
-}
-}  // namespace
 
 /**
  * @brief Create a schema for recent log files. Roles: file_path, file_name, app_name, last_opened.
@@ -143,13 +73,13 @@ auto RecentListSchemas::build_recent_file_row(const RecentLogFileRecord& record,
     -> QHash<int, QVariant>
 {
     QHash<int, QVariant> row_data;
-    const QString derived_file_name = QFileInfo(record.file_path).fileName();
-    const FileAvailabilityPresentation presentation = make_availability_presentation(file_status);
+    const RecentItemPresentation presentation =
+        RecentItemPresentationMapper::from_recent_log_file(record, file_status);
 
-    row_data.insert(to_role_id(RecentFileRole::FilePath), record.file_path);
-    row_data.insert(to_role_id(RecentFileRole::FileName), derived_file_name);
+    row_data.insert(to_role_id(RecentFileRole::FilePath), presentation.identity);
+    row_data.insert(to_role_id(RecentFileRole::FileName), presentation.title);
     row_data.insert(to_role_id(RecentFileRole::AppName), record.app_name);
-    row_data.insert(to_role_id(RecentFileRole::LastOpened), record.last_opened);
+    row_data.insert(to_role_id(RecentFileRole::LastOpened), presentation.last_used);
     row_data.insert(to_role_id(RecentFileRole::Availability),
                     static_cast<int>(file_status.availability));
     row_data.insert(to_role_id(RecentFileRole::StatusText), presentation.status_text);
@@ -169,12 +99,12 @@ auto RecentListSchemas::build_recent_session_row(const RecentSessionRecord& reco
     -> QHash<int, QVariant>
 {
     QHash<int, QVariant> row_data;
-    const QDateTime effective_last_opened =
-        record.last_opened.isValid() ? record.last_opened : record.created_at;
+    const RecentItemPresentation presentation =
+        RecentItemPresentationMapper::from_recent_session(record);
 
-    row_data.insert(to_role_id(RecentSessionRole::Name), record.name);
-    row_data.insert(to_role_id(RecentSessionRole::LastOpened), effective_last_opened);
-    row_data.insert(to_role_id(RecentSessionRole::Id), record.id);
+    row_data.insert(to_role_id(RecentSessionRole::Name), presentation.title);
+    row_data.insert(to_role_id(RecentSessionRole::LastOpened), presentation.last_used);
+    row_data.insert(to_role_id(RecentSessionRole::Id), presentation.identity);
 
     return row_data;
 }
