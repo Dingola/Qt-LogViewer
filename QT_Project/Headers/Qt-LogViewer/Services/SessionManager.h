@@ -2,6 +2,7 @@
 
 #include <QJsonObject>
 #include <QObject>
+#include <QSet>
 #include <QVector>
 
 #include "Qt-LogViewer/Models/LogFileInfo.h"
@@ -66,6 +67,13 @@ class SessionManager: public QObject
          * @brief Clears the recent log files list and persists the change.
          */
         auto clear_recent_log_files() -> void;
+
+        /**
+         * @brief Removes matching entries from recent-file metadata without deleting source files.
+         * @param file_paths Persisted recent-file paths to remove.
+         * @return Number of metadata entries removed and persisted.
+         */
+        auto remove_recent_log_files(const QSet<QString>& file_paths) -> int;
 
         /**
          * @brief Returns the list of recent sessions metadata.

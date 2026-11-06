@@ -61,6 +61,45 @@ void SessionControllerTest::TearDown()
     m_sessions_directory.clear();
 }
 
+/** @test Removes only requested recent metadata and persists the reduced list. */
+TEST_F(SessionControllerTest, RemovesRecentFilesWithoutDeletingSourcesOrSessions)
+{
+    const QString first_file =
+        m_file_system.write_text_file(QStringLiteral("first.log"), QStringLiteral("first"));
+    const QString second_file =
+        m_file_system.write_text_file(QStringLiteral("second.log"), QStringLiteral("second"));
+    m_session_controller->add_recent_log_file(LogFileInfo(first_file, QStringLiteral("First")));
+    m_session_controller->add_recent_log_file(LogFileInfo(second_file, QStringLiteral("Second")));
+    m_session_manager->upsert_session_metadata(QStringLiteral("session-id"),
+                                               QStringLiteral("Saved session"), false);
+    m_session_manager->save_session(
+        QStringLiteral("session-id"),
+        QJsonObject{{QStringLiteral("name"), QStringLiteral("Saved session")}});
+    const QString session_file_path =
+        m_session_repository->get_session_file_path(QStringLiteral("session-id"));
+    QSignalSpy recent_files_spy(m_session_manager, &SessionManager::recent_log_files_changed);
+
+    const int removed_count =
+        m_session_controller->remove_recent_log_files(QSet<QString>{first_file});
+
+    EXPECT_EQ(removed_count, 1);
+    EXPECT_EQ(recent_files_spy.count(), 1);
+    const QVector<RecentLogFileRecord> remaining = m_session_manager->get_recent_log_files();
+    ASSERT_EQ(remaining.size(), 1);
+    EXPECT_EQ(remaining.constFirst().file_path, second_file);
+    EXPECT_TRUE(QFileInfo::exists(first_file));
+    EXPECT_TRUE(QFileInfo::exists(second_file));
+    EXPECT_TRUE(QFileInfo::exists(session_file_path));
+    ASSERT_EQ(m_session_manager->get_recent_sessions().size(), 1);
+
+    SessionManager reloaded_manager(m_session_repository);
+    reloaded_manager.initialize_from_storage();
+    const QVector<RecentLogFileRecord> persisted = reloaded_manager.get_recent_log_files();
+    ASSERT_EQ(persisted.size(), 1);
+    EXPECT_EQ(persisted.constFirst().file_path, second_file);
+    EXPECT_EQ(reloaded_manager.get_recent_sessions().size(), 1);
+}
+
 /**
  * @test Verifies that an external session is loaded by path, assigned a safe identifier, and
  * persisted as the active managed session.

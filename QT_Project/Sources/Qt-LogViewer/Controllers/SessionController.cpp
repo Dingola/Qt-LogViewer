@@ -290,6 +290,21 @@ auto SessionController::clear_recent_log_files() -> void
 }
 
 /**
+ * @brief Removes recent-file metadata while preserving files and sessions.
+ * @param file_paths Persisted recent-file paths to remove.
+ * @return Number of removed recent-file entries.
+ */
+auto SessionController::remove_recent_log_files(const QSet<QString>& file_paths) -> int
+{
+    int removed_count = 0;
+    if (m_session_manager != nullptr)
+    {
+        removed_count = m_session_manager->remove_recent_log_files(file_paths);
+    }
+    return removed_count;
+}
+
+/**
  * @brief Saves the current session state.
  */
 auto SessionController::save_current_session() -> void

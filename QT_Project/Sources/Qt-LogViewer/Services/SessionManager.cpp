@@ -159,6 +159,40 @@ auto SessionManager::clear_recent_log_files() -> void
 }
 
 /**
+ * @brief Removes matching entries from recent-file metadata without deleting source files.
+ * @param file_paths Persisted recent-file paths to remove.
+ * @return Number of metadata entries removed and persisted.
+ */
+auto SessionManager::remove_recent_log_files(const QSet<QString>& file_paths) -> int
+{
+    QVector<RecentLogFileRecord> retained_files;
+    retained_files.reserve(m_recent_files.size());
+    int removed_count = 0;
+
+    for (const RecentLogFileRecord& record: m_recent_files)
+    {
+        if (file_paths.contains(record.file_path))
+        {
+            ++removed_count;
+        }
+        else
+        {
+            retained_files.append(record);
+        }
+    }
+
+    if (removed_count > 0)
+    {
+        m_recent_files = std::move(retained_files);
+        const QJsonObject root = make_root_from_current();
+        persist_root(root);
+        emit recent_log_files_changed(m_recent_files);
+    }
+
+    return removed_count;
+}
+
+/**
  * @brief Returns the list of recent sessions metadata.
  * @return Vector of RecentSessionRecord.
  */

@@ -70,6 +70,9 @@ class MainMenuController: public QObject
         /** @brief Emitted when clearing recent log files is requested. */
         void clear_recent_files_requested();
 
+        /** @brief Emitted when unavailable recent-file metadata should be removed. */
+        void remove_unavailable_recent_files_requested();
+
         /** @brief Emitted when saving the current session is requested. */
         void save_session_requested();
 

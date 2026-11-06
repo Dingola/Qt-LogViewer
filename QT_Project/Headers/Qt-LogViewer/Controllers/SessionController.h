@@ -124,6 +124,13 @@ class SessionController: public QObject
         auto clear_recent_log_files() -> void;
 
         /**
+         * @brief Removes recent-file metadata while preserving files and sessions.
+         * @param file_paths Persisted recent-file paths to remove.
+         * @return Number of removed recent-file entries.
+         */
+        auto remove_recent_log_files(const QSet<QString>& file_paths) -> int;
+
+        /**
          * @brief Saves the current session state.
          */
         auto save_current_session() -> void;

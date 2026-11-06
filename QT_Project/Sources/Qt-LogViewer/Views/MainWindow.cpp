@@ -34,6 +34,7 @@
 #include "Qt-LogViewer/Controllers/WorkspaceShortcutController.h"
 #include "Qt-LogViewer/Models/LogFileTreeModel.h"
 #include "Qt-LogViewer/Models/RecentItemsModel.h"
+#include "Qt-LogViewer/Models/RecentRoles.h"
 #include "Qt-LogViewer/Presenters/LogImportTabPresenter.h"
 #include "Qt-LogViewer/Presenters/LogViewPresenter.h"
 #include "Qt-LogViewer/Presenters/LogViewerDropOverlayPresenter.h"
@@ -178,6 +179,10 @@ MainWindow::MainWindow(LogViewerSettings& settings, FileCatalogController& catal
             &MainWindow::handle_open_recent_file);
     connect(start_page, &StartPageWidget::clear_recent_files_requested, this,
             &MainWindow::handle_clear_recent_files);
+    connect(start_page, &StartPageWidget::remove_recent_file_requested, this,
+            &MainWindow::handle_remove_recent_file);
+    connect(start_page, &StartPageWidget::remove_unavailable_recent_files_requested, this,
+            &MainWindow::handle_remove_unavailable_recent_files);
     connect(start_page, &StartPageWidget::open_session_requested, this,
             &MainWindow::handle_open_session_dialog);
     connect(start_page, &StartPageWidget::open_recent_session_requested, this,
@@ -379,6 +384,8 @@ auto MainWindow::initialize_menu() -> void
             &MainWindow::handle_open_recent_file);
     connect(m_menu_controller, &MainMenuController::clear_recent_files_requested, this,
             &MainWindow::handle_clear_recent_files);
+    connect(m_menu_controller, &MainMenuController::remove_unavailable_recent_files_requested, this,
+            &MainWindow::handle_remove_unavailable_recent_files);
     connect(m_menu_controller, &MainMenuController::save_session_requested, this,
             &MainWindow::handle_save_session);
     connect(m_menu_controller, &MainMenuController::open_session_requested, this,
@@ -730,6 +737,57 @@ auto MainWindow::handle_open_recent_session(const QString& session_id) -> void
 auto MainWindow::handle_clear_recent_files() -> void
 {
     m_session_controller->clear_recent_log_files();
+}
+
+/**
+ * @brief Removes one recent-file metadata entry without deleting its source file.
+ * @param file_path Persisted path identifying the entry.
+ */
+auto MainWindow::handle_remove_recent_file(const QString& file_path) -> void
+{
+    if (!file_path.isEmpty())
+    {
+        m_session_controller->remove_recent_log_files(QSet<QString>{file_path});
+    }
+}
+
+/** @brief Confirms and removes all currently unavailable recent-file metadata entries. */
+auto MainWindow::handle_remove_unavailable_recent_files() -> void
+{
+    QSet<QString> unavailable_paths;
+    if (m_recent_files_model != nullptr)
+    {
+        for (int row = 0; row < m_recent_files_model->rowCount(); ++row)
+        {
+            const QModelIndex index = m_recent_files_model->index(row, 0);
+            if (!index.flags().testFlag(Qt::ItemIsEnabled))
+            {
+                const QString file_path =
+                    index.data(to_role_id(RecentFileRole::FilePath)).toString();
+                if (!file_path.isEmpty())
+                {
+                    unavailable_paths.insert(file_path);
+                }
+            }
+        }
+    }
+
+    bool confirmed = false;
+    if (!unavailable_paths.isEmpty())
+    {
+        const QMessageBox::StandardButton answer =
+            QMessageBox::question(this, tr("Remove Unavailable Files"),
+                                  tr("Remove %n unavailable file(s) from Recent Files?\n\n"
+                                     "Original log files and saved sessions will not be deleted.",
+                                     nullptr, unavailable_paths.size()),
+                                  QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel);
+        confirmed = answer == QMessageBox::Yes;
+    }
+
+    if (confirmed)
+    {
+        m_session_controller->remove_recent_log_files(unavailable_paths);
+    }
 }
 
 /**

@@ -2,6 +2,7 @@
 
 #include <QAbstractItemModel>
 #include <QItemSelectionModel>
+#include <QPoint>
 #include <QWidget>
 
 namespace Ui
@@ -67,6 +68,15 @@ class StartPageWidget: public QWidget
         void clear_recent_files_requested();
 
         /**
+         * @brief User requested removal of one recent-file metadata entry.
+         * @param file_path Persisted path identifying the entry.
+         */
+        void remove_recent_file_requested(const QString& file_path);
+
+        /** @brief User requested removal of all currently unavailable recent-file entries. */
+        void remove_unavailable_recent_files_requested();
+
+        /**
          * @brief User requested to choose and open a session file.
          */
         void open_session_requested();
@@ -106,6 +116,12 @@ class StartPageWidget: public QWidget
 
         /** @brief Creates empty states for both recent-item lists. */
         auto setup_empty_states() -> void;
+
+        /**
+         * @brief Presents metadata-only cleanup actions for the recent file under the cursor.
+         * @param position Viewport-local context-menu position.
+         */
+        auto show_recent_file_context_menu(const QPoint& position) -> void;
 
         /**
          * @brief Helper to read selected file_path from `recentFilesView`.

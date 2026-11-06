@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QMainWindow>
+#include <QSet>
 #include <QString>
 #include <QUuid>
 #include <QVector>
@@ -330,6 +331,15 @@ class MainWindow: public QtWidgetsCommonLib::AppMainWindow
          * @brief Clear recent files list via session manager.
          */
         auto handle_clear_recent_files() -> void;
+
+        /**
+         * @brief Removes one recent-file metadata entry without deleting its source file.
+         * @param file_path Persisted path identifying the entry.
+         */
+        auto handle_remove_recent_file(const QString& file_path) -> void;
+
+        /** @brief Confirms and removes all currently unavailable recent-file metadata entries. */
+        auto handle_remove_unavailable_recent_files() -> void;
 
         /**
          * @brief Save current session snapshot (single-view example).

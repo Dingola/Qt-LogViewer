@@ -12,6 +12,7 @@
 #include <QIcon>
 #include <QLabel>
 #include <QListView>
+#include <QMenu>
 #include <QModelIndex>
 #include <QPushButton>
 #include <QSize>
@@ -189,6 +190,9 @@ auto StartPageWidget::setup_table_views() -> void
         files->setSelectionMode(QAbstractItemView::SingleSelection);
         files->setEditTriggers(QAbstractItemView::NoEditTriggers);
         files->setAlternatingRowColors(true);
+        files->setContextMenuPolicy(Qt::CustomContextMenu);
+        connect(files, &QWidget::customContextMenuRequested, this,
+                &StartPageWidget::show_recent_file_context_menu);
 
         if (auto* lv = qobject_cast<QListView*>(files); lv != nullptr)
         {
@@ -209,6 +213,52 @@ auto StartPageWidget::setup_table_views() -> void
             lv->setUniformItemSizes(true);
             lv->setSpacing(4);
         }
+    }
+}
+
+/**
+ * @brief Presents metadata-only cleanup actions for the recent file under the cursor.
+ * @param position Viewport-local context-menu position.
+ */
+auto StartPageWidget::show_recent_file_context_menu(const QPoint& position) -> void
+{
+    QListView* view = ui->recentFilesView;
+    QAbstractItemModel* model = view != nullptr ? view->model() : nullptr;
+    const QModelIndex context_index = view != nullptr ? view->indexAt(position) : QModelIndex();
+    bool has_unavailable_items = false;
+
+    if (model != nullptr)
+    {
+        for (int row = 0; row < model->rowCount() && !has_unavailable_items; ++row)
+        {
+            has_unavailable_items = !model->index(row, 0).flags().testFlag(Qt::ItemIsEnabled);
+        }
+    }
+
+    QMenu menu(this);
+    QAction* remove_action = menu.addAction(tr("Remove from Recent Files"));
+    remove_action->setEnabled(context_index.isValid());
+    QAction* cleanup_action = menu.addAction(tr("Remove Unavailable Files..."));
+    cleanup_action->setEnabled(has_unavailable_items);
+
+    QAction* selected_action = nullptr;
+    if (view != nullptr && (context_index.isValid() || has_unavailable_items))
+    {
+        selected_action = menu.exec(view->viewport()->mapToGlobal(position));
+    }
+
+    if (selected_action == remove_action && model != nullptr)
+    {
+        const QString file_path =
+            model->data(context_index, to_role_id(RecentFileRole::FilePath)).toString();
+        if (!file_path.isEmpty())
+        {
+            emit remove_recent_file_requested(file_path);
+        }
+    }
+    else if (selected_action == cleanup_action)
+    {
+        emit remove_unavailable_recent_files_requested();
     }
 }
 

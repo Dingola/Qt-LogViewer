@@ -36,6 +36,8 @@ constexpr auto k_about_text = QT_TRANSLATE_NOOP("MainMenuController", "About %1"
 constexpr auto k_about_qt_text = QT_TRANSLATE_NOOP("MainMenuController", "About Qt");
 constexpr auto k_clear_recent_files_text =
     QT_TRANSLATE_NOOP("MainMenuController", "Clear Recent Files");
+constexpr auto k_remove_unavailable_files_text =
+    QT_TRANSLATE_NOOP("MainMenuController", "Remove Unavailable Files...");
 constexpr auto k_unavailable_recent_file_text = QT_TRANSLATE_NOOP("MainMenuController", "%1 — %2");
 
 /**
@@ -158,6 +160,7 @@ auto MainMenuController::rebuild_recent_menus() -> void
     if (m_recent_files_menu != nullptr && m_recent_files_model != nullptr)
     {
         m_recent_files_menu->clear();
+        bool has_unavailable_files = false;
         for (int row = 0; row < m_recent_files_model->rowCount(); ++row)
         {
             const QModelIndex index = m_recent_files_model->index(row, 0);
@@ -168,6 +171,7 @@ auto MainMenuController::rebuild_recent_menus() -> void
             const QString status_text =
                 index.data(to_role_id(RecentFileRole::StatusText)).toString();
             const bool enabled = index.flags().testFlag(Qt::ItemIsEnabled);
+            has_unavailable_files = has_unavailable_files || !enabled;
             const QString action_title =
                 enabled ? title : translate(k_unavailable_recent_file_text).arg(title, status_text);
             QAction* action = m_recent_files_menu->addAction(action_title);
@@ -181,6 +185,11 @@ auto MainMenuController::rebuild_recent_menus() -> void
         }
 
         m_recent_files_menu->addSeparator();
+        QAction* cleanup_action =
+            m_recent_files_menu->addAction(translate(k_remove_unavailable_files_text));
+        cleanup_action->setEnabled(has_unavailable_files);
+        connect(cleanup_action, &QAction::triggered, this,
+                &MainMenuController::remove_unavailable_recent_files_requested);
         QAction* clear_action =
             m_recent_files_menu->addAction(translate(k_clear_recent_files_text));
         connect(clear_action, &QAction::triggered, this,
