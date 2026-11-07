@@ -10,8 +10,10 @@
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QIcon>
+#include <QInputDialog>
 #include <QMessageBox>
 #include <QMimeData>
+#include <QPushButton>
 #include <QResizeEvent>
 #include <QStackedWidget>
 #include <QStatusBar>
@@ -45,6 +47,7 @@
 #include "Qt-LogViewer/Services/LogViewerDropValidator.h"
 #include "Qt-LogViewer/Services/LogViewerSettings.h"
 #include "Qt-LogViewer/Services/SessionManager.h"
+#include "Qt-LogViewer/Services/SessionRestorePreflight.h"
 #include "Qt-LogViewer/Views/App/Dialogs/SettingsDialog.h"
 #include "Qt-LogViewer/Views/App/LogDataStatusWidget.h"
 #include "Qt-LogViewer/Views/App/LogDetailsWidget.h"
@@ -901,7 +904,8 @@ auto MainWindow::handle_reopen_last_session() -> void
  */
 auto MainWindow::restore_session(const SessionState& state) -> void
 {
-    if (!state.id.isEmpty())
+    SessionState prepared_state = state;
+    if (!prepared_state.id.isEmpty() && prepare_session_for_restore(prepared_state))
     {
         QString profile_error;
         const QVector<LogParsingProfile> available_profiles =
@@ -913,11 +917,12 @@ auto MainWindow::restore_session(const SessionState& state) -> void
                        << profile_error;
         }
 
-        const bool restored = m_session_controller->restore_session(state, available_profiles);
+        const bool restored =
+            m_session_controller->restore_session(prepared_state, available_profiles);
 
         if (restored)
         {
-            m_session_controller->request_expand_session(state.id);
+            m_session_controller->request_expand_session(prepared_state.id);
         }
         else
         {
@@ -925,10 +930,99 @@ auto MainWindow::restore_session(const SessionState& state) -> void
                                  tr("Session data could not be restored."));
         }
     }
-    else
+    else if (prepared_state.id.isEmpty())
     {
         QMessageBox::warning(this, tr("Open Session"), tr("Session data is invalid or empty."));
     }
+}
+
+/**
+ * @brief Resolves unavailable files before a session restore mutates runtime state.
+ * @param state Mutable working copy of the saved session.
+ * @return True when the user accepts restoring the prepared state.
+ */
+auto MainWindow::prepare_session_for_restore(SessionState& state) -> bool
+{
+    bool accepted = false;
+    bool deciding = true;
+    QVector<SessionFileIssue> issues = SessionRestorePreflight::collect_file_issues(state);
+
+    while (deciding && !issues.isEmpty())
+    {
+        QStringList issue_lines;
+        for (const SessionFileIssue& issue: issues)
+        {
+            issue_lines.append(QStringLiteral("\u2022 %1").arg(issue.file_path));
+        }
+
+        QMessageBox dialog(QMessageBox::Warning, tr("Unavailable Session Files"),
+                           tr("%n file(s) saved in this session are missing or unreadable.",
+                              nullptr, issues.size()),
+                           QMessageBox::NoButton, this);
+        dialog.setInformativeText(issue_lines.join(QLatin1Char('\n')));
+        QPushButton* continue_button =
+            dialog.addButton(tr("Continue with Available Files"), QMessageBox::AcceptRole);
+        QPushButton* locate_button =
+            dialog.addButton(tr("Locate File..."), QMessageBox::ActionRole);
+        QPushButton* cancel_button = dialog.addButton(QMessageBox::Cancel);
+        dialog.setDefaultButton(cancel_button);
+        dialog.exec();
+
+        if (dialog.clickedButton() == continue_button)
+        {
+            for (const SessionFileIssue& issue: issues)
+            {
+                SessionRestorePreflight::remove_file(state, issue.file_path);
+            }
+            accepted = true;
+            deciding = false;
+        }
+        else if (dialog.clickedButton() == locate_button)
+        {
+            QStringList paths;
+            for (const SessionFileIssue& issue: issues)
+            {
+                paths.append(issue.file_path);
+            }
+            bool path_selected = false;
+            const QString previous_path =
+                QInputDialog::getItem(this, tr("Locate Session File"), tr("Unavailable file:"),
+                                      paths, 0, false, &path_selected);
+            if (path_selected && !previous_path.isEmpty())
+            {
+                const QString replacement_path = QFileDialog::getOpenFileName(
+                    this, tr("Locate Session File"), QFileInfo(previous_path).absolutePath(),
+                    tr("Log Files (*.log *.txt);;All Files (*)"));
+                const QtCommonLib::LocalFileStatus replacement_status =
+                    QtCommonLib::inspect_local_file(replacement_path);
+                if (!replacement_path.isEmpty() &&
+                    replacement_status.availability ==
+                        QtCommonLib::LocalFileAvailability::Available)
+                {
+                    const bool path_replaced = SessionRestorePreflight::replace_file(
+                        state, previous_path, replacement_status.normalized_path);
+                    Q_ASSERT(path_replaced);
+                    issues = SessionRestorePreflight::collect_file_issues(state);
+                }
+                else if (!replacement_path.isEmpty())
+                {
+                    QMessageBox::warning(
+                        this, tr("Locate Session File"),
+                        tr("The selected file is not readable:\n%1").arg(replacement_path));
+                }
+            }
+        }
+        else
+        {
+            deciding = false;
+        }
+    }
+
+    if (issues.isEmpty())
+    {
+        accepted = true;
+    }
+    return accepted;
 }
 
 /**

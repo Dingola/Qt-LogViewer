@@ -375,6 +375,13 @@ class MainWindow: public QtWidgetsCommonLib::AppMainWindow
         auto restore_session(const SessionState& state) -> void;
 
         /**
+         * @brief Resolves unavailable files before a session restore mutates runtime state.
+         * @param state Mutable working copy of the saved session.
+         * @return True when the user accepts restoring the prepared state.
+         */
+        [[nodiscard]] auto prepare_session_for_restore(SessionState& state) -> bool;
+
+        /**
          * @brief Handles rename session requests from the LogFileExplorer.
          * @param session_id The session identifier.
          * @param new_name The new session name.
