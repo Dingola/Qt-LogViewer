@@ -41,7 +41,7 @@
 #include "Qt-LogViewer/Presenters/LogViewPresenter.h"
 #include "Qt-LogViewer/Presenters/LogViewerDropOverlayPresenter.h"
 #include "Qt-LogViewer/Presenters/WorkspacePresenter.h"
-#include "Qt-LogViewer/Services/LocalFileStatus.h"
+#include "QtCommonLib/FileSystem/LocalFileStatus.h"
 #include "Qt-LogViewer/Services/LogHistoryService.h"
 #include "Qt-LogViewer/Services/LogPreviewService.h"
 #include "Qt-LogViewer/Services/LogViewerDropValidator.h"

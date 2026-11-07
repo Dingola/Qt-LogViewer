@@ -4,7 +4,7 @@
 #include <QVector>
 
 #include "Qt-LogViewer/Models/SessionTypes.h"
-#include "Qt-LogViewer/Services/LocalFileStatus.h"
+#include "QtCommonLib/FileSystem/LocalFileStatus.h"
 
 /**
  * @file SessionRestorePreflight.h

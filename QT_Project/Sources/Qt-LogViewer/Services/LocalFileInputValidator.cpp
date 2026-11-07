@@ -2,7 +2,7 @@
 
 #include <QUrl>
 
-#include "Qt-LogViewer/Services/LocalFileStatus.h"
+#include "QtCommonLib/FileSystem/LocalFileStatus.h"
 
 /**
  * @file LocalFileInputValidator.cpp

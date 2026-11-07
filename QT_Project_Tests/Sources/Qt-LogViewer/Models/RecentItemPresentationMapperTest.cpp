@@ -9,7 +9,7 @@
 #include <QString>
 
 #include "Qt-LogViewer/Models/RecentItemPresentationMapper.h"
-#include "Qt-LogViewer/Services/LocalFileStatus.h"
+#include "QtCommonLib/FileSystem/LocalFileStatus.h"
 
 /**
  * @brief Verifies that a log-file domain record maps to the shared presentation contract.

@@ -10,7 +10,7 @@
 #include <QVector>
 
 #include "Qt-LogViewer/Models/RecentItemPresentationMapper.h"
-#include "Qt-LogViewer/Services/LocalFileStatus.h"
+#include "QtCommonLib/FileSystem/LocalFileStatus.h"
 #include "Qt-LogViewer/Services/SessionManager.h"
 
 /**

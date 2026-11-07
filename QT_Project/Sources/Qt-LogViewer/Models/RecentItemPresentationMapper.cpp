@@ -8,7 +8,7 @@
 #include <QCoreApplication>
 #include <QFileInfo>
 
-#include "Qt-LogViewer/Services/LocalFileStatus.h"
+#include "QtCommonLib/FileSystem/LocalFileStatus.h"
 
 namespace
 {

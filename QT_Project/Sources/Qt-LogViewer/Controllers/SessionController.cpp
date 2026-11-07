@@ -23,7 +23,7 @@
 #include "Qt-LogViewer/Models/LogFileTreeModel.h"
 #include "Qt-LogViewer/Models/LogModel.h"
 #include "Qt-LogViewer/Models/SessionTypes.h"
-#include "Qt-LogViewer/Services/LocalFileStatus.h"
+#include "QtCommonLib/FileSystem/LocalFileStatus.h"
 #include "Qt-LogViewer/Services/LogHistoryService.h"
 #include "Qt-LogViewer/Services/SessionCodec.h"
 #include "Qt-LogViewer/Services/SessionManager.h"
