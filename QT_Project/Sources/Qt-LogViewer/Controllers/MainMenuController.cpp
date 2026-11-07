@@ -183,24 +183,6 @@ auto MainMenuController::initialize_menu() -> void
 }
 
 /**
- * @brief Rebuilds the Recent Files and Recent Sessions submenus from models.
- *
- * Idempotent; clears and repopulates actions on each call.
- */
-auto MainMenuController::rebuild_recent_menus() -> void
-{
-    if (m_recent_files_binder != nullptr)
-    {
-        m_recent_files_binder->refresh();
-    }
-
-    if (m_recent_sessions_binder != nullptr)
-    {
-        m_recent_sessions_binder->refresh();
-    }
-}
-
-/**
  * @brief Retranslates all persistent menu and action texts in place.
  */
 auto MainMenuController::retranslate() -> void

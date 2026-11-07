@@ -48,12 +48,6 @@ class RecentItemsAdapter final: public QObject
          */
         auto refresh_file_availability() -> void;
 
-    signals:
-        /**
-         * @brief Emitted after either recent-items model has been updated.
-         */
-        auto recent_items_changed() -> void;
-
     private:
         /**
          * @brief Replaces recent-file presentation items with mapped records.

@@ -27,12 +27,10 @@ RecentItemsAdapter::RecentItemsAdapter(SessionManager* session_manager, QObject*
     connect(m_session_manager, &SessionManager::recent_log_files_changed, this,
             [this](const QVector<RecentLogFileRecord>& records) {
                 update_recent_files(records);
-                emit recent_items_changed();
             });
     connect(m_session_manager, &SessionManager::recent_sessions_changed, this,
             [this](const QVector<RecentSessionRecord>& records) {
                 update_recent_sessions(records);
-                emit recent_items_changed();
             });
 
     QGuiApplication* application = qobject_cast<QGuiApplication*>(QCoreApplication::instance());
@@ -74,7 +72,6 @@ auto RecentItemsAdapter::get_recent_sessions_model() -> RecentItemsModel*
 auto RecentItemsAdapter::refresh_file_availability() -> void
 {
     update_recent_files(m_session_manager->get_recent_log_files());
-    emit recent_items_changed();
 }
 
 /**

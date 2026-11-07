@@ -26,7 +26,10 @@ TEST_F(RecentItemsAdapterTest, SynchronizesModelsWhenRecentItemsChange)
     SessionRepository repository(QFileInfo(marker_path).absolutePath());
     SessionManager session_manager(&repository);
     RecentItemsAdapter adapter(&session_manager);
-    QSignalSpy changed_spy(&adapter, &RecentItemsAdapter::recent_items_changed);
+    RecentItemsModel* files_model = adapter.get_recent_files_model();
+    RecentItemsModel* sessions_model = adapter.get_recent_sessions_model();
+    QSignalSpy files_reset_spy(files_model, &QAbstractItemModel::modelReset);
+    QSignalSpy sessions_reset_spy(sessions_model, &QAbstractItemModel::modelReset);
 
     const QVector<RecentLogFileRecord> files{
         {QStringLiteral("C:/logs/application.log"), QStringLiteral("Application"),
@@ -39,8 +42,6 @@ TEST_F(RecentItemsAdapterTest, SynchronizesModelsWhenRecentItemsChange)
     emit session_manager.recent_log_files_changed(files);
     emit session_manager.recent_sessions_changed(sessions);
 
-    RecentItemsModel* files_model = adapter.get_recent_files_model();
-    RecentItemsModel* sessions_model = adapter.get_recent_sessions_model();
     ASSERT_EQ(files_model->rowCount(), 1);
     ASSERT_EQ(sessions_model->rowCount(), 1);
     EXPECT_EQ(files_model->data(files_model->index(0, 0), to_role_id(RecentItemRole::Identity)),
@@ -48,7 +49,8 @@ TEST_F(RecentItemsAdapterTest, SynchronizesModelsWhenRecentItemsChange)
     EXPECT_EQ(
         sessions_model->data(sessions_model->index(0, 0), to_role_id(RecentItemRole::Identity)),
         sessions.front().id);
-    EXPECT_EQ(changed_spy.count(), 2);
+    EXPECT_EQ(files_reset_spy.count(), 1);
+    EXPECT_EQ(sessions_reset_spy.count(), 1);
 }
 
 /** @test Re-evaluates availability without persisting derived filesystem state. */

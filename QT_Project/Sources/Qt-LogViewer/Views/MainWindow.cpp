@@ -139,13 +139,6 @@ MainWindow::MainWindow(LogViewerSettings& settings, FileCatalogController& catal
         central_stack->addWidget(old_central);
     }
 
-    connect(m_recent_items_adapter, &RecentItemsAdapter::recent_items_changed, this, [this] {
-        if (m_menu_controller != nullptr)
-        {
-            m_menu_controller->rebuild_recent_menus();
-        }
-    });
-
     setup_log_file_explorer();
     setup_log_level_pie_chart();
     setup_pagination_widget();
@@ -164,11 +157,6 @@ MainWindow::MainWindow(LogViewerSettings& settings, FileCatalogController& catal
             [this](const QString&) { close_all_tabs(); });
     connect(m_session_controller, &SessionController::view_restored, this,
             &MainWindow::restore_view_from_state);
-    connect(m_session_controller, &SessionController::session_renamed, this,
-            [this](const QString&, const QString&) { m_menu_controller->rebuild_recent_menus(); });
-    connect(m_session_controller, &SessionController::session_deleted, this,
-            [this](const QString&) { m_menu_controller->rebuild_recent_menus(); });
-
     // Start page widget (stack page 1)
     auto* start_page = new StartPageWidget(central_stack);
     start_page->set_recent_files_model(m_recent_files_model);
@@ -216,7 +204,6 @@ MainWindow::MainWindow(LogViewerSettings& settings, FileCatalogController& catal
                 statusBar()->showMessage(message, timeout_ms);
             });
     initialize_menu();
-    m_menu_controller->rebuild_recent_menus();
 
     QTimer::singleShot(0, this, [this] { this->resizeEvent(nullptr); });
     qDebug() << "MainWindow constructor finished";
@@ -539,7 +526,6 @@ auto MainWindow::process_log_file_drop(const QVector<QString>& file_paths) -> vo
     }
     m_session_controller->request_expand_session(session_id);
     m_session_controller->save_current_session();
-    m_menu_controller->rebuild_recent_menus();
     m_workspace_presenter->refresh_start_page();
 }
 /**
@@ -573,7 +559,6 @@ auto MainWindow::changeEvent(QEvent* event) -> void
         if (m_menu_controller != nullptr)
         {
             m_menu_controller->retranslate();
-            m_menu_controller->rebuild_recent_menus();
         }
         m_log_file_explorer_dock_widget->setWindowTitle(tr("Log File Explorer"));
         m_log_details_dock_widget->setWindowTitle(tr("Log Details"));
@@ -645,7 +630,6 @@ void MainWindow::handle_open_log_file_dialog_requested()
 
             m_session_controller->request_expand_session(session_id);
             m_session_controller->save_current_session();
-            m_menu_controller->rebuild_recent_menus();
         }
 
         m_workspace_presenter->refresh_start_page();
@@ -796,7 +780,6 @@ auto MainWindow::handle_remove_unavailable_recent_files() -> void
 auto MainWindow::handle_save_session() -> void
 {
     m_session_controller->save_current_session();
-    m_menu_controller->rebuild_recent_menus();
 }
 
 /**
@@ -887,7 +870,6 @@ auto MainWindow::restore_session(const SessionState& state) -> void
         if (restored)
         {
             m_session_controller->request_expand_session(state.id);
-            m_menu_controller->rebuild_recent_menus();
         }
         else
         {
@@ -966,7 +948,6 @@ auto MainWindow::handle_open_recent_file(const QString& file_path) -> void
         m_session_controller->request_expand_session(session_id);
         m_session_controller->save_current_session();
 
-        m_menu_controller->rebuild_recent_menus();
         m_workspace_presenter->refresh_start_page();
     }
 }

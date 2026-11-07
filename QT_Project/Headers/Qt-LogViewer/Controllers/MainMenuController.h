@@ -36,13 +36,6 @@ class MainMenuController: public QObject
                                     QObject* parent = nullptr);
 
         /**
-         * @brief Rebuilds the Recent Files and Recent Sessions submenus from models.
-         *
-         * Idempotent; clears and repopulates actions on each call.
-         */
-        auto rebuild_recent_menus() -> void;
-
-        /**
          * @brief Retranslates all persistent menu and action texts in place.
          */
         auto retranslate() -> void;
