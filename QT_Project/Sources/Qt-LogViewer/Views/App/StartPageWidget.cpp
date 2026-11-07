@@ -21,13 +21,42 @@
 
 #include "Qt-LogViewer/Models/RecentRoles.h"
 #include "Qt-LogViewer/Views/Shared/EmptyStateWidget.h"
-#include "Qt-LogViewer/Views/Shared/RecentItemDelegate.h"
+#include "Qt-LogViewer/Views/Shared/TwoLineItemDelegate.h"
 #include "ui_StartPageWidget.h"
 
 namespace
 {
 constexpr int k_brand_icon_size_px = 40;
 constexpr auto k_brand_icon_path = ":/Resources/Icons/App/AppIcon.svg";
+
+/**
+ * @brief Creates the shared two-line presentation used by recent-item lists.
+ * @param parent Owner of the delegate.
+ * @param include_status Whether unavailable-item status text should be rendered.
+ * @return Configured delegate using the recent-item semantic roles.
+ */
+[[nodiscard]] auto make_recent_item_delegate(QObject* parent,
+                                             bool include_status) -> TwoLineItemDelegate*
+{
+    TwoLineItemDelegate::Roles roles;
+    roles.title = to_role_id(RecentItemRole::Title);
+    roles.secondary = to_role_id(RecentItemRole::SecondaryText);
+    roles.metadata = to_role_id(RecentItemRole::LastUsed);
+    roles.icon = to_role_id(RecentItemRole::Icon);
+    roles.status = include_status ? to_role_id(RecentItemRole::StatusText) : -1;
+
+    auto* result = new TwoLineItemDelegate(roles, parent);
+    result->set_metadata_formatter([](const QVariant& value) {
+        QString text;
+        const QDateTime date_time = value.toDateTime();
+        if (date_time.isValid())
+        {
+            text = date_time.toString(QStringLiteral("yyyy-MM-dd HH:mm"));
+        }
+        return text;
+    });
+    return result;
+}
 }  // namespace
 
 /**
@@ -73,11 +102,7 @@ auto StartPageWidget::set_recent_files_model(QAbstractItemModel* model) -> void
 
     if (auto* lv = qobject_cast<QListView*>(ui->recentFilesView); lv != nullptr)
     {
-        auto* delegate = new RecentItemDelegate(to_role_id(RecentItemRole::Title),
-                                                to_role_id(RecentItemRole::SecondaryText),
-                                                to_role_id(RecentItemRole::LastUsed), lv);
-        delegate->set_status_role(to_role_id(RecentItemRole::StatusText));
-        lv->setItemDelegate(delegate);
+        lv->setItemDelegate(make_recent_item_delegate(lv, true));
         lv->setUniformItemSizes(true);
         lv->setSpacing(4);
     }
@@ -133,9 +158,7 @@ auto StartPageWidget::set_recent_sessions_model(QAbstractItemModel* model) -> vo
 
     if (auto* lv = qobject_cast<QListView*>(ui->recentSessionsView); lv != nullptr)
     {
-        lv->setItemDelegate(new RecentItemDelegate(to_role_id(RecentItemRole::Title),
-                                                   to_role_id(RecentItemRole::SecondaryText),
-                                                   to_role_id(RecentItemRole::LastUsed), lv));
+        lv->setItemDelegate(make_recent_item_delegate(lv, false));
         lv->setUniformItemSizes(true);
         lv->setSpacing(4);
     }

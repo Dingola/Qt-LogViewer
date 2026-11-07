@@ -25,13 +25,10 @@ RecentItemsAdapter::RecentItemsAdapter(SessionManager* session_manager, QObject*
     update_recent_sessions(m_session_manager->get_recent_sessions());
 
     connect(m_session_manager, &SessionManager::recent_log_files_changed, this,
-            [this](const QVector<RecentLogFileRecord>& records) {
-                update_recent_files(records);
-            });
-    connect(m_session_manager, &SessionManager::recent_sessions_changed, this,
-            [this](const QVector<RecentSessionRecord>& records) {
-                update_recent_sessions(records);
-            });
+            [this](const QVector<RecentLogFileRecord>& records) { update_recent_files(records); });
+    connect(
+        m_session_manager, &SessionManager::recent_sessions_changed, this,
+        [this](const QVector<RecentSessionRecord>& records) { update_recent_sessions(records); });
 
     QGuiApplication* application = qobject_cast<QGuiApplication*>(QCoreApplication::instance());
     if (application != nullptr)
