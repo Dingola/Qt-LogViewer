@@ -15,6 +15,7 @@
 
 #include "Qt-LogViewer/Models/RecentItemsModel.h"
 #include "Qt-LogViewer/Models/RecentRoles.h"
+#include "Qt-LogViewer/Views/Shared/RecentItemsMenuBinder.h"
 
 namespace
 {
@@ -39,6 +40,9 @@ constexpr auto k_clear_recent_files_text =
 constexpr auto k_remove_unavailable_files_text =
     QT_TRANSLATE_NOOP("MainMenuController", "Remove Unavailable Files...");
 constexpr auto k_unavailable_recent_file_text = QT_TRANSLATE_NOOP("MainMenuController", "%1 — %2");
+constexpr auto k_no_recent_files_text = QT_TRANSLATE_NOOP("MainMenuController", "No Recent Files");
+constexpr auto k_no_recent_sessions_text =
+    QT_TRANSLATE_NOOP("MainMenuController", "No Recent Sessions");
 
 /**
  * @brief Translates menu text using the MainMenuController translation context.
@@ -60,12 +64,42 @@ constexpr auto k_unavailable_recent_file_text = QT_TRANSLATE_NOOP("MainMenuContr
  */
 MainMenuController::MainMenuController(QMenuBar* menu_bar, RecentItemsModel* recent_files_model,
                                        RecentItemsModel* recent_sessions_model, QObject* parent)
-    : QObject(parent),
-      m_menu_bar(menu_bar),
-      m_recent_files_model(recent_files_model),
-      m_recent_sessions_model(recent_sessions_model)
+    : QObject(parent), m_menu_bar(menu_bar)
 {
-    initialize_menu();
+    if (m_menu_bar != nullptr)
+    {
+        initialize_menu();
+
+        const RecentItemsMenuRoles roles{
+            to_role_id(RecentItemRole::Title),   to_role_id(RecentItemRole::Identity),
+            to_role_id(RecentItemRole::Enabled), to_role_id(RecentItemRole::ToolTip),
+            to_role_id(RecentItemRole::Icon),    to_role_id(RecentItemRole::StatusText)};
+
+        m_action_remove_unavailable_files = new QAction(this);
+        connect(m_action_remove_unavailable_files, &QAction::triggered, this,
+                &MainMenuController::remove_unavailable_recent_files_requested);
+
+        m_recent_files_binder =
+            new RecentItemsMenuBinder(m_recent_files_menu, recent_files_model, roles, this);
+        m_recent_files_binder->set_footer_actions({m_action_remove_unavailable_files});
+        connect(m_recent_files_binder, &RecentItemsMenuBinder::item_activated, this,
+                [this](const QVariant& identity) {
+                    emit open_recent_file_requested(identity.toString());
+                });
+        connect(m_recent_files_binder, &RecentItemsMenuBinder::clear_requested, this,
+                &MainMenuController::clear_recent_files_requested);
+        connect(m_recent_files_binder, &RecentItemsMenuBinder::contains_disabled_items_changed,
+                m_action_remove_unavailable_files, &QAction::setEnabled);
+
+        m_recent_sessions_binder =
+            new RecentItemsMenuBinder(m_recent_sessions_menu, recent_sessions_model, roles, this);
+        connect(m_recent_sessions_binder, &RecentItemsMenuBinder::item_activated, this,
+                [this](const QVariant& identity) {
+                    emit open_recent_session_requested(identity.toString());
+                });
+
+        retranslate();
+    }
 }
 
 /**
@@ -145,8 +179,6 @@ auto MainMenuController::initialize_menu() -> void
                 &MainMenuController::about_qt_requested);
         connect(m_recent_files_menu, &QMenu::aboutToShow, this,
                 &MainMenuController::recent_files_refresh_requested);
-
-        retranslate();
     }
 }
 
@@ -157,55 +189,14 @@ auto MainMenuController::initialize_menu() -> void
  */
 auto MainMenuController::rebuild_recent_menus() -> void
 {
-    if (m_recent_files_menu != nullptr && m_recent_files_model != nullptr)
+    if (m_recent_files_binder != nullptr)
     {
-        m_recent_files_menu->clear();
-        bool has_unavailable_files = false;
-        for (int row = 0; row < m_recent_files_model->rowCount(); ++row)
-        {
-            const QModelIndex index = m_recent_files_model->index(row, 0);
-            const QString title = index.data(to_role_id(RecentItemRole::Title)).toString();
-            const QString path = index.data(to_role_id(RecentItemRole::Identity)).toString();
-            const QString status_text =
-                index.data(to_role_id(RecentItemRole::StatusText)).toString();
-            const bool enabled = index.flags().testFlag(Qt::ItemIsEnabled);
-            has_unavailable_files = has_unavailable_files || !enabled;
-            const QString action_title =
-                enabled ? title : translate(k_unavailable_recent_file_text).arg(title, status_text);
-            QAction* action = m_recent_files_menu->addAction(action_title);
-            const QString tooltip = index.data(Qt::ToolTipRole).toString();
-            action->setEnabled(enabled);
-            action->setToolTip(tooltip);
-            action->setStatusTip(status_text);
-            action->setWhatsThis(tooltip);
-            connect(action, &QAction::triggered, this,
-                    [this, path]() { emit open_recent_file_requested(path); });
-        }
-
-        m_recent_files_menu->addSeparator();
-        QAction* cleanup_action =
-            m_recent_files_menu->addAction(translate(k_remove_unavailable_files_text));
-        cleanup_action->setEnabled(has_unavailable_files);
-        connect(cleanup_action, &QAction::triggered, this,
-                &MainMenuController::remove_unavailable_recent_files_requested);
-        QAction* clear_action =
-            m_recent_files_menu->addAction(translate(k_clear_recent_files_text));
-        connect(clear_action, &QAction::triggered, this,
-                &MainMenuController::clear_recent_files_requested);
+        m_recent_files_binder->refresh();
     }
 
-    if (m_recent_sessions_menu != nullptr && m_recent_sessions_model != nullptr)
+    if (m_recent_sessions_binder != nullptr)
     {
-        m_recent_sessions_menu->clear();
-        for (int row = 0; row < m_recent_sessions_model->rowCount(); ++row)
-        {
-            const QModelIndex index = m_recent_sessions_model->index(row, 0);
-            const QString title = index.data(to_role_id(RecentItemRole::Title)).toString();
-            const QString id = index.data(to_role_id(RecentItemRole::Identity)).toString();
-            QAction* action = m_recent_sessions_menu->addAction(title);
-            connect(action, &QAction::triggered, this,
-                    [this, id]() { emit open_recent_session_requested(id); });
-        }
+        m_recent_sessions_binder->refresh();
     }
 }
 
@@ -231,6 +222,12 @@ auto MainMenuController::retranslate() -> void
         m_action_settings->setText(translate(k_settings_text));
         m_action_about->setText(translate(k_about_text).arg(QCoreApplication::applicationName()));
         m_action_about_qt->setText(translate(k_about_qt_text));
+        m_action_remove_unavailable_files->setText(translate(k_remove_unavailable_files_text));
+
+        m_recent_files_binder->set_empty_text(translate(k_no_recent_files_text));
+        m_recent_files_binder->set_clear_text(translate(k_clear_recent_files_text));
+        m_recent_files_binder->set_disabled_text_format(translate(k_unavailable_recent_file_text));
+        m_recent_sessions_binder->set_empty_text(translate(k_no_recent_sessions_text));
     }
 }
 

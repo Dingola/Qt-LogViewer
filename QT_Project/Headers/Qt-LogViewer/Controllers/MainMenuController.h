@@ -7,6 +7,7 @@ class QAction;
 class QMenu;
 class QMenuBar;
 class RecentItemsModel;
+class RecentItemsMenuBinder;
 
 /**
  * @file MainMenuController.h
@@ -14,7 +15,7 @@ class RecentItemsModel;
  *
  * Responsibilities:
  * - Create and translate the main menu bar.
- * - Rebuild the Recent Files and Recent Sessions submenus from models.
+ * - Configure bindings between recent-item models and their submenus.
  * - Add native dock toggle actions to the Views menu.
  * - Emit user intent without depending on MainWindow or runtime services.
  */
@@ -108,9 +109,6 @@ class MainMenuController: public QObject
 
     private:
         QMenuBar* m_menu_bar = nullptr;
-        RecentItemsModel* m_recent_files_model = nullptr;
-        RecentItemsModel* m_recent_sessions_model = nullptr;
-
         QMenu* m_file_menu = nullptr;
         QMenu* m_recent_files_menu = nullptr;
         QMenu* m_recent_sessions_menu = nullptr;
@@ -126,4 +124,7 @@ class MainMenuController: public QObject
         QAction* m_action_settings = nullptr;
         QAction* m_action_about = nullptr;
         QAction* m_action_about_qt = nullptr;
+        QAction* m_action_remove_unavailable_files = nullptr;
+        RecentItemsMenuBinder* m_recent_files_binder = nullptr;
+        RecentItemsMenuBinder* m_recent_sessions_binder = nullptr;
 };
