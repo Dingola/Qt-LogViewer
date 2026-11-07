@@ -12,8 +12,7 @@
 
 #include "Qt-LogViewer/Adapters/RecentItemsAdapter.h"
 #include "Qt-LogViewer/Models/LogFileInfo.h"
-#include "Qt-LogViewer/Models/RecentListSchema.h"
-#include "Qt-LogViewer/Services/LocalFileStatus.h"
+#include "Qt-LogViewer/Models/RecentRoles.h"
 #include "Qt-LogViewer/Services/SessionManager.h"
 #include "Qt-LogViewer/Services/SessionRepository.h"
 
@@ -44,10 +43,11 @@ TEST_F(RecentItemsAdapterTest, SynchronizesModelsWhenRecentItemsChange)
     RecentItemsModel* sessions_model = adapter.get_recent_sessions_model();
     ASSERT_EQ(files_model->rowCount(), 1);
     ASSERT_EQ(sessions_model->rowCount(), 1);
-    EXPECT_EQ(files_model->data(files_model->index(0, 0), to_role_id(RecentFileRole::FilePath)),
+    EXPECT_EQ(files_model->data(files_model->index(0, 0), to_role_id(RecentItemRole::Identity)),
               files.front().file_path);
-    EXPECT_EQ(sessions_model->data(sessions_model->index(0, 0), to_role_id(RecentSessionRole::Id)),
-              sessions.front().id);
+    EXPECT_EQ(
+        sessions_model->data(sessions_model->index(0, 0), to_role_id(RecentItemRole::Identity)),
+        sessions.front().id);
     EXPECT_EQ(changed_spy.count(), 2);
 }
 
@@ -66,16 +66,16 @@ TEST_F(RecentItemsAdapterTest, RefreshesTransientRecentFileAvailability)
     ASSERT_EQ(model->rowCount(), 1);
     const QModelIndex available_index = model->index(0, 0);
     EXPECT_TRUE(available_index.flags().testFlag(Qt::ItemIsEnabled));
-    EXPECT_EQ(model->data(available_index, to_role_id(RecentFileRole::Availability)).toInt(),
-              static_cast<int>(QtCommonLib::LocalFileAvailability::Available));
+    EXPECT_FALSE(
+        model->data(available_index, to_role_id(RecentItemRole::StatusText)).toString().isEmpty());
 
     ASSERT_TRUE(QFile::remove(file_path));
     adapter.refresh_file_availability();
 
     const QModelIndex missing_index = model->index(0, 0);
     EXPECT_FALSE(missing_index.flags().testFlag(Qt::ItemIsEnabled));
-    EXPECT_EQ(model->data(missing_index, to_role_id(RecentFileRole::Availability)).toInt(),
-              static_cast<int>(QtCommonLib::LocalFileAvailability::Missing));
+    EXPECT_FALSE(
+        model->data(missing_index, to_role_id(RecentItemRole::StatusText)).toString().isEmpty());
     EXPECT_FALSE(model->data(missing_index, Qt::ToolTipRole).toString().isEmpty());
     EXPECT_EQ(model->data(missing_index, Qt::AccessibleDescriptionRole),
               model->data(missing_index, Qt::ToolTipRole));

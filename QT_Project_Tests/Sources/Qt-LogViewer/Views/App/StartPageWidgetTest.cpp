@@ -8,7 +8,6 @@
 #include <QStackedWidget>
 
 #include "Qt-LogViewer/Models/RecentItemsModel.h"
-#include "Qt-LogViewer/Models/RecentListSchema.h"
 #include "Qt-LogViewer/Views/App/StartPageWidget.h"
 #include "Qt-LogViewer/Views/Shared/EmptyStateWidget.h"
 
@@ -131,17 +130,16 @@ TEST_F(StartPageWidgetTest, ExposesSemanticActionHierarchy)
 /** @test Keeps an unavailable recent file visible and prevents primary activation. */
 TEST_F(StartPageWidgetTest, PresentsUnavailableRecentFileWithoutOpeningIt)
 {
-    RecentItemsModel model(RecentListSchemas::make_recent_files_schema());
-    QHash<int, QVariant> row;
-    row.insert(to_role_id(RecentFileRole::FileName), QStringLiteral("missing.log"));
-    row.insert(to_role_id(RecentFileRole::FilePath), QStringLiteral("C:/logs/missing.log"));
-    row.insert(to_role_id(RecentFileRole::LastOpened), QDateTime::currentDateTime());
-    row.insert(to_role_id(RecentFileRole::StatusText), QStringLiteral("File not found"));
-    row.insert(to_role_id(RecentFileRole::Enabled), false);
-    row.insert(Qt::ToolTipRole, QStringLiteral("File not found: C:/logs/missing.log"));
-    row.insert(Qt::AccessibleDescriptionRole,
-               QStringLiteral("File not found: C:/logs/missing.log"));
-    model.set_rows({row});
+    RecentItemsModel model;
+    RecentItemPresentation item;
+    item.identity = QStringLiteral("C:/logs/missing.log");
+    item.title = QStringLiteral("missing.log");
+    item.secondary_text = item.identity.toString();
+    item.last_used = QDateTime::currentDateTime();
+    item.status_text = QStringLiteral("File not found");
+    item.enabled = false;
+    item.tooltip = QStringLiteral("File not found: C:/logs/missing.log");
+    model.set_items({item});
 
     m_widget->set_recent_files_model(&model);
 

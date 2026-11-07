@@ -7,11 +7,9 @@
 
 #include <QCoreApplication>
 #include <QGuiApplication>
-#include <QHash>
-#include <QVariant>
 #include <QVector>
 
-#include "Qt-LogViewer/Models/RecentListSchema.h"
+#include "Qt-LogViewer/Models/RecentItemPresentationMapper.h"
 #include "Qt-LogViewer/Services/LocalFileStatus.h"
 #include "Qt-LogViewer/Services/SessionManager.h"
 
@@ -21,10 +19,7 @@
  * @param parent Optional QObject parent.
  */
 RecentItemsAdapter::RecentItemsAdapter(SessionManager* session_manager, QObject* parent)
-    : QObject(parent),
-      m_session_manager(session_manager),
-      m_recent_files_model(RecentListSchemas::make_recent_files_schema()),
-      m_recent_sessions_model(RecentListSchemas::make_recent_sessions_schema())
+    : QObject(parent), m_session_manager(session_manager)
 {
     update_recent_files(m_session_manager->get_recent_log_files());
     update_recent_sessions(m_session_manager->get_recent_sessions());
@@ -83,37 +78,37 @@ auto RecentItemsAdapter::refresh_file_availability() -> void
 }
 
 /**
- * @brief Replaces recent-file model rows with mapped session records.
+ * @brief Replaces recent-file presentation items with mapped records.
  * @param records Recent-file records in display order.
  */
 auto RecentItemsAdapter::update_recent_files(const QVector<RecentLogFileRecord>& records) -> void
 {
-    QVector<QHash<int, QVariant>> rows;
-    rows.reserve(records.size());
+    QVector<RecentItemPresentation> items;
+    items.reserve(records.size());
 
     for (const RecentLogFileRecord& record: records)
     {
         const QtCommonLib::LocalFileStatus file_status =
             QtCommonLib::inspect_local_file(record.file_path);
-        rows.push_back(RecentListSchemas::build_recent_file_row(record, file_status));
+        items.push_back(RecentItemPresentationMapper::from_recent_log_file(record, file_status));
     }
 
-    m_recent_files_model.set_rows(std::move(rows));
+    m_recent_files_model.set_items(std::move(items));
 }
 
 /**
- * @brief Replaces recent-session model rows with mapped session records.
+ * @brief Replaces recent-session presentation items with mapped records.
  * @param records Recent-session records in display order.
  */
 auto RecentItemsAdapter::update_recent_sessions(const QVector<RecentSessionRecord>& records) -> void
 {
-    QVector<QHash<int, QVariant>> rows;
-    rows.reserve(records.size());
+    QVector<RecentItemPresentation> items;
+    items.reserve(records.size());
 
     for (const RecentSessionRecord& record: records)
     {
-        rows.push_back(RecentListSchemas::build_recent_session_row(record));
+        items.push_back(RecentItemPresentationMapper::from_recent_session(record));
     }
 
-    m_recent_sessions_model.set_rows(std::move(rows));
+    m_recent_sessions_model.set_items(std::move(items));
 }

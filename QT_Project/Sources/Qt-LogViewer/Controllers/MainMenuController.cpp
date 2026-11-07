@@ -14,7 +14,7 @@
 #include <QVariant>
 
 #include "Qt-LogViewer/Models/RecentItemsModel.h"
-#include "Qt-LogViewer/Models/RecentListSchema.h"
+#include "Qt-LogViewer/Models/RecentRoles.h"
 
 namespace
 {
@@ -164,12 +164,10 @@ auto MainMenuController::rebuild_recent_menus() -> void
         for (int row = 0; row < m_recent_files_model->rowCount(); ++row)
         {
             const QModelIndex index = m_recent_files_model->index(row, 0);
-            const QString title =
-                m_recent_files_model->data(index, to_role_id(RecentFileRole::FileName)).toString();
-            const QString path =
-                m_recent_files_model->data(index, to_role_id(RecentFileRole::FilePath)).toString();
+            const QString title = index.data(to_role_id(RecentItemRole::Title)).toString();
+            const QString path = index.data(to_role_id(RecentItemRole::Identity)).toString();
             const QString status_text =
-                index.data(to_role_id(RecentFileRole::StatusText)).toString();
+                index.data(to_role_id(RecentItemRole::StatusText)).toString();
             const bool enabled = index.flags().testFlag(Qt::ItemIsEnabled);
             has_unavailable_files = has_unavailable_files || !enabled;
             const QString action_title =
@@ -202,11 +200,8 @@ auto MainMenuController::rebuild_recent_menus() -> void
         for (int row = 0; row < m_recent_sessions_model->rowCount(); ++row)
         {
             const QModelIndex index = m_recent_sessions_model->index(row, 0);
-            const QString title =
-                m_recent_sessions_model->data(index, to_role_id(RecentSessionRole::Name))
-                    .toString();
-            const QString id =
-                m_recent_sessions_model->data(index, to_role_id(RecentSessionRole::Id)).toString();
+            const QString title = index.data(to_role_id(RecentItemRole::Title)).toString();
+            const QString id = index.data(to_role_id(RecentItemRole::Identity)).toString();
             QAction* action = m_recent_sessions_menu->addAction(title);
             connect(action, &QAction::triggered, this,
                     [this, id]() { emit open_recent_session_requested(id); });

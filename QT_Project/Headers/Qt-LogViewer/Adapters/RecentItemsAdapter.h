@@ -56,13 +56,13 @@ class RecentItemsAdapter final: public QObject
 
     private:
         /**
-         * @brief Replaces recent-file model rows with mapped session records.
+         * @brief Replaces recent-file presentation items with mapped records.
          * @param records Recent-file records in display order.
          */
         auto update_recent_files(const QVector<RecentLogFileRecord>& records) -> void;
 
         /**
-         * @brief Replaces recent-session model rows with mapped session records.
+         * @brief Replaces recent-session presentation items with mapped records.
          * @param records Recent-session records in display order.
          */
         auto update_recent_sessions(const QVector<RecentSessionRecord>& records) -> void;

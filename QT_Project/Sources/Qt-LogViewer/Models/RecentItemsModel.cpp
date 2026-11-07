@@ -1,30 +1,24 @@
 /**
  * @file RecentItemsModel.cpp
- * @brief Implements the generic, schema-driven recent items model.
- *
- * The model is domain-agnostic. A RecentListSchema provides exported role names and column
- * definitions. Callers supply rows via set_rows(...), where each row is a role->QVariant map.
+ * @brief Implements the typed recent-items list model.
  */
 
 #include "Qt-LogViewer/Models/RecentItemsModel.h"
 
-#include "Qt-LogViewer/Models/RecentListSchema.h"
+#include <utility>
+
+#include "Qt-LogViewer/Models/RecentRoles.h"
 
 /**
- * @brief Constructs a recent items model with the given schema.
- * @param schema Schema defining exported roles and columns.
+ * @brief Constructs an empty recent-items model.
  * @param parent Optional QObject parent.
- *
- * The schema determines which roles are exported via roleNames() and how columns are presented.
  */
-RecentItemsModel::RecentItemsModel(const RecentListSchema& schema, QObject* parent)
-    : QAbstractTableModel(parent), m_schema(schema), m_rows()
-{}
+RecentItemsModel::RecentItemsModel(QObject* parent): QAbstractListModel(parent) {}
 
 /**
- * @brief Returns the number of rows.
- * @param parent Parent index (unused for flat model).
- * @return Number of rows.
+ * @brief Returns the number of presentation items.
+ * @param parent Parent index, which must be invalid for this flat model.
+ * @return Number of root-level items.
  */
 auto RecentItemsModel::rowCount(const QModelIndex& parent) const -> int
 {
@@ -32,86 +26,66 @@ auto RecentItemsModel::rowCount(const QModelIndex& parent) const -> int
 
     if (!parent.isValid())
     {
-        count = m_rows.size();
+        count = m_items.size();
     }
 
     return count;
 }
 
 /**
- * @brief Returns the number of columns defined by the schema.
- * @param parent Parent index (unused).
- * @return Column count.
- */
-auto RecentItemsModel::columnCount(const QModelIndex& parent) const -> int
-{
-    Q_UNUSED(parent);
-    int cols = 0;
-    cols = m_schema.columns.size();
-    return cols;
-}
-
-/**
- * @brief Returns data for the given index and role.
- * @param index Model index (row/column).
- * @param role Qt role or custom role.
- * @return Requested value or invalid QVariant if out of range.
- *
- * For Qt::DisplayRole and Qt::EditRole, the value for the column's display role is returned.
- * For other roles, the row's role map is queried directly.
+ * @brief Returns presentation data for an item and semantic role.
+ * @param index Model index to inspect.
+ * @param role Qt or semantic recent-item role.
+ * @return Requested value or an invalid QVariant.
  */
 auto RecentItemsModel::data(const QModelIndex& index, int role) const -> QVariant
 {
     QVariant value;
-
-    if (index.isValid() && index.row() >= 0 && index.row() < m_rows.size())
+    if (index.isValid() && index.column() == 0 && index.row() >= 0 && index.row() < m_items.size())
     {
-        if (index.column() >= 0 && index.column() < m_schema.columns.size())
+        const RecentItemPresentation& item = m_items.at(index.row());
+        if (role == Qt::DisplayRole || role == Qt::AccessibleTextRole ||
+            role == to_role_id(RecentItemRole::Title))
         {
-            const auto& row = m_rows.at(index.row());
-
-            if (role == Qt::DisplayRole || role == Qt::EditRole)
-            {
-                const int display_role = m_schema.columns.at(index.column()).display_role;
-                value = row.value(display_role);
-            }
-            else
-            {
-                value = row.value(role);
-            }
+            value = item.title;
+        }
+        else if (role == Qt::DecorationRole || role == to_role_id(RecentItemRole::Icon))
+        {
+            value = item.icon;
+        }
+        else if (role == Qt::ToolTipRole || role == Qt::AccessibleDescriptionRole ||
+                 role == to_role_id(RecentItemRole::ToolTip))
+        {
+            value = item.tooltip;
+        }
+        else if (role == to_role_id(RecentItemRole::Identity))
+        {
+            value = item.identity;
+        }
+        else if (role == to_role_id(RecentItemRole::SecondaryText))
+        {
+            value = item.secondary_text;
+        }
+        else if (role == to_role_id(RecentItemRole::LastUsed))
+        {
+            value = item.last_used;
+        }
+        else if (role == to_role_id(RecentItemRole::Enabled))
+        {
+            value = item.enabled;
+        }
+        else if (role == to_role_id(RecentItemRole::StatusText))
+        {
+            value = item.status_text;
         }
     }
-
     return value;
 }
 
 /**
- * @brief Returns header text for columns.
- * @param section Column index.
- * @param orientation Expected Qt::Horizontal.
- * @param role Expected Qt::DisplayRole.
- * @return Header text or invalid QVariant if out of range.
- */
-auto RecentItemsModel::headerData(int section, Qt::Orientation orientation,
-                                  int role) const -> QVariant
-{
-    QVariant header;
-
-    if (role == Qt::DisplayRole && orientation == Qt::Horizontal)
-    {
-        if (section >= 0 && section < m_schema.columns.size())
-        {
-            header = m_schema.columns.at(section).header_title;
-        }
-    }
-
-    return header;
-}
-
-/**
- * @brief Returns item flags for a given index.
- * @param index Model index.
- * @return Selectable flags and, when allowed by the schema, enabled flags for valid indices.
+ * @brief Returns selectable flags and the presentation-controlled enabled state.
+ * @param index Model index to inspect.
+ * @return Item flags for the requested index.
  */
 auto RecentItemsModel::flags(const QModelIndex& index) const -> Qt::ItemFlags
 {
@@ -119,10 +93,8 @@ auto RecentItemsModel::flags(const QModelIndex& index) const -> Qt::ItemFlags
 
     if (index.isValid())
     {
-        const bool enabled =
-            m_schema.enabled_role < 0 || data(index, m_schema.enabled_role).toBool();
         item_flags = Qt::ItemIsSelectable;
-        if (enabled)
+        if (index.row() >= 0 && index.row() < m_items.size() && m_items.at(index.row()).enabled)
         {
             item_flags |= Qt::ItemIsEnabled;
         }
@@ -132,45 +104,40 @@ auto RecentItemsModel::flags(const QModelIndex& index) const -> Qt::ItemFlags
 }
 
 /**
- * @brief Exposes the role names defined by the active schema.
- * @return Mapping of role id to role name.
+ * @brief Exposes stable semantic role names.
+ * @return Mapping from role ids to role names.
  */
 auto RecentItemsModel::roleNames() const -> QHash<int, QByteArray>
 {
-    return m_schema.role_names;
+    QHash<int, QByteArray> roles;
+    roles.insert(to_role_id(RecentItemRole::Identity), QByteArray("identity"));
+    roles.insert(to_role_id(RecentItemRole::Title), QByteArray("title"));
+    roles.insert(to_role_id(RecentItemRole::SecondaryText), QByteArray("secondary_text"));
+    roles.insert(to_role_id(RecentItemRole::LastUsed), QByteArray("last_used"));
+    roles.insert(to_role_id(RecentItemRole::Icon), QByteArray("icon"));
+    roles.insert(to_role_id(RecentItemRole::Enabled), QByteArray("enabled"));
+    roles.insert(to_role_id(RecentItemRole::StatusText), QByteArray("status_text"));
+    roles.insert(to_role_id(RecentItemRole::ToolTip), QByteArray("tooltip"));
+    return roles;
 }
 
 /**
- * @brief Replaces the model contents with the provided rows.
- * @param rows New rows to set (role->QVariant maps).
- *
- * This call resets the model atomically. Rows should be consistent with the schema's roles.
+ * @brief Atomically replaces all presentation items.
+ * @param items New presentation items in display order.
  */
-auto RecentItemsModel::set_rows(QVector<QHash<int, QVariant>> rows) -> void
+auto RecentItemsModel::set_items(QVector<RecentItemPresentation> items) -> void
 {
     beginResetModel();
-    m_rows = std::move(rows);
+    m_items = std::move(items);
     endResetModel();
 }
 
 /**
- * @brief Clears all rows in the model.
- *
- * Resets the model and removes all row data.
+ * @brief Removes all presentation items.
  */
 auto RecentItemsModel::clear() -> void
 {
     beginResetModel();
-    m_rows.clear();
+    m_items.clear();
     endResetModel();
-}
-
-/**
- * @brief Returns a copy of the active schema used by the model.
- * @return Schema copy (roles and columns).
- */
-auto RecentItemsModel::get_schema() const -> RecentListSchema
-{
-    RecentListSchema schema_copy = m_schema;
-    return schema_copy;
 }

@@ -4,94 +4,59 @@
 
 /**
  * @file RecentRoles.h
- * @brief Defines strongly-typed roles for recent items domains (files and sessions) and provides
- *        a utility to convert them to stable Qt role ids.
- *
- * The purpose is to avoid a catch-all generic namespace and keep roles domain-specific:
- *  - RecentFileRole: roles used by "Recent Files" lists.
- *  - RecentSessionRole: roles used by "Recent Sessions" lists.
- *
- * The mapping to int uses stable offsets under Qt::UserRole to preserve compatibility across views
- * and delegates.
+ * @brief Defines stable semantic roles shared by all recent-item presentations.
  */
 
 /**
- * @enum RecentFileRole
- * @brief Stable roles for recent file items.
+ * @enum RecentItemRole
+ * @brief Identifies values exposed by `RecentItemsModel` independently of the item domain.
  */
-enum class RecentFileRole
+enum class RecentItemRole
 {
-    FilePath,      ///< Absolute file path (QString).
-    FileName,      ///< File name derived from path (QString).
-    AppName,       ///< Application name associated to the file (QString).
-    LastOpened,    ///< Last-opened timestamp (QDateTime).
-    Availability,  ///< LocalFileAvailability represented as an integer.
-    StatusText,    ///< Localized description of the current availability.
-    Enabled        ///< Whether the entry can currently be activated.
+    Identity,       ///< Stable application-owned identity stored as QVariant.
+    Title,          ///< Primary user-facing text stored as QString.
+    SecondaryText,  ///< Supporting user-facing text stored as QString.
+    LastUsed,       ///< Most recent usage timestamp stored as QDateTime.
+    Icon,           ///< Optional presentation icon stored as QIcon.
+    Enabled,        ///< Whether the item can currently be activated.
+    StatusText,     ///< Optional short status description.
+    ToolTip         ///< Optional detailed explanatory text.
 };
 
 /**
- * @enum RecentSessionRole
- * @brief Stable roles for recent session items.
+ * @brief Converts a semantic recent-item role to its stable Qt role id.
+ * @param role Recent-item role to convert.
+ * @return Stable role id based on `Qt::UserRole`.
  */
-enum class RecentSessionRole
+[[nodiscard]] constexpr auto to_role_id(RecentItemRole role) -> int
 {
-    Name,        ///< Human-readable session name (QString).
-    LastOpened,  ///< Last-opened timestamp; falls back to created_at if missing (QDateTime).
-    Id           ///< Unique session identifier (QString).
-};
-
-/**
- * @brief Converts a file-domain role to a stable integer role id.
- * @param role The RecentFileRole value.
- * @return Stable role id based on Qt::UserRole + offset.
- */
-[[nodiscard]] constexpr auto to_role_id(RecentFileRole role) -> int
-{
-    int role_id = Qt::UserRole + 199;
+    int role_id = Qt::UserRole + 108;
     switch (role)
     {
-    case RecentFileRole::FilePath:
+    case RecentItemRole::Identity:
         role_id = Qt::UserRole + 101;
         break;
-    case RecentFileRole::FileName:
+    case RecentItemRole::Title:
         role_id = Qt::UserRole + 102;
         break;
-    case RecentFileRole::AppName:
+    case RecentItemRole::SecondaryText:
         role_id = Qt::UserRole + 103;
         break;
-    case RecentFileRole::LastOpened:
+    case RecentItemRole::LastUsed:
         role_id = Qt::UserRole + 104;
         break;
-    case RecentFileRole::Availability:
+    case RecentItemRole::Icon:
         role_id = Qt::UserRole + 105;
         break;
-    case RecentFileRole::StatusText:
+    case RecentItemRole::Enabled:
         role_id = Qt::UserRole + 106;
         break;
-    case RecentFileRole::Enabled:
+    case RecentItemRole::StatusText:
         role_id = Qt::UserRole + 107;
+        break;
+    case RecentItemRole::ToolTip:
+        role_id = Qt::UserRole + 108;
         break;
     }
     return role_id;
-}
-
-/**
- * @brief Converts a session-domain role to a stable integer role id.
- * @param role The RecentSessionRole value.
- * @return Stable role id based on Qt::UserRole + offset.
- */
-[[nodiscard]] constexpr auto to_role_id(RecentSessionRole role) -> int
-{
-    // Reserve a contiguous block for session roles
-    switch (role)
-    {
-    case RecentSessionRole::Name:
-        return Qt::UserRole + 201;
-    case RecentSessionRole::LastOpened:
-        return Qt::UserRole + 202;
-    case RecentSessionRole::Id:
-        return Qt::UserRole + 203;
-    }
-    return Qt::UserRole + 299;  // fallback, should never be reached
 }

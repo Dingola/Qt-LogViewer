@@ -73,10 +73,10 @@ auto StartPageWidget::set_recent_files_model(QAbstractItemModel* model) -> void
 
     if (auto* lv = qobject_cast<QListView*>(ui->recentFilesView); lv != nullptr)
     {
-        auto* delegate = new RecentItemDelegate(to_role_id(RecentFileRole::FileName),
-                                                to_role_id(RecentFileRole::FilePath),
-                                                to_role_id(RecentFileRole::LastOpened), lv);
-        delegate->set_status_role(to_role_id(RecentFileRole::StatusText));
+        auto* delegate = new RecentItemDelegate(to_role_id(RecentItemRole::Title),
+                                                to_role_id(RecentItemRole::SecondaryText),
+                                                to_role_id(RecentItemRole::LastUsed), lv);
+        delegate->set_status_role(to_role_id(RecentItemRole::StatusText));
         lv->setItemDelegate(delegate);
         lv->setUniformItemSizes(true);
         lv->setSpacing(4);
@@ -133,9 +133,9 @@ auto StartPageWidget::set_recent_sessions_model(QAbstractItemModel* model) -> vo
 
     if (auto* lv = qobject_cast<QListView*>(ui->recentSessionsView); lv != nullptr)
     {
-        lv->setItemDelegate(new RecentItemDelegate(to_role_id(RecentSessionRole::Name),
-                                                   to_role_id(RecentSessionRole::Id),
-                                                   to_role_id(RecentSessionRole::LastOpened), lv));
+        lv->setItemDelegate(new RecentItemDelegate(to_role_id(RecentItemRole::Title),
+                                                   to_role_id(RecentItemRole::SecondaryText),
+                                                   to_role_id(RecentItemRole::LastUsed), lv));
         lv->setUniformItemSizes(true);
         lv->setSpacing(4);
     }
@@ -250,7 +250,7 @@ auto StartPageWidget::show_recent_file_context_menu(const QPoint& position) -> v
     if (selected_action == remove_action && model != nullptr)
     {
         const QString file_path =
-            model->data(context_index, to_role_id(RecentFileRole::FilePath)).toString();
+            model->data(context_index, to_role_id(RecentItemRole::Identity)).toString();
         if (!file_path.isEmpty())
         {
             emit remove_recent_file_requested(file_path);
@@ -358,7 +358,7 @@ auto StartPageWidget::setup_connections() -> void
             ui->recentFilesView->model() != nullptr)
         {
             const QVariant file_path_data =
-                ui->recentFilesView->model()->data(index, to_role_id(RecentFileRole::FilePath));
+                ui->recentFilesView->model()->data(index, to_role_id(RecentItemRole::Identity));
             const QString file_path = file_path_data.toString();
             if (!file_path.isEmpty())
             {
@@ -367,19 +367,19 @@ auto StartPageWidget::setup_connections() -> void
         }
     });
 
-    connect(
-        ui->recentSessionsView, &QListView::doubleClicked, this, [this](const QModelIndex& index) {
-            if (index.isValid() && ui->recentSessionsView->model() != nullptr)
-            {
-                const QVariant session_id_data =
-                    ui->recentSessionsView->model()->data(index, to_role_id(RecentSessionRole::Id));
-                const QString session_id = session_id_data.toString();
-                if (!session_id.isEmpty())
+    connect(ui->recentSessionsView, &QListView::doubleClicked, this,
+            [this](const QModelIndex& index) {
+                if (index.isValid() && ui->recentSessionsView->model() != nullptr)
                 {
-                    emit open_recent_session_requested(session_id);
+                    const QVariant session_id_data = ui->recentSessionsView->model()->data(
+                        index, to_role_id(RecentItemRole::Identity));
+                    const QString session_id = session_id_data.toString();
+                    if (!session_id.isEmpty())
+                    {
+                        emit open_recent_session_requested(session_id);
+                    }
                 }
-            }
-        });
+            });
 }
 
 /**
@@ -400,7 +400,7 @@ auto StartPageWidget::get_selected_recent_file_path() const -> QString
             if (index.isValid() && index.flags().testFlag(Qt::ItemIsEnabled) &&
                 view->model() != nullptr)
             {
-                const QVariant v = view->model()->data(index, to_role_id(RecentFileRole::FilePath));
+                const QVariant v = view->model()->data(index, to_role_id(RecentItemRole::Identity));
                 path = v.toString();
             }
         }
@@ -426,7 +426,7 @@ auto StartPageWidget::get_selected_recent_session_id() const -> QString
             const QModelIndex index = sel->currentIndex();
             if (index.isValid() && view->model() != nullptr)
             {
-                const QVariant v = view->model()->data(index, to_role_id(RecentSessionRole::Id));
+                const QVariant v = view->model()->data(index, to_role_id(RecentItemRole::Identity));
                 id = v.toString();
             }
         }

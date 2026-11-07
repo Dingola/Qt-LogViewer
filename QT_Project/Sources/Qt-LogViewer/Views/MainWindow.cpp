@@ -763,7 +763,7 @@ auto MainWindow::handle_remove_unavailable_recent_files() -> void
             if (!index.flags().testFlag(Qt::ItemIsEnabled))
             {
                 const QString file_path =
-                    index.data(to_role_id(RecentFileRole::FilePath)).toString();
+                    index.data(to_role_id(RecentItemRole::Identity)).toString();
                 if (!file_path.isEmpty())
                 {
                     unavailable_paths.insert(file_path);
