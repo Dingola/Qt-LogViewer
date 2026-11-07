@@ -15,7 +15,7 @@
 
 #include "Qt-LogViewer/Models/RecentItemsModel.h"
 #include "Qt-LogViewer/Models/RecentRoles.h"
-#include "Qt-LogViewer/Views/Shared/RecentItemsMenuBinder.h"
+#include "QtWidgetsCommonLib/ItemViews/RecentItemsMenuBinder.h"
 
 namespace
 {
@@ -70,7 +70,7 @@ MainMenuController::MainMenuController(QMenuBar* menu_bar, RecentItemsModel* rec
     {
         initialize_menu();
 
-        const RecentItemsMenuRoles roles{
+        const QtWidgetsCommonLib::RecentItemsMenuRoles roles{
             to_role_id(RecentItemRole::Title),   to_role_id(RecentItemRole::Identity),
             to_role_id(RecentItemRole::Enabled), to_role_id(RecentItemRole::ToolTip),
             to_role_id(RecentItemRole::Icon),    to_role_id(RecentItemRole::StatusText)};
@@ -79,21 +79,23 @@ MainMenuController::MainMenuController(QMenuBar* menu_bar, RecentItemsModel* rec
         connect(m_action_remove_unavailable_files, &QAction::triggered, this,
                 &MainMenuController::remove_unavailable_recent_files_requested);
 
-        m_recent_files_binder =
-            new RecentItemsMenuBinder(m_recent_files_menu, recent_files_model, roles, this);
+        m_recent_files_binder = new QtWidgetsCommonLib::RecentItemsMenuBinder(
+            m_recent_files_menu, recent_files_model, roles, this);
         m_recent_files_binder->set_footer_actions({m_action_remove_unavailable_files});
-        connect(m_recent_files_binder, &RecentItemsMenuBinder::item_activated, this,
-                [this](const QVariant& identity) {
+        connect(m_recent_files_binder, &QtWidgetsCommonLib::RecentItemsMenuBinder::item_activated,
+                this, [this](const QVariant& identity) {
                     emit open_recent_file_requested(identity.toString());
                 });
-        connect(m_recent_files_binder, &RecentItemsMenuBinder::clear_requested, this,
-                &MainMenuController::clear_recent_files_requested);
-        connect(m_recent_files_binder, &RecentItemsMenuBinder::contains_disabled_items_changed,
+        connect(m_recent_files_binder, &QtWidgetsCommonLib::RecentItemsMenuBinder::clear_requested,
+                this, &MainMenuController::clear_recent_files_requested);
+        connect(m_recent_files_binder,
+                &QtWidgetsCommonLib::RecentItemsMenuBinder::contains_disabled_items_changed,
                 m_action_remove_unavailable_files, &QAction::setEnabled);
 
-        m_recent_sessions_binder =
-            new RecentItemsMenuBinder(m_recent_sessions_menu, recent_sessions_model, roles, this);
-        connect(m_recent_sessions_binder, &RecentItemsMenuBinder::item_activated, this,
+        m_recent_sessions_binder = new QtWidgetsCommonLib::RecentItemsMenuBinder(
+            m_recent_sessions_menu, recent_sessions_model, roles, this);
+        connect(m_recent_sessions_binder,
+                &QtWidgetsCommonLib::RecentItemsMenuBinder::item_activated, this,
                 [this](const QVariant& identity) {
                     emit open_recent_session_requested(identity.toString());
                 });

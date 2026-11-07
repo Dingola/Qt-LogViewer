@@ -10,8 +10,8 @@
 #include <QVector>
 
 #include "Qt-LogViewer/Models/RecentItemPresentationMapper.h"
-#include "QtCommonLib/FileSystem/LocalFileStatus.h"
 #include "Qt-LogViewer/Services/SessionManager.h"
+#include "QtCommonLib/FileSystem/LocalFileStatus.h"
 
 /**
  * @brief Constructs the adapter and binds its models to SessionManager updates.

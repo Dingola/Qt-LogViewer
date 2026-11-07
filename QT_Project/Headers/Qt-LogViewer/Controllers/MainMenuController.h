@@ -7,7 +7,11 @@ class QAction;
 class QMenu;
 class QMenuBar;
 class RecentItemsModel;
+
+namespace QtWidgetsCommonLib
+{
 class RecentItemsMenuBinder;
+}
 
 /**
  * @file MainMenuController.h
@@ -118,6 +122,6 @@ class MainMenuController: public QObject
         QAction* m_action_about = nullptr;
         QAction* m_action_about_qt = nullptr;
         QAction* m_action_remove_unavailable_files = nullptr;
-        RecentItemsMenuBinder* m_recent_files_binder = nullptr;
-        RecentItemsMenuBinder* m_recent_sessions_binder = nullptr;
+        QtWidgetsCommonLib::RecentItemsMenuBinder* m_recent_files_binder = nullptr;
+        QtWidgetsCommonLib::RecentItemsMenuBinder* m_recent_sessions_binder = nullptr;
 };
