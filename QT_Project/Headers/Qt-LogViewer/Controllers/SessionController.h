@@ -131,6 +131,15 @@ class SessionController: public QObject
         auto remove_recent_log_files(const QSet<QString>& file_paths) -> int;
 
         /**
+         * @brief Relinks one recent-file metadata entry to a user-selected replacement.
+         * @param previous_file_path Persisted path identifying the unavailable entry.
+         * @param replacement_file_path New local path selected by the user.
+         * @return True when the recent-file entry was updated.
+         */
+        auto relink_recent_log_file(const QString& previous_file_path,
+                                    const QString& replacement_file_path) -> bool;
+
+        /**
          * @brief Saves the current session state.
          */
         auto save_current_session() -> void;

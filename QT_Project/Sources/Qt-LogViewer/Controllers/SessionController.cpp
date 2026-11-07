@@ -23,6 +23,7 @@
 #include "Qt-LogViewer/Models/LogFileTreeModel.h"
 #include "Qt-LogViewer/Models/LogModel.h"
 #include "Qt-LogViewer/Models/SessionTypes.h"
+#include "Qt-LogViewer/Services/LocalFileStatus.h"
 #include "Qt-LogViewer/Services/LogHistoryService.h"
 #include "Qt-LogViewer/Services/SessionCodec.h"
 #include "Qt-LogViewer/Services/SessionManager.h"
@@ -302,6 +303,27 @@ auto SessionController::remove_recent_log_files(const QSet<QString>& file_paths)
         removed_count = m_session_manager->remove_recent_log_files(file_paths);
     }
     return removed_count;
+}
+
+/**
+ * @brief Relinks one recent-file metadata entry to a user-selected replacement.
+ * @param previous_file_path Persisted path identifying the unavailable entry.
+ * @param replacement_file_path New local path selected by the user.
+ * @return True when the recent-file entry was updated.
+ */
+auto SessionController::relink_recent_log_file(const QString& previous_file_path,
+                                               const QString& replacement_file_path) -> bool
+{
+    bool changed = false;
+    const QtCommonLib::LocalFileStatus replacement_status =
+        QtCommonLib::inspect_local_file(replacement_file_path);
+    if (m_session_manager != nullptr &&
+        replacement_status.availability == QtCommonLib::LocalFileAvailability::Available)
+    {
+        changed = m_session_manager->relink_recent_log_file(previous_file_path,
+                                                            replacement_status.normalized_path);
+    }
+    return changed;
 }
 
 /**

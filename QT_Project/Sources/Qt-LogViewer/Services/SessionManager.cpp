@@ -193,6 +193,51 @@ auto SessionManager::remove_recent_log_files(const QSet<QString>& file_paths) ->
 }
 
 /**
+ * @brief Replaces the path of one recent-file record without modifying saved sessions.
+ * @param previous_file_path Persisted path identifying the unavailable entry.
+ * @param replacement_file_path New local path selected by the user.
+ * @return True when recent-file metadata was changed and persisted.
+ */
+auto SessionManager::relink_recent_log_file(const QString& previous_file_path,
+                                            const QString& replacement_file_path) -> bool
+{
+    int previous_index = -1;
+    int replacement_index = -1;
+    for (int index = 0; index < m_recent_files.size(); ++index)
+    {
+        const RecentLogFileRecord& record = m_recent_files.at(index);
+        if (record.file_path == previous_file_path)
+        {
+            previous_index = index;
+        }
+        if (record.file_path == replacement_file_path)
+        {
+            replacement_index = index;
+        }
+    }
+
+    bool changed = previous_index >= 0 && !replacement_file_path.isEmpty() &&
+                   previous_file_path != replacement_file_path;
+    if (changed && replacement_index >= 0)
+    {
+        m_recent_files.removeAt(previous_index);
+    }
+    else if (changed)
+    {
+        m_recent_files[previous_index].file_path = replacement_file_path;
+    }
+
+    if (changed)
+    {
+        sort_recent_files_mru();
+        persist_root(make_root_from_current());
+        emit recent_log_files_changed(m_recent_files);
+    }
+
+    return changed;
+}
+
+/**
  * @brief Returns the list of recent sessions metadata.
  * @return Vector of RecentSessionRecord.
  */

@@ -73,6 +73,12 @@ class StartPageWidget: public QWidget
          */
         void remove_recent_file_requested(const QString& file_path);
 
+        /**
+         * @brief User requested to locate a replacement for an unavailable recent file.
+         * @param file_path Persisted path identifying the unavailable entry.
+         */
+        void relink_recent_file_requested(const QString& file_path);
+
         /** @brief User requested removal of all currently unavailable recent-file entries. */
         void remove_unavailable_recent_files_requested();
 

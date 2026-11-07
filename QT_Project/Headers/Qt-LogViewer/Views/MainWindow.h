@@ -338,6 +338,12 @@ class MainWindow: public QtWidgetsCommonLib::AppMainWindow
          */
         auto handle_remove_recent_file(const QString& file_path) -> void;
 
+        /**
+         * @brief Selects and validates a replacement for an unavailable recent file.
+         * @param file_path Persisted path identifying the unavailable entry.
+         */
+        auto handle_relink_recent_file(const QString& file_path) -> void;
+
         /** @brief Confirms and removes all currently unavailable recent-file metadata entries. */
         auto handle_remove_unavailable_recent_files() -> void;
 

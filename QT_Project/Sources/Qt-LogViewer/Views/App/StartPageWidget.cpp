@@ -259,6 +259,9 @@ auto StartPageWidget::show_recent_file_context_menu(const QPoint& position) -> v
     }
 
     QMenu menu(this);
+    QAction* locate_action = menu.addAction(tr("Locate File..."));
+    locate_action->setEnabled(context_index.isValid() &&
+                              !context_index.flags().testFlag(Qt::ItemIsEnabled));
     QAction* remove_action = menu.addAction(tr("Remove from Recent Files"));
     remove_action->setEnabled(context_index.isValid());
     QAction* cleanup_action = menu.addAction(tr("Remove Unavailable Files..."));
@@ -270,7 +273,16 @@ auto StartPageWidget::show_recent_file_context_menu(const QPoint& position) -> v
         selected_action = menu.exec(view->viewport()->mapToGlobal(position));
     }
 
-    if (selected_action == remove_action && model != nullptr)
+    if (selected_action == locate_action && model != nullptr)
+    {
+        const QString file_path =
+            model->data(context_index, to_role_id(RecentItemRole::Identity)).toString();
+        if (!file_path.isEmpty())
+        {
+            emit relink_recent_file_requested(file_path);
+        }
+    }
+    else if (selected_action == remove_action && model != nullptr)
     {
         const QString file_path =
             model->data(context_index, to_role_id(RecentItemRole::Identity)).toString();

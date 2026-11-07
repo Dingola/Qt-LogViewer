@@ -1,6 +1,7 @@
 #include "Qt-LogViewer/Controllers/SessionControllerTest.h"
 
 #include <QDateTime>
+#include <QDir>
 #include <QFileInfo>
 #include <QJsonDocument>
 #include <QSignalSpy>
@@ -97,6 +98,43 @@ TEST_F(SessionControllerTest, RemovesRecentFilesWithoutDeletingSourcesOrSessions
     const QVector<RecentLogFileRecord> persisted = reloaded_manager.get_recent_log_files();
     ASSERT_EQ(persisted.size(), 1);
     EXPECT_EQ(persisted.constFirst().file_path, second_file);
+    EXPECT_EQ(reloaded_manager.get_recent_sessions().size(), 1);
+}
+
+/** @test Relinks recent metadata while preserving its attributes and saved sessions. */
+TEST_F(SessionControllerTest, RelinksRecentFileWithoutChangingSavedSessions)
+{
+    const QString missing_file =
+        QDir(m_sessions_directory).filePath(QStringLiteral("old-location/moved.log"));
+    const QString replacement_file =
+        m_file_system.write_text_file(QStringLiteral("moved.log"), QStringLiteral("replacement"));
+    m_session_controller->add_recent_log_file(
+        LogFileInfo(missing_file, QStringLiteral("Original application")));
+    m_session_manager->upsert_session_metadata(QStringLiteral("session-id"),
+                                               QStringLiteral("Saved session"), false);
+    m_session_manager->save_session(
+        QStringLiteral("session-id"),
+        QJsonObject{{QStringLiteral("name"), QStringLiteral("Saved session")}});
+    const QString session_file_path =
+        m_session_repository->get_session_file_path(QStringLiteral("session-id"));
+    QSignalSpy recent_files_spy(m_session_manager, &SessionManager::recent_log_files_changed);
+
+    const bool changed =
+        m_session_controller->relink_recent_log_file(missing_file, replacement_file);
+
+    EXPECT_TRUE(changed);
+    EXPECT_EQ(recent_files_spy.count(), 1);
+    const QVector<RecentLogFileRecord> recent_files = m_session_manager->get_recent_log_files();
+    ASSERT_EQ(recent_files.size(), 1);
+    EXPECT_EQ(recent_files.constFirst().file_path, replacement_file);
+    EXPECT_EQ(recent_files.constFirst().app_name, QStringLiteral("Original application"));
+    EXPECT_TRUE(QFileInfo::exists(session_file_path));
+
+    SessionManager reloaded_manager(m_session_repository);
+    reloaded_manager.initialize_from_storage();
+    const QVector<RecentLogFileRecord> persisted_files = reloaded_manager.get_recent_log_files();
+    ASSERT_EQ(persisted_files.size(), 1);
+    EXPECT_EQ(persisted_files.constFirst().file_path, replacement_file);
     EXPECT_EQ(reloaded_manager.get_recent_sessions().size(), 1);
 }
 

@@ -39,6 +39,7 @@
 #include "Qt-LogViewer/Presenters/LogViewPresenter.h"
 #include "Qt-LogViewer/Presenters/LogViewerDropOverlayPresenter.h"
 #include "Qt-LogViewer/Presenters/WorkspacePresenter.h"
+#include "Qt-LogViewer/Services/LocalFileStatus.h"
 #include "Qt-LogViewer/Services/LogHistoryService.h"
 #include "Qt-LogViewer/Services/LogPreviewService.h"
 #include "Qt-LogViewer/Services/LogViewerDropValidator.h"
@@ -169,6 +170,8 @@ MainWindow::MainWindow(LogViewerSettings& settings, FileCatalogController& catal
             &MainWindow::handle_clear_recent_files);
     connect(start_page, &StartPageWidget::remove_recent_file_requested, this,
             &MainWindow::handle_remove_recent_file);
+    connect(start_page, &StartPageWidget::relink_recent_file_requested, this,
+            &MainWindow::handle_relink_recent_file);
     connect(start_page, &StartPageWidget::remove_unavailable_recent_files_requested, this,
             &MainWindow::handle_remove_unavailable_recent_files);
     connect(start_page, &StartPageWidget::open_session_requested, this,
@@ -732,6 +735,51 @@ auto MainWindow::handle_remove_recent_file(const QString& file_path) -> void
     if (!file_path.isEmpty())
     {
         m_session_controller->remove_recent_log_files(QSet<QString>{file_path});
+    }
+}
+
+/**
+ * @brief Selects and validates a replacement for an unavailable recent file.
+ * @param file_path Persisted path identifying the unavailable entry.
+ */
+auto MainWindow::handle_relink_recent_file(const QString& file_path) -> void
+{
+    const QFileInfo previous_file(file_path);
+    const QString replacement_path =
+        QFileDialog::getOpenFileName(this, tr("Locate Log File"), previous_file.absolutePath(),
+                                     tr("Log Files (*.log *.txt);;All Files (*)"));
+    bool accepted = !replacement_path.isEmpty();
+    QString normalized_replacement_path = replacement_path;
+
+    if (accepted)
+    {
+        const QtCommonLib::LocalFileStatus replacement_status =
+            QtCommonLib::inspect_local_file(replacement_path);
+        accepted = replacement_status.availability == QtCommonLib::LocalFileAvailability::Available;
+        normalized_replacement_path = replacement_status.normalized_path;
+        if (!accepted)
+        {
+            QMessageBox::warning(this, tr("Locate Log File"),
+                                 tr("The selected replacement is not a readable local file."));
+        }
+    }
+
+    if (accepted &&
+        previous_file.fileName().compare(QFileInfo(normalized_replacement_path).fileName(),
+                                         Qt::CaseInsensitive) != 0)
+    {
+        const QMessageBox::StandardButton answer = QMessageBox::question(
+            this, tr("Use Different File Name?"),
+            tr("The selected file has a different name.\n\nMissing: %1\nReplacement: %2\n\n"
+               "Use this replacement anyway?")
+                .arg(previous_file.fileName(), QFileInfo(normalized_replacement_path).fileName()),
+            QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel);
+        accepted = answer == QMessageBox::Yes;
+    }
+
+    if (accepted)
+    {
+        m_session_controller->relink_recent_log_file(file_path, normalized_replacement_path);
     }
 }
 
