@@ -61,7 +61,7 @@ void WorkspacePresenterTest::SetUp()
     m_central_stack->addWidget(new QWidget());
     m_central_stack->addWidget(new QWidget());
     m_session_controller = new SessionController(
-        nullptr, m_runtime->catalog().get_model(), m_profile, &m_runtime->catalog(),
+        nullptr, nullptr, m_runtime->catalog().get_model(), m_profile, &m_runtime->catalog(),
         &m_runtime->views(), &m_runtime->filters(), &m_runtime->history(), &m_runtime->pages(),
         &m_runtime->queries(), &m_runtime->imports(), &m_runtime->lifecycle(),
         &m_runtime->live_tailing());

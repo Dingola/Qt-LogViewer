@@ -2,10 +2,8 @@
 
 #include <QJsonObject>
 #include <QObject>
-#include <QSet>
 #include <QVector>
 
-#include "Qt-LogViewer/Models/LogFileInfo.h"
 #include "Qt-LogViewer/Models/SessionTypes.h"
 
 // Forward declarations for types used as pointers/references
@@ -13,16 +11,14 @@ class SessionRepository;
 
 /**
  * @file SessionManager.h
- * @brief Declares the SessionManager service that manages recent files and session metadata
- *        in-memory and delegates JSON persistence to SessionRepository.
+ * @brief Declares the SessionManager service that manages session metadata and persistence.
  *
  * Responsibilities:
- * - Maintain an in-memory list of recent files and recent sessions.
- * - Provide high-level APIs to add/clear recent files and to list/load/save/delete sessions.
+ * - Maintain an in-memory list of recent sessions.
+ * - Provide high-level APIs to list, load, save, and delete sessions.
  * - Emit signals so UI models (menus/start page) can update.
  *
  * Data records:
- * - RecentLogFileRecord: { file_path, app_name, last_opened }
  * - RecentSessionRecord: { id, name, created_at, last_opened }
  *
  * Persistence is handled via SessionRepository under AppConfigLocation.
@@ -40,49 +36,11 @@ class SessionManager: public QObject
         explicit SessionManager(SessionRepository* repository, QObject* parent = nullptr);
 
         /**
-         * @brief Loads state from repository into memory (recent files and sessions).
+         * @brief Loads session state from the repository into memory.
          *
          * Safe to call multiple times; replaces the in-memory lists.
          */
         auto initialize_from_storage() -> void;
-
-        /**
-         * @brief Returns the list of recent log files.
-         * @return Vector of RecentLogFileRecord.
-         */
-        [[nodiscard]] auto get_recent_log_files() const -> QVector<RecentLogFileRecord>;
-
-        /**
-         * @brief Adds/updates a recent log file record and persists the root document.
-         * @param file_info LogFileInfo from which file_path and app_name are derived.
-         *
-         * Behavior:
-         * - Deduplicate by file_path (case-sensitive as stored).
-         * - Update last_opened to current time.
-         * - Move updated item to front (most recent first).
-         */
-        auto add_recent_log_file(const LogFileInfo& file_info) -> void;
-
-        /**
-         * @brief Clears the recent log files list and persists the change.
-         */
-        auto clear_recent_log_files() -> void;
-
-        /**
-         * @brief Removes matching entries from recent-file metadata without deleting source files.
-         * @param file_paths Persisted recent-file paths to remove.
-         * @return Number of metadata entries removed and persisted.
-         */
-        auto remove_recent_log_files(const QSet<QString>& file_paths) -> int;
-
-        /**
-         * @brief Replaces the path of one recent-file record without modifying saved sessions.
-         * @param previous_file_path Persisted path identifying the unavailable entry.
-         * @param replacement_file_path New local path selected by the user.
-         * @return True when recent-file metadata was changed and persisted.
-         */
-        auto relink_recent_log_file(const QString& previous_file_path,
-                                    const QString& replacement_file_path) -> bool;
 
         /**
          * @brief Returns the list of recent sessions metadata.
@@ -180,12 +138,6 @@ class SessionManager: public QObject
 
     signals:
         /**
-         * @brief Emitted when the recent log files list changes.
-         * @param items Current recent log files.
-         */
-        void recent_log_files_changed(const QVector<RecentLogFileRecord>& items);
-
-        /**
          * @brief Emitted when the recent sessions list changes.
          * @param items Current recent sessions.
          */
@@ -193,26 +145,11 @@ class SessionManager: public QObject
 
     private:
         /**
-         * @brief Converts a RecentLogFileRecord to JSON.
-         * @param rec The record to convert.
-         * @return QJsonObject representation.
-         */
-        [[nodiscard]] static auto to_json(const RecentLogFileRecord& rec) -> QJsonObject;
-
-        /**
          * @brief Converts a RecentSessionRecord to JSON.
          * @param rec The record to convert.
          * @return QJsonObject representation.
          */
         [[nodiscard]] static auto to_json(const RecentSessionRecord& rec) -> QJsonObject;
-
-        /**
-         * @brief Parses a recent file record from JSON.
-         * @param obj The JSON object.
-         * @return RecentLogFileRecord value.
-         */
-        [[nodiscard]] static auto from_json_recent_file(const QJsonObject& obj)
-            -> RecentLogFileRecord;
 
         /**
          * @brief Parses a recent session record from JSON.
@@ -241,12 +178,6 @@ class SessionManager: public QObject
         auto load_root() const -> QJsonObject;
 
         /**
-         * @brief Sort recent files by last_opened descending, then by file_name ascending as
-         * tiebreaker.
-         */
-        auto sort_recent_files_mru() -> void;
-
-        /**
          * @brief Sort recent sessions by last_opened or created_at (most recent first).
          */
         auto sort_recent_sessions_mru() -> void;
@@ -264,15 +195,8 @@ class SessionManager: public QObject
          */
         auto upsert_recent_session(const RecentSessionRecord& rec) -> void;
 
-        /**
-         * @brief Upserts a recent file record into the list (dedupe by file_path).
-         * @param rec The record to upsert.
-         */
-        auto upsert_recent_file(const RecentLogFileRecord& rec) -> void;
-
     private:
         SessionRepository* m_repository{nullptr};
-        QVector<RecentLogFileRecord> m_recent_files;
         QVector<RecentSessionRecord> m_recent_sessions;
         QString m_last_session_id;
         QString m_current_session_id;

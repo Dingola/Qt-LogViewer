@@ -1,6 +1,6 @@
 /**
  * @file RecentItemsAdapterTest.cpp
- * @brief Verifies mapping of SessionManager updates into recent-item models.
+ * @brief Verifies mapping of domain-service updates into recent-item models.
  */
 
 #include "Qt-LogViewer/Adapters/RecentItemsAdapterTest.h"
@@ -13,6 +13,7 @@
 
 #include "Qt-LogViewer/Adapters/RecentItemsAdapter.h"
 #include "Qt-LogViewer/Models/LogFileInfo.h"
+#include "Qt-LogViewer/Services/RecentFilesService.h"
 #include "Qt-LogViewer/Services/SessionManager.h"
 #include "Qt-LogViewer/Services/SessionRepository.h"
 #include "QtWidgetsCommonLib/RecentItems/RecentFilesMenuController.h"
@@ -41,7 +42,7 @@ namespace
 }  // namespace
 
 /**
- * @brief Ensures both recent models follow records emitted by SessionManager.
+ * @brief Ensures both recent models follow records emitted by their domain services.
  */
 TEST_F(RecentItemsAdapterTest, SynchronizesModelsWhenRecentItemsChange)
 {
@@ -49,7 +50,8 @@ TEST_F(RecentItemsAdapterTest, SynchronizesModelsWhenRecentItemsChange)
         m_file_system.write_text_file(QStringLiteral("adapter.marker"), QString());
     SessionRepository repository(QFileInfo(marker_path).absolutePath());
     SessionManager session_manager(&repository);
-    RecentItemsAdapter adapter(&session_manager);
+    RecentFilesService recent_files_service(&repository);
+    RecentItemsAdapter adapter(&recent_files_service, &session_manager);
     QMenu files_menu;
     QtWidgetsCommonLib::RecentFilesMenuController files_controller(&files_menu);
     adapter.bind_recent_files_controller(&files_controller);
@@ -66,7 +68,7 @@ TEST_F(RecentItemsAdapterTest, SynchronizesModelsWhenRecentItemsChange)
          QDateTime::fromString(QStringLiteral("2026-09-28T09:00:00"), Qt::ISODate),
          QDateTime::fromString(QStringLiteral("2026-09-28T10:00:00"), Qt::ISODate)}};
 
-    emit session_manager.recent_log_files_changed(files);
+    emit recent_files_service.recent_log_files_changed(files);
     emit session_manager.recent_sessions_changed(sessions);
 
     ASSERT_EQ(files_model->rowCount(), 1);
@@ -87,13 +89,14 @@ TEST_F(RecentItemsAdapterTest, RefreshesTransientRecentFileAvailability)
         m_file_system.write_text_file(QStringLiteral("recent.log"), QStringLiteral("entry"));
     SessionRepository repository(QFileInfo(file_path).absolutePath());
     SessionManager session_manager(&repository);
-    RecentItemsAdapter adapter(&session_manager);
+    RecentFilesService recent_files_service(&repository);
+    RecentItemsAdapter adapter(&recent_files_service, &session_manager);
     QMenu files_menu;
     QtWidgetsCommonLib::RecentFilesMenuController files_controller(&files_menu);
     files_controller.set_texts(make_recent_file_texts());
     adapter.bind_recent_files_controller(&files_controller);
 
-    session_manager.add_recent_log_file(LogFileInfo(file_path));
+    recent_files_service.add_recent_log_file(LogFileInfo(file_path));
 
     QAbstractItemModel* model = files_controller.model();
     ASSERT_EQ(model->rowCount(), 1);

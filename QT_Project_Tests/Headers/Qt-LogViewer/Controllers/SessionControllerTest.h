@@ -7,6 +7,7 @@
 
 class SessionController;
 class SessionManager;
+class RecentFilesService;
 class SessionRepository;
 class TestLogRuntime;
 
@@ -37,6 +38,10 @@ class SessionControllerTest: public ::testing::Test
         SessionRepository* m_session_repository{nullptr};
         /** @brief Session manager backed by the isolated test repository. */
         SessionManager* m_session_manager{nullptr};
+        /**
+         * @brief Recent-file service backed by the isolated test repository.
+         */
+        RecentFilesService* m_recent_files_service{nullptr};
         /** @brief Isolated directory containing persisted session documents. */
         QString m_sessions_directory;
         /** @brief Isolated filesystem owning source and session files created by each test. */

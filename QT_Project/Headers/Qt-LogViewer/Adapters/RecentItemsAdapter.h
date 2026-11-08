@@ -7,6 +7,7 @@
 #include "QtWidgetsCommonLib/RecentItems/RecentItemsModel.h"
 
 class SessionManager;
+class RecentFilesService;
 namespace QtWidgetsCommonLib
 {
 class RecentFilesMenuController;
@@ -19,10 +20,10 @@ class RecentFilesMenuController;
 
 /**
  * @class RecentItemsAdapter
- * @brief Keeps recent-file and recent-session models synchronized with SessionManager.
+ * @brief Keeps recent-file and recent-session presentation synchronized with domain services.
  *
  * The adapter owns the recent-session model and synchronizes recent-file paths with an attached
- * menu facade. It does not own the injected session manager or facade.
+ * menu facade. It does not own the injected domain services or facade.
  */
 class RecentItemsAdapter final: public QObject
 {
@@ -31,10 +32,12 @@ class RecentItemsAdapter final: public QObject
     public:
         /**
          * @brief Constructs the adapter and initializes recent-session presentation data.
-         * @param session_manager Source of recent-file and recent-session records.
+         * @param recent_files_service Source of recent-file records.
+         * @param session_manager Source of recent-session records.
          * @param parent Optional QObject parent.
          */
-        explicit RecentItemsAdapter(SessionManager* session_manager, QObject* parent = nullptr);
+        explicit RecentItemsAdapter(RecentFilesService* recent_files_service,
+                                    SessionManager* session_manager, QObject* parent = nullptr);
 
         /**
          * @brief Attaches the high-level recent-files facade and supplies current persisted paths.
@@ -68,6 +71,7 @@ class RecentItemsAdapter final: public QObject
         auto update_recent_sessions(const QVector<RecentSessionRecord>& records) -> void;
 
     private:
+        RecentFilesService* m_recent_files_service{nullptr};
         SessionManager* m_session_manager{nullptr};
         QtWidgetsCommonLib::RecentFilesMenuController* m_recent_files_controller{nullptr};
         QtWidgetsCommonLib::RecentItemsModel m_recent_sessions_model;

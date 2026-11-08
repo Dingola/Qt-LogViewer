@@ -11,6 +11,7 @@
 #include <QVector>
 
 #include "Qt-LogViewer/Models/RecentItemPresentationMapper.h"
+#include "Qt-LogViewer/Services/RecentFilesService.h"
 #include "Qt-LogViewer/Services/SessionManager.h"
 #include "QtWidgetsCommonLib/RecentItems/RecentFilesMenuController.h"
 
@@ -22,15 +23,19 @@ using QtWidgetsCommonLib::RecentItemsModel;
 
 /**
  * @brief Constructs the adapter and binds its models to SessionManager updates.
- * @param session_manager Source of recent-file and recent-session records.
+ * @param recent_files_service Source of recent-file records.
+ * @param session_manager Source of recent-session records.
  * @param parent Optional QObject parent.
  */
-RecentItemsAdapter::RecentItemsAdapter(SessionManager* session_manager, QObject* parent)
-    : QObject(parent), m_session_manager(session_manager)
+RecentItemsAdapter::RecentItemsAdapter(RecentFilesService* recent_files_service,
+                                       SessionManager* session_manager, QObject* parent)
+    : QObject(parent),
+      m_recent_files_service(recent_files_service),
+      m_session_manager(session_manager)
 {
     update_recent_sessions(m_session_manager->get_recent_sessions());
 
-    connect(m_session_manager, &SessionManager::recent_log_files_changed, this,
+    connect(m_recent_files_service, &RecentFilesService::recent_log_files_changed, this,
             [this](const QVector<RecentLogFileRecord>& records) { update_recent_files(records); });
     connect(
         m_session_manager, &SessionManager::recent_sessions_changed, this,
@@ -61,7 +66,7 @@ auto RecentItemsAdapter::bind_recent_files_controller(
     {
         connect(m_recent_files_controller, &QObject::destroyed, this,
                 [this] { m_recent_files_controller = nullptr; });
-        update_recent_files(m_session_manager->get_recent_log_files());
+        update_recent_files(m_recent_files_service->get_recent_log_files());
     }
 }
 

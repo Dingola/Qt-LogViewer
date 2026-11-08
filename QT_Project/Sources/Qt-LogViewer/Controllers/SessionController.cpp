@@ -24,9 +24,9 @@
 #include "Qt-LogViewer/Models/LogModel.h"
 #include "Qt-LogViewer/Models/SessionTypes.h"
 #include "Qt-LogViewer/Services/LogHistoryService.h"
+#include "Qt-LogViewer/Services/RecentFilesService.h"
 #include "Qt-LogViewer/Services/SessionCodec.h"
 #include "Qt-LogViewer/Services/SessionManager.h"
-#include "QtCommonLib/FileSystem/LocalFileStatus.h"
 
 namespace
 {
@@ -97,6 +97,7 @@ namespace
 /**
  * @brief Constructs a SessionController.
  * @param session_manager The session manager for persistence.
+ * @param recent_files_service Recent-file domain service.
  * @param tree_model The tree model for UI representation.
  * @param default_profile Fallback profile for legacy session files.
  * @param catalog File catalog used for session explorer entries.
@@ -110,16 +111,16 @@ namespace
  * @param live_tailing Per-view live-tailing state.
  * @param parent Optional QObject parent.
  */
-SessionController::SessionController(SessionManager* session_manager, LogFileTreeModel* tree_model,
-                                     const LogParsingProfile& default_profile,
-                                     FileCatalogController* catalog, ViewRegistry* views,
-                                     FilterCoordinator* filters, LogHistoryService* history,
-                                     LogPageCoordinator* pages, LogQueryController* queries,
-                                     LogImportCoordinator* imports,
-                                     ViewLifecycleCoordinator* lifecycle,
-                                     LiveTailingCoordinator* live_tailing, QObject* parent)
+SessionController::SessionController(
+    SessionManager* session_manager, RecentFilesService* recent_files_service,
+    LogFileTreeModel* tree_model, const LogParsingProfile& default_profile,
+    FileCatalogController* catalog, ViewRegistry* views, FilterCoordinator* filters,
+    LogHistoryService* history, LogPageCoordinator* pages, LogQueryController* queries,
+    LogImportCoordinator* imports, ViewLifecycleCoordinator* lifecycle,
+    LiveTailingCoordinator* live_tailing, QObject* parent)
     : QObject(parent),
       m_session_manager(session_manager),
+      m_recent_files_service(recent_files_service),
       m_tree_model(tree_model),
       m_default_profile(default_profile),
       m_catalog(catalog),
@@ -273,9 +274,9 @@ auto SessionController::add_file_to_session(const QString& session_id,
  */
 auto SessionController::add_recent_log_file(const LogFileInfo& file_info) -> void
 {
-    if (m_session_manager != nullptr)
+    if (m_recent_files_service != nullptr)
     {
-        m_session_manager->add_recent_log_file(file_info);
+        m_recent_files_service->add_recent_log_file(file_info);
     }
 }
 
@@ -284,9 +285,9 @@ auto SessionController::add_recent_log_file(const LogFileInfo& file_info) -> voi
  */
 auto SessionController::clear_recent_log_files() -> void
 {
-    if (m_session_manager != nullptr)
+    if (m_recent_files_service != nullptr)
     {
-        m_session_manager->clear_recent_log_files();
+        m_recent_files_service->clear_recent_log_files();
     }
 }
 
@@ -298,9 +299,9 @@ auto SessionController::clear_recent_log_files() -> void
 auto SessionController::remove_recent_log_files(const QSet<QString>& file_paths) -> int
 {
     int removed_count = 0;
-    if (m_session_manager != nullptr)
+    if (m_recent_files_service != nullptr)
     {
-        removed_count = m_session_manager->remove_recent_log_files(file_paths);
+        removed_count = m_recent_files_service->remove_recent_log_files(file_paths);
     }
     return removed_count;
 }
@@ -315,13 +316,10 @@ auto SessionController::relink_recent_log_file(const QString& previous_file_path
                                                const QString& replacement_file_path) -> bool
 {
     bool changed = false;
-    const QtCommonLib::LocalFileStatus replacement_status =
-        QtCommonLib::inspect_local_file(replacement_file_path);
-    if (m_session_manager != nullptr &&
-        replacement_status.availability == QtCommonLib::LocalFileAvailability::Available)
+    if (m_recent_files_service != nullptr)
     {
-        changed = m_session_manager->relink_recent_log_file(previous_file_path,
-                                                            replacement_status.normalized_path);
+        changed = m_recent_files_service->relink_recent_log_file(previous_file_path,
+                                                                 replacement_file_path);
     }
     return changed;
 }

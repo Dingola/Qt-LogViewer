@@ -11,14 +11,8 @@ namespace
 {
 // Root JSON keys (stable, not localized).
 constexpr auto k_schema_version_key = "schema_version";
-constexpr auto k_recent_files_key = "recent_files";
 constexpr auto k_recent_sessions_key = "recent_sessions";
 constexpr auto k_last_session_id_key = "last_session_id";
-
-// Recent files fields.
-constexpr auto k_file_path_key = "file_path";
-constexpr auto k_app_name_key = "app_name";
-constexpr auto k_last_opened_key = "last_opened";
 
 // Recent sessions fields.
 constexpr auto k_session_id_key = "id";
@@ -61,7 +55,6 @@ auto to_iso_datetime(const QDateTime& dt) -> QString
 SessionManager::SessionManager(SessionRepository* repository, QObject* parent)
     : QObject(parent),
       m_repository(repository),
-      m_recent_files(),
       m_recent_sessions(),
       m_last_session_id(),
       m_current_session_id()
@@ -76,20 +69,9 @@ auto SessionManager::initialize_from_storage() -> void
 {
     const QJsonObject root = load_root();
 
-    m_recent_files.clear();
     m_recent_sessions.clear();
     m_last_session_id.clear();
     m_current_session_id.clear();
-
-    if (root.contains(QString::fromLatin1(k_recent_files_key)))
-    {
-        const QJsonArray arr = root.value(QString::fromLatin1(k_recent_files_key)).toArray();
-        for (const auto& v: arr)
-        {
-            const QJsonObject obj = v.toObject();
-            m_recent_files.append(from_json_recent_file(obj));
-        }
-    }
 
     if (root.contains(QString::fromLatin1(k_recent_sessions_key)))
     {
@@ -106,135 +88,9 @@ auto SessionManager::initialize_from_storage() -> void
         m_last_session_id = root.value(QString::fromLatin1(k_last_session_id_key)).toString();
     }
 
-    sort_recent_files_mru();
     sort_recent_sessions_mru();
 
-    emit recent_log_files_changed(m_recent_files);
     emit recent_sessions_changed(m_recent_sessions);
-}
-
-/**
- * @brief Returns the list of recent log files.
- * @return Vector of RecentLogFileRecord.
- */
-auto SessionManager::get_recent_log_files() const -> QVector<RecentLogFileRecord>
-{
-    QVector<RecentLogFileRecord> items = m_recent_files;
-    return items;
-}
-
-/**
- * @brief Adds/updates a recent log file record and persists the root document.
- * @param file_info LogFileInfo from which file_path and app_name are derived.
- *
- * Behavior:
- * - Deduplicate by file_path (case-sensitive as stored).
- * - Update last_opened to current time.
- * - Move updated item to front (most recent first).
- */
-auto SessionManager::add_recent_log_file(const LogFileInfo& file_info) -> void
-{
-    RecentLogFileRecord rec{file_info.get_file_path(), file_info.get_app_name(),
-                            QDateTime::currentDateTime()};
-    upsert_recent_file(rec);
-    sort_recent_files_mru();
-
-    const QJsonObject root = make_root_from_current();
-    persist_root(root);
-
-    emit recent_log_files_changed(m_recent_files);
-}
-
-/**
- * @brief Clears the recent log files list and persists the change.
- */
-auto SessionManager::clear_recent_log_files() -> void
-{
-    m_recent_files.clear();
-
-    const QJsonObject root = make_root_from_current();
-    persist_root(root);
-
-    emit recent_log_files_changed(m_recent_files);
-}
-
-/**
- * @brief Removes matching entries from recent-file metadata without deleting source files.
- * @param file_paths Persisted recent-file paths to remove.
- * @return Number of metadata entries removed and persisted.
- */
-auto SessionManager::remove_recent_log_files(const QSet<QString>& file_paths) -> int
-{
-    QVector<RecentLogFileRecord> retained_files;
-    retained_files.reserve(m_recent_files.size());
-    int removed_count = 0;
-
-    for (const RecentLogFileRecord& record: m_recent_files)
-    {
-        if (file_paths.contains(record.file_path))
-        {
-            ++removed_count;
-        }
-        else
-        {
-            retained_files.append(record);
-        }
-    }
-
-    if (removed_count > 0)
-    {
-        m_recent_files = std::move(retained_files);
-        const QJsonObject root = make_root_from_current();
-        persist_root(root);
-        emit recent_log_files_changed(m_recent_files);
-    }
-
-    return removed_count;
-}
-
-/**
- * @brief Replaces the path of one recent-file record without modifying saved sessions.
- * @param previous_file_path Persisted path identifying the unavailable entry.
- * @param replacement_file_path New local path selected by the user.
- * @return True when recent-file metadata was changed and persisted.
- */
-auto SessionManager::relink_recent_log_file(const QString& previous_file_path,
-                                            const QString& replacement_file_path) -> bool
-{
-    int previous_index = -1;
-    int replacement_index = -1;
-    for (int index = 0; index < m_recent_files.size(); ++index)
-    {
-        const RecentLogFileRecord& record = m_recent_files.at(index);
-        if (record.file_path == previous_file_path)
-        {
-            previous_index = index;
-        }
-        if (record.file_path == replacement_file_path)
-        {
-            replacement_index = index;
-        }
-    }
-
-    bool changed = previous_index >= 0 && !replacement_file_path.isEmpty() &&
-                   previous_file_path != replacement_file_path;
-    if (changed && replacement_index >= 0)
-    {
-        m_recent_files.removeAt(previous_index);
-    }
-    else if (changed)
-    {
-        m_recent_files[previous_index].file_path = replacement_file_path;
-    }
-
-    if (changed)
-    {
-        sort_recent_files_mru();
-        persist_root(make_root_from_current());
-        emit recent_log_files_changed(m_recent_files);
-    }
-
-    return changed;
 }
 
 /**
@@ -440,21 +296,6 @@ auto SessionManager::set_last_session_id(const QString& session_id) -> void
 }
 
 /**
- * @brief Converts a RecentLogFileRecord to JSON.
- * @param rec The record to convert.
- * @return QJsonObject representation.
- */
-auto SessionManager::to_json(const RecentLogFileRecord& rec) -> QJsonObject
-{
-    QJsonObject obj;
-    obj.insert(QString::fromLatin1(k_file_path_key), rec.file_path);
-    obj.insert(QString::fromLatin1(k_app_name_key), rec.app_name);
-    obj.insert(QString::fromLatin1(k_last_opened_key),
-               rec.last_opened.isValid() ? to_iso_datetime(rec.last_opened) : QString());
-    return obj;
-}
-
-/**
  * @brief Converts a RecentSessionRecord to JSON.
  * @param rec The record to convert.
  * @return QJsonObject representation.
@@ -469,21 +310,6 @@ auto SessionManager::to_json(const RecentSessionRecord& rec) -> QJsonObject
     obj.insert(QString::fromLatin1(k_session_last_opened_key),
                rec.last_opened.isValid() ? to_iso_datetime(rec.last_opened) : QString());
     return obj;
-}
-
-/**
- * @brief Parses a recent file record from JSON.
- * @param obj The JSON object.
- * @return RecentLogFileRecord value.
- */
-auto SessionManager::from_json_recent_file(const QJsonObject& obj) -> RecentLogFileRecord
-{
-    RecentLogFileRecord rec;
-    rec.file_path = obj.value(QString::fromLatin1(k_file_path_key)).toString();
-    rec.app_name = obj.value(QString::fromLatin1(k_app_name_key)).toString();
-    rec.last_opened =
-        parse_iso_datetime(obj.value(QString::fromLatin1(k_last_opened_key)).toString());
-    return rec;
 }
 
 /**
@@ -509,18 +335,10 @@ auto SessionManager::from_json_recent_session(const QJsonObject& obj) -> RecentS
  */
 auto SessionManager::make_root_from_current() const -> QJsonObject
 {
-    QJsonObject root;
+    QJsonObject root = load_root();
 
     // Inject schema_version (kept by repository on save, but provide here for clarity).
     root.insert(QString::fromLatin1(k_schema_version_key), SessionRepository::get_schema_version());
-
-    // Recent files
-    QJsonArray files;
-    for (const auto& rf: m_recent_files)
-    {
-        files.append(to_json(rf));
-    }
-    root.insert(QString::fromLatin1(k_recent_files_key), files);
 
     // Recent sessions
     QJsonArray sessions;
@@ -565,23 +383,6 @@ auto SessionManager::load_root() const -> QJsonObject
     }
 
     return root;
-}
-
-/**
- * @brief Sort recent files by last_opened descending, then by file_name ascending as tiebreaker.
- */
-auto SessionManager::sort_recent_files_mru() -> void
-{
-    std::sort(m_recent_files.begin(), m_recent_files.end(),
-              [](const RecentLogFileRecord& a, const RecentLogFileRecord& b) {
-                  if (a.last_opened == b.last_opened)
-                  {
-                      const QString af = QFileInfo(a.file_path).fileName();
-                      const QString bf = QFileInfo(b.file_path).fileName();
-                      return af.localeAwareCompare(bf) < 0;
-                  }
-                  return a.last_opened > b.last_opened;
-              });
 }
 
 /**
@@ -649,28 +450,5 @@ auto SessionManager::upsert_recent_session(const RecentSessionRecord& rec) -> vo
     if (!exists)
     {
         m_recent_sessions.append(rec);
-    }
-}
-
-/**
- * @brief Upserts a recent file record into the list (dedupe by file_path).
- * @param rec The record to upsert.
- */
-auto SessionManager::upsert_recent_file(const RecentLogFileRecord& rec) -> void
-{
-    bool exists = false;
-
-    for (auto& f: m_recent_files)
-    {
-        if (f.file_path == rec.file_path)
-        {
-            f = rec;
-            exists = true;
-        }
-    }
-
-    if (!exists)
-    {
-        m_recent_files.append(rec);
     }
 }

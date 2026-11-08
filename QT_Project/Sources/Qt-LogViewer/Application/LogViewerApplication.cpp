@@ -27,6 +27,7 @@
 #include "Qt-LogViewer/Services/LogParsingProfile.h"
 #include "Qt-LogViewer/Services/LogPreviewService.h"
 #include "Qt-LogViewer/Services/LogViewerSettings.h"
+#include "Qt-LogViewer/Services/RecentFilesService.h"
 #include "Qt-LogViewer/Services/SessionManager.h"
 #include "Qt-LogViewer/Services/SessionRepository.h"
 #include "Qt-LogViewer/Views/MainWindow.h"
@@ -45,6 +46,19 @@ namespace
     auto session_manager = std::make_unique<SessionManager>(repository);
     session_manager->initialize_from_storage();
     return session_manager;
+}
+
+/**
+ * @brief Creates and initializes the recent-file service from the shared index repository.
+ * @param repository Persistence repository owned by the application composition.
+ * @return Initialized recent-file service.
+ */
+[[nodiscard]] auto create_recent_files_service(SessionRepository* repository)
+    -> std::unique_ptr<RecentFilesService>
+{
+    auto service = std::make_unique<RecentFilesService>(repository);
+    service->initialize_from_storage();
+    return service;
 }
 }  // namespace
 
@@ -79,11 +93,12 @@ class LogViewerApplication::Implementation final
                                &m_history, &m_history_writer, &m_pages, &m_queries),
               m_preview(m_default_profile),
               m_session_manager(create_session_manager(&m_session_repository)),
-              m_recent_items_adapter(m_session_manager.get()),
-              m_session_controller(m_session_manager.get(), m_catalog.get_model(),
-                                   m_default_profile, &m_catalog, &m_views, &m_filters, &m_history,
-                                   &m_pages, &m_queries, &m_imports, &m_view_lifecycle,
-                                   &m_live_tailing),
+              m_recent_files_service(create_recent_files_service(&m_session_repository)),
+              m_recent_items_adapter(m_recent_files_service.get(), m_session_manager.get()),
+              m_session_controller(m_session_manager.get(), m_recent_files_service.get(),
+                                   m_catalog.get_model(), m_default_profile, &m_catalog, &m_views,
+                                   &m_filters, &m_history, &m_pages, &m_queries, &m_imports,
+                                   &m_view_lifecycle, &m_live_tailing),
               m_main_window(new MainWindow(settings, m_catalog, m_views, m_filters, m_history,
                                            m_pages, m_queries, m_imports, m_view_lifecycle,
                                            m_live_tailing, m_preview, *m_session_manager,
@@ -124,6 +139,7 @@ class LogViewerApplication::Implementation final
         LogPreviewService m_preview;
         SessionRepository m_session_repository;
         std::unique_ptr<SessionManager> m_session_manager;
+        std::unique_ptr<RecentFilesService> m_recent_files_service;
         RecentItemsAdapter m_recent_items_adapter;
         SessionController m_session_controller;
         MainWindow* m_main_window{nullptr};  ///< Owned by the outer application window.

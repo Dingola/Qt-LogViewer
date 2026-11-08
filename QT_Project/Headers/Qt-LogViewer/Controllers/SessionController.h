@@ -24,6 +24,7 @@ class LogQueryController;
 class ViewLifecycleCoordinator;
 class ViewRegistry;
 class SessionManager;
+class RecentFilesService;
 class LogFileTreeModel;
 
 /**
@@ -46,6 +47,7 @@ class SessionController: public QObject
         /**
          * @brief Constructs a SessionController.
          * @param session_manager The session manager for persistence.
+         * @param recent_files_service Recent-file domain service.
          * @param tree_model The tree model for UI representation.
          * @param default_profile Fallback profile for legacy session files.
          * @param catalog File catalog used for session explorer entries.
@@ -59,14 +61,13 @@ class SessionController: public QObject
          * @param live_tailing Per-view live-tailing state.
          * @param parent Optional QObject parent.
          */
-        explicit SessionController(SessionManager* session_manager, LogFileTreeModel* tree_model,
-                                   const LogParsingProfile& default_profile,
-                                   FileCatalogController* catalog, ViewRegistry* views,
-                                   FilterCoordinator* filters, LogHistoryService* history,
-                                   LogPageCoordinator* pages, LogQueryController* queries,
-                                   LogImportCoordinator* imports,
-                                   ViewLifecycleCoordinator* lifecycle,
-                                   LiveTailingCoordinator* live_tailing, QObject* parent = nullptr);
+        explicit SessionController(
+            SessionManager* session_manager, RecentFilesService* recent_files_service,
+            LogFileTreeModel* tree_model, const LogParsingProfile& default_profile,
+            FileCatalogController* catalog, ViewRegistry* views, FilterCoordinator* filters,
+            LogHistoryService* history, LogPageCoordinator* pages, LogQueryController* queries,
+            LogImportCoordinator* imports, ViewLifecycleCoordinator* lifecycle,
+            LiveTailingCoordinator* live_tailing, QObject* parent = nullptr);
 
         /**
          * @brief Ensures a current session exists, creating one if necessary.
@@ -383,6 +384,7 @@ class SessionController: public QObject
         };
 
         SessionManager* m_session_manager{nullptr};
+        RecentFilesService* m_recent_files_service{nullptr};
         LogFileTreeModel* m_tree_model{nullptr};
         LogParsingProfile m_default_profile;
         FileCatalogController* m_catalog{nullptr};
