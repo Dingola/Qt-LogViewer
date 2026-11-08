@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Qt-LogViewer/Models/RecentItemPresentation.h"
 #include "Qt-LogViewer/Models/SessionTypes.h"
+#include "QtWidgetsCommonLib/RecentItems/RecentItemPresentation.h"
 
 namespace QtCommonLib
 {
@@ -29,12 +29,13 @@ namespace RecentItemPresentationMapper
  */
 [[nodiscard]] auto from_recent_log_file(const RecentLogFileRecord& record,
                                         const QtCommonLib::LocalFileStatus& file_status)
-    -> RecentItemPresentation;
+    -> QtWidgetsCommonLib::RecentItemPresentation;
 
 /**
  * @brief Maps a recent session record.
  * @param record Persisted recent session record.
  * @return Presentation values for the recent session.
  */
-[[nodiscard]] auto from_recent_session(const RecentSessionRecord& record) -> RecentItemPresentation;
+[[nodiscard]] auto from_recent_session(const RecentSessionRecord& record)
+    -> QtWidgetsCommonLib::RecentItemPresentation;
 }  // namespace RecentItemPresentationMapper

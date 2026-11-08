@@ -6,12 +6,11 @@
 class QAction;
 class QMenu;
 class QMenuBar;
-class RecentItemsModel;
-
 namespace QtWidgetsCommonLib
 {
 class RecentItemsMenuBinder;
-}
+class RecentItemsModel;
+}  // namespace QtWidgetsCommonLib
 
 /**
  * @file MainMenuController.h
@@ -35,8 +34,9 @@ class MainMenuController: public QObject
          * @param recent_sessions_model Model containing recent sessions.
          * @param parent Optional QObject parent.
          */
-        explicit MainMenuController(QMenuBar* menu_bar, RecentItemsModel* recent_files_model,
-                                    RecentItemsModel* recent_sessions_model,
+        explicit MainMenuController(QMenuBar* menu_bar,
+                                    QtWidgetsCommonLib::RecentItemsModel* recent_files_model,
+                                    QtWidgetsCommonLib::RecentItemsModel* recent_sessions_model,
                                     QObject* parent = nullptr);
 
         /**

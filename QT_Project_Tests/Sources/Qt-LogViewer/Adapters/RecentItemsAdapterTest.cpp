@@ -12,9 +12,14 @@
 
 #include "Qt-LogViewer/Adapters/RecentItemsAdapter.h"
 #include "Qt-LogViewer/Models/LogFileInfo.h"
-#include "Qt-LogViewer/Models/RecentRoles.h"
 #include "Qt-LogViewer/Services/SessionManager.h"
 #include "Qt-LogViewer/Services/SessionRepository.h"
+#include "QtWidgetsCommonLib/RecentItems/RecentItemsModel.h"
+#include "QtWidgetsCommonLib/RecentItems/RecentRoles.h"
+
+using QtWidgetsCommonLib::RecentItemRole;
+using QtWidgetsCommonLib::RecentItemsModel;
+using QtWidgetsCommonLib::to_role_id;
 
 /**
  * @brief Ensures both recent models follow records emitted by SessionManager.

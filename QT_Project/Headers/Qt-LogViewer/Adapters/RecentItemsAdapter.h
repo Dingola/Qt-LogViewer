@@ -3,8 +3,8 @@
 #include <QObject>
 #include <QVector>
 
-#include "Qt-LogViewer/Models/RecentItemsModel.h"
 #include "Qt-LogViewer/Models/SessionTypes.h"
+#include "QtWidgetsCommonLib/RecentItems/RecentItemsModel.h"
 
 class SessionManager;
 
@@ -35,13 +35,13 @@ class RecentItemsAdapter final: public QObject
          * @brief Returns the synchronized recent-files model.
          * @return Model owned by this adapter.
          */
-        [[nodiscard]] auto get_recent_files_model() -> RecentItemsModel*;
+        [[nodiscard]] auto get_recent_files_model() -> QtWidgetsCommonLib::RecentItemsModel*;
 
         /**
          * @brief Returns the synchronized recent-sessions model.
          * @return Model owned by this adapter.
          */
-        [[nodiscard]] auto get_recent_sessions_model() -> RecentItemsModel*;
+        [[nodiscard]] auto get_recent_sessions_model() -> QtWidgetsCommonLib::RecentItemsModel*;
 
         /**
          * @brief Re-evaluates transient file availability for all persisted recent-file records.
@@ -63,6 +63,6 @@ class RecentItemsAdapter final: public QObject
 
     private:
         SessionManager* m_session_manager{nullptr};
-        RecentItemsModel m_recent_files_model;
-        RecentItemsModel m_recent_sessions_model;
+        QtWidgetsCommonLib::RecentItemsModel m_recent_files_model;
+        QtWidgetsCommonLib::RecentItemsModel m_recent_sessions_model;
 };

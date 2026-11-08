@@ -10,6 +10,8 @@
 
 #include "QtCommonLib/FileSystem/LocalFileStatus.h"
 
+using QtWidgetsCommonLib::RecentItemPresentation;
+
 namespace
 {
 constexpr auto k_translation_context = "RecentListSchemas";

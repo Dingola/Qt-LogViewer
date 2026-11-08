@@ -19,13 +19,15 @@
 #include <QStackedWidget>
 #include <QVariant>
 
-#include "Qt-LogViewer/Models/RecentRoles.h"
 #include "Qt-LogViewer/Views/Shared/EmptyStateWidget.h"
-#include "QtWidgetsCommonLib/ItemViews/TwoLineItemDelegate.h"
+#include "QtWidgetsCommonLib/ItemViews/Delegates/TwoLineItemDelegate.h"
+#include "QtWidgetsCommonLib/RecentItems/RecentRoles.h"
 #include "ui_StartPageWidget.h"
 
 namespace
 {
+using QtWidgetsCommonLib::RecentItemRole;
+using QtWidgetsCommonLib::to_role_id;
 using QtWidgetsCommonLib::TwoLineItemDelegate;
 
 constexpr int k_brand_icon_size_px = 40;

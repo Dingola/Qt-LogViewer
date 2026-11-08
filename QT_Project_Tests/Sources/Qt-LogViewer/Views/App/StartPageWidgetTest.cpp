@@ -7,9 +7,12 @@
 #include <QSignalSpy>
 #include <QStackedWidget>
 
-#include "Qt-LogViewer/Models/RecentItemsModel.h"
 #include "Qt-LogViewer/Views/App/StartPageWidget.h"
 #include "Qt-LogViewer/Views/Shared/EmptyStateWidget.h"
+#include "QtWidgetsCommonLib/RecentItems/RecentItemsModel.h"
+
+using QtWidgetsCommonLib::RecentItemPresentation;
+using QtWidgetsCommonLib::RecentItemsModel;
 
 /**
  * @file StartPageWidgetTest.cpp

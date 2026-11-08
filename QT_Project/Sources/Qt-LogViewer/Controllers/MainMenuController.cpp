@@ -13,9 +13,13 @@
 #include <QModelIndex>
 #include <QVariant>
 
-#include "Qt-LogViewer/Models/RecentItemsModel.h"
-#include "Qt-LogViewer/Models/RecentRoles.h"
-#include "QtWidgetsCommonLib/ItemViews/RecentItemsMenuBinder.h"
+#include "QtWidgetsCommonLib/RecentItems/RecentItemsMenuBinder.h"
+#include "QtWidgetsCommonLib/RecentItems/RecentItemsModel.h"
+#include "QtWidgetsCommonLib/RecentItems/RecentRoles.h"
+
+using QtWidgetsCommonLib::RecentItemRole;
+using QtWidgetsCommonLib::RecentItemsModel;
+using QtWidgetsCommonLib::to_role_id;
 
 namespace
 {

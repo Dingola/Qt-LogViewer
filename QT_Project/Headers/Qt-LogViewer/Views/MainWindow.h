@@ -45,11 +45,15 @@ class LogImportTabPresenter;
 class LogViewerDropOverlayPresenter;
 class WorkspacePresenter;
 class LogFileInfo;
-class RecentItemsModel;
 class SessionManager;
 class RecentItemsAdapter;
 class LogFileExplorer;
 class LogLevelPieChartWidget;
+
+namespace QtWidgetsCommonLib
+{
+class RecentItemsModel;
+}
 class LogDataStatusWidget;
 class LogDetailsWidget;
 class LogViewWidget;
@@ -425,9 +429,9 @@ class MainWindow: public QtWidgetsCommonLib::AppMainWindow
         SessionManager* m_session_manager = nullptr;
         RecentItemsAdapter* m_recent_items_adapter = nullptr;
 
-        // Unified, schema-driven recent models
-        RecentItemsModel* m_recent_files_model = nullptr;
-        RecentItemsModel* m_recent_sessions_model = nullptr;
+        // Shared recent-item presentation models
+        QtWidgetsCommonLib::RecentItemsModel* m_recent_files_model = nullptr;
+        QtWidgetsCommonLib::RecentItemsModel* m_recent_sessions_model = nullptr;
 
         SessionController* m_session_controller{nullptr};
 

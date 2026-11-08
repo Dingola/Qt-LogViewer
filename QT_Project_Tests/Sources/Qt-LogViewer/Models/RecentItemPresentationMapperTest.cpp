@@ -11,6 +11,8 @@
 #include "Qt-LogViewer/Models/RecentItemPresentationMapper.h"
 #include "QtCommonLib/FileSystem/LocalFileStatus.h"
 
+using QtWidgetsCommonLib::RecentItemPresentation;
+
 /**
  * @brief Verifies that a log-file domain record maps to the shared presentation contract.
  */

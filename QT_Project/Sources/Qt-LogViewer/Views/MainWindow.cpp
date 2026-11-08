@@ -35,8 +35,6 @@
 #include "Qt-LogViewer/Controllers/ViewRegistry.h"
 #include "Qt-LogViewer/Controllers/WorkspaceShortcutController.h"
 #include "Qt-LogViewer/Models/LogFileTreeModel.h"
-#include "Qt-LogViewer/Models/RecentItemsModel.h"
-#include "Qt-LogViewer/Models/RecentRoles.h"
 #include "Qt-LogViewer/Presenters/LogImportTabPresenter.h"
 #include "Qt-LogViewer/Presenters/LogViewPresenter.h"
 #include "Qt-LogViewer/Presenters/LogViewerDropOverlayPresenter.h"
@@ -59,6 +57,8 @@
 #include "Qt-LogViewer/Views/Shared/DropOverlayWidget.h"
 #include "Qt-LogViewer/Views/Shared/EmptyStateWidget.h"
 #include "QtCommonLib/FileSystem/LocalFileStatus.h"
+#include "QtWidgetsCommonLib/RecentItems/RecentItemsModel.h"
+#include "QtWidgetsCommonLib/RecentItems/RecentRoles.h"
 #include "QtWidgetsCommonLib/Services/Translator.h"
 #include "QtWidgetsCommonLib/Utils/StylesheetLoader.h"
 #include "ui_MainWindow.h"
@@ -72,6 +72,8 @@ constexpr auto k_untitled_session_text = QT_TRANSLATE_NOOP("MainWindow", "Untitl
 }  // namespace
 
 using QtWidgetsCommonLib::AppMainWindow;
+using QtWidgetsCommonLib::RecentItemRole;
+using QtWidgetsCommonLib::to_role_id;
 
 /**
  * @brief Constructs a MainWindow object.

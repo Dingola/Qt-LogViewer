@@ -13,6 +13,12 @@
 #include "Qt-LogViewer/Services/SessionManager.h"
 #include "QtCommonLib/FileSystem/LocalFileStatus.h"
 
+namespace
+{
+using QtWidgetsCommonLib::RecentItemPresentation;
+using QtWidgetsCommonLib::RecentItemsModel;
+}  // namespace
+
 /**
  * @brief Constructs the adapter and binds its models to SessionManager updates.
  * @param session_manager Source of recent-file and recent-session records.
