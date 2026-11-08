@@ -21,11 +21,13 @@
 
 #include "Qt-LogViewer/Models/RecentRoles.h"
 #include "Qt-LogViewer/Views/Shared/EmptyStateWidget.h"
-#include "Qt-LogViewer/Views/Shared/TwoLineItemDelegate.h"
+#include "QtWidgetsCommonLib/ItemViews/TwoLineItemDelegate.h"
 #include "ui_StartPageWidget.h"
 
 namespace
 {
+using QtWidgetsCommonLib::TwoLineItemDelegate;
+
 constexpr int k_brand_icon_size_px = 40;
 constexpr auto k_brand_icon_path = ":/Resources/Icons/App/AppIcon.svg";
 
