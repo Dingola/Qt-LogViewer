@@ -18,6 +18,7 @@ class QDropEvent;
 class QCloseEvent;
 class QEvent;
 class QStackedWidget;
+class QAbstractItemModel;
 
 // Forward declarations for project types used as pointers/references
 namespace Ui
@@ -430,7 +431,7 @@ class MainWindow: public QtWidgetsCommonLib::AppMainWindow
         RecentItemsAdapter* m_recent_items_adapter = nullptr;
 
         // Shared recent-item presentation models
-        QtWidgetsCommonLib::RecentItemsModel* m_recent_files_model = nullptr;
+        QAbstractItemModel* m_recent_files_model = nullptr;
         QtWidgetsCommonLib::RecentItemsModel* m_recent_sessions_model = nullptr;
 
         SessionController* m_session_controller{nullptr};

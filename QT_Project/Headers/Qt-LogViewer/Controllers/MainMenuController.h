@@ -9,6 +9,7 @@ class QMenuBar;
 namespace QtWidgetsCommonLib
 {
 class RecentItemsMenuBinder;
+class RecentFilesMenuController;
 class RecentItemsModel;
 }  // namespace QtWidgetsCommonLib
 
@@ -30,14 +31,19 @@ class MainMenuController: public QObject
         /**
          * @brief Constructs a MainMenuController.
          * @param menu_bar The menu bar to populate.
-         * @param recent_files_model Model containing recent log files.
          * @param recent_sessions_model Model containing recent sessions.
          * @param parent Optional QObject parent.
          */
         explicit MainMenuController(QMenuBar* menu_bar,
-                                    QtWidgetsCommonLib::RecentItemsModel* recent_files_model,
                                     QtWidgetsCommonLib::RecentItemsModel* recent_sessions_model,
                                     QObject* parent = nullptr);
+
+        /**
+         * @brief Returns the owned high-level recent-files facade.
+         * @return Facade bound to the recent-files submenu.
+         */
+        [[nodiscard]] auto recent_files_controller()
+            -> QtWidgetsCommonLib::RecentFilesMenuController*;
 
         /**
          * @brief Retranslates all persistent menu and action texts in place.
@@ -53,9 +59,6 @@ class MainMenuController: public QObject
         auto add_view_action(QAction* action) -> void;
 
     signals:
-        /** @brief Emitted before recent files are shown so transient status can be refreshed. */
-        void recent_files_refresh_requested();
-
         /** @brief Emitted when opening log files is requested. */
         void open_log_file_requested();
 
@@ -121,7 +124,6 @@ class MainMenuController: public QObject
         QAction* m_action_settings = nullptr;
         QAction* m_action_about = nullptr;
         QAction* m_action_about_qt = nullptr;
-        QAction* m_action_remove_unavailable_files = nullptr;
-        QtWidgetsCommonLib::RecentItemsMenuBinder* m_recent_files_binder = nullptr;
+        QtWidgetsCommonLib::RecentFilesMenuController* m_recent_files_controller = nullptr;
         QtWidgetsCommonLib::RecentItemsMenuBinder* m_recent_sessions_binder = nullptr;
 };

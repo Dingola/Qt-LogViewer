@@ -9,32 +9,8 @@
 #include <QString>
 
 #include "Qt-LogViewer/Models/RecentItemPresentationMapper.h"
-#include "QtCommonLib/FileSystem/LocalFileStatus.h"
 
 using QtWidgetsCommonLib::RecentItemPresentation;
-
-/**
- * @brief Verifies that a log-file domain record maps to the shared presentation contract.
- */
-TEST_F(RecentItemPresentationMapperTest, MapsRecentLogFileToPresentationItem)
-{
-    const RecentLogFileRecord record{
-        QStringLiteral("C:/logs/app/test.log"), QStringLiteral("LogViewerApp"),
-        QDateTime::fromString(QStringLiteral("2025-03-10T12:34:56"), Qt::ISODate)};
-    const QtCommonLib::LocalFileStatus status{record.file_path, record.file_path,
-                                              QtCommonLib::LocalFileAvailability::Missing};
-
-    const RecentItemPresentation presentation =
-        RecentItemPresentationMapper::from_recent_log_file(record, status);
-
-    EXPECT_EQ(presentation.identity.toString(), record.file_path);
-    EXPECT_EQ(presentation.title, QStringLiteral("test.log"));
-    EXPECT_EQ(presentation.secondary_text, record.file_path);
-    EXPECT_EQ(presentation.last_used, record.last_opened);
-    EXPECT_FALSE(presentation.enabled);
-    EXPECT_FALSE(presentation.status_text.isEmpty());
-    EXPECT_TRUE(presentation.tooltip.contains(record.file_path));
-}
 
 /**
  * @brief Verifies that a session record maps to the same presentation contract.

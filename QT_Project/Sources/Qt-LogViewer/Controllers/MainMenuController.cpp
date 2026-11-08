@@ -12,7 +12,9 @@
 #include <QMenuBar>
 #include <QModelIndex>
 #include <QVariant>
+#include <utility>
 
+#include "QtWidgetsCommonLib/RecentItems/RecentFilesMenuController.h"
 #include "QtWidgetsCommonLib/RecentItems/RecentItemsMenuBinder.h"
 #include "QtWidgetsCommonLib/RecentItems/RecentItemsModel.h"
 #include "QtWidgetsCommonLib/RecentItems/RecentRoles.h"
@@ -47,6 +49,17 @@ constexpr auto k_unavailable_recent_file_text = QT_TRANSLATE_NOOP("MainMenuContr
 constexpr auto k_no_recent_files_text = QT_TRANSLATE_NOOP("MainMenuController", "No Recent Files");
 constexpr auto k_no_recent_sessions_text =
     QT_TRANSLATE_NOOP("MainMenuController", "No Recent Sessions");
+constexpr auto k_recent_list_translation_context = "RecentListSchemas";
+constexpr auto k_available_text = QT_TRANSLATE_NOOP("RecentListSchemas", "Available");
+constexpr auto k_missing_text = QT_TRANSLATE_NOOP("RecentListSchemas", "File not found");
+constexpr auto k_not_readable_text = QT_TRANSLATE_NOOP("RecentListSchemas", "File is not readable");
+constexpr auto k_not_a_file_text = QT_TRANSLATE_NOOP("RecentListSchemas", "Path is not a file");
+constexpr auto k_available_tooltip = QT_TRANSLATE_NOOP("RecentListSchemas", "Available: %1");
+constexpr auto k_missing_tooltip = QT_TRANSLATE_NOOP("RecentListSchemas", "File not found: %1");
+constexpr auto k_not_readable_tooltip =
+    QT_TRANSLATE_NOOP("RecentListSchemas", "File is not readable: %1");
+constexpr auto k_not_a_file_tooltip =
+    QT_TRANSLATE_NOOP("RecentListSchemas", "Path is not a file: %1");
 
 /**
  * @brief Translates menu text using the MainMenuController translation context.
@@ -57,6 +70,18 @@ constexpr auto k_no_recent_sessions_text =
 {
     return QCoreApplication::translate(k_translation_context, source_text);
 }
+
+/**
+ * @brief Translates recent-file status text using its established catalog context.
+ * @param source_text Source text registered in the translation catalog.
+ * @return Translated status text.
+ */
+[[nodiscard]] auto translate_recent(const char* source_text) -> QString
+{
+    const QString result =
+        QCoreApplication::translate(k_recent_list_translation_context, source_text);
+    return result;
+}
 }  // namespace
 
 /**
@@ -66,8 +91,8 @@ constexpr auto k_no_recent_sessions_text =
  * @param recent_sessions_model Model containing recent sessions.
  * @param parent Optional QObject parent.
  */
-MainMenuController::MainMenuController(QMenuBar* menu_bar, RecentItemsModel* recent_files_model,
-                                       RecentItemsModel* recent_sessions_model, QObject* parent)
+MainMenuController::MainMenuController(QMenuBar* menu_bar, RecentItemsModel* recent_sessions_model,
+                                       QObject* parent)
     : QObject(parent), m_menu_bar(menu_bar)
 {
     if (m_menu_bar != nullptr)
@@ -79,22 +104,19 @@ MainMenuController::MainMenuController(QMenuBar* menu_bar, RecentItemsModel* rec
             to_role_id(RecentItemRole::Enabled), to_role_id(RecentItemRole::ToolTip),
             to_role_id(RecentItemRole::Icon),    to_role_id(RecentItemRole::StatusText)};
 
-        m_action_remove_unavailable_files = new QAction(this);
-        connect(m_action_remove_unavailable_files, &QAction::triggered, this,
+        m_recent_files_controller =
+            new QtWidgetsCommonLib::RecentFilesMenuController(m_recent_files_menu, this);
+        connect(m_recent_files_menu, &QMenu::aboutToShow, m_recent_files_controller,
+                &QtWidgetsCommonLib::RecentFilesMenuController::refresh_file_status);
+        connect(m_recent_files_controller,
+                &QtWidgetsCommonLib::RecentFilesMenuController::file_activated, this,
+                &MainMenuController::open_recent_file_requested);
+        connect(m_recent_files_controller,
+                &QtWidgetsCommonLib::RecentFilesMenuController::clear_requested, this,
+                &MainMenuController::clear_recent_files_requested);
+        connect(m_recent_files_controller,
+                &QtWidgetsCommonLib::RecentFilesMenuController::remove_unavailable_requested, this,
                 &MainMenuController::remove_unavailable_recent_files_requested);
-
-        m_recent_files_binder = new QtWidgetsCommonLib::RecentItemsMenuBinder(
-            m_recent_files_menu, recent_files_model, roles, this);
-        m_recent_files_binder->set_footer_actions({m_action_remove_unavailable_files});
-        connect(m_recent_files_binder, &QtWidgetsCommonLib::RecentItemsMenuBinder::item_activated,
-                this, [this](const QVariant& identity) {
-                    emit open_recent_file_requested(identity.toString());
-                });
-        connect(m_recent_files_binder, &QtWidgetsCommonLib::RecentItemsMenuBinder::clear_requested,
-                this, &MainMenuController::clear_recent_files_requested);
-        connect(m_recent_files_binder,
-                &QtWidgetsCommonLib::RecentItemsMenuBinder::contains_disabled_items_changed,
-                m_action_remove_unavailable_files, &QAction::setEnabled);
 
         m_recent_sessions_binder = new QtWidgetsCommonLib::RecentItemsMenuBinder(
             m_recent_sessions_menu, recent_sessions_model, roles, this);
@@ -106,6 +128,16 @@ MainMenuController::MainMenuController(QMenuBar* menu_bar, RecentItemsModel* rec
 
         retranslate();
     }
+}
+
+/**
+ * @brief Returns the owned high-level recent-files facade.
+ * @return Facade bound to the recent-files submenu.
+ */
+auto MainMenuController::recent_files_controller() -> QtWidgetsCommonLib::RecentFilesMenuController*
+{
+    auto* result = m_recent_files_controller;
+    return result;
 }
 
 /**
@@ -183,8 +215,6 @@ auto MainMenuController::initialize_menu() -> void
         connect(m_action_about, &QAction::triggered, this, &MainMenuController::about_requested);
         connect(m_action_about_qt, &QAction::triggered, this,
                 &MainMenuController::about_qt_requested);
-        connect(m_recent_files_menu, &QMenu::aboutToShow, this,
-                &MainMenuController::recent_files_refresh_requested);
     }
 }
 
@@ -210,11 +240,20 @@ auto MainMenuController::retranslate() -> void
         m_action_settings->setText(translate(k_settings_text));
         m_action_about->setText(translate(k_about_text).arg(QCoreApplication::applicationName()));
         m_action_about_qt->setText(translate(k_about_qt_text));
-        m_action_remove_unavailable_files->setText(translate(k_remove_unavailable_files_text));
-
-        m_recent_files_binder->set_empty_text(translate(k_no_recent_files_text));
-        m_recent_files_binder->set_clear_text(translate(k_clear_recent_files_text));
-        m_recent_files_binder->set_disabled_text_format(translate(k_unavailable_recent_file_text));
+        QtWidgetsCommonLib::RecentFilesMenuTexts texts;
+        texts.empty_text = translate(k_no_recent_files_text);
+        texts.clear_text = translate(k_clear_recent_files_text);
+        texts.remove_unavailable_text = translate(k_remove_unavailable_files_text);
+        texts.disabled_text_format = translate(k_unavailable_recent_file_text);
+        texts.available_status_text = translate_recent(k_available_text);
+        texts.missing_status_text = translate_recent(k_missing_text);
+        texts.not_readable_status_text = translate_recent(k_not_readable_text);
+        texts.not_a_file_status_text = translate_recent(k_not_a_file_text);
+        texts.available_tooltip_format = translate_recent(k_available_tooltip);
+        texts.missing_tooltip_format = translate_recent(k_missing_tooltip);
+        texts.not_readable_tooltip_format = translate_recent(k_not_readable_tooltip);
+        texts.not_a_file_tooltip_format = translate_recent(k_not_a_file_tooltip);
+        m_recent_files_controller->set_texts(std::move(texts));
         m_recent_sessions_binder->set_empty_text(translate(k_no_recent_sessions_text));
     }
 }

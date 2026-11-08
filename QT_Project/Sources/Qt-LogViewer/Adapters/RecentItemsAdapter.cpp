@@ -7,11 +7,12 @@
 
 #include <QCoreApplication>
 #include <QGuiApplication>
+#include <QStringList>
 #include <QVector>
 
 #include "Qt-LogViewer/Models/RecentItemPresentationMapper.h"
 #include "Qt-LogViewer/Services/SessionManager.h"
-#include "QtCommonLib/FileSystem/LocalFileStatus.h"
+#include "QtWidgetsCommonLib/RecentItems/RecentFilesMenuController.h"
 
 namespace
 {
@@ -27,7 +28,6 @@ using QtWidgetsCommonLib::RecentItemsModel;
 RecentItemsAdapter::RecentItemsAdapter(SessionManager* session_manager, QObject* parent)
     : QObject(parent), m_session_manager(session_manager)
 {
-    update_recent_files(m_session_manager->get_recent_log_files());
     update_recent_sessions(m_session_manager->get_recent_sessions());
 
     connect(m_session_manager, &SessionManager::recent_log_files_changed, this,
@@ -50,13 +50,19 @@ RecentItemsAdapter::RecentItemsAdapter(SessionManager* session_manager, QObject*
 }
 
 /**
- * @brief Returns the synchronized recent-files model.
- * @return Model owned by this adapter.
+ * @brief Attaches the high-level recent-files facade and supplies current persisted paths.
+ * @param controller Facade owned by the menu controller.
  */
-auto RecentItemsAdapter::get_recent_files_model() -> RecentItemsModel*
+auto RecentItemsAdapter::bind_recent_files_controller(
+    QtWidgetsCommonLib::RecentFilesMenuController* controller) -> void
 {
-    RecentItemsModel* model = &m_recent_files_model;
-    return model;
+    m_recent_files_controller = controller;
+    if (m_recent_files_controller != nullptr)
+    {
+        connect(m_recent_files_controller, &QObject::destroyed, this,
+                [this] { m_recent_files_controller = nullptr; });
+        update_recent_files(m_session_manager->get_recent_log_files());
+    }
 }
 
 /**
@@ -74,7 +80,10 @@ auto RecentItemsAdapter::get_recent_sessions_model() -> RecentItemsModel*
  */
 auto RecentItemsAdapter::refresh_file_availability() -> void
 {
-    update_recent_files(m_session_manager->get_recent_log_files());
+    if (m_recent_files_controller != nullptr)
+    {
+        m_recent_files_controller->refresh_file_status();
+    }
 }
 
 /**
@@ -83,17 +92,16 @@ auto RecentItemsAdapter::refresh_file_availability() -> void
  */
 auto RecentItemsAdapter::update_recent_files(const QVector<RecentLogFileRecord>& records) -> void
 {
-    QVector<RecentItemPresentation> items;
-    items.reserve(records.size());
-
-    for (const RecentLogFileRecord& record: records)
+    if (m_recent_files_controller != nullptr)
     {
-        const QtCommonLib::LocalFileStatus file_status =
-            QtCommonLib::inspect_local_file(record.file_path);
-        items.push_back(RecentItemPresentationMapper::from_recent_log_file(record, file_status));
+        QStringList file_paths;
+        file_paths.reserve(records.size());
+        for (const RecentLogFileRecord& record: records)
+        {
+            file_paths.push_back(record.file_path);
+        }
+        m_recent_files_controller->set_files(std::move(file_paths));
     }
-
-    m_recent_files_model.set_items(std::move(items));
 }
 
 /**

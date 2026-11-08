@@ -7,6 +7,10 @@
 #include "QtWidgetsCommonLib/RecentItems/RecentItemsModel.h"
 
 class SessionManager;
+namespace QtWidgetsCommonLib
+{
+class RecentFilesMenuController;
+}
 
 /**
  * @file RecentItemsAdapter.h
@@ -17,7 +21,8 @@ class SessionManager;
  * @class RecentItemsAdapter
  * @brief Keeps recent-file and recent-session models synchronized with SessionManager.
  *
- * The adapter owns both presentation models but does not own the injected session manager.
+ * The adapter owns the recent-session model and synchronizes recent-file paths with an attached
+ * menu facade. It does not own the injected session manager or facade.
  */
 class RecentItemsAdapter final: public QObject
 {
@@ -25,17 +30,18 @@ class RecentItemsAdapter final: public QObject
 
     public:
         /**
-         * @brief Constructs the adapter and initializes both models from current session data.
+         * @brief Constructs the adapter and initializes recent-session presentation data.
          * @param session_manager Source of recent-file and recent-session records.
          * @param parent Optional QObject parent.
          */
         explicit RecentItemsAdapter(SessionManager* session_manager, QObject* parent = nullptr);
 
         /**
-         * @brief Returns the synchronized recent-files model.
-         * @return Model owned by this adapter.
+         * @brief Attaches the high-level recent-files facade and supplies current persisted paths.
+         * @param controller Facade owned by the menu controller.
          */
-        [[nodiscard]] auto get_recent_files_model() -> QtWidgetsCommonLib::RecentItemsModel*;
+        auto bind_recent_files_controller(QtWidgetsCommonLib::RecentFilesMenuController* controller)
+            -> void;
 
         /**
          * @brief Returns the synchronized recent-sessions model.
@@ -63,6 +69,6 @@ class RecentItemsAdapter final: public QObject
 
     private:
         SessionManager* m_session_manager{nullptr};
-        QtWidgetsCommonLib::RecentItemsModel m_recent_files_model;
+        QtWidgetsCommonLib::RecentFilesMenuController* m_recent_files_controller{nullptr};
         QtWidgetsCommonLib::RecentItemsModel m_recent_sessions_model;
 };

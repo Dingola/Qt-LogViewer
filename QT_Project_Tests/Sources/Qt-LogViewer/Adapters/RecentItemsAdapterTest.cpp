@@ -8,18 +8,37 @@
 #include <QDateTime>
 #include <QFile>
 #include <QFileInfo>
+#include <QMenu>
 #include <QSignalSpy>
 
 #include "Qt-LogViewer/Adapters/RecentItemsAdapter.h"
 #include "Qt-LogViewer/Models/LogFileInfo.h"
 #include "Qt-LogViewer/Services/SessionManager.h"
 #include "Qt-LogViewer/Services/SessionRepository.h"
+#include "QtWidgetsCommonLib/RecentItems/RecentFilesMenuController.h"
 #include "QtWidgetsCommonLib/RecentItems/RecentItemsModel.h"
 #include "QtWidgetsCommonLib/RecentItems/RecentRoles.h"
 
 using QtWidgetsCommonLib::RecentItemRole;
 using QtWidgetsCommonLib::RecentItemsModel;
 using QtWidgetsCommonLib::to_role_id;
+
+namespace
+{
+/**
+ * @brief Creates deterministic status texts for adapter integration tests.
+ * @return Complete recent-file text configuration.
+ */
+[[nodiscard]] auto make_recent_file_texts() -> QtWidgetsCommonLib::RecentFilesMenuTexts
+{
+    QtWidgetsCommonLib::RecentFilesMenuTexts result;
+    result.available_status_text = QStringLiteral("Available");
+    result.missing_status_text = QStringLiteral("Missing");
+    result.not_readable_status_text = QStringLiteral("Not readable");
+    result.not_a_file_status_text = QStringLiteral("Not a file");
+    return result;
+}
+}  // namespace
 
 /**
  * @brief Ensures both recent models follow records emitted by SessionManager.
@@ -31,7 +50,10 @@ TEST_F(RecentItemsAdapterTest, SynchronizesModelsWhenRecentItemsChange)
     SessionRepository repository(QFileInfo(marker_path).absolutePath());
     SessionManager session_manager(&repository);
     RecentItemsAdapter adapter(&session_manager);
-    RecentItemsModel* files_model = adapter.get_recent_files_model();
+    QMenu files_menu;
+    QtWidgetsCommonLib::RecentFilesMenuController files_controller(&files_menu);
+    adapter.bind_recent_files_controller(&files_controller);
+    QAbstractItemModel* files_model = files_controller.model();
     RecentItemsModel* sessions_model = adapter.get_recent_sessions_model();
     QSignalSpy files_reset_spy(files_model, &QAbstractItemModel::modelReset);
     QSignalSpy sessions_reset_spy(sessions_model, &QAbstractItemModel::modelReset);
@@ -66,10 +88,14 @@ TEST_F(RecentItemsAdapterTest, RefreshesTransientRecentFileAvailability)
     SessionRepository repository(QFileInfo(file_path).absolutePath());
     SessionManager session_manager(&repository);
     RecentItemsAdapter adapter(&session_manager);
+    QMenu files_menu;
+    QtWidgetsCommonLib::RecentFilesMenuController files_controller(&files_menu);
+    files_controller.set_texts(make_recent_file_texts());
+    adapter.bind_recent_files_controller(&files_controller);
 
     session_manager.add_recent_log_file(LogFileInfo(file_path));
 
-    RecentItemsModel* model = adapter.get_recent_files_model();
+    QAbstractItemModel* model = files_controller.model();
     ASSERT_EQ(model->rowCount(), 1);
     const QModelIndex available_index = model->index(0, 0);
     EXPECT_TRUE(available_index.flags().testFlag(Qt::ItemIsEnabled));

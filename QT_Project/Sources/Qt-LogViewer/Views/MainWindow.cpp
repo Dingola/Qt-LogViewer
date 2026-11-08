@@ -57,6 +57,7 @@
 #include "Qt-LogViewer/Views/Shared/DropOverlayWidget.h"
 #include "Qt-LogViewer/Views/Shared/EmptyStateWidget.h"
 #include "QtCommonLib/FileSystem/LocalFileStatus.h"
+#include "QtWidgetsCommonLib/RecentItems/RecentFilesMenuController.h"
 #include "QtWidgetsCommonLib/RecentItems/RecentItemsModel.h"
 #include "QtWidgetsCommonLib/RecentItems/RecentRoles.h"
 #include "QtWidgetsCommonLib/Services/Translator.h"
@@ -118,7 +119,6 @@ MainWindow::MainWindow(LogViewerSettings& settings, FileCatalogController& catal
       m_preview(&preview),
       m_session_manager(&session_manager),
       m_recent_items_adapter(&recent_items_adapter),
-      m_recent_files_model(recent_items_adapter.get_recent_files_model()),
       m_recent_sessions_model(recent_items_adapter.get_recent_sessions_model()),
       m_session_controller(&session_controller),
       m_log_level_pie_chart_widget(new LogLevelPieChartWidget(this)),
@@ -163,6 +163,8 @@ MainWindow::MainWindow(LogViewerSettings& settings, FileCatalogController& catal
             [this](const QString&) { close_all_tabs(); });
     connect(m_session_controller, &SessionController::view_restored, this,
             &MainWindow::restore_view_from_state);
+    initialize_dock_controller();
+    initialize_menu();
     // Start page widget (stack page 1)
     auto* start_page = new StartPageWidget(central_stack);
     start_page->set_recent_files_model(m_recent_files_model);
@@ -192,7 +194,6 @@ MainWindow::MainWindow(LogViewerSettings& settings, FileCatalogController& catal
     connect(m_imports, &LogImportCoordinator::progress, this, &MainWindow::handle_loading_progress);
     connect(m_imports, &LogImportCoordinator::finished, this, &MainWindow::handle_loading_finished);
     connect(m_imports, &LogImportCoordinator::error, this, &MainWindow::handle_loading_error);
-    initialize_dock_controller();
     m_workspace_presenter = new WorkspacePresenter(
         m_views, m_filters, m_history, m_pages, m_queries, m_imports, m_lifecycle,
         m_session_controller, ui->tabWidgetLog, ui->logFilterBarWidget, ui->paginationWidget,
@@ -211,8 +212,6 @@ MainWindow::MainWindow(LogViewerSettings& settings, FileCatalogController& catal
             [this](const QString& message, int timeout_ms) {
                 statusBar()->showMessage(message, timeout_ms);
             });
-    initialize_menu();
-
     QTimer::singleShot(0, this, [this] { this->resizeEvent(nullptr); });
     qDebug() << "MainWindow constructor finished";
 }
@@ -362,8 +361,10 @@ auto MainWindow::initialize_dock_controller() -> void
  */
 auto MainWindow::initialize_menu() -> void
 {
-    m_menu_controller =
-        new MainMenuController(ui->menubar, m_recent_files_model, m_recent_sessions_model, this);
+    m_menu_controller = new MainMenuController(ui->menubar, m_recent_sessions_model, this);
+    auto* recent_files_controller = m_menu_controller->recent_files_controller();
+    m_recent_items_adapter->bind_recent_files_controller(recent_files_controller);
+    m_recent_files_model = recent_files_controller->model();
 
     // Add the native toggle action of each registered dock to the Views menu
     for (QAction* toggle_action: m_dock_controller->get_toggle_actions())
@@ -373,8 +374,6 @@ auto MainWindow::initialize_menu() -> void
 
     connect(m_menu_controller, &MainMenuController::open_log_file_requested, this,
             &MainWindow::handle_open_log_file_dialog_requested);
-    connect(m_menu_controller, &MainMenuController::recent_files_refresh_requested,
-            m_recent_items_adapter, &RecentItemsAdapter::refresh_file_availability);
     connect(m_menu_controller, &MainMenuController::open_recent_file_requested, this,
             &MainWindow::handle_open_recent_file);
     connect(m_menu_controller, &MainMenuController::clear_recent_files_requested, this,
