@@ -99,7 +99,7 @@ TEST_F(LogPageCoordinatorTest, AssignsTargetViewToQuery)
 }
 
 /**
- * @brief Verifies page-size and page-number changes.
+ * @brief Verifies that page navigation preserves result-set aggregates.
  */
 TEST_F(LogPageCoordinatorTest, LoadsSelectedPage)
 {
@@ -117,6 +117,7 @@ TEST_F(LogPageCoordinatorTest, LoadsSelectedPage)
     LogQuery query;
 
     ASSERT_TRUE(m_coordinator->set_query(m_view_id, query));
+    QSignalSpy result_set_spy(m_coordinator, &LogPageCoordinator::result_set_changed);
     ASSERT_TRUE(m_coordinator->set_page_size(m_view_id, 10));
     ASSERT_TRUE(m_coordinator->set_current_page(m_view_id, 2));
 
@@ -133,6 +134,7 @@ TEST_F(LogPageCoordinatorTest, LoadsSelectedPage)
     ASSERT_EQ(loaded_entries.size(), 10);
     EXPECT_EQ(loaded_entries.first().get_message(), QStringLiteral("entry-20"));
     EXPECT_EQ(loaded_entries.last().get_message(), QStringLiteral("entry-11"));
+    EXPECT_EQ(result_set_spy.count(), 0);
 }
 
 /**
@@ -266,6 +268,8 @@ TEST_F(LogPageCoordinatorTest, RefreshesTotalsWithoutReplacingHistoricalPage)
 
     QSignalSpy page_state_spy(m_coordinator, &LogPageCoordinator::page_state_updated);
 
+    QSignalSpy result_set_spy(m_coordinator, &LogPageCoordinator::result_set_changed);
+
     const LogEntry new_entry = create_entry(
         QStringLiteral("new-entry"),
         QDateTime::fromString(QStringLiteral("2026-01-01T13:00:00.000Z"), Qt::ISODateWithMs));
@@ -305,4 +309,5 @@ TEST_F(LogPageCoordinatorTest, RefreshesTotalsWithoutReplacingHistoricalPage)
 
     EXPECT_EQ(page_loaded_spy.count(), 0);
     EXPECT_EQ(page_state_spy.count(), 1);
+    EXPECT_EQ(result_set_spy.count(), 1);
 }

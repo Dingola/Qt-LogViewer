@@ -145,8 +145,8 @@ class WorkspacePresenter: public QObject
         [[nodiscard]] auto get_active_view_id() const -> QUuid;
 
         /**
-         * @brief Updates shared page and level-count presentation for one view.
-         * @param view_id View whose query state changed.
+         * @brief Updates shared pagination without recomputing unchanged result aggregates.
+         * @param view_id View whose visible page state changed.
          * @param current_page Current one-based page.
          * @param total_pages Total available pages.
          */

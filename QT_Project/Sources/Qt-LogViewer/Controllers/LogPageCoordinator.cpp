@@ -122,6 +122,7 @@ auto LogPageCoordinator::apply_state(const QUuid& view_id, const LogQuery& query
 
         emit page_loaded(view_id, state.get_current_page(), state.get_total_pages(),
                          state.get_total_entries());
+        emit result_set_changed(view_id);
 
         loaded = true;
     }
@@ -177,6 +178,10 @@ auto LogPageCoordinator::reload(const QUuid& view_id) -> bool
 
             state->set_total_entries(total_entries);
             loaded = load_current_page(view_id);
+            if (loaded)
+            {
+                emit result_set_changed(view_id);
+            }
         }
     }
 
@@ -230,6 +235,7 @@ auto LogPageCoordinator::refresh_total_entries(const QUuid& view_id) -> bool
 
             emit page_state_updated(view_id, state->get_current_page(), state->get_total_pages(),
                                     state->get_total_entries());
+            emit result_set_changed(view_id);
 
             updated = true;
         }

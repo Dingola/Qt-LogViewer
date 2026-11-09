@@ -120,6 +120,16 @@ class LogPageCoordinator final: public QObject
         void page_state_updated(const QUuid& view_id, qsizetype current_page, qsizetype total_pages,
                                 qsizetype total_entries);
 
+        /**
+         * @brief Emitted after a query or its underlying entries changed aggregate results.
+         *
+         * Pure page-number and page-size changes do not emit this signal because they preserve
+         * the result set, its facets, and its total entry count.
+         *
+         * @param view_id View whose result-set aggregates may need presentation updates.
+         */
+        void result_set_changed(const QUuid& view_id);
+
     private:
         /**
          * @brief Loads the selected page while preserving the known result count.

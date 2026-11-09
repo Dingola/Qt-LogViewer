@@ -459,6 +459,13 @@ auto WorkspacePresenter::connect_workspace_updates() -> void
         connect(m_pages, &LogPageCoordinator::page_state_updated, this,
                 [this](const QUuid& view_id, qsizetype current_page, qsizetype total_pages,
                        qsizetype) { update_page_state(view_id, current_page, total_pages); });
+        connect(m_pages, &LogPageCoordinator::result_set_changed, this,
+                [this](const QUuid& view_id) {
+                    if (view_id == get_active_view_id())
+                    {
+                        refresh_active_view();
+                    }
+                });
         connect(m_imports, &LogImportCoordinator::finished, this,
                 [this](const QUuid& view_id, const QString&) {
                     m_importing_views.remove(view_id);
@@ -607,8 +614,8 @@ auto WorkspacePresenter::get_active_view_id() const -> QUuid
 }
 
 /**
- * @brief Updates shared page and level-count presentation for one view.
- * @param view_id View whose query state changed.
+ * @brief Updates shared pagination without recomputing unchanged result aggregates.
+ * @param view_id View whose visible page state changed.
  * @param current_page Current one-based page.
  * @param total_pages Total available pages.
  */
@@ -622,31 +629,6 @@ auto WorkspacePresenter::update_page_state(const QUuid& view_id, qsizetype curre
             m_pagination->set_pagination(static_cast<int>(current_page),
                                          static_cast<int>(total_pages));
         }
-
-        if (m_history != nullptr && m_queries != nullptr)
-        {
-            QMap<QString, int> level_counts;
-            const QMap<QString, qsizetype> history_counts =
-                m_history->get_log_level_counts(m_queries->create_query(view_id));
-            for (auto iterator = history_counts.cbegin(); iterator != history_counts.cend();
-                 ++iterator)
-            {
-                level_counts.insert(iterator.key(), static_cast<int>(iterator.value()));
-            }
-
-            if (m_filter_bar != nullptr)
-            {
-                const QSignalBlocker blocker(m_filter_bar);
-                m_filter_bar->set_log_level_counts(level_counts);
-            }
-
-            if (m_level_chart != nullptr)
-            {
-                m_level_chart->set_log_level_counts(level_counts);
-            }
-        }
-
-        refresh_data_status();
     }
 }
 

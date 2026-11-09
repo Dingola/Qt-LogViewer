@@ -92,3 +92,34 @@
 - **Erstimport:** Misst den vollständigen Weg ohne vorhandenen Cache.
 - **Cache-Treffer:** Misst das erneute Öffnen derselben Datei über den bereits erzeugten persistenten Cache.
 - **Leeres Feld bei Daten pro Sekunde:** Für Filter, Suche und Seitenwechsel ist eine Dateidatenrate fachlich nicht sinnvoll; dort zählt ausschließlich die gemessene Dauer.
+
+---
+
+## Messlauf 2026-11-09T19:07:39.805Z
+
+- Git-Commit: `7f88c2fc8d93`
+- Datensatzgröße: 1074000000 Bytes (1024.25 Mebibyte)
+- Ergebnis-CSV: `LargeFileBenchmarkResults.csv`
+
+| Messphase | Bedeutung | Dauer | Verarbeitete Logeinträge | Verarbeitete Daten pro Sekunde | Arbeitsspeicher am Phasenende |
+|---|---|---:|---:|---:|---:|
+| Erstimport | Datei vollständig einlesen, analysieren und speichern | 73.253 s | 4000000 | 13.98 Mebibyte pro Sekunde | 21.85 Mebibyte |
+| Cache-Treffer | Bereits aufgebauten Cache öffnen und erste Seite laden | 1.910 s | 4000000 | 536.13 Mebibyte pro Sekunde | 22.04 Mebibyte |
+| Mittlere Seite öffnen | Von der ersten auf die mittlere Ergebnisseite wechseln | 1.006 s | 4000000 | – | 21.83 Mebibyte |
+| Letzte Seite öffnen | Von der mittleren auf die letzte Ergebnisseite wechseln | 1.040 s | 4000000 | – | 21.59 Mebibyte |
+| Anwendungsfilter setzen | Nur Logeinträge der Anwendung App01 laden | 0.657 s | 1000000 | – | 21.61 Mebibyte |
+| Anwendungsfilter entfernen | Wieder Logeinträge aller Anwendungen laden | 1.897 s | 4000000 | – | 21.64 Mebibyte |
+| Log-Level-Filter setzen | Nur Logeinträge mit Level ERROR laden | 0.659 s | 1000000 | – | 21.80 Mebibyte |
+| Log-Level-Filter entfernen | Wieder Logeinträge aller Level laden | 1.887 s | 4000000 | – | 21.63 Mebibyte |
+| Textsuche ausführen | Nach dem Text scenario=large-file in Meldungen suchen | 2.426 s | 4000000 | – | 21.79 Mebibyte |
+| Textsuche entfernen | Textsuche leeren und ungefilterte erste Seite laden | 1.896 s | 4000000 | – | 21.91 Mebibyte |
+| Regex-Suche ausführen | Regulären Ausdruck über alle vier Millionen Meldungen prüfen | 117.926 s | 4000000 | – | 51.70 Mebibyte |
+| Regex-Suche entfernen | Regulären Ausdruck leeren und erste Seite neu laden | 1.887 s | 4000000 | – | 52.38 Mebibyte |
+
+## Bedeutung der Einheiten
+
+- **Mebibyte pro Sekunde:** Wie viele Daten pro Sekunde verarbeitet wurden. Ein Mebibyte entspricht 1.048.576 Bytes. Ein höherer Wert ist besser.
+- **Arbeitsspeicher am Phasenende:** Physischer Speicher, den der Benchmark-Prozess beim Abschluss der jeweiligen Phase belegt hat. Ein niedrigerer Wert ist besser.
+- **Erstimport:** Misst den vollständigen Weg ohne vorhandenen Cache.
+- **Cache-Treffer:** Misst das erneute Öffnen derselben Datei über den bereits erzeugten persistenten Cache.
+- **Leeres Feld bei Daten pro Sekunde:** Für Filter, Suche und Seitenwechsel ist eine Dateidatenrate fachlich nicht sinnvoll; dort zählt ausschließlich die gemessene Dauer.

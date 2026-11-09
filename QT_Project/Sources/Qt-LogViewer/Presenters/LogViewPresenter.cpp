@@ -149,21 +149,13 @@ auto LogViewPresenter::connect_view_updates() -> void
                     m_widget->set_view_file_paths(file_paths);
                 }
             });
-    connect(m_pages, &LogPageCoordinator::page_loaded, this,
-            [this](const QUuid& view_id, qsizetype, qsizetype, qsizetype) {
-                if (view_id == m_view_id)
-                {
-                    refresh_filter_presentation(true);
-                    refresh_query_presentation();
-                }
-            });
-    connect(m_pages, &LogPageCoordinator::page_state_updated, this,
-            [this](const QUuid& view_id, qsizetype, qsizetype, qsizetype) {
-                if (view_id == m_view_id)
-                {
-                    refresh_filter_presentation(true);
-                }
-            });
+    connect(m_pages, &LogPageCoordinator::result_set_changed, this, [this](const QUuid& view_id) {
+        if (view_id == m_view_id)
+        {
+            refresh_filter_presentation(true);
+            refresh_query_presentation();
+        }
+    });
     connect(m_imports, &LogImportCoordinator::finished, this,
             [this](const QUuid& view_id, const QString&) {
                 if (view_id == m_view_id)
