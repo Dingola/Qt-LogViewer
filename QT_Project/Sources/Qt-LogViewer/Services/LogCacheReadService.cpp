@@ -485,6 +485,22 @@ auto bind_values(QSqlQuery& sql_query, const QList<QVariant>& bindings) -> void
 }
 
 /**
+ * @brief Determines whether an unfiltered timestamp page can use the covering timestamp index.
+ * @param query View query containing the requested ordering.
+ * @param filter SQL filter resolved for the source.
+ * @param maximum_rows Maximum requested row count.
+ * @return True when row identifiers can be paged before dimension joins are evaluated.
+ */
+[[nodiscard]] auto can_page_timestamp_ids_first(const LogQuery& query,
+                                                const SourceSqlFilter& filter,
+                                                qsizetype maximum_rows) -> bool
+{
+    const bool supported = maximum_rows >= 0 && query.sort_field == LogField::Timestamp &&
+                           filter.joins.isEmpty() && filter.where.isEmpty();
+    return supported;
+}
+
+/**
  * @brief Loads filtered metadata rows from one cache database.
  * @param source Validated cache source.
  * @param query View query.
@@ -506,18 +522,36 @@ auto bind_values(QSqlQuery& sql_query, const QList<QVariant>& bindings) -> void
         if (connection.is_open())
         {
             QSqlDatabase database = connection.database();
-            QString sql = QStringLiteral(
+            const QString row_projection = QStringLiteral(
                 "SELECT e.id, e.source_line, e.byte_offset, e.byte_length, "
-                "e.timestamp_utc_ms, l.value, a.value "
-                "FROM log_entries e JOIN log_levels l ON l.id=e.level_id "
+                "e.timestamp_utc_ms, l.value, a.value ");
+            const QString dimension_joins = QStringLiteral(
+                " JOIN log_levels l ON l.id=e.level_id "
                 "JOIN applications a ON a.id=e.app_id");
-            sql += filter.joins + filter.where + create_source_order(query);
-            QList<QVariant> bindings = filter.bindings;
-            if (maximum_rows >= 0)
+            const bool page_ids_first = can_page_timestamp_ids_first(query, filter, maximum_rows);
+            QString sql;
+            QList<QVariant> bindings;
+            if (page_ids_first)
             {
-                sql += QStringLiteral(" LIMIT ? OFFSET ?");
+                sql = row_projection + QStringLiteral("FROM (") +
+                      QStringLiteral("SELECT e.id FROM log_entries e") +
+                      create_source_order(query) + QStringLiteral(" LIMIT ? OFFSET ?) page ") +
+                      QStringLiteral("JOIN log_entries e ON e.id=page.id") + dimension_joins +
+                      create_source_order(query);
                 bindings.append(maximum_rows);
                 bindings.append(std::max<qsizetype>(0, offset));
+            }
+            else
+            {
+                sql = row_projection + QStringLiteral("FROM log_entries e") + dimension_joins +
+                      filter.joins + filter.where + create_source_order(query);
+                bindings = filter.bindings;
+                if (maximum_rows >= 0)
+                {
+                    sql += QStringLiteral(" LIMIT ? OFFSET ?");
+                    bindings.append(maximum_rows);
+                    bindings.append(std::max<qsizetype>(0, offset));
+                }
             }
 
             QSqlQuery sql_query(database);
