@@ -770,6 +770,77 @@ auto bind_values(QSqlQuery& sql_query, const QList<QVariant>& bindings) -> void
     const bool precedes = query.sort_order == Qt::DescendingOrder ? comparison > 0 : comparison < 0;
     return precedes;
 }
+
+/**
+ * @brief Selects only the leading message-sorted rows required for one requested page.
+ * @param rows Matching metadata rows that may require source materialization.
+ * @param query Message-sorting state including the requested direction.
+ * @param offset Zero-based page offset.
+ * @param limit Maximum number of page entries.
+ * @return At most offset plus limit materialized rows in requested order.
+ */
+[[nodiscard]] auto select_message_page_rows(QVector<CacheRow>& rows, const LogQuery& query,
+                                            qsizetype offset, qsizetype limit) -> QVector<CacheRow>
+{
+    const qsizetype normalized_offset = std::max<qsizetype>(0, offset);
+    const qsizetype normalized_limit = std::max<qsizetype>(0, limit);
+    const qsizetype maximum_size =
+        normalized_offset > std::numeric_limits<qsizetype>::max() - normalized_limit
+            ? std::numeric_limits<qsizetype>::max()
+            : normalized_offset + normalized_limit;
+    QVector<CacheRow> selected_rows;
+    selected_rows.reserve(std::min(rows.size(), maximum_size));
+    QString active_file_path;
+    QFile source_file;
+    std::optional<LogParser> parser;
+    bool source_ready = false;
+    const auto precedes = [&query](const CacheRow& left, const CacheRow& right) {
+        return row_precedes(left, right, query);
+    };
+
+    if (maximum_size > 0)
+    {
+        for (CacheRow& row: rows)
+        {
+            bool materialized = row.materialized_entry.has_value();
+            if (!materialized && row.source.file_path != active_file_path)
+            {
+                active_file_path = row.source.file_path;
+                source_file.close();
+                source_file.setFileName(active_file_path);
+                parser.reset();
+                if (row.source.profile.has_value())
+                {
+                    parser.emplace(row.source.profile.value());
+                }
+                source_ready = parser.has_value() && source_file.open(QIODevice::ReadOnly);
+            }
+            if (!materialized && source_ready && parser.has_value())
+            {
+                materialized = materialize_row(row, source_file, parser.value());
+            }
+
+            if (materialized && selected_rows.size() < maximum_size)
+            {
+                selected_rows.append(std::move(row));
+                std::push_heap(selected_rows.begin(), selected_rows.end(), precedes);
+            }
+            else if (materialized && precedes(row, selected_rows.front()))
+            {
+                std::pop_heap(selected_rows.begin(), selected_rows.end(), precedes);
+                selected_rows.last() = std::move(row);
+                std::push_heap(selected_rows.begin(), selected_rows.end(), precedes);
+            }
+            else if (materialized)
+            {
+                row.materialized_entry.reset();
+            }
+        }
+    }
+
+    std::stable_sort(selected_rows.begin(), selected_rows.end(), precedes);
+    return selected_rows;
+}
 }  // namespace
 
 /**
@@ -867,14 +938,7 @@ auto LogCacheReadService::load_entries_page(const LogQuery& query, qsizetype off
     }
     if (query.sort_field == LogField::Message)
     {
-        for (CacheRow& row: rows)
-        {
-            materialize_row(row);
-        }
-        rows.erase(
-            std::remove_if(rows.begin(), rows.end(),
-                           [](const CacheRow& row) { return !row.materialized_entry.has_value(); }),
-            rows.end());
+        rows = select_message_page_rows(rows, query, page_offset, limit);
     }
     std::stable_sort(rows.begin(), rows.end(),
                      [&query](const CacheRow& left, const CacheRow& right) {
