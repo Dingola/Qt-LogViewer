@@ -33,6 +33,9 @@ set_property(CACHE ${MAIN_PROJECT_NAME}_BUILD_TARGET_TYPE PROPERTY STRINGS execu
 # Option to build the test project
 option(${MAIN_PROJECT_NAME}_BUILD_TEST_PROJECT "Build test project" OFF)
 
+# Performance tooling is opt-in and is not configured or built with normal application targets.
+option(${MAIN_PROJECT_NAME}_BUILD_PERFORMANCE_BENCHMARK "Build performance benchmark" OFF)
+
 # Option to include third-party libraries source code into the solution
 option(${MAIN_PROJECT_NAME}_INCLUDE_THIRD_LIBS_INTO_SOLUTION "Force third-party libraries to be included in the solution via add_subdirectory" OFF)
 
@@ -141,6 +144,13 @@ if (${MAIN_PROJECT_NAME}_BUILD_TEST_PROJECT)
   set(startup_project ${MAIN_PROJECT_NAME}_Tests)
 else()
   set(startup_project ${MAIN_PROJECT_NAME})
+endif()
+
+if (${MAIN_PROJECT_NAME}_BUILD_PERFORMANCE_BENCHMARK)
+  if (NOT ${MAIN_PROJECT_NAME}_BUILD_TARGET_TYPE STREQUAL static_library)
+    message(FATAL_ERROR "The performance benchmark requires ${MAIN_PROJECT_NAME}_BUILD_TARGET_TYPE=static_library")
+  endif()
+  add_subdirectory(QT_Project_Benchmarks)
 endif()
 
 # Set the startup project
