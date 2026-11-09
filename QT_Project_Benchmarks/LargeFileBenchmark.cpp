@@ -6,6 +6,7 @@
 #include <QCommandLineParser>
 #include <QCoreApplication>
 #include <QDateTime>
+#include <QDebug>
 #include <QDir>
 #include <QElapsedTimer>
 #include <QFile>
@@ -29,6 +30,7 @@
 #include "Qt-LogViewer/Controllers/LogQueryController.h"
 #include "Qt-LogViewer/Controllers/ViewRegistry.h"
 #include "Qt-LogViewer/Models/LogPageState.h"
+#include "Qt-LogViewer/Models/LogQuery.h"
 #include "Qt-LogViewer/Services/HistoryWriteService.h"
 #include "Qt-LogViewer/Services/LogCacheCatalog.h"
 #include "Qt-LogViewer/Services/LogCacheReadService.h"
@@ -65,21 +67,28 @@ class BenchmarkRunner final
          * @brief Constructs the isolated benchmark composition.
          * @param dataset_path Unique dataset copy without an existing cache generation.
          * @param results_path CSV output path.
-         * @param git_commit Commit identifier stored with the measurements.
+         * @param source_state Commit and working-tree state stored with the measurements.
+         * @param storage_root Temporary root used for history and persistent cache files.
+         * @param include_message_sort Whether the known-expensive message sort is measured.
          * @param completion Callback invoked with the final process exit code.
          */
-        BenchmarkRunner(QString dataset_path, QString results_path, QString git_commit,
+        BenchmarkRunner(QString dataset_path, QString results_path, QString source_state,
+                        QString storage_root, bool include_message_sort,
                         std::function<void(int)> completion)
             : m_dataset_path(std::move(dataset_path)),
               m_results_path(std::move(results_path)),
-              m_git_commit(std::move(git_commit)),
+              m_source_state(std::move(source_state)),
+              m_storage_root(std::move(storage_root)),
+              m_include_message_sort(include_message_sort),
               m_completion(std::move(completion)),
               m_profile(LogParsingProfile::create_default(
                   QStringLiteral("{timestamp} {level} {message} {app_name}"),
                   QStringLiteral("Large-file benchmark"))),
               m_ingest(m_profile),
               m_filters(&m_views),
+              m_cache_catalog(QDir(m_storage_root).filePath(QStringLiteral("index-v2"))),
               m_cache_reader(&m_cache_catalog, &m_views),
+              m_history(QDir(m_storage_root).filePath(QStringLiteral("history.sqlite"))),
               m_history_writer(m_history.get_database_path()),
               m_pages(&m_history, &m_views),
               m_queries(&m_filters, &m_pages, &m_views),
@@ -117,6 +126,10 @@ class BenchmarkRunner final
         /** @brief Starts the currently selected import phase. */
         auto start_phase() -> void
         {
+            const QString phase = m_scenario == QStringLiteral("fresh_import")
+                                      ? QStringLiteral("Erstimport")
+                                      : QStringLiteral("Cache-Treffer");
+            qInfo().noquote() << QStringLiteral("Starte Messphase: %1").arg(phase);
             m_timer.start();
             m_active_view = m_imports.import_file_async(m_dataset_path, m_profile, 10'000);
             if (m_active_view.isNull())
@@ -154,6 +167,9 @@ class BenchmarkRunner final
                     static_cast<double>(m_timer.nsecsElapsed()) / 1000000.0;
                 m_results.append(Result{phase, meaning, duration_ms, entry_count,
                                         get_working_set_bytes(), true});
+                qInfo().noquote()
+                    << QStringLiteral("Messphase abgeschlossen: %1 (%2 s)")
+                           .arg(phase, QString::number(duration_ms / 1000.0, 'f', 3));
                 m_active_view = QUuid();
 
                 if (m_scenario == QStringLiteral("fresh_import"))
@@ -183,6 +199,7 @@ class BenchmarkRunner final
                                  const QString& meaning,
                                  const std::function<bool()>& operation) -> bool
         {
+            qInfo().noquote() << QStringLiteral("Starte Messphase: %1").arg(phase);
             QElapsedTimer timer;
             timer.start();
             const bool succeeded = operation();
@@ -198,12 +215,30 @@ class BenchmarkRunner final
                     static_cast<double>(timer.nsecsElapsed()) / 1000000.0;
                 m_results.append(Result{phase, meaning, duration_ms, entry_count,
                                         get_working_set_bytes(), false});
+                qInfo().noquote()
+                    << QStringLiteral("Messphase abgeschlossen: %1 (%2 s)")
+                           .arg(phase, QString::number(duration_ms / 1000.0, 'f', 3));
             }
             return succeeded;
         }
 
         /**
-         * @brief Measures paging, filtering, plain search, and regular-expression search.
+         * @brief Applies one explicit sort order to the active result set.
+         * @param view_id View whose query is updated.
+         * @param field Stable field identifier used for sorting.
+         * @param order Requested sort direction.
+         * @return True when the updated query was loaded.
+         */
+        auto apply_sort(const QUuid& view_id, const QString& field, Qt::SortOrder order) -> bool
+        {
+            LogQuery query = m_queries.create_query(view_id);
+            query.sort_field = field;
+            query.sort_order = order;
+            return m_pages.set_query(view_id, query);
+        }
+
+        /**
+         * @brief Measures paging, sorting, filtering, plain search, and regular-expression search.
          * @param view_id Fully loaded cache-backed view.
          * @return True when every interaction completed successfully.
          */
@@ -214,6 +249,20 @@ class BenchmarkRunner final
             const qsizetype middle_page = std::max<qsizetype>(1, total_pages / 2);
             bool succeeded = state != nullptr;
 
+            if (succeeded && total_pages > 1)
+            {
+                succeeded = measure_interaction(
+                    view_id, QStringLiteral("Zweite Seite öffnen"),
+                    QStringLiteral("Von Seite 1 auf die direkt benachbarte Seite 2 wechseln"),
+                    [this, view_id] { return m_pages.set_current_page(view_id, 2); });
+            }
+            if (succeeded && total_pages > 1)
+            {
+                succeeded = measure_interaction(
+                    view_id, QStringLiteral("Erste Seite wieder öffnen"),
+                    QStringLiteral("Von Seite 2 zur ersten Ergebnisseite zurückkehren"),
+                    [this, view_id] { return m_pages.set_current_page(view_id, 1); });
+            }
             if (succeeded)
             {
                 succeeded = measure_interaction(
@@ -230,6 +279,51 @@ class BenchmarkRunner final
                     QStringLiteral("Von der mittleren auf die letzte Ergebnisseite wechseln"),
                     [this, view_id, total_pages] {
                         return m_pages.set_current_page(view_id, total_pages);
+                    });
+            }
+            if (succeeded)
+            {
+                succeeded = measure_interaction(
+                    view_id, QStringLiteral("Zeitstempel aufsteigend sortieren"),
+                    QStringLiteral("Alle Einträge nach dem ältesten Zeitstempel zuerst sortieren"),
+                    [this, view_id] {
+                        return apply_sort(view_id, LogField::Timestamp, Qt::AscendingOrder);
+                    });
+            }
+            if (succeeded)
+            {
+                succeeded = measure_interaction(
+                    view_id, QStringLiteral("Anwendung sortieren"),
+                    QStringLiteral("Alle Einträge alphabetisch nach Anwendung sortieren"),
+                    [this, view_id] {
+                        return apply_sort(view_id, LogField::AppName, Qt::AscendingOrder);
+                    });
+            }
+            if (succeeded)
+            {
+                succeeded = measure_interaction(
+                    view_id, QStringLiteral("Log-Level sortieren"),
+                    QStringLiteral("Alle Einträge alphabetisch nach Log-Level sortieren"),
+                    [this, view_id] {
+                        return apply_sort(view_id, LogField::Level, Qt::AscendingOrder);
+                    });
+            }
+            if (succeeded && m_include_message_sort)
+            {
+                succeeded = measure_interaction(
+                    view_id, QStringLiteral("Nachricht sortieren"),
+                    QStringLiteral("Alle Einträge alphabetisch nach Nachricht sortieren"),
+                    [this, view_id] {
+                        return apply_sort(view_id, LogField::Message, Qt::AscendingOrder);
+                    });
+            }
+            if (succeeded)
+            {
+                succeeded = measure_interaction(
+                    view_id, QStringLiteral("Standardsortierung wiederherstellen"),
+                    QStringLiteral("Neueste Zeitstempel wieder zuerst anzeigen"),
+                    [this, view_id] {
+                        return apply_sort(view_id, LogField::Timestamp, Qt::DescendingOrder);
                     });
             }
             if (succeeded)
@@ -364,7 +458,10 @@ class BenchmarkRunner final
                     report_stream << "# Large-File-Benchmark – Ergebnisse\n";
                 }
                 report_stream << "\n---\n\n## Messlauf " << timestamp << "\n\n"
-                              << "- Git-Commit: `" << m_git_commit << "`\n"
+                              << "- Quellstand: `" << m_source_state << "`\n"
+                              << "- Nachrichtensortierung: "
+                              << (m_include_message_sort ? "enthalten" : "ausgelassen (opt-in)")
+                              << "\n"
                               << "- Datensatzgröße: " << bytes << " Bytes ("
                               << QString::number(dataset_mebibytes, 'f', 2) << " Mebibyte)\n"
                               << "- Ergebnis-CSV: `" << output_info.fileName() << "`\n\n"
@@ -379,7 +476,7 @@ class BenchmarkRunner final
                                                   : 0.0;
                     const QString throughput_value =
                         result.includes_throughput ? QString::number(throughput, 'f', 2) : QString();
-                    stream << timestamp << ';' << m_git_commit << ';' << bytes << ';'
+                    stream << timestamp << ';' << m_source_state << ';' << bytes << ';'
                            << result.phase << ';'
                            << QString::number(result.duration_ms, 'f', 3) << ';'
                            << result.entry_count << ';'
@@ -420,7 +517,9 @@ class BenchmarkRunner final
 
         QString m_dataset_path;
         QString m_results_path;
-        QString m_git_commit;
+        QString m_source_state;
+        QString m_storage_root;
+        bool m_include_message_sort{false};
         std::function<void(int)> m_completion;
         QString m_scenario{QStringLiteral("fresh_import")};
         LogParsingProfile m_profile;
@@ -457,16 +556,30 @@ auto main(int argc, char* argv[]) -> int
         {{QStringLiteral("results")}, QStringLiteral("CSV output path."), QStringLiteral("path")},
         {{QStringLiteral("git-commit")}, QStringLiteral("Commit identifier."),
          QStringLiteral("hash")},
+        {{QStringLiteral("source-state")}, QStringLiteral("Commit and working-tree state."),
+         QStringLiteral("description")},
+        {{QStringLiteral("storage-root")}, QStringLiteral("Temporary benchmark storage root."),
+         QStringLiteral("path")},
+        {{QStringLiteral("include-message-sort")},
+         QStringLiteral("Include the known-expensive message sorting scenario.")},
     });
     parser.process(application);
 
     int exit_code = 1;
     const QString dataset_path = parser.value(QStringLiteral("dataset"));
     const QString results_path = parser.value(QStringLiteral("results"));
-    if (!dataset_path.isEmpty() && !results_path.isEmpty() && QFileInfo::exists(dataset_path))
+    const QString storage_root = parser.value(QStringLiteral("storage-root"));
+    const bool include_message_sort = parser.isSet(QStringLiteral("include-message-sort"));
+    QString source_state = parser.value(QStringLiteral("source-state"));
+    if (source_state.isEmpty())
     {
-        BenchmarkRunner runner(dataset_path, results_path,
-                               parser.value(QStringLiteral("git-commit")),
+        source_state = parser.value(QStringLiteral("git-commit"));
+    }
+    if (!dataset_path.isEmpty() && !results_path.isEmpty() && !storage_root.isEmpty() &&
+        QFileInfo::exists(dataset_path) && QDir().mkpath(storage_root))
+    {
+        BenchmarkRunner runner(dataset_path, results_path, source_state, storage_root,
+                               include_message_sort,
                                [&application](int code) { application.exit(code); });
         runner.start();
         exit_code = application.exec();

@@ -7,7 +7,8 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$DatasetPath,
     [string]$ResultsPath = "",
-    [string]$BuildPath = ".\_build_performance"
+    [string]$BuildPath = ".\_build_performance",
+    [switch]$IncludeMessageSort
 )
 
 $ErrorActionPreference = "Stop"
@@ -46,12 +47,18 @@ try {
     New-Item -ItemType Directory -Path $temporaryDirectory | Out-Null
     Copy-Item -LiteralPath $source -Destination $temporaryDataset
     $commit = (& git -C $repository rev-parse --short=12 HEAD).Trim()
+    & git -C $repository diff --quiet HEAD -- QT_Project QT_Project_Benchmarks CMakeLists.txt Scripts/Win/Performance ':(exclude)QT_Project/Resources/Translations/**'
+    $sourceState = if ($LASTEXITCODE -eq 0) { $commit } else { "$commit+Arbeitskopie" }
+    $storageRoot = Join-Path $temporaryDirectory "storage"
+    New-Item -ItemType Directory -Path $storageRoot | Out-Null
     $previousPath = $env:PATH
     $previousPlatform = $env:QT_QPA_PLATFORM
     $env:PATH = "$qtBin;$previousPath"
     $env:QT_QPA_PLATFORM = "offscreen"
-    $process = Start-Process -FilePath $executable -ArgumentList @("--dataset", $temporaryDataset, "--results", $results, "--git-commit", $commit) -Wait -PassThru -WindowStyle Hidden
-    if ($process.ExitCode -ne 0) { throw "Benchmark failed with exit code $($process.ExitCode)." }
+    $benchmarkArguments = @("--dataset", $temporaryDataset, "--results", $results, "--source-state", $sourceState, "--storage-root", $storageRoot)
+    if ($IncludeMessageSort) { $benchmarkArguments += "--include-message-sort" }
+    & $executable @benchmarkArguments
+    if ($LASTEXITCODE -ne 0) { throw "Benchmark failed with exit code $LASTEXITCODE." }
     Get-Item -LiteralPath $results
     Get-Item -LiteralPath ([System.IO.Path]::ChangeExtension($results, ".md"))
 }
