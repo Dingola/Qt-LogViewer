@@ -54,7 +54,8 @@ auto LogCacheReadServiceTest::create_log_file(const QVector<QString>& records) -
 }
 
 /**
- * @test Verifies an exact cache hit reopens without parsing or copying rows into legacy history.
+ * @test Verifies an exact cache hit reports loading, reopens without parsing, and avoids copying
+ * rows into legacy history.
  */
 TEST_F(LogCacheReadServiceTest, ReopensExactCacheWithoutParsingOrLegacyCopy)
 {
@@ -73,14 +74,17 @@ TEST_F(LogCacheReadServiceTest, ReopensExactCacheWithoutParsingOrLegacyCopy)
     EXPECT_EQ(legacy_history.count_entries(first_query), 0);
     ASSERT_TRUE(m_runtime->lifecycle().close_view(first_view));
 
-    QSignalSpy progress_spy(&m_runtime->imports(), &LogImportCoordinator::progress);
+    QSignalSpy progress_spy(&m_runtime->imports(), &LogImportCoordinator::cache_loading_progress);
     QSignalSpy finished_spy(&m_runtime->imports(), &LogImportCoordinator::finished);
     const QUuid reopened_view = m_runtime->imports().import_file_async(file_path, m_profile, 1);
     ASSERT_FALSE(reopened_view.isNull());
     m_runtime->live_tailing().set_enabled(reopened_view, false);
 
-    EXPECT_EQ(progress_spy.count(), 0);
-    ASSERT_EQ(finished_spy.count(), 1);
+    ASSERT_TRUE(QtTestAwait::wait_until([&finished_spy]() { return finished_spy.count() == 1; }));
+    ASSERT_GE(progress_spy.count(), 1);
+    EXPECT_EQ(progress_spy.constFirst().at(0).toUuid(), reopened_view);
+    EXPECT_EQ(progress_spy.constFirst().at(2).toInt(), 0);
+    EXPECT_EQ(progress_spy.constLast().at(2).toInt(), 90);
     const LogPageState* page_state = m_runtime->pages().get_page_state(reopened_view);
     ASSERT_NE(page_state, nullptr);
     EXPECT_EQ(page_state->get_total_entries(), 2);
@@ -103,6 +107,10 @@ TEST_F(LogCacheReadServiceTest, FiltersAndSearchesReboundCacheEntries)
     ASSERT_TRUE(m_runtime->lifecycle().close_view(initial_view));
     const QUuid view_id = m_runtime->imports().import_file_async(file_path, m_profile, 1);
     ASSERT_FALSE(view_id.isNull());
+    ASSERT_TRUE(QtTestAwait::wait_until([this, &view_id]() {
+        const LogPageState* state = m_runtime->pages().get_page_state(view_id);
+        return state != nullptr && state->get_total_entries() == 2;
+    }));
     m_runtime->live_tailing().set_enabled(view_id, false);
 
     ASSERT_TRUE(m_runtime->queries().set_log_levels(view_id, {QStringLiteral("ERROR")}));
@@ -190,6 +198,10 @@ TEST_F(LogCacheReadServiceTest, ReusesCachedPrefixForAppendedSource)
     QSignalSpy finished_spy(&m_runtime->imports(), &LogImportCoordinator::finished);
     const QUuid view_id = m_runtime->imports().import_file_async(file_path, m_profile, 1);
     ASSERT_FALSE(view_id.isNull());
+    ASSERT_TRUE(QtTestAwait::wait_until([this, &view_id]() {
+        const LogPageState* state = m_runtime->pages().get_page_state(view_id);
+        return state != nullptr && state->get_total_entries() == 2;
+    }));
     const LogPageState* prefix_page_state = m_runtime->pages().get_page_state(view_id);
     ASSERT_NE(prefix_page_state, nullptr);
     EXPECT_EQ(prefix_page_state->get_total_entries(), 2);
@@ -198,7 +210,7 @@ TEST_F(LogCacheReadServiceTest, ReusesCachedPrefixForAppendedSource)
     m_runtime->live_tailing().set_enabled(view_id, false);
 
     EXPECT_GT(progress_spy.count(), 0);
-    EXPECT_EQ(progress_spy.constFirst().at(1).toLongLong(), prefix_identity->file_size);
+    EXPECT_EQ(progress_spy.constFirst().at(2).toLongLong(), prefix_identity->file_size);
     const LogPageState* page_state = m_runtime->pages().get_page_state(view_id);
     ASSERT_NE(page_state, nullptr);
     EXPECT_EQ(page_state->get_total_entries(), 3);

@@ -235,6 +235,13 @@ class LogViewWidget: public QWidget
                                    qint64 total_bytes) -> void;
 
         /**
+         * @brief Displays phase progress while reopening an existing persistent cache.
+         * @param file_path Source file represented by the cache.
+         * @param percent Completed cache-reopen phases from 0 through 100.
+         */
+        auto show_cache_loading_progress(const QString& file_path, int percent) -> void;
+
+        /**
          * @brief Briefly confirms that a file finished loading successfully.
          * @param file_path Source file that completed.
          */

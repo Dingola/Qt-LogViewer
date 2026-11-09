@@ -300,6 +300,15 @@ class MainWindow: public QtWidgetsCommonLib::AppMainWindow
                                      qint64 bytes_read, qint64 total_bytes) -> void;
 
         /**
+         * @brief Handles phase progress while an existing persistent cache is reopened.
+         * @param view_id View receiving the cached records.
+         * @param file_path Source file represented by the cache.
+         * @param percent Completed cache-reopen phases from 0 through 100.
+         */
+        auto handle_cache_loading_progress(const QUuid& view_id, const QString& file_path,
+                                           int percent) -> void;
+
+        /**
          * @brief Handles streaming completion for a file/view.
          * @param view_id The view that received the data.
          * @param file_path The file that finished streaming.

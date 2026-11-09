@@ -192,6 +192,8 @@ MainWindow::MainWindow(LogViewerSettings& settings, FileCatalogController& catal
     central_stack->addWidget(start_page);
 
     connect(m_imports, &LogImportCoordinator::progress, this, &MainWindow::handle_loading_progress);
+    connect(m_imports, &LogImportCoordinator::cache_loading_progress, this,
+            &MainWindow::handle_cache_loading_progress);
     connect(m_imports, &LogImportCoordinator::finished, this, &MainWindow::handle_loading_finished);
     connect(m_imports, &LogImportCoordinator::error, this, &MainWindow::handle_loading_error);
     m_workspace_presenter = new WorkspacePresenter(
@@ -1151,7 +1153,27 @@ auto MainWindow::handle_loading_progress(const QUuid& view_id, const QString& fi
     if (widget != nullptr)
     {
         widget->show_loading_progress(file_path, bytes_read, total_bytes);
-        set_loading_tab_suffix(widget, tr(" · %1%").arg(percent));
+        const QString suffix = total_bytes > 0 && bytes_read >= total_bytes
+                                   ? tr(" · Finalizing…")
+                                   : tr(" · %1%").arg(percent);
+        set_loading_tab_suffix(widget, suffix);
+    }
+}
+
+/**
+ * @brief Handles phase progress while an existing persistent cache is reopened.
+ * @param view_id View receiving the cached records.
+ * @param file_path Source file represented by the cache.
+ * @param percent Completed cache-reopen phases from 0 through 100.
+ */
+auto MainWindow::handle_cache_loading_progress(const QUuid& view_id, const QString& file_path,
+                                               int percent) -> void
+{
+    LogViewWidget* widget = find_log_view_widget(view_id);
+    if (widget != nullptr)
+    {
+        widget->show_cache_loading_progress(file_path, percent);
+        set_loading_tab_suffix(widget, tr(" · Cache %1%").arg(percent));
     }
 }
 

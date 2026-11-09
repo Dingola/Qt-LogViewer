@@ -173,6 +173,14 @@ class LogImportCoordinator final: public QObject
         void progress(const QUuid& view_id, const QString& file_path, qint64 bytes_read,
                       qint64 total_bytes);
 
+        /**
+         * @brief Reports phase progress while an existing persistent cache is reopened.
+         * @param view_id View receiving the cached records.
+         * @param file_path Source file represented by the cache.
+         * @param percent Completed cache-reopen phases from 0 through 100.
+         */
+        void cache_loading_progress(const QUuid& view_id, const QString& file_path, int percent);
+
         /** @brief Reports completion after storage and visible-page refresh succeed. */
         void finished(const QUuid& view_id, const QString& file_path);
 

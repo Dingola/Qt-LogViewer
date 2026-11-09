@@ -6,6 +6,7 @@
 #include <QLabel>
 #include <QMainWindow>
 #include <QPlainTextEdit>
+#include <QSignalSpy>
 #include <QStackedWidget>
 #include <QTest>
 #include <QWidget>
@@ -177,6 +178,35 @@ TEST_F(WorkspacePresenterTest, SwitchesBetweenLogViews)
     EXPECT_EQ(m_filter_bar->get_current_app_name(), QStringLiteral("SecondApp"));
 }
 
+/**
+ * @test Verifies that inserting a tab re-announces a view which the import coordinator already
+ * selected before the tab became visible.
+ */
+TEST_F(WorkspacePresenterTest, ReannouncesPreselectedViewWhenLogTabAppears)
+{
+    const QUuid first_view_id =
+        add_log_view({QStringLiteral("2024-01-01 12:00:00 INFO FirstMessage FirstApp")});
+    const QUuid preselected_view_id =
+        add_log_view({QStringLiteral("2024-01-01 12:01:00 INFO SecondMessage SecondApp")});
+    ASSERT_FALSE(first_view_id.isNull());
+    ASSERT_FALSE(preselected_view_id.isNull());
+    const int first_index = m_tab_widget->find_view_index(first_view_id);
+    const int preselected_index = m_tab_widget->find_view_index(preselected_view_id);
+    ASSERT_GE(first_index, 0);
+    ASSERT_GE(preselected_index, 0);
+    m_tab_widget->setCurrentIndex(first_index);
+    ASSERT_TRUE(m_runtime->views().set_current_view(preselected_view_id));
+    QSignalSpy current_view_spy(&m_runtime->views(), &ViewRegistry::current_view_id_changed);
+
+    m_tab_widget->setCurrentIndex(preselected_index);
+
+    EXPECT_EQ(current_view_spy.count(), 1);
+    EXPECT_EQ(m_workspace_content_stack->currentWidget(), m_tab_widget);
+    const LogViewWidget* current_view = m_tab_widget->current_log_view();
+    ASSERT_NE(current_view, nullptr);
+    EXPECT_EQ(current_view->get_view_id(), preselected_view_id);
+}
+
 /** @test Verifies that active-view data status follows counts, filters, sources, and cache state. */
 TEST_F(WorkspacePresenterTest, PresentsActiveViewDataStatus)
 {
@@ -203,6 +233,25 @@ TEST_F(WorkspacePresenterTest, PresentsActiveViewDataStatus)
     EXPECT_TRUE(entries->text().contains(QStringLiteral("1 visible")));
     EXPECT_TRUE(entries->text().contains(QStringLiteral("2 total")));
     EXPECT_TRUE(filters->text().contains(QStringLiteral("1")));
+}
+
+/**
+ * @test Verifies that byte-progress notifications do not run the expensive aggregate status
+ * refresh path.
+ */
+TEST_F(WorkspacePresenterTest, DoesNotRefreshDataStatusForByteProgress)
+{
+    const QUuid view_id =
+        add_log_view({QStringLiteral("2024-01-01 12:00:00 INFO FirstMessage FirstApp")});
+    ASSERT_FALSE(view_id.isNull());
+
+    const QLabel* cache = m_data_status->findChild<QLabel*>(QStringLiteral("labelCacheStatus"));
+    ASSERT_NE(cache, nullptr);
+    EXPECT_EQ(cache->property("cacheState").toString(), QStringLiteral("current"));
+
+    m_runtime->imports().progress(view_id, QStringLiteral("large.log"), 1024, 2048);
+
+    EXPECT_EQ(cache->property("cacheState").toString(), QStringLiteral("current"));
 }
 
 /** @test Verifies hidden loaded views resize their columns only after becoming visible. */

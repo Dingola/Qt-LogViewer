@@ -6,6 +6,7 @@
 #include <QSettings>
 #include <QSignalSpy>
 #include <QTemporaryDir>
+#include <QTest>
 #include <QTextStream>
 
 #include "Qt-LogViewer/Controllers/LogViewContext.h"
@@ -113,7 +114,8 @@ TEST_F(LogImportTabPresenterTest, CancelsImportTab)
 }
 
 /**
- * @test Verifies that a confirmed import replaces its temporary tab with a new log view.
+ * @test Verifies that a confirmed import presents its new log view before deferred streaming
+ * reports initial progress.
  */
 TEST_F(LogImportTabPresenterTest, ReplacesImportTabWithNewView)
 {
@@ -129,14 +131,19 @@ TEST_F(LogImportTabPresenterTest, ReplacesImportTabWithNewView)
         import_widget->findChild<QPushButton*>(QStringLiteral("pushButtonImport"));
     ASSERT_NE(import_button, nullptr);
     ASSERT_TRUE(import_button->isEnabled());
+    QSignalSpy progress_spy(&m_runtime->imports(), &LogImportCoordinator::progress);
 
     import_button->click();
 
+    EXPECT_EQ(progress_spy.count(), 0);
     ASSERT_EQ(m_tab_widget->count(), 1);
     LogViewWidget* log_view_widget = m_tab_widget->current_log_view();
     ASSERT_NE(log_view_widget, nullptr);
     EXPECT_FALSE(log_view_widget->get_view_id().isNull());
     EXPECT_EQ(m_runtime->views().get_all_view_ids().size(), 1);
+    QTRY_VERIFY_WITH_TIMEOUT(progress_spy.count() >= 1, 1000);
+    EXPECT_EQ(progress_spy.first().at(0).toUuid(), log_view_widget->get_view_id());
+    EXPECT_EQ(progress_spy.first().at(2).toLongLong(), 0);
 }
 
 /**

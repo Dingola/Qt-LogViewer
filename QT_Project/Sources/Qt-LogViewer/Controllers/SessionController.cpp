@@ -30,6 +30,9 @@
 
 namespace
 {
+/** Number of restored entries transferred per UI-thread batch event. */
+constexpr qsizetype k_restore_import_batch_size = 10'000;
+
 /**
  * @brief Resolves the persisted parsing profile for one restored file.
  * @param state Restored view state containing profile identifiers.
@@ -785,7 +788,7 @@ auto SessionController::start_deferred_restore_imports() -> void
         for (const PendingRestoreImport& import: imports)
         {
             m_imports->enqueue_registered_file(import.view_id, import.file_path, import.profile,
-                                               1000);
+                                               k_restore_import_batch_size);
         }
     }
 }

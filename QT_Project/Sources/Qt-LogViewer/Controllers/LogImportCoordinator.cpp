@@ -8,6 +8,7 @@
 #include <QDebug>
 #include <QFileInfo>
 #include <QList>
+#include <QTimer>
 #include <optional>
 
 #include "Qt-LogViewer/Controllers/LiveTailingCoordinator.h"
@@ -22,6 +23,12 @@
 #include "Qt-LogViewer/Services/LogFileCacheDatabase.h"
 #include "Qt-LogViewer/Services/LogHistoryService.h"
 #include "Qt-LogViewer/Services/LogLoader.h"
+
+namespace
+{
+/** One display frame reserved before deferred import work begins. */
+constexpr int k_import_presentation_delay_ms = 16;
+}  // namespace
 
 /**
  * @brief Constructs an import coordinator from its workflow collaborators.
@@ -287,7 +294,8 @@ auto LogImportCoordinator::import_files(const QVector<QString>& file_paths,
  * @param file_path File to import.
  * @param profile Parsing profile selected for the file.
  * @param batch_size Number of parsed entries per storage batch.
- * @return Created view id.
+ * @return Created view id. Streaming starts on the next event-loop turn so the view can be
+ * presented first.
  */
 auto LogImportCoordinator::import_file_async(const QString& file_path,
                                              const LogParsingProfile& profile,
@@ -308,8 +316,15 @@ auto LogImportCoordinator::import_file_async(const QString& file_path,
             m_live_tailing->reset_view(view_id, true);
         }
 
-        enqueue(view_id, absolute_file_path, profile);
-        start_next(batch_size);
+        QTimer::singleShot(k_import_presentation_delay_ms, this,
+                           [this, view_id, absolute_file_path, profile, batch_size] {
+                               if (!m_shutting_down && m_views != nullptr &&
+                                   m_views->get_context(view_id) != nullptr)
+                               {
+                                   enqueue(view_id, absolute_file_path, profile);
+                                   start_next(batch_size);
+                               }
+                           });
     }
 
     return view_id;
@@ -321,7 +336,7 @@ auto LogImportCoordinator::import_file_async(const QString& file_path,
  * @param file_path File to import.
  * @param profile Parsing profile selected for the file.
  * @param batch_size Number of parsed entries per storage batch.
- * @return True when the request was registered and enqueued.
+ * @return True when the request was registered for deferred enqueueing.
  */
 auto LogImportCoordinator::import_file_async(const QUuid& view_id, const QString& file_path,
                                              const LogParsingProfile& profile,
@@ -338,8 +353,15 @@ auto LogImportCoordinator::import_file_async(const QUuid& view_id, const QString
         {
             const QString app_name = LogLoader::identify_app(absolute_file_path);
             m_views->add_loaded_file(view_id, LogFileInfo(absolute_file_path, app_name));
-            enqueue(view_id, absolute_file_path, profile);
-            start_next(batch_size);
+            QTimer::singleShot(k_import_presentation_delay_ms, this,
+                               [this, view_id, absolute_file_path, profile, batch_size] {
+                                   if (!m_shutting_down && m_views != nullptr &&
+                                       m_views->get_context(view_id) != nullptr)
+                                   {
+                                       enqueue(view_id, absolute_file_path, profile);
+                                       start_next(batch_size);
+                                   }
+                               });
             enqueued = true;
         }
     }
@@ -356,7 +378,8 @@ auto LogImportCoordinator::import_file_async(const QUuid& view_id, const QString
  * @param file_paths Files to import.
  * @param profile Parsing profile selected for every file.
  * @param batch_size Number of parsed entries per storage batch.
- * @return Created view id, or a null id for an empty request.
+ * @return Created view id, or a null id for an empty request. Streaming starts on the next
+ * event-loop turn so the view can be presented first.
  */
 auto LogImportCoordinator::import_files_async(const QVector<QString>& file_paths,
                                               const LogParsingProfile& profile,
@@ -383,12 +406,24 @@ auto LogImportCoordinator::import_files_async(const QVector<QString>& file_paths
             m_live_tailing->reset_view(view_id, true);
         }
 
+        QVector<QString> absolute_file_paths;
+        absolute_file_paths.reserve(file_paths.size());
         for (const QString& file_path: file_paths)
         {
-            enqueue(view_id, QFileInfo(file_path).absoluteFilePath(), profile);
+            absolute_file_paths.append(QFileInfo(file_path).absoluteFilePath());
         }
-
-        start_next(batch_size);
+        QTimer::singleShot(k_import_presentation_delay_ms, this,
+                           [this, view_id, absolute_file_paths, profile, batch_size] {
+                               if (!m_shutting_down && m_views != nullptr &&
+                                   m_views->get_context(view_id) != nullptr)
+                               {
+                                   for (const QString& file_path: absolute_file_paths)
+                                   {
+                                       enqueue(view_id, file_path, profile);
+                                   }
+                                   start_next(batch_size);
+                               }
+                           });
     }
 
     return view_id;
@@ -401,6 +436,8 @@ auto LogImportCoordinator::import_files_async(const QVector<QString>& file_paths
  * @param file_path Registered file path.
  * @param profile Restored parsing profile.
  * @param batch_size Number of parsed entries per storage batch.
+ *
+ * Enqueueing is deferred by one event-loop turn so the restored tab can be presented first.
  */
 auto LogImportCoordinator::enqueue_registered_file(const QUuid& view_id, const QString& file_path,
                                                    const LogParsingProfile& profile,
@@ -408,8 +445,16 @@ auto LogImportCoordinator::enqueue_registered_file(const QUuid& view_id, const Q
 {
     if (!m_shutting_down && m_views != nullptr && m_views->get_context(view_id) != nullptr)
     {
-        enqueue(view_id, QFileInfo(file_path).absoluteFilePath(), profile);
-        start_next(batch_size);
+        const QString absolute_file_path = QFileInfo(file_path).absoluteFilePath();
+        QTimer::singleShot(k_import_presentation_delay_ms, this,
+                           [this, view_id, absolute_file_path, profile, batch_size] {
+                               if (!m_shutting_down && m_views != nullptr &&
+                                   m_views->get_context(view_id) != nullptr)
+                               {
+                                   enqueue(view_id, absolute_file_path, profile);
+                                   start_next(batch_size);
+                               }
+                           });
     }
 }
 
@@ -727,14 +772,15 @@ auto LogImportCoordinator::enqueue(const QUuid& view_id, const QString& file_pat
 
     if (m_ingest != nullptr && m_history_writer != nullptr)
     {
+        const QString absolute_file_path = QFileInfo(file_path).absoluteFilePath();
         const std::optional<LogCacheGeneration> cache_generation =
-            prepare_cache_generation(file_path, profile);
+            prepare_cache_generation(absolute_file_path, profile);
         const bool cache_ready = m_cache_catalog == nullptr || cache_generation.has_value();
         if (!cache_ready)
         {
             emit error(view_id, file_path,
                        tr("The persistent cache generation could not be prepared."));
-            emit file_removal_requested(view_id, QFileInfo(file_path).absoluteFilePath());
+            emit file_removal_requested(view_id, absolute_file_path);
         }
         else
         {
@@ -742,13 +788,17 @@ auto LogImportCoordinator::enqueue(const QUuid& view_id, const QString& file_pat
                                    cache_generation->state == LogCacheGenerationState::Complete;
             if (cache_hit)
             {
+                emit cache_loading_progress(view_id, absolute_file_path, 0);
                 remember_view_generation(view_id, file_path, cache_generation->id);
+                emit cache_loading_progress(view_id, absolute_file_path, 25);
                 const bool view_bound = bind_view_generations(view_id);
+                emit cache_loading_progress(view_id, absolute_file_path, 70);
                 if (view_bound)
                 {
                     refresh_visible_page(view_id);
                 }
-                emit finished(view_id, QFileInfo(file_path).absoluteFilePath());
+                emit cache_loading_progress(view_id, absolute_file_path, 90);
+                emit finished(view_id, absolute_file_path);
                 if (m_live_tailing != nullptr)
                 {
                     m_live_tailing->start_file(view_id, file_path, profile);

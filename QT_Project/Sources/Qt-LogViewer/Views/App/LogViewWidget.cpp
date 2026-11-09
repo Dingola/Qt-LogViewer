@@ -118,19 +118,61 @@ auto LogViewWidget::show_loading_progress(const QString& file_path, qint64 bytes
                                                    static_cast<double>(bounded_total) +
                                                0.5)
                             : 0;
+    const bool finalizing = bounded_total > 0 && bounded_bytes >= bounded_total;
+    const bool repaint_required =
+        !m_loading_feedback->isVisible() || m_loading_progress->value() != percent || finalizing;
     const QString file_name = QFileInfo(file_path).fileName();
-    m_loading_label->setText(tr("Loading %1 · %2% · %3 / %4")
-                                 .arg(file_name.isEmpty() ? tr("log file") : file_name)
-                                 .arg(percent)
-                                 .arg(QLocale().formattedDataSize(bounded_bytes))
-                                 .arg(QLocale().formattedDataSize(bounded_total)));
+    if (finalizing)
+    {
+        m_loading_label->setText(tr("Finalizing %1 · %2")
+                                     .arg(file_name.isEmpty() ? tr("log file") : file_name)
+                                     .arg(QLocale().formattedDataSize(bounded_total)));
+        m_loading_progress->setRange(0, 0);
+    }
+    else
+    {
+        m_loading_label->setText(tr("Loading %1 · %2% · %3 / %4")
+                                     .arg(file_name.isEmpty() ? tr("log file") : file_name)
+                                     .arg(percent)
+                                     .arg(QLocale().formattedDataSize(bounded_bytes))
+                                     .arg(QLocale().formattedDataSize(bounded_total)));
+        m_loading_progress->setRange(0, 100);
+        m_loading_progress->setValue(percent);
+    }
     m_loading_label->setToolTip(file_path);
-    m_loading_progress->setValue(percent);
     m_loading_cancel_button->show();
     m_loading_feedback->setProperty("state", QStringLiteral("loading"));
     m_loading_feedback->style()->unpolish(m_loading_feedback);
     m_loading_feedback->style()->polish(m_loading_feedback);
     m_loading_feedback->show();
+    if (repaint_required)
+    {
+        m_loading_feedback->repaint();
+    }
+}
+
+/**
+ * @brief Displays phase progress while reopening an existing persistent cache.
+ * @param file_path Source file represented by the cache.
+ * @param percent Completed cache-reopen phases from 0 through 100.
+ */
+auto LogViewWidget::show_cache_loading_progress(const QString& file_path, int percent) -> void
+{
+    ++m_loading_feedback_revision;
+    const int bounded_percent = qBound(0, percent, 100);
+    const QString file_name = QFileInfo(file_path).fileName();
+    m_loading_label->setText(tr("Opening cached %1 · %2%")
+                                 .arg(file_name.isEmpty() ? tr("log file") : file_name)
+                                 .arg(bounded_percent));
+    m_loading_label->setToolTip(file_path);
+    m_loading_progress->setRange(0, 100);
+    m_loading_progress->setValue(bounded_percent);
+    m_loading_cancel_button->hide();
+    m_loading_feedback->setProperty("state", QStringLiteral("loading"));
+    m_loading_feedback->style()->unpolish(m_loading_feedback);
+    m_loading_feedback->style()->polish(m_loading_feedback);
+    m_loading_feedback->show();
+    m_loading_feedback->repaint();
 }
 
 /**
@@ -143,6 +185,7 @@ auto LogViewWidget::show_loading_finished(const QString& file_path) -> void
     const QString file_name = QFileInfo(file_path).fileName();
     m_loading_label->setText(tr("✓ Loaded %1").arg(file_name));
     m_loading_label->setToolTip(file_path);
+    m_loading_progress->setRange(0, 100);
     m_loading_progress->setValue(100);
     m_loading_cancel_button->hide();
     m_loading_feedback->setProperty("state", QStringLiteral("complete"));

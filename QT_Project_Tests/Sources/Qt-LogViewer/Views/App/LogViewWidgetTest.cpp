@@ -179,6 +179,29 @@ TEST_F(LogViewWidgetTest, PresentsCancellableLoadingProgress)
     EXPECT_FALSE(cancel->isVisible());
 }
 
+/** @test Verifies cached loading phases and stream finalization remain visibly distinct. */
+TEST_F(LogViewWidgetTest, PresentsCachePhasesAndStreamFinalization)
+{
+    auto* label = m_widget->findChild<QLabel*>(QStringLiteral("loadingFeedbackLabel"));
+    auto* progress = m_widget->findChild<QProgressBar*>(QStringLiteral("loadingFeedbackProgress"));
+    auto* cancel = m_widget->findChild<QPushButton*>(QStringLiteral("loadingFeedbackCancelButton"));
+    ASSERT_NE(label, nullptr);
+    ASSERT_NE(progress, nullptr);
+    ASSERT_NE(cancel, nullptr);
+
+    m_widget->show_cache_loading_progress(QStringLiteral("C:/logs/cached.log"), 70);
+    EXPECT_TRUE(label->text().contains(QStringLiteral("cached.log")));
+    EXPECT_EQ(progress->minimum(), 0);
+    EXPECT_EQ(progress->maximum(), 100);
+    EXPECT_EQ(progress->value(), 70);
+    EXPECT_FALSE(cancel->isVisible());
+
+    m_widget->show_loading_progress(QStringLiteral("C:/logs/fresh.log"), 100, 100);
+    EXPECT_TRUE(label->text().contains(QStringLiteral("Finalizing")));
+    EXPECT_EQ(progress->minimum(), 0);
+    EXPECT_EQ(progress->maximum(), 0);
+}
+
 /**
  * @brief set_app_names and forwarded app_filter_changed signal from filter widget.
  */

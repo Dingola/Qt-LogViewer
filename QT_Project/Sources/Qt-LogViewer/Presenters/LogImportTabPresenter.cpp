@@ -21,7 +21,8 @@
 
 namespace
 {
-constexpr qsizetype k_import_batch_size = 1000;
+/** Number of parsed entries transferred per UI-thread batch event. */
+constexpr qsizetype k_import_batch_size = 10'000;
 constexpr int k_status_message_timeout_ms = 3000;
 constexpr auto k_untitled_session_text = QT_TRANSLATE_NOOP("MainWindow", "Untitled Session");
 }  // namespace

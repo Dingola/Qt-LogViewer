@@ -412,11 +412,15 @@ auto WorkspacePresenter::connect_workspace_actions() -> void
     {
         connect(m_tab_widget, &QTabWidget::currentChanged, this, [this](int) {
             const QUuid view_id = get_active_view_id();
+            bool refreshed_by_view_change = false;
             if (!view_id.isNull() && m_views != nullptr)
             {
-                m_views->set_current_view(view_id);
+                refreshed_by_view_change = m_views->set_current_view(view_id);
             }
-            refresh_active_view();
+            if (!refreshed_by_view_change)
+            {
+                refresh_active_view();
+            }
             resize_active_view_columns_if_pending();
         });
         connect(m_tab_widget, &TabWidget::about_to_close_tab, this, [this](int index, QWidget*) {
@@ -468,10 +472,10 @@ auto WorkspacePresenter::connect_workspace_updates() -> void
         connect(m_imports, &LogImportCoordinator::progress, this,
                 [this](const QUuid& view_id, const QString&, qint64, qint64) {
                     m_importing_views.insert(view_id);
-                    if (view_id == get_active_view_id())
-                    {
-                        refresh_data_status();
-                    }
+                });
+        connect(m_imports, &LogImportCoordinator::cache_loading_progress, this,
+                [this](const QUuid& view_id, const QString&, int) {
+                    m_importing_views.insert(view_id);
                 });
         connect(m_imports, &LogImportCoordinator::error, this,
                 [this](const QUuid& view_id, const QString&, const QString&) {

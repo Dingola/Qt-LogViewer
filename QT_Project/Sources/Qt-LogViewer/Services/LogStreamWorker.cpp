@@ -60,6 +60,7 @@ auto LogStreamWorker::start(const QString& file_path, qsizetype batch_size, qint
             }
         }
         const qint64 bounded_start = qBound<qint64>(0, start_offset, total);
+        const qint64 progress_interval = qMax<qint64>(1024 * 1024, qMax<qint64>(1, total / 100));
         const bool positioned = file.seek(bounded_start);
         last_progress = bounded_start;
         emit progress(file_path, bounded_start, total);
@@ -101,7 +102,7 @@ auto LogStreamWorker::start(const QString& file_path, qsizetype batch_size, qint
             }
 
             const qint64 pos = file.pos();
-            if (pos - last_progress >= 1024 * 1024 || (pos >= total && pos != last_progress))
+            if (pos - last_progress >= progress_interval || (pos >= total && pos != last_progress))
             {
                 emit progress(file_path, pos, total);
                 last_progress = pos;
