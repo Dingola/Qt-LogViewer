@@ -41,6 +41,16 @@ class LogPageCoordinator final: public QObject
         auto set_query(const QUuid& view_id, const LogQuery& query) -> bool;
 
         /**
+         * @brief Changes result ordering and reloads page one without recounting unchanged rows.
+         * @param view_id Target view.
+         * @param sort_field Stable identifier of the field used for sorting.
+         * @param sort_order Requested sort direction.
+         * @return True when page state exists for the view.
+         */
+        auto set_sorting(const QUuid& view_id, const QString& sort_field,
+                         Qt::SortOrder sort_order) -> bool;
+
+        /**
          * @brief Sets the current page and reloads the view model.
          * @param view_id Target view.
          * @param page One-based page number.
@@ -123,8 +133,8 @@ class LogPageCoordinator final: public QObject
         /**
          * @brief Emitted after a query or its underlying entries changed aggregate results.
          *
-         * Pure page-number and page-size changes do not emit this signal because they preserve
-         * the result set, its facets, and its total entry count.
+         * Pure page-number, page-size, and sorting changes do not emit this signal because they
+         * preserve the result set, its facets, and its total entry count.
          *
          * @param view_id View whose result-set aggregates may need presentation updates.
          */

@@ -29,6 +29,7 @@
 #include "Qt-LogViewer/Controllers/LogPageCoordinator.h"
 #include "Qt-LogViewer/Controllers/LogQueryController.h"
 #include "Qt-LogViewer/Controllers/ViewRegistry.h"
+#include "Qt-LogViewer/Models/LogModel.h"
 #include "Qt-LogViewer/Models/LogPageState.h"
 #include "Qt-LogViewer/Models/LogQuery.h"
 #include "Qt-LogViewer/Services/HistoryWriteService.h"
@@ -225,16 +226,13 @@ class BenchmarkRunner final
         /**
          * @brief Applies one explicit sort order to the active result set.
          * @param view_id View whose query is updated.
-         * @param field Stable field identifier used for sorting.
+         * @param column Sortable model column selected by the user-facing path.
          * @param order Requested sort direction.
          * @return True when the updated query was loaded.
          */
-        auto apply_sort(const QUuid& view_id, const QString& field, Qt::SortOrder order) -> bool
+        auto apply_sort(const QUuid& view_id, int column, Qt::SortOrder order) -> bool
         {
-            LogQuery query = m_queries.create_query(view_id);
-            query.sort_field = field;
-            query.sort_order = order;
-            return m_pages.set_query(view_id, query);
+            return m_queries.set_sort(view_id, column, order);
         }
 
         /**
@@ -287,7 +285,7 @@ class BenchmarkRunner final
                     view_id, QStringLiteral("Zeitstempel aufsteigend sortieren"),
                     QStringLiteral("Alle Einträge nach dem ältesten Zeitstempel zuerst sortieren"),
                     [this, view_id] {
-                        return apply_sort(view_id, LogField::Timestamp, Qt::AscendingOrder);
+                        return apply_sort(view_id, LogModel::Timestamp, Qt::AscendingOrder);
                     });
             }
             if (succeeded)
@@ -296,7 +294,7 @@ class BenchmarkRunner final
                     view_id, QStringLiteral("Anwendung sortieren"),
                     QStringLiteral("Alle Einträge alphabetisch nach Anwendung sortieren"),
                     [this, view_id] {
-                        return apply_sort(view_id, LogField::AppName, Qt::AscendingOrder);
+                        return apply_sort(view_id, LogModel::AppName, Qt::AscendingOrder);
                     });
             }
             if (succeeded)
@@ -305,7 +303,7 @@ class BenchmarkRunner final
                     view_id, QStringLiteral("Log-Level sortieren"),
                     QStringLiteral("Alle Einträge alphabetisch nach Log-Level sortieren"),
                     [this, view_id] {
-                        return apply_sort(view_id, LogField::Level, Qt::AscendingOrder);
+                        return apply_sort(view_id, LogModel::Level, Qt::AscendingOrder);
                     });
             }
             if (succeeded && m_include_message_sort)
@@ -314,7 +312,7 @@ class BenchmarkRunner final
                     view_id, QStringLiteral("Nachricht sortieren"),
                     QStringLiteral("Alle Einträge alphabetisch nach Nachricht sortieren"),
                     [this, view_id] {
-                        return apply_sort(view_id, LogField::Message, Qt::AscendingOrder);
+                        return apply_sort(view_id, LogModel::Message, Qt::AscendingOrder);
                     });
             }
             if (succeeded)
@@ -323,7 +321,7 @@ class BenchmarkRunner final
                     view_id, QStringLiteral("Standardsortierung wiederherstellen"),
                     QStringLiteral("Neueste Zeitstempel wieder zuerst anzeigen"),
                     [this, view_id] {
-                        return apply_sort(view_id, LogField::Timestamp, Qt::DescendingOrder);
+                        return apply_sort(view_id, LogModel::Timestamp, Qt::DescendingOrder);
                     });
             }
             if (succeeded)

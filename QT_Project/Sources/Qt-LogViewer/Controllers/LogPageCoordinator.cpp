@@ -50,6 +50,28 @@ auto LogPageCoordinator::set_query(const QUuid& view_id, const LogQuery& query) 
 }
 
 /**
+ * @brief Changes result ordering and reloads page one without recounting unchanged rows.
+ * @param view_id Target view.
+ * @param sort_field Stable identifier of the field used for sorting.
+ * @param sort_order Requested sort direction.
+ * @return True when page state exists for the view.
+ */
+auto LogPageCoordinator::set_sorting(const QUuid& view_id, const QString& sort_field,
+                                     Qt::SortOrder sort_order) -> bool
+{
+    bool updated = false;
+    auto state = m_page_states.find(view_id);
+
+    if (state != m_page_states.end())
+    {
+        state->set_sorting(sort_field, sort_order);
+        updated = load_current_page(view_id);
+    }
+
+    return updated;
+}
+
+/**
  * @brief Sets the current page and reloads the view model.
  * @param view_id Target view.
  * @param page One-based page number.

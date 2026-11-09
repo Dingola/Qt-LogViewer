@@ -175,10 +175,7 @@ auto LogQueryController::set_sort(const QUuid& view_id, int column, Qt::SortOrde
 
     if (model != nullptr && model->is_column_sortable(column) && m_pages != nullptr)
     {
-        LogQuery query = create_query(view_id);
-        query.sort_field = model->get_column_field_id(column);
-        query.sort_order = order;
-        sorted = m_pages->set_query(view_id, query);
+        sorted = m_pages->set_sorting(view_id, model->get_column_field_id(column), order);
     }
 
     return sorted;

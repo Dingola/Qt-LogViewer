@@ -19,6 +19,18 @@ auto LogPageState::set_query(const LogQuery& query) -> void
 }
 
 /**
+ * @brief Changes result ordering while preserving the known result count.
+ * @param sort_field Stable identifier of the field used for sorting.
+ * @param sort_order Requested sort direction.
+ */
+auto LogPageState::set_sorting(const QString& sort_field, Qt::SortOrder sort_order) -> void
+{
+    m_query.sort_field = sort_field;
+    m_query.sort_order = sort_order;
+    m_current_page = 1;
+}
+
+/**
  * @brief Returns the current query.
  * @return Query describing the result set.
  */

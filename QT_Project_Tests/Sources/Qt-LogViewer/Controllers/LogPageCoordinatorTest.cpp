@@ -169,6 +169,47 @@ TEST_F(LogPageCoordinatorTest, ReusesKnownTotalWhenChangingPage)
 }
 
 /**
+ * @test Verifies that sorting reloads page one without recounting or invalidating aggregates.
+ */
+TEST_F(LogPageCoordinatorTest, ReusesKnownTotalWhenSortingChanges)
+{
+    QVector<LogEntry> entries;
+    for (int index = 1; index <= 30; ++index)
+    {
+        entries.append(create_entry(
+            QStringLiteral("entry-%1").arg(index),
+            QDateTime::fromString(QStringLiteral("2026-01-01T12:00:00.000Z"), Qt::ISODateWithMs)));
+    }
+    ASSERT_TRUE(m_history_service->add_entries(m_view_id, entries));
+
+    LogQuery query;
+    ASSERT_TRUE(m_coordinator->set_query(m_view_id, query));
+    ASSERT_TRUE(m_coordinator->set_page_size(m_view_id, 10));
+    ASSERT_TRUE(m_coordinator->set_current_page(m_view_id, 2));
+
+    const LogEntry later_entry = create_entry(
+        QStringLiteral("later-entry"),
+        QDateTime::fromString(QStringLiteral("2026-01-01T13:00:00.000Z"), Qt::ISODateWithMs));
+    ASSERT_TRUE(m_history_service->add_entries(m_view_id, {later_entry}));
+    QSignalSpy result_set_spy(m_coordinator, &LogPageCoordinator::result_set_changed);
+
+    ASSERT_TRUE(m_coordinator->set_sorting(m_view_id, LogField::Message, Qt::AscendingOrder));
+
+    const LogPageState* state = m_coordinator->get_page_state(m_view_id);
+    ASSERT_NE(state, nullptr);
+    EXPECT_EQ(state->get_current_page(), 1);
+    EXPECT_EQ(state->get_total_entries(), 30);
+    EXPECT_EQ(state->get_total_pages(), 3);
+    EXPECT_EQ(state->get_query().sort_field, LogField::Message);
+    EXPECT_EQ(state->get_query().sort_order, Qt::AscendingOrder);
+    EXPECT_EQ(result_set_spy.count(), 0);
+
+    const QVector<LogEntry> loaded_entries = m_views->get_context(m_view_id)->get_entries();
+    ASSERT_EQ(loaded_entries.size(), 10);
+    EXPECT_EQ(loaded_entries.first().get_message(), QStringLiteral("entry-1"));
+}
+
+/**
  * @brief Verifies that query filters are applied before loading the model.
  */
 TEST_F(LogPageCoordinatorTest, LoadsFilteredEntries)

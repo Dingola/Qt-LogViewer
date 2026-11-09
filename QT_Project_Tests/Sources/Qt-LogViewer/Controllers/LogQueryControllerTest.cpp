@@ -71,7 +71,8 @@ auto LogQueryControllerTest::create_entry(int index, const QString& file_path) c
 }
 
 /**
- * @brief Verifies that a filter change resets paging and emits one completed page update.
+ * @brief Verifies that a filter change resets paging and emits one completed
+ * page update.
  */
 TEST_F(LogQueryControllerTest, FilterChangeResetsPageAndReloadsOnce)
 {
@@ -110,7 +111,8 @@ TEST_F(LogQueryControllerTest, FilterChangeResetsPageAndReloadsOnce)
 }
 
 /**
- * @brief Verifies that restoring filters, sorting, and paging performs one model reload.
+ * @brief Verifies that restoring filters, sorting, and paging performs one
+ * model reload.
  */
 TEST_F(LogQueryControllerTest, AppliesRestoredStateWithSingleReload)
 {
@@ -149,7 +151,8 @@ TEST_F(LogQueryControllerTest, AppliesRestoredStateWithSingleReload)
 }
 
 /**
- * @brief Verifies that visibility and sorting operations each trigger one complete update.
+ * @test Verifies that visibility and sorting operations each trigger one page
+ * update while only result-set changes invalidate aggregates.
  */
 TEST_F(LogQueryControllerTest, VisibilityAndSortingReloadOncePerOperation)
 {
@@ -161,15 +164,19 @@ TEST_F(LogQueryControllerTest, VisibilityAndSortingReloadOncePerOperation)
     ASSERT_TRUE(m_queries->reload_query(m_view_id));
 
     QSignalSpy page_loaded_spy(m_pages, &LogPageCoordinator::page_loaded);
+    QSignalSpy result_set_spy(m_pages, &LogPageCoordinator::result_set_changed);
 
     ASSERT_TRUE(m_queries->toggle_file_visibility(m_view_id, first_file));
     EXPECT_EQ(page_loaded_spy.count(), 1);
+    EXPECT_EQ(result_set_spy.count(), 1);
     EXPECT_TRUE(m_queries->create_query(m_view_id).hidden_files.contains(first_file));
 
     page_loaded_spy.clear();
+    result_set_spy.clear();
 
     ASSERT_TRUE(m_queries->set_sort(m_view_id, LogModel::Message, Qt::AscendingOrder));
     EXPECT_EQ(page_loaded_spy.count(), 1);
+    EXPECT_EQ(result_set_spy.count(), 0);
     EXPECT_EQ(m_queries->create_query(m_view_id).sort_field, LogField::Message);
     EXPECT_EQ(m_queries->create_query(m_view_id).sort_order, Qt::AscendingOrder);
 }

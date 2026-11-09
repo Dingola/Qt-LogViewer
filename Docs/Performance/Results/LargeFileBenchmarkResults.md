@@ -30,7 +30,6 @@
 - **Erstimport:** Misst den vollständigen Weg ohne vorhandenen Cache.
 - **Cache-Treffer:** Misst das erneute Öffnen derselben Datei über den bereits erzeugten persistenten Cache.
 - **Leeres Feld bei Daten pro Sekunde:** Für Filter, Suche und Seitenwechsel ist eine Dateidatenrate fachlich nicht sinnvoll; dort zählt ausschließlich die gemessene Dauer.
-
 ---
 
 ## Messlauf 2026-11-09T15:43:08.008Z
@@ -191,6 +190,45 @@
 | Textsuche entfernen | Textsuche leeren und ungefilterte erste Seite laden | 1.962 s | 4000000 | – | 21.99 Mebibyte |
 | Regex-Suche ausführen | Regulären Ausdruck über alle vier Millionen Meldungen prüfen | 113.768 s | 4000000 | – | 52.11 Mebibyte |
 | Regex-Suche entfernen | Regulären Ausdruck leeren und erste Seite neu laden | 1.869 s | 4000000 | – | 52.47 Mebibyte |
+
+## Bedeutung der Einheiten
+
+- **Mebibyte pro Sekunde:** Wie viele Daten pro Sekunde verarbeitet wurden. Ein Mebibyte entspricht 1.048.576 Bytes. Ein höherer Wert ist besser.
+- **Arbeitsspeicher am Phasenende:** Physischer Speicher, den der Benchmark-Prozess beim Abschluss der jeweiligen Phase belegt hat. Ein niedrigerer Wert ist besser.
+- **Erstimport:** Misst den vollständigen Weg ohne vorhandenen Cache.
+- **Cache-Treffer:** Misst das erneute Öffnen derselben Datei über den bereits erzeugten persistenten Cache.
+- **Leeres Feld bei Daten pro Sekunde:** Für Filter, Suche und Seitenwechsel ist eine Dateidatenrate fachlich nicht sinnvoll; dort zählt ausschließlich die gemessene Dauer.
+
+
+---
+
+## Messlauf 2026-11-09T21:06:59.073Z
+
+- Quellstand: `515530238538+Arbeitskopie`
+- Nachrichtensortierung: ausgelassen (opt-in)
+- Datensatzgröße: 1074000000 Bytes (1024.25 Mebibyte)
+- Ergebnis-CSV: `LargeFileBenchmarkResults.csv`
+
+| Messphase | Bedeutung | Dauer | Verarbeitete Logeinträge | Verarbeitete Daten pro Sekunde | Arbeitsspeicher am Phasenende |
+|---|---|---:|---:|---:|---:|
+| Erstimport | Datei vollständig einlesen, analysieren und speichern | 54.845 s | 4000000 | 18.68 Mebibyte pro Sekunde | 22.13 Mebibyte |
+| Cache-Treffer | Bereits aufgebauten Cache öffnen und erste Seite laden | 1.886 s | 4000000 | 543.18 Mebibyte pro Sekunde | 22.25 Mebibyte |
+| Zweite Seite öffnen | Von Seite 1 auf die direkt benachbarte Seite 2 wechseln | 0.958 s | 4000000 | – | 22.10 Mebibyte |
+| Erste Seite wieder öffnen | Von Seite 2 zur ersten Ergebnisseite zurückkehren | 0.965 s | 4000000 | – | 22.05 Mebibyte |
+| Mittlere Seite öffnen | Von der ersten auf die mittlere Ergebnisseite wechseln | 0.997 s | 4000000 | – | 22.09 Mebibyte |
+| Letzte Seite öffnen | Von der mittleren auf die letzte Ergebnisseite wechseln | 1.036 s | 4000000 | – | 22.17 Mebibyte |
+| Zeitstempel aufsteigend sortieren | Alle Einträge nach dem ältesten Zeitstempel zuerst sortieren | 0.964 s | 4000000 | – | 21.99 Mebibyte |
+| Anwendung sortieren | Alle Einträge alphabetisch nach Anwendung sortieren | 1.063 s | 4000000 | – | 22.03 Mebibyte |
+| Log-Level sortieren | Alle Einträge alphabetisch nach Log-Level sortieren | 1.048 s | 4000000 | – | 22.00 Mebibyte |
+| Standardsortierung wiederherstellen | Neueste Zeitstempel wieder zuerst anzeigen | 0.973 s | 4000000 | – | 22.28 Mebibyte |
+| Anwendungsfilter setzen | Nur Logeinträge der Anwendung App01 laden | 0.642 s | 1000000 | – | 21.98 Mebibyte |
+| Anwendungsfilter entfernen | Wieder Logeinträge aller Anwendungen laden | 1.881 s | 4000000 | – | 22.32 Mebibyte |
+| Log-Level-Filter setzen | Nur Logeinträge mit Level ERROR laden | 0.653 s | 1000000 | – | 22.32 Mebibyte |
+| Log-Level-Filter entfernen | Wieder Logeinträge aller Level laden | 1.885 s | 4000000 | – | 22.30 Mebibyte |
+| Textsuche ausführen | Nach dem Text scenario=large-file in Meldungen suchen | 2.367 s | 4000000 | – | 22.13 Mebibyte |
+| Textsuche entfernen | Textsuche leeren und ungefilterte erste Seite laden | 1.877 s | 4000000 | – | 22.36 Mebibyte |
+| Regex-Suche ausführen | Regulären Ausdruck über alle vier Millionen Meldungen prüfen | 112.072 s | 4000000 | – | 51.20 Mebibyte |
+| Regex-Suche entfernen | Regulären Ausdruck leeren und erste Seite neu laden | 1.888 s | 4000000 | – | 52.19 Mebibyte |
 
 ## Bedeutung der Einheiten
 

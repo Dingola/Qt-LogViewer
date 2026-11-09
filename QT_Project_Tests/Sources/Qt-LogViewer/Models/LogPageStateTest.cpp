@@ -106,6 +106,24 @@ TEST_F(LogPageStateTest, ResetsPagingWhenQueryChanges)
 }
 
 /**
+ * @test Verifies that changing result ordering resets only the selected page.
+ */
+TEST_F(LogPageStateTest, PreservesResultCountWhenSortingChanges)
+{
+    LogPageState state;
+    state.set_total_entries(100);
+    state.set_current_page(3);
+
+    state.set_sorting(LogField::Message, Qt::AscendingOrder);
+
+    EXPECT_EQ(state.get_query().sort_field, LogField::Message);
+    EXPECT_EQ(state.get_query().sort_order, Qt::AscendingOrder);
+    EXPECT_EQ(state.get_current_page(), 1);
+    EXPECT_EQ(state.get_total_entries(), 100);
+    EXPECT_EQ(state.get_total_pages(), 4);
+}
+
+/**
  * @brief Verifies that invalid page sizes are ignored.
  */
 TEST_F(LogPageStateTest, IgnoresInvalidPageSize)
