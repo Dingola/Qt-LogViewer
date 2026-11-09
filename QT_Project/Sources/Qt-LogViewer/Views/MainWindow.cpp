@@ -1063,6 +1063,12 @@ auto MainWindow::create_log_view_widget_for_view(const QUuid& view_id,
                                            m_imports, m_lifecycle, m_live_tailing, log_view_widget,
                                            view_id, state, log_view_widget);
     m_workspace_presenter->bind_log_view_presenter(presenter);
+    connect(log_view_widget, &LogViewWidget::loading_cancel_requested, this,
+            [this, log_view_widget, view_id]() {
+                m_imports->cancel(view_id);
+                log_view_widget->hide_loading_progress();
+                set_loading_tab_suffix(log_view_widget, QString());
+            });
 
     return log_view_widget;
 }
@@ -1126,13 +1132,13 @@ auto MainWindow::handle_add_log_file_to_current_view_requested(const LogFileInfo
 /**
  * @brief Handles streaming progress for a specific view.
  * @param view_id The target view.
+ * @param file_path Source file currently being processed.
  * @param bytes_read Bytes read so far.
  * @param total_bytes Total file size in bytes.
  */
-auto MainWindow::handle_loading_progress(const QUuid& view_id, qint64 bytes_read,
-                                         qint64 total_bytes) -> void
+auto MainWindow::handle_loading_progress(const QUuid& view_id, const QString& file_path,
+                                         qint64 bytes_read, qint64 total_bytes) -> void
 {
-    Q_UNUSED(view_id);
     int percent = 0;
 
     if (total_bytes > 0)
@@ -1141,8 +1147,12 @@ auto MainWindow::handle_loading_progress(const QUuid& view_id, qint64 bytes_read
             (static_cast<double>(bytes_read) * 100.0) / static_cast<double>(total_bytes) + 0.5);
     }
 
-    statusBar()->showMessage(
-        tr("Loading... %1% (%2 / %3 bytes)").arg(percent).arg(bytes_read).arg(total_bytes));
+    LogViewWidget* widget = find_log_view_widget(view_id);
+    if (widget != nullptr)
+    {
+        widget->show_loading_progress(file_path, bytes_read, total_bytes);
+        set_loading_tab_suffix(widget, tr(" · %1%").arg(percent));
+    }
 }
 
 /**
@@ -1152,10 +1162,14 @@ auto MainWindow::handle_loading_progress(const QUuid& view_id, qint64 bytes_read
  */
 auto MainWindow::handle_loading_finished(const QUuid& view_id, const QString& file_path) -> void
 {
-    Q_UNUSED(view_id);
-    QFileInfo info(file_path);
-    statusBar()->showMessage(tr("Loaded %1 (%2 bytes)").arg(info.fileName()).arg(info.size()),
-                             4000);
+    LogViewWidget* widget = find_log_view_widget(view_id);
+    if (widget != nullptr)
+    {
+        widget->show_loading_finished(file_path);
+        set_loading_tab_suffix(widget, tr(" · ✓"));
+        QTimer::singleShot(1800, widget,
+                           [this, widget]() { set_loading_tab_suffix(widget, QString()); });
+    }
 }
 
 /**
@@ -1167,11 +1181,54 @@ auto MainWindow::handle_loading_finished(const QUuid& view_id, const QString& fi
 auto MainWindow::handle_loading_error(const QUuid& view_id, const QString& file_path,
                                       const QString& message) -> void
 {
-    Q_UNUSED(view_id);
-    statusBar()->clearMessage();
+    LogViewWidget* widget = find_log_view_widget(view_id);
+    if (widget != nullptr)
+    {
+        widget->hide_loading_progress();
+        set_loading_tab_suffix(widget, QString());
+    }
 
     QMessageBox::critical(this, tr("Load Error"),
                           tr("Failed to load file:\n%1\n\n%2").arg(file_path, message));
+}
+
+/**
+ * @brief Finds the tab content associated with a runtime view identifier.
+ * @param view_id Runtime view identifier.
+ * @return Matching log view widget, or nullptr when no tab owns the id.
+ */
+auto MainWindow::find_log_view_widget(const QUuid& view_id) const -> LogViewWidget*
+{
+    LogViewWidget* result = nullptr;
+    for (int index = 0; index < ui->tabWidgetLog->count() && result == nullptr; ++index)
+    {
+        auto* candidate = qobject_cast<LogViewWidget*>(ui->tabWidgetLog->widget(index));
+        if (candidate != nullptr && candidate->get_view_id() == view_id)
+        {
+            result = candidate;
+        }
+    }
+    return result;
+}
+
+/**
+ * @brief Updates the compact progress suffix of a log-view tab.
+ * @param widget Log-view tab content.
+ * @param suffix Progress or completion suffix, or an empty string to clear it.
+ */
+auto MainWindow::set_loading_tab_suffix(LogViewWidget* widget, const QString& suffix) -> void
+{
+    const int index = ui->tabWidgetLog->indexOf(widget);
+    if (index >= 0)
+    {
+        QString base_title = widget->property("loadingBaseTabTitle").toString();
+        if (base_title.isEmpty())
+        {
+            base_title = ui->tabWidgetLog->tabText(index);
+            widget->setProperty("loadingBaseTabTitle", base_title);
+        }
+        ui->tabWidgetLog->setTabText(index, base_title + suffix);
+    }
 }
 
 /**

@@ -219,7 +219,7 @@ TEST_F(LogWorkflowIntegrationTest, ReopensCancelledFileWithNewParsingProfile)
     const QMetaObject::Connection cancellation_connection = QObject::connect(
         &m_runtime->imports(), &LogImportCoordinator::progress, &m_runtime->imports(),
         [this, &cancelled_view_id, &cancellation_requested, &cancelled_view_closed](
-            const QUuid& progress_view_id, qint64 bytes_read, qint64 total_bytes) {
+            const QUuid& progress_view_id, const QString&, qint64 bytes_read, qint64 total_bytes) {
             const bool is_partial_progress = total_bytes > 0 && bytes_read < total_bytes;
             if (!cancellation_requested && progress_view_id == cancelled_view_id &&
                 is_partial_progress)

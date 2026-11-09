@@ -292,11 +292,12 @@ class MainWindow: public QtWidgetsCommonLib::AppMainWindow
         /**
          * @brief Handles streaming progress for a specific view.
          * @param view_id The target view.
+         * @param file_path Source file currently being processed.
          * @param bytes_read Bytes read so far.
          * @param total_bytes Total file size in bytes.
          */
-        auto handle_loading_progress(const QUuid& view_id, qint64 bytes_read,
-                                     qint64 total_bytes) -> void;
+        auto handle_loading_progress(const QUuid& view_id, const QString& file_path,
+                                     qint64 bytes_read, qint64 total_bytes) -> void;
 
         /**
          * @brief Handles streaming completion for a file/view.
@@ -313,6 +314,20 @@ class MainWindow: public QtWidgetsCommonLib::AppMainWindow
          */
         auto handle_loading_error(const QUuid& view_id, const QString& file_path,
                                   const QString& message) -> void;
+
+        /**
+         * @brief Finds the tab content associated with a runtime view identifier.
+         * @param view_id Runtime view identifier.
+         * @return Matching log view widget, or nullptr when no tab owns the id.
+         */
+        [[nodiscard]] auto find_log_view_widget(const QUuid& view_id) const -> LogViewWidget*;
+
+        /**
+         * @brief Updates the compact progress suffix of a log-view tab.
+         * @param widget Log-view tab content.
+         * @param suffix Progress or completion suffix, or an empty string to clear it.
+         */
+        auto set_loading_tab_suffix(LogViewWidget* widget, const QString& suffix) -> void;
 
         /**
          * @brief Open selected recent file from menu or start page.

@@ -13,7 +13,8 @@
  * @brief Test fixture for LogViewWidget.
  *
  * Covers view id management, model wiring and selection forwarding, filter widget API forwarding,
- * files-in-view menu rebuilding and action signal forwarding, and simple visibility/clear helpers.
+ * files-in-view menu rebuilding, per-view loading feedback, action signal forwarding, and simple
+ * visibility/clear helpers.
  */
 class LogViewWidgetTest: public ::testing::Test
 {

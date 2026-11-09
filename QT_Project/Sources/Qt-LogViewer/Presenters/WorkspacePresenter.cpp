@@ -466,7 +466,7 @@ auto WorkspacePresenter::connect_workspace_updates() -> void
                     }
                 });
         connect(m_imports, &LogImportCoordinator::progress, this,
-                [this](const QUuid& view_id, qint64, qint64) {
+                [this](const QUuid& view_id, const QString&, qint64, qint64) {
                     m_importing_views.insert(view_id);
                     if (view_id == get_active_view_id())
                     {

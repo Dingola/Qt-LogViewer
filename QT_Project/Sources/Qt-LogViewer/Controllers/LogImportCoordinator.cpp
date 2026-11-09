@@ -583,12 +583,13 @@ auto LogImportCoordinator::connect_workflow() -> void
                 });
 
         connect(m_ingest, &LogIngestController::progress, this,
-                [this](const QUuid& operation_id, const QUuid& view_id, const QString&,
+                [this](const QUuid& operation_id, const QUuid& view_id, const QString& file_path,
                        qint64 bytes_read, qint64 total_bytes) {
                     if (!m_shutting_down && !view_id.isNull() &&
                         m_operation_views.value(operation_id) == view_id)
                     {
-                        emit progress(view_id, bytes_read, total_bytes);
+                        emit progress(view_id, QFileInfo(file_path).absoluteFilePath(), bytes_read,
+                                      total_bytes);
                     }
                 });
 

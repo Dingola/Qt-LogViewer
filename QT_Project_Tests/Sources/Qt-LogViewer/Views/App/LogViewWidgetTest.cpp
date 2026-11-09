@@ -2,7 +2,9 @@
 
 #include <QApplication>
 #include <QItemSelectionModel>
+#include <QLabel>
 #include <QMenu>
+#include <QProgressBar>
 #include <QPushButton>
 #include <QSignalSpy>
 #include <QStackedWidget>
@@ -149,6 +151,32 @@ TEST_F(LogViewWidgetTest, PresentsContextualEmptyResultState)
     EXPECT_TRUE(reset_button->isVisibleTo(empty_state));
     reset_button->click();
     EXPECT_EQ(reset_spy.count(), 1);
+}
+
+/** @test Verifies that loading progress is scoped to the affected log view and cancellable. */
+TEST_F(LogViewWidgetTest, PresentsCancellableLoadingProgress)
+{
+    QSignalSpy cancel_spy(m_widget, &LogViewWidget::loading_cancel_requested);
+    m_widget->show_loading_progress(QStringLiteral("C:/logs/example.log"), 50, 100);
+
+    auto* feedback = m_widget->findChild<QWidget*>(QStringLiteral("loadingFeedback"));
+    auto* label = m_widget->findChild<QLabel*>(QStringLiteral("loadingFeedbackLabel"));
+    auto* progress = m_widget->findChild<QProgressBar*>(QStringLiteral("loadingFeedbackProgress"));
+    auto* cancel = m_widget->findChild<QPushButton*>(QStringLiteral("loadingFeedbackCancelButton"));
+    ASSERT_NE(feedback, nullptr);
+    ASSERT_NE(label, nullptr);
+    ASSERT_NE(progress, nullptr);
+    ASSERT_NE(cancel, nullptr);
+    EXPECT_TRUE(feedback->isVisibleTo(m_widget));
+    EXPECT_TRUE(label->text().contains(QStringLiteral("example.log")));
+    EXPECT_EQ(progress->value(), 50);
+
+    cancel->click();
+    EXPECT_EQ(cancel_spy.count(), 1);
+
+    m_widget->show_loading_finished(QStringLiteral("C:/logs/example.log"));
+    EXPECT_TRUE(label->text().contains(QStringLiteral("Loaded")));
+    EXPECT_FALSE(cancel->isVisible());
 }
 
 /**

@@ -2,11 +2,19 @@
 
 #include <QAction>
 #include <QCheckBox>
+#include <QFileInfo>
+#include <QHBoxLayout>
 #include <QItemSelectionModel>
+#include <QLabel>
 #include <QLayout>
+#include <QLocale>
 #include <QMenu>
 #include <QPainter>
+#include <QProgressBar>
+#include <QPushButton>
 #include <QStackedWidget>
+#include <QStyle>
+#include <QTimer>
 #include <QToolButton>
 
 #include "Qt-LogViewer/Views/App/FilesInViewMenuItemWidget.h"
@@ -41,6 +49,7 @@ LogViewWidget::LogViewWidget(QWidget* parent)
     ui->setupUi(this);
     setAttribute(Qt::WA_StyledBackground, true);
     ui->verticalLayout->setContentsMargins(9, 0, 9, 0);
+    setup_loading_feedback();
     setup_empty_state();
 
     // Forward filter signals
@@ -60,6 +69,100 @@ LogViewWidget::LogViewWidget(QWidget* parent)
     }
 
     setup_files_menu();
+}
+
+/** @brief Creates the compact per-view loading feedback above the log table. */
+auto LogViewWidget::setup_loading_feedback() -> void
+{
+    m_loading_feedback = new QWidget(this);
+    m_loading_feedback->setObjectName(QStringLiteral("loadingFeedback"));
+    auto* layout = new QHBoxLayout(m_loading_feedback);
+    layout->setContentsMargins(8, 4, 8, 4);
+    layout->setSpacing(8);
+
+    m_loading_label = new QLabel(m_loading_feedback);
+    m_loading_label->setObjectName(QStringLiteral("loadingFeedbackLabel"));
+    m_loading_label->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Preferred);
+    m_loading_progress = new QProgressBar(m_loading_feedback);
+    m_loading_progress->setObjectName(QStringLiteral("loadingFeedbackProgress"));
+    m_loading_progress->setRange(0, 100);
+    m_loading_progress->setTextVisible(false);
+    m_loading_progress->setFixedHeight(4);
+    m_loading_cancel_button = new QPushButton(tr("Cancel"), m_loading_feedback);
+    m_loading_cancel_button->setObjectName(QStringLiteral("loadingFeedbackCancelButton"));
+
+    layout->addWidget(m_loading_label);
+    layout->addWidget(m_loading_progress, 1);
+    layout->addWidget(m_loading_cancel_button);
+    ui->verticalLayout->insertWidget(0, m_loading_feedback);
+    m_loading_feedback->hide();
+
+    connect(m_loading_cancel_button, &QPushButton::clicked, this,
+            &LogViewWidget::loading_cancel_requested);
+}
+
+/**
+ * @brief Displays byte progress for the file currently loading into this view.
+ * @param file_path Source file being processed.
+ * @param bytes_read Number of bytes processed so far.
+ * @param total_bytes Total source size in bytes.
+ */
+auto LogViewWidget::show_loading_progress(const QString& file_path, qint64 bytes_read,
+                                          qint64 total_bytes) -> void
+{
+    ++m_loading_feedback_revision;
+    const qint64 bounded_total = qMax<qint64>(0, total_bytes);
+    const qint64 bounded_bytes = qBound<qint64>(0, bytes_read, bounded_total);
+    const int percent = bounded_total > 0
+                            ? static_cast<int>((static_cast<double>(bounded_bytes) * 100.0) /
+                                                   static_cast<double>(bounded_total) +
+                                               0.5)
+                            : 0;
+    const QString file_name = QFileInfo(file_path).fileName();
+    m_loading_label->setText(tr("Loading %1 · %2% · %3 / %4")
+                                 .arg(file_name.isEmpty() ? tr("log file") : file_name)
+                                 .arg(percent)
+                                 .arg(QLocale().formattedDataSize(bounded_bytes))
+                                 .arg(QLocale().formattedDataSize(bounded_total)));
+    m_loading_label->setToolTip(file_path);
+    m_loading_progress->setValue(percent);
+    m_loading_cancel_button->show();
+    m_loading_feedback->setProperty("state", QStringLiteral("loading"));
+    m_loading_feedback->style()->unpolish(m_loading_feedback);
+    m_loading_feedback->style()->polish(m_loading_feedback);
+    m_loading_feedback->show();
+}
+
+/**
+ * @brief Briefly confirms that a file finished loading successfully.
+ * @param file_path Source file that completed.
+ */
+auto LogViewWidget::show_loading_finished(const QString& file_path) -> void
+{
+    const quint64 revision = ++m_loading_feedback_revision;
+    const QString file_name = QFileInfo(file_path).fileName();
+    m_loading_label->setText(tr("✓ Loaded %1").arg(file_name));
+    m_loading_label->setToolTip(file_path);
+    m_loading_progress->setValue(100);
+    m_loading_cancel_button->hide();
+    m_loading_feedback->setProperty("state", QStringLiteral("complete"));
+    m_loading_feedback->style()->unpolish(m_loading_feedback);
+    m_loading_feedback->style()->polish(m_loading_feedback);
+    m_loading_feedback->show();
+
+    QTimer::singleShot(1800, this, [this, revision]() {
+        if (m_loading_feedback_revision == revision)
+        {
+            m_loading_feedback->hide();
+        }
+    });
+}
+
+/** @brief Hides the loading feedback after cancellation or failure. */
+auto LogViewWidget::hide_loading_progress() -> void
+{
+    ++m_loading_feedback_revision;
+    m_loading_feedback->hide();
 }
 
 /**

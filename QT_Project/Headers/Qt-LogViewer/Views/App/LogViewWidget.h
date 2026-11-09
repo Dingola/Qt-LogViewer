@@ -23,6 +23,9 @@ class LogFilterWidget;
 class LogTableView;
 class EmptyStateWidget;
 class QAction;
+class QLabel;
+class QProgressBar;
+class QPushButton;
 class QStackedWidget;
 
 /**
@@ -222,6 +225,24 @@ class LogViewWidget: public QWidget
          */
         auto set_empty_result_filtered(bool filtered) -> void;
 
+        /**
+         * @brief Displays byte progress for the file currently loading into this view.
+         * @param file_path Source file being processed.
+         * @param bytes_read Number of bytes processed so far.
+         * @param total_bytes Total source size in bytes.
+         */
+        auto show_loading_progress(const QString& file_path, qint64 bytes_read,
+                                   qint64 total_bytes) -> void;
+
+        /**
+         * @brief Briefly confirms that a file finished loading successfully.
+         * @param file_path Source file that completed.
+         */
+        auto show_loading_finished(const QString& file_path) -> void;
+
+        /** @brief Hides the loading feedback after cancellation or failure. */
+        auto hide_loading_progress() -> void;
+
     signals:
         /**
          * @brief Emitted when the application filter selection changes.
@@ -276,6 +297,9 @@ class LogViewWidget: public QWidget
          * filters. */
         void reset_filters_requested();
 
+        /** @brief Emitted when the user requests cancellation of this view's imports. */
+        void loading_cancel_requested();
+
     protected:
         /**
          * @brief Handles language change and other UI change events.
@@ -307,6 +331,9 @@ class LogViewWidget: public QWidget
         /** @brief Creates the table/empty-state stack and its context action. */
         auto setup_empty_state() -> void;
 
+        /** @brief Creates the compact per-view loading feedback above the table. */
+        auto setup_loading_feedback() -> void;
+
         /** @brief Selects the table or the appropriate empty-result presentation. */
         auto update_empty_state() -> void;
 
@@ -325,5 +352,10 @@ class LogViewWidget: public QWidget
         QStackedWidget* m_content_stack{nullptr};
         EmptyStateWidget* m_empty_state{nullptr};
         QAction* m_reset_filters_action{nullptr};
+        QWidget* m_loading_feedback{nullptr};
+        QLabel* m_loading_label{nullptr};
+        QProgressBar* m_loading_progress{nullptr};
+        QPushButton* m_loading_cancel_button{nullptr};
+        quint64 m_loading_feedback_revision{0};
         bool m_empty_result_filtered{false};
 };

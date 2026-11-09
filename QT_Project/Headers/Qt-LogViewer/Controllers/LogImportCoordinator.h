@@ -163,8 +163,15 @@ class LogImportCoordinator final: public QObject
         auto shutdown() -> void;
 
     signals:
-        /** @brief Reports asynchronous byte progress for one view. */
-        void progress(const QUuid& view_id, qint64 bytes_read, qint64 total_bytes);
+        /**
+         * @brief Reports asynchronous byte progress for one file in one view.
+         * @param view_id View receiving the imported records.
+         * @param file_path Source file currently being processed.
+         * @param bytes_read Number of source bytes processed so far.
+         * @param total_bytes Total number of source bytes to process.
+         */
+        void progress(const QUuid& view_id, const QString& file_path, qint64 bytes_read,
+                      qint64 total_bytes);
 
         /** @brief Reports completion after storage and visible-page refresh succeed. */
         void finished(const QUuid& view_id, const QString& file_path);

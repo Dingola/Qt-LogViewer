@@ -2160,6 +2160,28 @@ LogViewWidget {
     background-color: @log-view-bg-color;
 }
 
+LogViewWidget #loadingFeedback {
+    background-color: @log-view-bg-color;
+    border-bottom: 1px solid @table-frame-color;
+}
+
+LogViewWidget #loadingFeedbackLabel {
+    color: @text-color-secondary;
+}
+
+LogViewWidget #loadingFeedback[state="complete"] #loadingFeedbackLabel {
+    color: @status-success-color;
+}
+
+LogViewWidget #loadingFeedbackProgress {
+    border: none;
+    background-color: @table-frame-color;
+}
+
+LogViewWidget #loadingFeedbackProgress::chunk {
+    background-color: @icon-accent-color;
+}
+
 LogViewWidget QToolButton {
     min-width: @log-view-tool-button-min-width;
     max-width: @log-view-tool-button-max-width;
