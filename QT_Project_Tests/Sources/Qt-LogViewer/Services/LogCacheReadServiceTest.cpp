@@ -174,6 +174,35 @@ TEST_F(LogCacheReadServiceTest, MergesBoundedPagesAcrossMultipleCacheDatabases)
     EXPECT_EQ(applications, (QSet<QString>{QStringLiteral("AppA"), QStringLiteral("AppB")}));
 }
 
+/**
+ * @test Verifies that a deep page from one cache source preserves the requested ordering and
+ * boundaries when SQLite applies the offset directly.
+ */
+TEST_F(LogCacheReadServiceTest, LoadsBoundedDeepPageFromSingleCacheDatabase)
+{
+    const QString file_path =
+        create_log_file({QStringLiteral("2026-01-01 10:00:00 INFO First AppA"),
+                         QStringLiteral("2026-01-01 10:01:00 INFO Second AppA"),
+                         QStringLiteral("2026-01-01 10:02:00 INFO Third AppA"),
+                         QStringLiteral("2026-01-01 10:03:00 INFO Fourth AppA"),
+                         QStringLiteral("2026-01-01 10:04:00 INFO Fifth AppA")});
+    ASSERT_FALSE(file_path.isEmpty());
+
+    const QUuid view_id = m_runtime->imports().import_file(file_path, m_profile);
+    ASSERT_FALSE(view_id.isNull());
+    m_runtime->live_tailing().set_enabled(view_id, false);
+
+    LogQuery query;
+    query.view_id = view_id;
+    query.sort_field = LogField::Timestamp;
+    query.sort_order = Qt::DescendingOrder;
+
+    const QVector<LogEntry> page = m_runtime->history().load_entries_page(query, 3, 2);
+    ASSERT_EQ(page.size(), 2);
+    EXPECT_EQ(page.at(0).get_message(), QStringLiteral("Second"));
+    EXPECT_EQ(page.at(1).get_message(), QStringLiteral("First"));
+}
+
 /** @test Verifies an appended source reuses its cache prefix and imports only the suffix. */
 TEST_F(LogCacheReadServiceTest, ReusesCachedPrefixForAppendedSource)
 {

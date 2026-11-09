@@ -489,10 +489,12 @@ auto bind_values(QSqlQuery& sql_query, const QList<QVariant>& bindings) -> void
  * @param source Validated cache source.
  * @param query View query.
  * @param maximum_rows Maximum ordered rows to return, or -1 for every match.
+ * @param offset Number of ordered matching rows skipped by SQLite.
  * @return Matching row metadata in the query's requested order.
  */
 [[nodiscard]] auto load_source_rows(const CacheSource& source, const LogQuery& query,
-                                    qsizetype maximum_rows = -1) -> QVector<CacheRow>
+                                    qsizetype maximum_rows = -1,
+                                    qsizetype offset = 0) -> QVector<CacheRow>
 {
     QVector<CacheRow> rows;
     const SourceSqlFilter filter = create_source_sql_filter(source, query);
@@ -513,8 +515,9 @@ auto bind_values(QSqlQuery& sql_query, const QList<QVariant>& bindings) -> void
             QList<QVariant> bindings = filter.bindings;
             if (maximum_rows >= 0)
             {
-                sql += QStringLiteral(" LIMIT ?");
+                sql += QStringLiteral(" LIMIT ? OFFSET ?");
                 bindings.append(maximum_rows);
+                bindings.append(std::max<qsizetype>(0, offset));
             }
 
             QSqlQuery sql_query(database);
@@ -807,9 +810,16 @@ auto LogCacheReadService::load_entries_page(const LogQuery& query, qsizetype off
     const bool requires_full_scan = query.sort_field == LogField::Message ||
                                     (query.use_regex && !query.search_text.trimmed().isEmpty());
     QVector<CacheRow> rows;
+    qsizetype page_offset = offset;
     if (requires_full_scan)
     {
         rows = collect_rows(sources, live_entries, file_paths, query);
+    }
+    else if (sources.size() == 1 && live_entries.isEmpty())
+    {
+        rows = load_source_rows(sources.first(), query, std::max<qsizetype>(0, limit),
+                                std::max<qsizetype>(0, offset));
+        page_offset = 0;
     }
     else
     {
@@ -837,7 +847,7 @@ auto LogCacheReadService::load_entries_page(const LogQuery& query, qsizetype off
                          return row_precedes(left, right, query);
                      });
 
-    const qsizetype first = std::clamp<qsizetype>(offset, 0, rows.size());
+    const qsizetype first = std::clamp<qsizetype>(page_offset, 0, rows.size());
     const qsizetype last =
         std::clamp<qsizetype>(first + std::max<qsizetype>(0, limit), first, rows.size());
     entries.reserve(last - first);

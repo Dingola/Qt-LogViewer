@@ -121,6 +121,13 @@ class LogPageCoordinator final: public QObject
                                 qsizetype total_entries);
 
     private:
+        /**
+         * @brief Loads the selected page while preserving the known result count.
+         * @param view_id Target view.
+         * @return True when the view and its page state are available.
+         */
+        auto load_current_page(const QUuid& view_id) -> bool;
+
         LogHistoryService* m_history_service;
         ViewRegistry* m_views;
         QMap<QUuid, LogPageState> m_page_states;

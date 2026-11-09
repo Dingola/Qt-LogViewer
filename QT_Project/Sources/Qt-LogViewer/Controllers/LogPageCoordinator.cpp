@@ -63,7 +63,7 @@ auto LogPageCoordinator::set_current_page(const QUuid& view_id, qsizetype page) 
     if (state != m_page_states.end())
     {
         state->set_current_page(page);
-        updated = reload(view_id);
+        updated = load_current_page(view_id);
     }
 
     return updated;
@@ -84,7 +84,7 @@ auto LogPageCoordinator::set_page_size(const QUuid& view_id, qsizetype page_size
     {
         state->set_page_size(page_size);
         state->set_current_page(1);
-        updated = reload(view_id);
+        updated = load_current_page(view_id);
     }
 
     return updated;
@@ -176,19 +176,35 @@ auto LogPageCoordinator::reload(const QUuid& view_id) -> bool
             const qsizetype total_entries = m_history_service->count_entries(state->get_query());
 
             state->set_total_entries(total_entries);
-
-            const QVector<LogEntry> entries = m_history_service->load_entries_page(
-                state->get_query(), state->get_offset(), state->get_page_size());
-
-            context->replace_entries(entries);
-
-            emit page_loaded(view_id, state->get_current_page(), state->get_total_pages(),
-                             state->get_total_entries());
-
-            loaded = true;
+            loaded = load_current_page(view_id);
         }
     }
 
+    return loaded;
+}
+
+/**
+ * @brief Loads the selected page without recounting an unchanged query.
+ * @param view_id Target view.
+ * @return True when the view and its page state are available.
+ */
+auto LogPageCoordinator::load_current_page(const QUuid& view_id) -> bool
+{
+    bool loaded = false;
+    if (m_history_service != nullptr && m_views != nullptr)
+    {
+        auto state = m_page_states.find(view_id);
+        LogViewContext* context = m_views->get_context(view_id);
+        if (state != m_page_states.end() && context != nullptr)
+        {
+            const QVector<LogEntry> entries = m_history_service->load_entries_page(
+                state->get_query(), state->get_offset(), state->get_page_size());
+            context->replace_entries(entries);
+            emit page_loaded(view_id, state->get_current_page(), state->get_total_pages(),
+                             state->get_total_entries());
+            loaded = true;
+        }
+    }
     return loaded;
 }
 

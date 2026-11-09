@@ -136,6 +136,37 @@ TEST_F(LogPageCoordinatorTest, LoadsSelectedPage)
 }
 
 /**
+ * @test Verifies that changing only the selected page reuses the known result count.
+ */
+TEST_F(LogPageCoordinatorTest, ReusesKnownTotalWhenChangingPage)
+{
+    QVector<LogEntry> entries;
+    for (int index = 1; index <= 30; ++index)
+    {
+        entries.append(create_entry(
+            QStringLiteral("entry-%1").arg(index),
+            QDateTime::fromString(QStringLiteral("2026-01-01T12:00:00.000Z"), Qt::ISODateWithMs)));
+    }
+    ASSERT_TRUE(m_history_service->add_entries(m_view_id, entries));
+
+    LogQuery query;
+    ASSERT_TRUE(m_coordinator->set_query(m_view_id, query));
+    ASSERT_TRUE(m_coordinator->set_page_size(m_view_id, 10));
+
+    const LogEntry later_entry = create_entry(
+        QStringLiteral("later-entry"),
+        QDateTime::fromString(QStringLiteral("2026-01-01T13:00:00.000Z"), Qt::ISODateWithMs));
+    ASSERT_TRUE(m_history_service->add_entries(m_view_id, {later_entry}));
+    ASSERT_TRUE(m_coordinator->set_current_page(m_view_id, 2));
+
+    const LogPageState* state = m_coordinator->get_page_state(m_view_id);
+    ASSERT_NE(state, nullptr);
+    EXPECT_EQ(state->get_current_page(), 2);
+    EXPECT_EQ(state->get_total_entries(), 30);
+    EXPECT_EQ(state->get_total_pages(), 3);
+}
+
+/**
  * @brief Verifies that query filters are applied before loading the model.
  */
 TEST_F(LogPageCoordinatorTest, LoadsFilteredEntries)
