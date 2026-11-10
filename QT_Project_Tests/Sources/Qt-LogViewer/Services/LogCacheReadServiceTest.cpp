@@ -123,11 +123,21 @@ TEST_F(LogCacheReadServiceTest, FiltersAndSearchesReboundCacheEntries)
                                                 SearchField::Message, false));
     LogViewContext* context = m_runtime->views().get_context(view_id);
     ASSERT_NE(context, nullptr);
+    ASSERT_TRUE(QtTestAwait::wait_until([context]() {
+        const bool single_entry = context->get_model()->rowCount() == 1;
+        return single_entry &&
+               context->get_model()->get_entry(0).get_message() == QStringLiteral("Second");
+    }));
     ASSERT_EQ(context->get_model()->rowCount(), 1);
     EXPECT_EQ(context->get_model()->get_entry(0).get_message(), QStringLiteral("Second"));
 
     ASSERT_TRUE(m_runtime->queries().set_search(view_id, QStringLiteral("^F\\w+$"),
                                                 SearchField::Message, true));
+    ASSERT_TRUE(QtTestAwait::wait_until([context]() {
+        const bool single_entry = context->get_model()->rowCount() == 1;
+        return single_entry &&
+               context->get_model()->get_entry(0).get_message() == QStringLiteral("First");
+    }));
     ASSERT_EQ(context->get_model()->rowCount(), 1);
     EXPECT_EQ(context->get_model()->get_entry(0).get_message(), QStringLiteral("First"));
 }

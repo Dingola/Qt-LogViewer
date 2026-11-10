@@ -164,7 +164,7 @@ auto LogPageCoordinator::apply_state(const QUuid& view_id, const LogQuery& query
         {
             state.set_total_entries(current_page * page_size);
             state.set_current_page(current_page);
-            loaded = load_regex_page_async(view_id, true);
+            loaded = load_regex_page_async(view_id, true, false);
         }
         else
         {
@@ -241,7 +241,7 @@ auto LogPageCoordinator::reload(const QUuid& view_id) -> bool
                 state->get_query().use_regex && !state->get_query().search_text.trimmed().isEmpty();
             if (regex_query)
             {
-                loaded = load_regex_page_async(view_id, true);
+                loaded = load_regex_page_async(view_id, true, false);
             }
             else
             {
@@ -286,7 +286,7 @@ auto LogPageCoordinator::load_current_page(const QUuid& view_id) -> bool
                 state->get_query().use_regex && !state->get_query().search_text.trimmed().isEmpty();
             if (regex_query)
             {
-                loaded = load_regex_page_async(view_id, false);
+                loaded = load_regex_page_async(view_id, false, false);
             }
             else
             {
@@ -323,22 +323,14 @@ auto LogPageCoordinator::refresh_total_entries(const QUuid& view_id) -> bool
                 state->get_query().use_regex && !state->get_query().search_text.trimmed().isEmpty();
             if (regex_query)
             {
-                updated = load_regex_page_async(view_id, true);
+                updated = load_regex_page_async(view_id, true, true);
             }
             else
             {
                 cancel_regex_query(view_id);
-                const qsizetype requested_offset = state->get_offset();
-                LogPageResult result = m_history_service->load_entries_page_result(
-                    state->get_query(), requested_offset, state->get_page_size());
-                state->set_total_entries(result.total_entries);
-                if (state->get_offset() != requested_offset)
-                {
-                    result.entries = m_history_service->load_entries_page(
-                        state->get_query(), state->get_offset(), state->get_page_size());
-                }
-                m_history_service->remember_page_result(state->get_query(), result);
-                context->replace_entries(result.entries);
+                const qsizetype total_entries =
+                    m_history_service->count_entries(state->get_query());
+                state->set_total_entries(total_entries);
 
                 emit page_state_updated(view_id, state->get_current_page(),
                                         state->get_total_pages(), state->get_total_entries());
@@ -355,10 +347,11 @@ auto LogPageCoordinator::refresh_total_entries(const QUuid& view_id) -> bool
  * @brief Starts a replaceable background regular-expression page query.
  * @param view_id Target view.
  * @param notify_result_set_changed True when aggregates changed with the query.
+ * @param preserve_visible_entries True when only pagination totals may be updated.
  * @return True when a background operation was started.
  */
-auto LogPageCoordinator::load_regex_page_async(const QUuid& view_id,
-                                               bool notify_result_set_changed) -> bool
+auto LogPageCoordinator::load_regex_page_async(const QUuid& view_id, bool notify_result_set_changed,
+                                               bool preserve_visible_entries) -> bool
 {
     bool started = false;
     auto state = m_page_states.find(view_id);
@@ -383,7 +376,7 @@ auto LogPageCoordinator::load_regex_page_async(const QUuid& view_id,
             m_regex_workers.insert(worker);
             connect(worker, &QThread::finished, this,
                     [this, worker, view_id, query, requested_offset, revision, cancelled, result,
-                     notify_result_set_changed] {
+                     notify_result_set_changed, preserve_visible_entries] {
                         m_regex_workers.remove(worker);
                         const bool current = !cancelled->load() &&
                                              m_request_revisions.value(view_id, 0) == revision &&
@@ -400,19 +393,31 @@ auto LogPageCoordinator::load_regex_page_async(const QUuid& view_id,
                                 const bool same_page = page_state->get_offset() == requested_offset;
                                 if (same_page)
                                 {
-                                    m_history_service->remember_page_result(query, *result);
-                                    view_context->replace_entries(result->entries);
-                                    emit page_loaded(view_id, page_state->get_current_page(),
-                                                     page_state->get_total_pages(),
-                                                     page_state->get_total_entries());
-                                    if (notify_result_set_changed)
+                                    if (preserve_visible_entries)
                                     {
+                                        emit page_state_updated(view_id,
+                                                                page_state->get_current_page(),
+                                                                page_state->get_total_pages(),
+                                                                page_state->get_total_entries());
                                         emit result_set_changed(view_id);
+                                    }
+                                    else
+                                    {
+                                        m_history_service->remember_page_result(query, *result);
+                                        view_context->replace_entries(result->entries);
+                                        emit page_loaded(view_id, page_state->get_current_page(),
+                                                         page_state->get_total_pages(),
+                                                         page_state->get_total_entries());
+                                        if (notify_result_set_changed)
+                                        {
+                                            emit result_set_changed(view_id);
+                                        }
                                     }
                                 }
                                 else
                                 {
-                                    load_regex_page_async(view_id, notify_result_set_changed);
+                                    load_regex_page_async(view_id, notify_result_set_changed,
+                                                          preserve_visible_entries);
                                 }
                             }
                         }

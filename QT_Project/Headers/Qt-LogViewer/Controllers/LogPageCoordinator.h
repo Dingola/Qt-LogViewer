@@ -160,9 +160,11 @@ class LogPageCoordinator final: public QObject
          * @brief Starts a replaceable background regular-expression page query.
          * @param view_id Target view.
          * @param notify_result_set_changed True when aggregates changed with the query.
+         * @param preserve_visible_entries True when only pagination totals may be updated.
          * @return True when a background operation was started.
          */
-        auto load_regex_page_async(const QUuid& view_id, bool notify_result_set_changed) -> bool;
+        auto load_regex_page_async(const QUuid& view_id, bool notify_result_set_changed,
+                                   bool preserve_visible_entries) -> bool;
 
         /**
          * @brief Cooperatively cancels the active regular-expression query for a view.
