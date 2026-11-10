@@ -586,7 +586,13 @@ void MainWindow::showEvent(QShowEvent* event)
     AppMainWindow::showEvent(event);
     if (!m_dock_layout_adopted)
     {
-        m_dock_controller->adopt_restored_layout(!m_session_controller->has_current_session());
+        const bool restored_layout_available =
+            m_log_viewer_settings != nullptr &&
+            !m_log_viewer_settings->get_mainwindow_state().isEmpty();
+        if (restored_layout_available)
+        {
+            m_dock_controller->adopt_restored_layout(!m_session_controller->has_current_session());
+        }
         m_dock_layout_adopted = true;
     }
     m_workspace_presenter->refresh_start_page();
