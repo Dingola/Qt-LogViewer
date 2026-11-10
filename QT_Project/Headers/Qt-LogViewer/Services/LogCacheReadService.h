@@ -6,8 +6,12 @@
 #include <QString>
 #include <QUuid>
 #include <QVector>
+#include <atomic>
+#include <functional>
+#include <memory>
 
 #include "Qt-LogViewer/Models/LogEntry.h"
+#include "Qt-LogViewer/Models/LogPageResult.h"
 #include "Qt-LogViewer/Models/LogQuery.h"
 
 class LogCacheCatalog;
@@ -72,6 +76,29 @@ class LogCacheReadService final
          */
         [[nodiscard]] auto load_entries_page(const LogQuery& query, qsizetype offset,
                                              qsizetype limit) const -> QVector<LogEntry>;
+
+        /**
+         * @brief Loads a page and its aggregates while sharing a required regular-expression scan.
+         * @param query Filter, search and sorting state.
+         * @param offset Zero-based result offset.
+         * @param limit Maximum number of entries to return.
+         * @return Page entries, total count and an optional log-level facet.
+         */
+        [[nodiscard]] auto load_entries_page_result(const LogQuery& query, qsizetype offset,
+                                                    qsizetype limit) const -> LogPageResult;
+
+        /**
+         * @brief Creates a self-contained cancellable regular-expression page operation.
+         * @param query Regular-expression query to execute.
+         * @param offset Zero-based result offset.
+         * @param limit Maximum number of entries to return.
+         * @param cancelled Shared cooperative cancellation state.
+         * @return Background-safe operation, or an empty function for an invalid request.
+         */
+        [[nodiscard]] auto create_regex_page_task(
+            const LogQuery& query, qsizetype offset, qsizetype limit,
+            const std::shared_ptr<std::atomic_bool>& cancelled) const
+            -> std::function<LogPageResult()>;
 
         /**
          * @brief Counts matching cached entries grouped by normalized level.

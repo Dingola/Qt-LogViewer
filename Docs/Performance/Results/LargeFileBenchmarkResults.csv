@@ -121,3 +121,22 @@ Zeitpunkt (UTC nach ISO 8601);Git-Commit;Dateigröße (Bytes);Messphase;Dauer (M
 2026-11-09T21:39:53.318Z;f47791f53eca+Arbeitskopie;1074000000;Textsuche entfernen;1927.163;4000000;;22.73
 2026-11-09T21:39:53.318Z;f47791f53eca+Arbeitskopie;1074000000;Regex-Suche ausführen;115014.315;4000000;;48.59
 2026-11-09T21:39:53.318Z;f47791f53eca+Arbeitskopie;1074000000;Regex-Suche entfernen;1935.640;4000000;;49.84
+2026-11-10T02:19:11.733Z;da09fc08af0f+Arbeitskopie;1074000000;Erstimport;54968.219;4000000;18.63;22.39
+2026-11-10T02:19:11.733Z;da09fc08af0f+Arbeitskopie;1074000000;Cache-Treffer;1931.111;4000000;530.39;22.41
+2026-11-10T02:19:11.733Z;da09fc08af0f+Arbeitskopie;1074000000;Zweite Seite öffnen;971.278;4000000;;22.41
+2026-11-10T02:19:11.733Z;da09fc08af0f+Arbeitskopie;1074000000;Erste Seite wieder öffnen;973.992;4000000;;22.42
+2026-11-10T02:19:11.733Z;da09fc08af0f+Arbeitskopie;1074000000;Mittlere Seite öffnen;1004.644;4000000;;22.48
+2026-11-10T02:19:11.733Z;da09fc08af0f+Arbeitskopie;1074000000;Letzte Seite öffnen;1036.459;4000000;;22.36
+2026-11-10T02:19:11.733Z;da09fc08af0f+Arbeitskopie;1074000000;Zeitstempel aufsteigend sortieren;965.639;4000000;;22.36
+2026-11-10T02:19:11.733Z;da09fc08af0f+Arbeitskopie;1074000000;Anwendung sortieren;1078.510;4000000;;22.36
+2026-11-10T02:19:11.733Z;da09fc08af0f+Arbeitskopie;1074000000;Log-Level sortieren;1067.207;4000000;;22.36
+2026-11-10T02:19:11.733Z;da09fc08af0f+Arbeitskopie;1074000000;Nachricht sortieren;31666.505;4000000;;23.54
+2026-11-10T02:19:11.733Z;da09fc08af0f+Arbeitskopie;1074000000;Standardsortierung wiederherstellen;979.462;4000000;;23.21
+2026-11-10T02:19:11.733Z;da09fc08af0f+Arbeitskopie;1074000000;Anwendungsfilter setzen;652.197;1000000;;23.05
+2026-11-10T02:19:11.733Z;da09fc08af0f+Arbeitskopie;1074000000;Anwendungsfilter entfernen;1885.784;4000000;;23.04
+2026-11-10T02:19:11.733Z;da09fc08af0f+Arbeitskopie;1074000000;Log-Level-Filter setzen;656.708;1000000;;23.17
+2026-11-10T02:19:11.733Z;da09fc08af0f+Arbeitskopie;1074000000;Log-Level-Filter entfernen;1885.537;4000000;;23.04
+2026-11-10T02:19:11.733Z;da09fc08af0f+Arbeitskopie;1074000000;Textsuche ausführen;2398.805;4000000;;23.35
+2026-11-10T02:19:11.733Z;da09fc08af0f+Arbeitskopie;1074000000;Textsuche entfernen;1901.308;4000000;;23.00
+2026-11-10T02:19:11.733Z;da09fc08af0f+Arbeitskopie;1074000000;Regex-Suche ausführen;72352.008;4000000;;27.21
+2026-11-10T02:19:11.733Z;da09fc08af0f+Arbeitskopie;1074000000;Regex-Suche entfernen;8509.575;4000000;;30.11

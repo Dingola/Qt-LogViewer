@@ -1,13 +1,18 @@
 #pragma once
 
+#include <QHash>
 #include <QMap>
 #include <QObject>
+#include <QSet>
 #include <QUuid>
+#include <atomic>
+#include <memory>
 
 #include "Qt-LogViewer/Models/LogPageState.h"
 
 class LogHistoryService;
 class ViewRegistry;
+class QThread;
 
 /**
  * @file LogPageCoordinator.h
@@ -31,6 +36,9 @@ class LogPageCoordinator final: public QObject
          */
         explicit LogPageCoordinator(LogHistoryService* history_service, ViewRegistry* views,
                                     QObject* parent = nullptr);
+
+        /** @brief Cancels and joins active regular-expression queries. */
+        ~LogPageCoordinator() override;
 
         /**
          * @brief Sets the query for a view and loads its first page.
@@ -148,7 +156,27 @@ class LogPageCoordinator final: public QObject
          */
         auto load_current_page(const QUuid& view_id) -> bool;
 
+        /**
+         * @brief Starts a replaceable background regular-expression page query.
+         * @param view_id Target view.
+         * @param notify_result_set_changed True when aggregates changed with the query.
+         * @return True when a background operation was started.
+         */
+        auto load_regex_page_async(const QUuid& view_id, bool notify_result_set_changed) -> bool;
+
+        /**
+         * @brief Cooperatively cancels the active regular-expression query for a view.
+         * @param view_id Target view.
+         */
+        auto cancel_regex_query(const QUuid& view_id) -> void;
+
         LogHistoryService* m_history_service;
         ViewRegistry* m_views;
         QMap<QUuid, LogPageState> m_page_states;
+        /** @brief Monotonic request revisions used to discard stale results. */
+        QHash<QUuid, quint64> m_request_revisions;
+        /** @brief Cooperative cancellation states grouped by view. */
+        QHash<QUuid, std::shared_ptr<std::atomic_bool>> m_regex_cancellations;
+        /** @brief Active worker objects joined during destruction. */
+        QSet<QThread*> m_regex_workers;
 };

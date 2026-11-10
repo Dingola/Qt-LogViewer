@@ -42,6 +42,22 @@ struct SqlFilter {
 };
 
 /**
+ * @brief Compares the query state that influences a log-level facet.
+ * @param left First query.
+ * @param right Second query.
+ * @return True when both queries produce the same level facet.
+ */
+[[nodiscard]] auto has_same_facet_query(const LogQuery& left, const LogQuery& right) -> bool
+{
+    const bool same =
+        left.view_id == right.view_id && left.app_name == right.app_name &&
+        left.search_text == right.search_text && left.search_fields == right.search_fields &&
+        left.use_regex == right.use_regex && left.show_only_file == right.show_only_file &&
+        left.hidden_files == right.hidden_files;
+    return same;
+}
+
+/**
  * @brief Converts a possibly null Qt string to non-null text accepted by SQLite constraints.
  * @param value String supplied by an optional parsed field.
  * @return Original value, or a non-null empty string when the input is null.
@@ -497,6 +513,9 @@ LogHistoryService::~LogHistoryService() = default;
 auto LogHistoryService::set_cache_read_service(LogCacheReadService* cache_reader) -> void
 {
     m_cache_read_service = cache_reader;
+    m_cached_regex_facet_queries.clear();
+    m_cached_regex_level_counts.clear();
+    m_pending_regex_facet_queries.clear();
 }
 
 /**
@@ -508,6 +527,12 @@ auto LogHistoryService::set_cache_read_service(LogCacheReadService* cache_reader
 auto LogHistoryService::add_entries(const QUuid& view_id, const QVector<LogEntry>& entries) -> bool
 {
     bool added = false;
+    if (!entries.isEmpty())
+    {
+        m_cached_regex_facet_queries.remove(view_id);
+        m_cached_regex_level_counts.remove(view_id);
+        m_pending_regex_facet_queries.remove(view_id);
+    }
     const bool cache_query =
         m_cache_read_service != nullptr && m_cache_read_service->can_query(view_id);
 
@@ -702,6 +727,87 @@ auto LogHistoryService::load_entries_page(const LogQuery& log_query, qsizetype o
 }
 
 /**
+ * @brief Loads a page and matching aggregates as one logical query operation.
+ * @param log_query Query describing the requested result set and sorting.
+ * @param offset Zero-based offset within the complete result set.
+ * @param limit Maximum number of entries returned.
+ * @return Page entries, total count and optional log-level counts.
+ */
+auto LogHistoryService::load_entries_page_result(const LogQuery& log_query, qsizetype offset,
+                                                 qsizetype limit) const -> LogPageResult
+{
+    LogPageResult result;
+    const bool valid_page = offset >= 0 && limit > 0;
+    if (valid_page)
+    {
+        const bool cache_query =
+            m_cache_read_service != nullptr && m_cache_read_service->can_query(log_query.view_id);
+        if (cache_query)
+        {
+            result = m_cache_read_service->load_entries_page_result(log_query, offset, limit);
+        }
+        else
+        {
+            result.total_entries = count_entries(log_query);
+            result.entries = load_entries_page(log_query, offset, limit);
+        }
+    }
+    return result;
+}
+
+/**
+ * @brief Retains aggregates produced with a page for subsequent presenter refreshes.
+ * @param log_query Query represented by the result.
+ * @param result Result containing optional reusable aggregates.
+ */
+auto LogHistoryService::remember_page_result(const LogQuery& log_query,
+                                             const LogPageResult& result) -> void
+{
+    const auto pending = m_pending_regex_facet_queries.constFind(log_query.view_id);
+    if (pending != m_pending_regex_facet_queries.cend() &&
+        has_same_facet_query(pending.value(), log_query))
+    {
+        m_pending_regex_facet_queries.remove(log_query.view_id);
+    }
+    if (result.has_log_level_counts)
+    {
+        m_cached_regex_facet_queries.insert(log_query.view_id, log_query);
+        m_cached_regex_level_counts.insert(log_query.view_id, result.log_level_counts);
+    }
+    else
+    {
+        m_cached_regex_facet_queries.remove(log_query.view_id);
+        m_cached_regex_level_counts.remove(log_query.view_id);
+    }
+}
+
+/**
+ * @brief Creates a background-safe regular-expression page operation from cache snapshots.
+ * @param log_query Regular-expression query to execute.
+ * @param offset Zero-based result offset.
+ * @param limit Maximum number of entries to return.
+ * @param cancelled Shared cooperative cancellation state.
+ * @return Background-safe operation, or an empty function when unavailable.
+ */
+auto LogHistoryService::create_regex_page_task(
+    const LogQuery& log_query, qsizetype offset, qsizetype limit,
+    const std::shared_ptr<std::atomic_bool>& cancelled) const -> std::function<LogPageResult()>
+{
+    std::function<LogPageResult()> task;
+    const bool cache_query =
+        m_cache_read_service != nullptr && m_cache_read_service->can_query(log_query.view_id);
+    if (cache_query)
+    {
+        task = m_cache_read_service->create_regex_page_task(log_query, offset, limit, cancelled);
+        if (task)
+        {
+            m_pending_regex_facet_queries.insert(log_query.view_id, log_query);
+        }
+    }
+    return task;
+}
+
+/**
  * @brief Counts matching entries grouped by normalized log level.
  * @param log_query Query describing the filtered result set.
  * @return Map of uppercase log level names to matching entry counts.
@@ -713,7 +819,20 @@ auto LogHistoryService::get_log_level_counts(const LogQuery& log_query) const
 
     const bool cache_query =
         m_cache_read_service != nullptr && m_cache_read_service->can_query(log_query.view_id);
-    if (cache_query)
+    const bool regex_query = log_query.use_regex && !log_query.search_text.trimmed().isEmpty();
+    const auto cached_query = m_cached_regex_facet_queries.constFind(log_query.view_id);
+    const auto pending_query = m_pending_regex_facet_queries.constFind(log_query.view_id);
+    const bool cached_regex_facets = regex_query &&
+                                     cached_query != m_cached_regex_facet_queries.cend() &&
+                                     has_same_facet_query(cached_query.value(), log_query);
+    const bool pending_regex_facets = regex_query &&
+                                      pending_query != m_pending_regex_facet_queries.cend() &&
+                                      has_same_facet_query(pending_query.value(), log_query);
+    if (cached_regex_facets)
+    {
+        level_counts = m_cached_regex_level_counts.value(log_query.view_id);
+    }
+    else if (cache_query && !pending_regex_facets)
     {
         level_counts = m_cache_read_service->get_log_level_counts(log_query);
     }
@@ -924,6 +1043,9 @@ auto LogHistoryService::search_entries(const QUuid& view_id, const QString& sear
  */
 auto LogHistoryService::remove_view_entries(const QUuid& view_id) -> void
 {
+    m_cached_regex_facet_queries.remove(view_id);
+    m_cached_regex_level_counts.remove(view_id);
+    m_pending_regex_facet_queries.remove(view_id);
     if (m_cache_read_service != nullptr)
     {
         m_cache_read_service->remove_view(view_id);
@@ -944,6 +1066,9 @@ auto LogHistoryService::remove_view_entries(const QUuid& view_id) -> void
  */
 auto LogHistoryService::remove_file_entries(const QUuid& view_id, const QString& file_path) -> void
 {
+    m_cached_regex_facet_queries.remove(view_id);
+    m_cached_regex_level_counts.remove(view_id);
+    m_pending_regex_facet_queries.remove(view_id);
     if (m_cache_read_service != nullptr)
     {
         m_cache_read_service->remove_file(view_id, file_path);

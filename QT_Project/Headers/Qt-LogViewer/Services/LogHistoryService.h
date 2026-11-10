@@ -1,14 +1,18 @@
 #pragma once
 
 #include <QByteArray>
+#include <QHash>
 #include <QObject>
 #include <QSet>
 #include <QString>
 #include <QUuid>
 #include <QVector>
+#include <atomic>
+#include <functional>
 #include <memory>
 
 #include "Qt-LogViewer/Models/LogEntry.h"
+#include "Qt-LogViewer/Models/LogPageResult.h"
 #include "Qt-LogViewer/Models/LogQuery.h"
 #include "Qt-LogViewer/Models/SearchFields.h"
 
@@ -91,6 +95,36 @@ class LogHistoryService final: public QObject
          */
         [[nodiscard]] auto load_entries_page(const LogQuery& log_query, qsizetype offset,
                                              qsizetype limit) const -> QVector<LogEntry>;
+
+        /**
+         * @brief Loads a page and matching aggregates as one logical query operation.
+         * @param log_query Query describing the requested result set and sorting.
+         * @param offset Zero-based offset within the complete result set.
+         * @param limit Maximum number of entries returned.
+         * @return Page entries, total count and optional log-level counts.
+         */
+        [[nodiscard]] auto load_entries_page_result(const LogQuery& log_query, qsizetype offset,
+                                                    qsizetype limit) const -> LogPageResult;
+
+        /**
+         * @brief Retains aggregates produced with a page for subsequent presenter refreshes.
+         * @param log_query Query represented by the result.
+         * @param result Result containing optional reusable aggregates.
+         */
+        auto remember_page_result(const LogQuery& log_query, const LogPageResult& result) -> void;
+
+        /**
+         * @brief Creates a background-safe regular-expression page operation from cache snapshots.
+         * @param log_query Regular-expression query to execute.
+         * @param offset Zero-based result offset.
+         * @param limit Maximum number of entries to return.
+         * @param cancelled Shared cooperative cancellation state.
+         * @return Background-safe operation, or an empty function when unavailable.
+         */
+        [[nodiscard]] auto create_regex_page_task(
+            const LogQuery& log_query, qsizetype offset, qsizetype limit,
+            const std::shared_ptr<std::atomic_bool>& cancelled) const
+            -> std::function<LogPageResult()>;
 
         /**
          * @brief Counts matching entries grouped by normalized log level.
@@ -211,4 +245,10 @@ class LogHistoryService final: public QObject
         LogCacheReadService* m_cache_read_service{nullptr};
         /** @brief Whether connection setup and schema initialization succeeded. */
         bool m_is_available{false};
+        /** @brief Query associated with each reusable regular-expression level facet. */
+        QHash<QUuid, LogQuery> m_cached_regex_facet_queries;
+        /** @brief Reusable regular-expression level facets grouped by view. */
+        QHash<QUuid, QMap<QString, qsizetype>> m_cached_regex_level_counts;
+        /** @brief Regular-expression facet queries currently produced by workers. */
+        mutable QHash<QUuid, LogQuery> m_pending_regex_facet_queries;
 };

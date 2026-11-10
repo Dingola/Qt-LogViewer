@@ -5,6 +5,10 @@
 
 #include "Qt-LogViewer/Controllers/LogPageCoordinator.h"
 
+#include <QThread>
+#include <functional>
+#include <utility>
+
 #include "Qt-LogViewer/Controllers/LogViewContext.h"
 #include "Qt-LogViewer/Controllers/ViewRegistry.h"
 #include "Qt-LogViewer/Services/LogHistoryService.h"
@@ -21,8 +25,28 @@ LogPageCoordinator::LogPageCoordinator(LogHistoryService* history_service, ViewR
 {
     if (m_views != nullptr)
     {
-        connect(m_views, &ViewRegistry::view_removed, this,
-                [this](const QUuid& view_id) { m_page_states.remove(view_id); });
+        connect(m_views, &ViewRegistry::view_removed, this, [this](const QUuid& view_id) {
+            cancel_regex_query(view_id);
+            m_page_states.remove(view_id);
+            m_request_revisions.remove(view_id);
+        });
+    }
+}
+
+/** @brief Cancels and joins active regular-expression queries. */
+LogPageCoordinator::~LogPageCoordinator()
+{
+    for (auto iterator = m_regex_cancellations.cbegin(); iterator != m_regex_cancellations.cend();
+         ++iterator)
+    {
+        iterator.value()->store(true);
+    }
+    const QSet<QThread*> workers = m_regex_workers;
+    m_regex_workers.clear();
+    for (QThread* worker: workers)
+    {
+        worker->wait();
+        delete worker;
     }
 }
 
@@ -134,19 +158,36 @@ auto LogPageCoordinator::apply_state(const QUuid& view_id, const LogQuery& query
         LogPageState& state = m_page_states[view_id];
         state.set_query(view_query);
         state.set_page_size(page_size);
-        state.set_total_entries(m_history_service->count_entries(state.get_query()));
-        state.set_current_page(current_page);
+        const bool regex_query =
+            state.get_query().use_regex && !state.get_query().search_text.trimmed().isEmpty();
+        if (regex_query)
+        {
+            state.set_total_entries(current_page * page_size);
+            state.set_current_page(current_page);
+            loaded = load_regex_page_async(view_id, true);
+        }
+        else
+        {
+            cancel_regex_query(view_id);
+            const qsizetype requested_page = std::max<qsizetype>(1, current_page);
+            const qsizetype requested_offset = (requested_page - 1) * page_size;
+            LogPageResult result = m_history_service->load_entries_page_result(
+                state.get_query(), requested_offset, state.get_page_size());
+            state.set_total_entries(result.total_entries);
+            state.set_current_page(requested_page);
+            if (state.get_offset() != requested_offset)
+            {
+                result.entries = m_history_service->load_entries_page(
+                    state.get_query(), state.get_offset(), state.get_page_size());
+            }
+            m_history_service->remember_page_result(state.get_query(), result);
+            context->replace_entries(result.entries);
 
-        const QVector<LogEntry> entries = m_history_service->load_entries_page(
-            state.get_query(), state.get_offset(), state.get_page_size());
-
-        context->replace_entries(entries);
-
-        emit page_loaded(view_id, state.get_current_page(), state.get_total_pages(),
-                         state.get_total_entries());
-        emit result_set_changed(view_id);
-
-        loaded = true;
+            emit page_loaded(view_id, state.get_current_page(), state.get_total_pages(),
+                             state.get_total_entries());
+            emit result_set_changed(view_id);
+            loaded = true;
+        }
     }
 
     return loaded;
@@ -196,13 +237,30 @@ auto LogPageCoordinator::reload(const QUuid& view_id) -> bool
 
         if (state != m_page_states.end() && context != nullptr)
         {
-            const qsizetype total_entries = m_history_service->count_entries(state->get_query());
-
-            state->set_total_entries(total_entries);
-            loaded = load_current_page(view_id);
-            if (loaded)
+            const bool regex_query =
+                state->get_query().use_regex && !state->get_query().search_text.trimmed().isEmpty();
+            if (regex_query)
             {
+                loaded = load_regex_page_async(view_id, true);
+            }
+            else
+            {
+                cancel_regex_query(view_id);
+                const qsizetype requested_offset = state->get_offset();
+                LogPageResult result = m_history_service->load_entries_page_result(
+                    state->get_query(), requested_offset, state->get_page_size());
+                state->set_total_entries(result.total_entries);
+                if (state->get_offset() != requested_offset)
+                {
+                    result.entries = m_history_service->load_entries_page(
+                        state->get_query(), state->get_offset(), state->get_page_size());
+                }
+                m_history_service->remember_page_result(state->get_query(), result);
+                context->replace_entries(result.entries);
+                emit page_loaded(view_id, state->get_current_page(), state->get_total_pages(),
+                                 state->get_total_entries());
                 emit result_set_changed(view_id);
+                loaded = true;
             }
         }
     }
@@ -224,12 +282,22 @@ auto LogPageCoordinator::load_current_page(const QUuid& view_id) -> bool
         LogViewContext* context = m_views->get_context(view_id);
         if (state != m_page_states.end() && context != nullptr)
         {
-            const QVector<LogEntry> entries = m_history_service->load_entries_page(
-                state->get_query(), state->get_offset(), state->get_page_size());
-            context->replace_entries(entries);
-            emit page_loaded(view_id, state->get_current_page(), state->get_total_pages(),
-                             state->get_total_entries());
-            loaded = true;
+            const bool regex_query =
+                state->get_query().use_regex && !state->get_query().search_text.trimmed().isEmpty();
+            if (regex_query)
+            {
+                loaded = load_regex_page_async(view_id, false);
+            }
+            else
+            {
+                cancel_regex_query(view_id);
+                const QVector<LogEntry> entries = m_history_service->load_entries_page(
+                    state->get_query(), state->get_offset(), state->get_page_size());
+                context->replace_entries(entries);
+                emit page_loaded(view_id, state->get_current_page(), state->get_total_pages(),
+                                 state->get_total_entries());
+                loaded = true;
+            }
         }
     }
     return loaded;
@@ -251,19 +319,125 @@ auto LogPageCoordinator::refresh_total_entries(const QUuid& view_id) -> bool
 
         if (state != m_page_states.end() && context != nullptr)
         {
-            const qsizetype total_entries = m_history_service->count_entries(state->get_query());
+            const bool regex_query =
+                state->get_query().use_regex && !state->get_query().search_text.trimmed().isEmpty();
+            if (regex_query)
+            {
+                updated = load_regex_page_async(view_id, true);
+            }
+            else
+            {
+                cancel_regex_query(view_id);
+                const qsizetype requested_offset = state->get_offset();
+                LogPageResult result = m_history_service->load_entries_page_result(
+                    state->get_query(), requested_offset, state->get_page_size());
+                state->set_total_entries(result.total_entries);
+                if (state->get_offset() != requested_offset)
+                {
+                    result.entries = m_history_service->load_entries_page(
+                        state->get_query(), state->get_offset(), state->get_page_size());
+                }
+                m_history_service->remember_page_result(state->get_query(), result);
+                context->replace_entries(result.entries);
 
-            state->set_total_entries(total_entries);
-
-            emit page_state_updated(view_id, state->get_current_page(), state->get_total_pages(),
-                                    state->get_total_entries());
-            emit result_set_changed(view_id);
-
-            updated = true;
+                emit page_state_updated(view_id, state->get_current_page(),
+                                        state->get_total_pages(), state->get_total_entries());
+                emit result_set_changed(view_id);
+                updated = true;
+            }
         }
     }
 
     return updated;
+}
+
+/**
+ * @brief Starts a replaceable background regular-expression page query.
+ * @param view_id Target view.
+ * @param notify_result_set_changed True when aggregates changed with the query.
+ * @return True when a background operation was started.
+ */
+auto LogPageCoordinator::load_regex_page_async(const QUuid& view_id,
+                                               bool notify_result_set_changed) -> bool
+{
+    bool started = false;
+    auto state = m_page_states.find(view_id);
+    LogViewContext* context = m_views != nullptr ? m_views->get_context(view_id) : nullptr;
+    if (state != m_page_states.end() && context != nullptr && m_history_service != nullptr)
+    {
+        cancel_regex_query(view_id);
+        const auto cancelled = std::make_shared<std::atomic_bool>(false);
+        const LogQuery query = state->get_query();
+        const qsizetype requested_offset = state->get_offset();
+        const qsizetype page_size = state->get_page_size();
+        std::function<LogPageResult()> task = m_history_service->create_regex_page_task(
+            query, requested_offset, page_size, cancelled);
+        if (task)
+        {
+            const quint64 revision = m_request_revisions.value(view_id, 0) + 1;
+            m_request_revisions.insert(view_id, revision);
+            m_regex_cancellations.insert(view_id, cancelled);
+            const auto result = std::make_shared<LogPageResult>();
+            QThread* worker =
+                QThread::create([task = std::move(task), result] { *result = task(); });
+            m_regex_workers.insert(worker);
+            connect(worker, &QThread::finished, this,
+                    [this, worker, view_id, query, requested_offset, revision, cancelled, result,
+                     notify_result_set_changed] {
+                        m_regex_workers.remove(worker);
+                        const bool current = !cancelled->load() &&
+                                             m_request_revisions.value(view_id, 0) == revision &&
+                                             m_regex_cancellations.value(view_id) == cancelled;
+                        if (current)
+                        {
+                            m_regex_cancellations.remove(view_id);
+                            auto page_state = m_page_states.find(view_id);
+                            LogViewContext* view_context =
+                                m_views != nullptr ? m_views->get_context(view_id) : nullptr;
+                            if (page_state != m_page_states.end() && view_context != nullptr)
+                            {
+                                page_state->set_total_entries(result->total_entries);
+                                const bool same_page = page_state->get_offset() == requested_offset;
+                                if (same_page)
+                                {
+                                    m_history_service->remember_page_result(query, *result);
+                                    view_context->replace_entries(result->entries);
+                                    emit page_loaded(view_id, page_state->get_current_page(),
+                                                     page_state->get_total_pages(),
+                                                     page_state->get_total_entries());
+                                    if (notify_result_set_changed)
+                                    {
+                                        emit result_set_changed(view_id);
+                                    }
+                                }
+                                else
+                                {
+                                    load_regex_page_async(view_id, notify_result_set_changed);
+                                }
+                            }
+                        }
+                        worker->deleteLater();
+                    });
+            worker->start();
+            started = true;
+        }
+    }
+    return started;
+}
+
+/**
+ * @brief Cooperatively cancels the active regular-expression query for a view.
+ * @param view_id Target view.
+ */
+auto LogPageCoordinator::cancel_regex_query(const QUuid& view_id) -> void
+{
+    const auto cancellation = m_regex_cancellations.find(view_id);
+    if (cancellation != m_regex_cancellations.end())
+    {
+        cancellation.value()->store(true);
+        m_regex_cancellations.erase(cancellation);
+    }
+    m_request_revisions.insert(view_id, m_request_revisions.value(view_id, 0) + 1);
 }
 
 /**

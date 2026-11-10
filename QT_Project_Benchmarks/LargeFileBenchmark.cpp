@@ -9,6 +9,7 @@
 #include <QDebug>
 #include <QDir>
 #include <QElapsedTimer>
+#include <QEventLoop>
 #include <QFile>
 #include <QFileInfo>
 #include <QObject>
@@ -224,6 +225,62 @@ class BenchmarkRunner final
         }
 
         /**
+         * @brief Measures an interaction that completes through page_loaded.
+         * @param view_id View used by the operation.
+         * @param phase Human-readable phase name.
+         * @param meaning Human-readable description of the measured work.
+         * @param operation Operation starting the asynchronous page query.
+         * @return True when the operation completed before the timeout.
+         */
+        auto measure_async_interaction(const QUuid& view_id, const QString& phase,
+                                       const QString& meaning,
+                                       const std::function<bool()>& operation) -> bool
+        {
+            qInfo().noquote() << QStringLiteral("Starte Messphase: %1").arg(phase);
+            QElapsedTimer timer;
+            QEventLoop event_loop;
+            QTimer timeout;
+            timeout.setSingleShot(true);
+            bool completed = false;
+            const QMetaObject::Connection page_connection =
+                QObject::connect(&m_pages, &LogPageCoordinator::page_loaded, &event_loop,
+                                 [&event_loop, &completed, view_id](const QUuid& loaded_view_id,
+                                                                   qsizetype, qsizetype,
+                                                                   qsizetype) {
+                                     if (loaded_view_id == view_id)
+                                     {
+                                         completed = true;
+                                         event_loop.quit();
+                                     }
+                                 });
+            QObject::connect(&timeout, &QTimer::timeout, &event_loop, &QEventLoop::quit);
+
+            timer.start();
+            const bool started = operation();
+            if (started && !completed)
+            {
+                timeout.start(10 * 60 * 1000);
+                event_loop.exec();
+            }
+            QObject::disconnect(page_connection);
+
+            const bool succeeded = started && completed;
+            if (succeeded)
+            {
+                const LogPageState* state = m_pages.get_page_state(view_id);
+                const qint64 entry_count = state != nullptr ? state->get_total_entries() : 0;
+                const double duration_ms =
+                    static_cast<double>(timer.nsecsElapsed()) / 1000000.0;
+                m_results.append(Result{phase, meaning, duration_ms, entry_count,
+                                        get_working_set_bytes(), false});
+                qInfo().noquote()
+                    << QStringLiteral("Messphase abgeschlossen: %1 (%2 s)")
+                           .arg(phase, QString::number(duration_ms / 1000.0, 'f', 3));
+            }
+            return succeeded;
+        }
+
+        /**
          * @brief Applies one explicit sort order to the active result set.
          * @param view_id View whose query is updated.
          * @param column Sortable model column selected by the user-facing path.
@@ -378,7 +435,7 @@ class BenchmarkRunner final
             }
             if (succeeded)
             {
-                succeeded = measure_interaction(
+                succeeded = measure_async_interaction(
                     view_id, QStringLiteral("Regex-Suche ausführen"),
                     QStringLiteral("Regulären Ausdruck über alle vier Millionen Meldungen prüfen"),
                     [this, view_id] {

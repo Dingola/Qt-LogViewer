@@ -295,7 +295,9 @@ auto materialize_row(CacheRow& row, QFile& source_file, const LogParser& parser)
     bool materialized = row.materialized_entry.has_value();
     if (!materialized && row.byte_offset >= 0 && row.byte_length >= 0)
     {
-        materialized = source_file.isOpen() && source_file.seek(row.byte_offset);
+        const bool positioned = source_file.isOpen() && (source_file.pos() == row.byte_offset ||
+                                                         source_file.seek(row.byte_offset));
+        materialized = positioned;
         if (materialized)
         {
             const QByteArray record_bytes = source_file.read(row.byte_length);
@@ -350,12 +352,7 @@ auto materialize_row(CacheRow& row) -> bool
 {
     const bool all_fields = query.search_fields.isEmpty();
     bool matches = false;
-    if ((all_fields || query.search_fields.contains(LogField::Message)) &&
-        row.materialized_entry.has_value())
-    {
-        matches = expression.match(row.materialized_entry->get_message()).hasMatch();
-    }
-    if (!matches && (all_fields || query.search_fields.contains(LogField::Level)))
+    if (all_fields || query.search_fields.contains(LogField::Level))
     {
         matches = expression.match(row.level).hasMatch();
     }
@@ -366,6 +363,11 @@ auto materialize_row(CacheRow& row) -> bool
     if (!matches && (all_fields || query.search_fields.contains(LogField::FilePath)))
     {
         matches = expression.match(row.source.file_path).hasMatch();
+    }
+    if (!matches && (all_fields || query.search_fields.contains(LogField::Message)) &&
+        row.materialized_entry.has_value())
+    {
+        matches = expression.match(row.materialized_entry->get_message()).hasMatch();
     }
     return matches;
 }
@@ -506,11 +508,12 @@ auto bind_values(QSqlQuery& sql_query, const QList<QVariant>& bindings) -> void
  * @param query View query.
  * @param maximum_rows Maximum ordered rows to return, or -1 for every match.
  * @param offset Number of ordered matching rows skipped by SQLite.
+ * @param cancelled Optional cooperative cancellation state.
  * @return Matching row metadata in the query's requested order.
  */
-[[nodiscard]] auto load_source_rows(const CacheSource& source, const LogQuery& query,
-                                    qsizetype maximum_rows = -1,
-                                    qsizetype offset = 0) -> QVector<CacheRow>
+[[nodiscard]] auto load_source_rows(
+    const CacheSource& source, const LogQuery& query, qsizetype maximum_rows = -1,
+    qsizetype offset = 0, const std::atomic_bool* cancelled = nullptr) -> QVector<CacheRow>
 {
     QVector<CacheRow> rows;
     const SourceSqlFilter filter = create_source_sql_filter(source, query);
@@ -559,7 +562,8 @@ auto bind_values(QSqlQuery& sql_query, const QList<QVariant>& bindings) -> void
             bind_values(sql_query, bindings);
             if (sql_query.exec())
             {
-                while (sql_query.next())
+                bool has_row = sql_query.next();
+                while (has_row && (cancelled == nullptr || !cancelled->load()))
                 {
                     CacheRow row;
                     row.source = source;
@@ -575,6 +579,7 @@ auto bind_values(QSqlQuery& sql_query, const QList<QVariant>& bindings) -> void
                     row.level = sql_query.value(5).toString();
                     row.app_name = sql_query.value(6).toString();
                     rows.append(std::move(row));
+                    has_row = sql_query.next();
                 }
             }
         }
@@ -663,19 +668,24 @@ auto bind_values(QSqlQuery& sql_query, const QList<QVariant>& bindings) -> void
  * @param live_entries Parsed live records layered above the persistent cache.
  * @param file_paths Ordered paths used to retain stable source ordering.
  * @param query View query.
+ * @param cancelled Optional cooperative cancellation state.
  * @return Globally collected matching rows.
  */
 [[nodiscard]] auto collect_rows(const QVector<CacheSource>& sources,
                                 const QVector<LogEntry>& live_entries,
-                                const QVector<QString>& file_paths,
-                                const LogQuery& query) -> QVector<CacheRow>
+                                const QVector<QString>& file_paths, const LogQuery& query,
+                                const std::atomic_bool* cancelled = nullptr) -> QVector<CacheRow>
 {
     QVector<CacheRow> rows;
-    for (const CacheSource& source: sources)
+    for (qsizetype index = 0;
+         index < sources.size() && (cancelled == nullptr || !cancelled->load()); ++index)
     {
-        rows.append(load_source_rows(source, query));
+        rows.append(load_source_rows(sources.at(index), query, -1, 0, cancelled));
     }
-    append_live_rows(rows, live_entries, file_paths, query);
+    if (cancelled == nullptr || !cancelled->load())
+    {
+        append_live_rows(rows, live_entries, file_paths, query);
+    }
 
     if (query.use_regex && !query.search_text.trimmed().isEmpty())
     {
@@ -690,8 +700,10 @@ auto bind_values(QSqlQuery& sql_query, const QList<QVariant>& bindings) -> void
             QFile source_file;
             std::optional<LogParser> parser;
             bool source_ready = false;
-            for (CacheRow& row: rows)
+            for (qsizetype index = 0;
+                 index < rows.size() && (cancelled == nullptr || !cancelled->load()); ++index)
             {
+                CacheRow& row = rows[index];
                 const bool cached_entry = row.materialized_entry.has_value();
                 if (requires_materialization && !cached_entry &&
                     row.source.file_path != active_file_path)
@@ -707,18 +719,27 @@ auto bind_values(QSqlQuery& sql_query, const QList<QVariant>& bindings) -> void
                     source_ready = parser.has_value() && source_file.open(QIODevice::ReadOnly);
                 }
 
+                bool matches = matches_regex(row, query, expression);
                 bool materialized = !requires_materialization || cached_entry;
-                if (!materialized && source_ready && parser.has_value())
+                if (!matches && !materialized && source_ready && parser.has_value())
                 {
                     materialized = materialize_row(row, source_file, parser.value());
                 }
-                if (materialized && matches_regex(row, query, expression))
+                if (!matches && materialized)
+                {
+                    matches = matches_regex(row, query, expression);
+                }
+                if (matches)
                 {
                     matching_rows.append(std::move(row));
                 }
             }
         }
         rows = std::move(matching_rows);
+    }
+    if (cancelled != nullptr && cancelled->load())
+    {
+        rows.clear();
     }
     return rows;
 }
@@ -841,6 +862,56 @@ auto bind_values(QSqlQuery& sql_query, const QList<QVariant>& bindings) -> void
     std::stable_sort(selected_rows.begin(), selected_rows.end(), precedes);
     return selected_rows;
 }
+
+/**
+ * @brief Creates a page and reusable aggregates from one already completed full scan.
+ * @param rows Rows matching the complete query.
+ * @param query Sorting and filtering state applied to the rows.
+ * @param offset Zero-based result offset.
+ * @param limit Maximum number of entries to materialize.
+ * @return Materialized page, total count and optional complete level facet.
+ */
+[[nodiscard]] auto create_page_result(QVector<CacheRow> rows, const LogQuery& query,
+                                      qsizetype offset, qsizetype limit) -> LogPageResult
+{
+    LogPageResult result;
+    result.total_entries = rows.size();
+    result.has_log_level_counts = query.log_levels.isEmpty();
+    if (result.has_log_level_counts)
+    {
+        for (const CacheRow& row: rows)
+        {
+            const QString level = row.level.trimmed().toUpper();
+            if (!level.isEmpty())
+            {
+                result.log_level_counts[level] += 1;
+            }
+        }
+    }
+
+    if (query.sort_field == LogField::Message)
+    {
+        rows = select_message_page_rows(rows, query, offset, limit);
+    }
+    std::stable_sort(rows.begin(), rows.end(),
+                     [&query](const CacheRow& left, const CacheRow& right) {
+                         return row_precedes(left, right, query);
+                     });
+
+    const qsizetype first = std::clamp<qsizetype>(offset, 0, rows.size());
+    const qsizetype last =
+        std::clamp<qsizetype>(first + std::max<qsizetype>(0, limit), first, rows.size());
+    result.entries.reserve(last - first);
+    for (qsizetype index = first; index < last; ++index)
+    {
+        CacheRow& row = rows[index];
+        if (materialize_row(row))
+        {
+            result.entries.append(row.materialized_entry.value());
+        }
+    }
+    return result;
+}
 }  // namespace
 
 /**
@@ -958,6 +1029,77 @@ auto LogCacheReadService::load_entries_page(const LogQuery& query, qsizetype off
         }
     }
     return entries;
+}
+
+/**
+ * @brief Loads a page and its aggregates while sharing a required regular-expression scan.
+ * @param query Filter, search and sorting state.
+ * @param offset Zero-based result offset.
+ * @param limit Maximum number of entries to return.
+ * @return Page entries, total count and an optional log-level facet.
+ */
+auto LogCacheReadService::load_entries_page_result(const LogQuery& query, qsizetype offset,
+                                                   qsizetype limit) const -> LogPageResult
+{
+    LogPageResult result;
+    const bool valid_page = offset >= 0 && limit > 0;
+    if (valid_page)
+    {
+        const bool regex_scan = query.use_regex && !query.search_text.trimmed().isEmpty();
+        if (regex_scan)
+        {
+            const QVector<QString> file_paths =
+                m_views != nullptr ? m_views->get_file_paths(query.view_id) : QVector<QString>();
+            const QVector<CacheSource> sources = resolve_sources(m_catalog, m_views, query.view_id);
+            const QVector<LogEntry> live_entries = m_live_entries.value(query.view_id);
+            result = create_page_result(collect_rows(sources, live_entries, file_paths, query),
+                                        query, offset, limit);
+        }
+        else
+        {
+            result.total_entries = count_entries(query);
+            result.entries = load_entries_page(query, offset, limit);
+        }
+    }
+    return result;
+}
+
+/**
+ * @brief Creates a self-contained cancellable regular-expression page operation.
+ * @param query Regular-expression query to execute.
+ * @param offset Zero-based result offset.
+ * @param limit Maximum number of entries to return.
+ * @param cancelled Shared cooperative cancellation state.
+ * @return Background-safe operation, or an empty function for an invalid request.
+ */
+auto LogCacheReadService::create_regex_page_task(
+    const LogQuery& query, qsizetype offset, qsizetype limit,
+    const std::shared_ptr<std::atomic_bool>& cancelled) const -> std::function<LogPageResult()>
+{
+    std::function<LogPageResult()> task;
+    const bool valid = query.use_regex && !query.search_text.trimmed().isEmpty() && offset >= 0 &&
+                       limit > 0 && cancelled != nullptr;
+    if (valid)
+    {
+        const QVector<QString> file_paths =
+            m_views != nullptr ? m_views->get_file_paths(query.view_id) : QVector<QString>();
+        const QVector<CacheSource> sources = resolve_sources(m_catalog, m_views, query.view_id);
+        const QVector<LogEntry> live_entries = m_live_entries.value(query.view_id);
+        task = [sources, live_entries, file_paths, query, offset, limit, cancelled] {
+            LogPageResult result;
+            if (!cancelled->load())
+            {
+                QVector<CacheRow> rows =
+                    collect_rows(sources, live_entries, file_paths, query, cancelled.get());
+                if (!cancelled->load())
+                {
+                    result = create_page_result(std::move(rows), query, offset, limit);
+                }
+            }
+            return result;
+        };
+    }
+    return task;
 }
 
 /**

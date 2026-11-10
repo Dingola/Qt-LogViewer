@@ -276,3 +276,42 @@
 - **Erstimport:** Misst den vollständigen Weg ohne vorhandenen Cache.
 - **Cache-Treffer:** Misst das erneute Öffnen derselben Datei über den bereits erzeugten persistenten Cache.
 - **Leeres Feld bei Daten pro Sekunde:** Für Filter, Suche und Seitenwechsel ist eine Dateidatenrate fachlich nicht sinnvoll; dort zählt ausschließlich die gemessene Dauer.
+
+---
+
+## Messlauf 2026-11-10T02:19:11.733Z
+
+- Quellstand: `da09fc08af0f+Arbeitskopie`
+- Nachrichtensortierung: enthalten
+- Datensatzgröße: 1074000000 Bytes (1024.25 Mebibyte)
+- Ergebnis-CSV: `LargeFileBenchmarkResults.csv`
+
+| Messphase | Bedeutung | Dauer | Verarbeitete Logeinträge | Verarbeitete Daten pro Sekunde | Arbeitsspeicher am Phasenende |
+|---|---|---:|---:|---:|---:|
+| Erstimport | Datei vollständig einlesen, analysieren und speichern | 54.968 s | 4000000 | 18.63 Mebibyte pro Sekunde | 22.39 Mebibyte |
+| Cache-Treffer | Bereits aufgebauten Cache öffnen und erste Seite laden | 1.931 s | 4000000 | 530.39 Mebibyte pro Sekunde | 22.41 Mebibyte |
+| Zweite Seite öffnen | Von Seite 1 auf die direkt benachbarte Seite 2 wechseln | 0.971 s | 4000000 | – | 22.41 Mebibyte |
+| Erste Seite wieder öffnen | Von Seite 2 zur ersten Ergebnisseite zurückkehren | 0.974 s | 4000000 | – | 22.42 Mebibyte |
+| Mittlere Seite öffnen | Von der ersten auf die mittlere Ergebnisseite wechseln | 1.005 s | 4000000 | – | 22.48 Mebibyte |
+| Letzte Seite öffnen | Von der mittleren auf die letzte Ergebnisseite wechseln | 1.036 s | 4000000 | – | 22.36 Mebibyte |
+| Zeitstempel aufsteigend sortieren | Alle Einträge nach dem ältesten Zeitstempel zuerst sortieren | 0.966 s | 4000000 | – | 22.36 Mebibyte |
+| Anwendung sortieren | Alle Einträge alphabetisch nach Anwendung sortieren | 1.079 s | 4000000 | – | 22.36 Mebibyte |
+| Log-Level sortieren | Alle Einträge alphabetisch nach Log-Level sortieren | 1.067 s | 4000000 | – | 22.36 Mebibyte |
+| Nachricht sortieren | Alle Einträge alphabetisch nach Nachricht sortieren | 31.667 s | 4000000 | – | 23.54 Mebibyte |
+| Standardsortierung wiederherstellen | Neueste Zeitstempel wieder zuerst anzeigen | 0.979 s | 4000000 | – | 23.21 Mebibyte |
+| Anwendungsfilter setzen | Nur Logeinträge der Anwendung App01 laden | 0.652 s | 1000000 | – | 23.05 Mebibyte |
+| Anwendungsfilter entfernen | Wieder Logeinträge aller Anwendungen laden | 1.886 s | 4000000 | – | 23.04 Mebibyte |
+| Log-Level-Filter setzen | Nur Logeinträge mit Level ERROR laden | 0.657 s | 1000000 | – | 23.17 Mebibyte |
+| Log-Level-Filter entfernen | Wieder Logeinträge aller Level laden | 1.886 s | 4000000 | – | 23.04 Mebibyte |
+| Textsuche ausführen | Nach dem Text scenario=large-file in Meldungen suchen | 2.399 s | 4000000 | – | 23.35 Mebibyte |
+| Textsuche entfernen | Textsuche leeren und ungefilterte erste Seite laden | 1.901 s | 4000000 | – | 23.00 Mebibyte |
+| Regex-Suche ausführen | Regulären Ausdruck über alle vier Millionen Meldungen prüfen | 72.352 s | 4000000 | – | 27.21 Mebibyte |
+| Regex-Suche entfernen | Regulären Ausdruck leeren und erste Seite neu laden | 8.510 s | 4000000 | – | 30.11 Mebibyte |
+
+## Bedeutung der Einheiten
+
+- **Mebibyte pro Sekunde:** Wie viele Daten pro Sekunde verarbeitet wurden. Ein Mebibyte entspricht 1.048.576 Bytes. Ein höherer Wert ist besser.
+- **Arbeitsspeicher am Phasenende:** Physischer Speicher, den der Benchmark-Prozess beim Abschluss der jeweiligen Phase belegt hat. Ein niedrigerer Wert ist besser.
+- **Erstimport:** Misst den vollständigen Weg ohne vorhandenen Cache.
+- **Cache-Treffer:** Misst das erneute Öffnen derselben Datei über den bereits erzeugten persistenten Cache.
+- **Leeres Feld bei Daten pro Sekunde:** Für Filter, Suche und Seitenwechsel ist eine Dateidatenrate fachlich nicht sinnvoll; dort zählt ausschließlich die gemessene Dauer.
