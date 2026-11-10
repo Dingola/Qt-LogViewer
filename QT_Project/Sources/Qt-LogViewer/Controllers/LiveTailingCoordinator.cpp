@@ -5,6 +5,7 @@
 
 #include "Qt-LogViewer/Controllers/LiveTailingCoordinator.h"
 
+#include <QFileInfo>
 #include <QTimer>
 #include <algorithm>
 
@@ -37,10 +38,11 @@ LiveTailingCoordinator::LiveTailingCoordinator(const LogParsingProfile& default_
     m_refresh_timer->setSingleShot(true);
     m_refresh_timer->setInterval(150);
 
-    connect(m_tailer_service, &LogTailerService::entries_available, this,
-            [this](const QUuid& view_id, const QString&, const QVector<LogEntry>& entries) {
-                handle_entries(view_id, entries);
-            });
+    connect(
+        m_tailer_service, &LogTailerService::entries_available, this,
+        [this](const QUuid& view_id, const QString& file_path, const QVector<LogEntry>& entries) {
+            handle_entries(view_id, file_path, entries);
+        });
     connect(m_refresh_timer, &QTimer::timeout, this,
             &LiveTailingCoordinator::refresh_pending_views);
 }
@@ -93,7 +95,22 @@ auto LiveTailingCoordinator::set_enabled(const QUuid& view_id, bool enabled) -> 
  */
 auto LiveTailingCoordinator::is_enabled(const QUuid& view_id) const -> bool
 {
-    return m_enabled_views.contains(view_id);
+    const bool enabled = m_enabled_views.contains(view_id);
+    return enabled;
+}
+
+/**
+ * @brief Returns the last successful live append time for one source.
+ * @param view_id Owning view.
+ * @param file_path Source file path.
+ * @return UTC append time, or an invalid value when no live entry was observed.
+ */
+auto LiveTailingCoordinator::get_last_entry_time(const QUuid& view_id,
+                                                 const QString& file_path) const -> QDateTime
+{
+    const QString absolute_path = QFileInfo(file_path).absoluteFilePath();
+    const QDateTime timestamp = m_last_entry_times.value(view_id).value(absolute_path);
+    return timestamp;
 }
 
 /**
@@ -162,6 +179,7 @@ auto LiveTailingCoordinator::remove_view(const QUuid& view_id) -> void
 {
     m_enabled_views.remove(view_id);
     m_pending_refresh_views.remove(view_id);
+    m_last_entry_times.remove(view_id);
 
     if (m_tailer_service != nullptr)
     {
@@ -180,6 +198,7 @@ auto LiveTailingCoordinator::shutdown() -> void
         m_refresh_timer->stop();
         m_pending_refresh_views.clear();
         m_enabled_views.clear();
+        m_last_entry_times.clear();
         m_tailer_service->stop_all_tailing();
     }
 }
@@ -196,9 +215,10 @@ auto LiveTailingCoordinator::set_refresh_interval_ms(int interval_ms) -> void
 /**
  * @brief Persists appended entries and schedules one visible update for their view.
  * @param view_id Receiving view.
+ * @param file_path Source that supplied the entries.
  * @param entries Newly parsed entries.
  */
-auto LiveTailingCoordinator::handle_entries(const QUuid& view_id,
+auto LiveTailingCoordinator::handle_entries(const QUuid& view_id, const QString& file_path,
                                             const QVector<LogEntry>& entries) -> void
 {
     const bool can_process = !m_shutting_down && m_enabled_views.contains(view_id) &&
@@ -207,8 +227,12 @@ auto LiveTailingCoordinator::handle_entries(const QUuid& view_id,
 
     if (can_process && m_history_service->add_entries(view_id, entries))
     {
+        const QString absolute_path = QFileInfo(file_path).absoluteFilePath();
+        const QDateTime timestamp = QDateTime::currentDateTimeUtc();
+        m_last_entry_times[view_id].insert(absolute_path, timestamp);
         m_pending_refresh_views.insert(view_id);
         m_refresh_timer->start();
+        emit live_tail_updated(view_id, absolute_path, timestamp);
     }
 }
 

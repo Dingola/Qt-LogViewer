@@ -99,10 +99,10 @@ class LogViewerApplication::Implementation final
                                    m_catalog.get_model(), m_default_profile, &m_catalog, &m_views,
                                    &m_filters, &m_history, &m_pages, &m_queries, &m_imports,
                                    &m_view_lifecycle, &m_live_tailing),
-              m_main_window(new MainWindow(settings, m_catalog, m_views, m_filters, m_history,
-                                           m_pages, m_queries, m_imports, m_view_lifecycle,
-                                           m_live_tailing, m_preview, *m_session_manager,
-                                           m_recent_items_adapter, m_session_controller)),
+              m_main_window(new MainWindow(
+                  settings, m_catalog, m_views, m_filters, m_history, m_pages, m_queries, m_imports,
+                  m_view_lifecycle, m_live_tailing, m_preview, m_cache_catalog, *m_session_manager,
+                  m_recent_items_adapter, m_session_controller)),
               m_app_window(std::make_unique<QtWidgetsCommonLib::AppWindow>(nullptr, m_main_window))
         {
             m_history.set_cache_read_service(&m_cache_reader);

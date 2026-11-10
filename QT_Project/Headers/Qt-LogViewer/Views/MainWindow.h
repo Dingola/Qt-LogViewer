@@ -32,6 +32,7 @@ class FileCatalogController;
 class FilterCoordinator;
 class LiveTailingCoordinator;
 class LogHistoryService;
+class LogCacheCatalog;
 class LogImportCoordinator;
 class LogPageCoordinator;
 class LogPreviewService;
@@ -45,6 +46,7 @@ class SessionController;
 class LogImportTabPresenter;
 class LogViewerDropOverlayPresenter;
 class WorkspacePresenter;
+class FileInfoPresenter;
 class LogFileInfo;
 class SessionManager;
 class RecentItemsAdapter;
@@ -57,6 +59,7 @@ class RecentItemsModel;
 }
 class LogDataStatusWidget;
 class LogDetailsWidget;
+class FileInfoWidget;
 class LogViewWidget;
 class StartPageWidget;
 class DockWidget;
@@ -94,6 +97,7 @@ class MainWindow: public QtWidgetsCommonLib::AppMainWindow
          * @param lifecycle View and file cleanup workflow.
          * @param live_tailing Live-tailing workflow.
          * @param preview Log preview service used by import tabs.
+         * @param cache_catalog Persistent cache metadata shown by the file inspector.
          * @param session_manager Session state service owned by the composition root.
          * @param recent_items_adapter Adapter supplying synchronized recent-item models.
          * @param session_controller Session workflow controller owned by the composition root.
@@ -105,7 +109,7 @@ class MainWindow: public QtWidgetsCommonLib::AppMainWindow
                             LogQueryController& queries, LogImportCoordinator& imports,
                             ViewLifecycleCoordinator& lifecycle,
                             LiveTailingCoordinator& live_tailing, LogPreviewService& preview,
-                            SessionManager& session_manager,
+                            LogCacheCatalog& cache_catalog, SessionManager& session_manager,
                             RecentItemsAdapter& recent_items_adapter,
                             SessionController& session_controller, QWidget* parent = nullptr);
 
@@ -136,6 +140,9 @@ class MainWindow: public QtWidgetsCommonLib::AppMainWindow
          * @brief Sets up the log details dock widget.
          */
         auto setup_log_details_dock() -> void;
+
+        /** @brief Sets up the active-view file information dock. */
+        auto setup_file_info_dock() -> void;
 
         /**
          * @brief Sets up the filter bar widget.
@@ -441,6 +448,7 @@ class MainWindow: public QtWidgetsCommonLib::AppMainWindow
         ViewLifecycleCoordinator* m_lifecycle{nullptr};
         LiveTailingCoordinator* m_live_tailing{nullptr};
         LogPreviewService* m_preview{nullptr};
+        LogCacheCatalog* m_cache_catalog{nullptr};
         DockController* m_dock_controller = nullptr;
         /** @brief Whether the persisted dock layout has been adopted after the initial show. */
         bool m_dock_layout_adopted{false};
@@ -449,6 +457,7 @@ class MainWindow: public QtWidgetsCommonLib::AppMainWindow
         LogImportTabPresenter* m_log_import_tab_presenter = nullptr;
         LogViewerDropOverlayPresenter* m_drop_overlay_presenter = nullptr;
         WorkspacePresenter* m_workspace_presenter = nullptr;
+        FileInfoPresenter* m_file_info_presenter = nullptr;
 
         // Session-related
         SessionManager* m_session_manager = nullptr;
@@ -462,11 +471,13 @@ class MainWindow: public QtWidgetsCommonLib::AppMainWindow
 
         // Docks
         DockWidget* m_log_details_dock_widget = nullptr;
+        DockWidget* m_file_info_dock_widget = nullptr;
         DockWidget* m_log_file_explorer_dock_widget = nullptr;
         DockWidget* m_log_level_pie_chart_dock_widget = nullptr;
 
         // Views
         LogDetailsWidget* m_log_details_widget = nullptr;
+        FileInfoWidget* m_file_info_widget = nullptr;
         QStackedWidget* m_workspace_content_stack = nullptr;
         EmptyStateWidget* m_workspace_empty_state = nullptr;
         DropOverlayWidget* m_drop_overlay = nullptr;

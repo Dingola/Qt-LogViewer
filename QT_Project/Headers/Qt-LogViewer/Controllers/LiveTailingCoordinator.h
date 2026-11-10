@@ -1,5 +1,7 @@
 #pragma once
 
+#include <QDateTime>
+#include <QHash>
 #include <QObject>
 #include <QSet>
 #include <QUuid>
@@ -67,6 +69,15 @@ class LiveTailingCoordinator final: public QObject
         [[nodiscard]] auto is_enabled(const QUuid& view_id) const -> bool;
 
         /**
+         * @brief Returns the last successful live append time for one source.
+         * @param view_id Owning view.
+         * @param file_path Source file path.
+         * @return UTC append time, or an invalid value when no live entry was observed.
+         */
+        [[nodiscard]] auto get_last_entry_time(const QUuid& view_id,
+                                               const QString& file_path) const -> QDateTime;
+
+        /**
          * @brief Resets registrations while retaining a requested restore-time setting.
          *
          * No file is started immediately. Restored imports call start_file() only after their
@@ -110,13 +121,24 @@ class LiveTailingCoordinator final: public QObject
          */
         auto set_refresh_interval_ms(int interval_ms) -> void;
 
+    signals:
+        /**
+         * @brief Announces updated live-tail metadata after entries were persisted.
+         * @param view_id Receiving view.
+         * @param file_path Source that supplied the entries.
+         * @param timestamp UTC time at which the append was accepted.
+         */
+        void live_tail_updated(const QUuid& view_id, const QString& file_path,
+                               const QDateTime& timestamp);
+
     private:
         /**
          * @brief Persists appended entries and schedules one visible update for their view.
          * @param view_id Receiving view.
          * @param entries Newly parsed entries.
          */
-        auto handle_entries(const QUuid& view_id, const QVector<LogEntry>& entries) -> void;
+        auto handle_entries(const QUuid& view_id, const QString& file_path,
+                            const QVector<LogEntry>& entries) -> void;
 
         /**
          * @brief Applies the accumulated visible updates through the query component.
@@ -132,5 +154,6 @@ class LiveTailingCoordinator final: public QObject
         QTimer* m_refresh_timer{nullptr};
         QSet<QUuid> m_enabled_views;
         QSet<QUuid> m_pending_refresh_views;
+        QHash<QUuid, QHash<QString, QDateTime>> m_last_entry_times;
         bool m_shutting_down{false};
 };

@@ -35,10 +35,12 @@
 #include "Qt-LogViewer/Controllers/ViewRegistry.h"
 #include "Qt-LogViewer/Controllers/WorkspaceShortcutController.h"
 #include "Qt-LogViewer/Models/LogFileTreeModel.h"
+#include "Qt-LogViewer/Presenters/FileInfoPresenter.h"
 #include "Qt-LogViewer/Presenters/LogImportTabPresenter.h"
 #include "Qt-LogViewer/Presenters/LogViewPresenter.h"
 #include "Qt-LogViewer/Presenters/LogViewerDropOverlayPresenter.h"
 #include "Qt-LogViewer/Presenters/WorkspacePresenter.h"
+#include "Qt-LogViewer/Services/LogCacheCatalog.h"
 #include "Qt-LogViewer/Services/LogHistoryService.h"
 #include "Qt-LogViewer/Services/LogPreviewService.h"
 #include "Qt-LogViewer/Services/LogViewerDropValidator.h"
@@ -46,6 +48,7 @@
 #include "Qt-LogViewer/Services/SessionManager.h"
 #include "Qt-LogViewer/Services/SessionRestorePreflight.h"
 #include "Qt-LogViewer/Views/App/Dialogs/SettingsDialog.h"
+#include "Qt-LogViewer/Views/App/FileInfoWidget.h"
 #include "Qt-LogViewer/Views/App/LogDataStatusWidget.h"
 #include "Qt-LogViewer/Views/App/LogDetailsWidget.h"
 #include "Qt-LogViewer/Views/App/LogFileExplorer.h"
@@ -93,6 +96,7 @@ using QtWidgetsCommonLib::to_role_id;
  * @param lifecycle View and file cleanup workflow.
  * @param live_tailing Live-tailing workflow.
  * @param preview Log preview service used by import tabs.
+ * @param cache_catalog Persistent cache metadata catalog.
  * @param session_manager Session state service owned by the composition root.
  * @param recent_items_adapter Adapter supplying synchronized recent-item models.
  * @param session_controller Session workflow controller owned by the composition root.
@@ -103,7 +107,8 @@ MainWindow::MainWindow(LogViewerSettings& settings, FileCatalogController& catal
                        LogPageCoordinator& pages, LogQueryController& queries,
                        LogImportCoordinator& imports, ViewLifecycleCoordinator& lifecycle,
                        LiveTailingCoordinator& live_tailing, LogPreviewService& preview,
-                       SessionManager& session_manager, RecentItemsAdapter& recent_items_adapter,
+                       LogCacheCatalog& cache_catalog, SessionManager& session_manager,
+                       RecentItemsAdapter& recent_items_adapter,
                        SessionController& session_controller, QWidget* parent)
     : AppMainWindow(&settings, parent),
       m_log_viewer_settings(&settings),
@@ -117,6 +122,7 @@ MainWindow::MainWindow(LogViewerSettings& settings, FileCatalogController& catal
       m_lifecycle(&lifecycle),
       m_live_tailing(&live_tailing),
       m_preview(&preview),
+      m_cache_catalog(&cache_catalog),
       m_session_manager(&session_manager),
       m_recent_items_adapter(&recent_items_adapter),
       m_recent_sessions_model(recent_items_adapter.get_recent_sessions_model()),
@@ -149,6 +155,7 @@ MainWindow::MainWindow(LogViewerSettings& settings, FileCatalogController& catal
     setup_log_level_pie_chart();
     setup_pagination_widget();
     setup_log_details_dock();
+    setup_file_info_dock();
     setup_filter_bar();
     setup_tab_widget();
     setup_drop_overlay();
@@ -201,6 +208,10 @@ MainWindow::MainWindow(LogViewerSettings& settings, FileCatalogController& catal
         m_session_controller, ui->tabWidgetLog, ui->logFilterBarWidget, ui->paginationWidget,
         m_log_details_widget, m_log_level_pie_chart_widget, m_data_status_widget,
         m_workspace_content_stack, central_stack, m_dock_controller, this);
+    m_file_info_presenter = new FileInfoPresenter(m_views, m_history, m_cache_catalog,
+                                                  m_live_tailing, m_file_info_widget, this);
+    connect(m_imports, &LogImportCoordinator::finished, m_file_info_presenter,
+            [this](const QUuid&, const QString&) { m_file_info_presenter->refresh(); });
     m_workspace_shortcut_controller = new WorkspaceShortcutController(
         m_pages, ui->tabWidgetLog, ui->logFilterBarWidget, m_log_details_widget, this);
     m_log_import_tab_presenter = new LogImportTabPresenter(
@@ -301,6 +312,20 @@ auto MainWindow::setup_log_details_dock() -> void
     addDockWidget(Qt::BottomDockWidgetArea, m_log_details_dock_widget);
 }
 
+/** @brief Sets up the active-view file information dock. */
+auto MainWindow::setup_file_info_dock() -> void
+{
+    m_file_info_dock_widget = new DockWidget(tr("File Info"), this);
+    m_file_info_dock_widget->setContentsMargins(0, 0, 0, 0);
+    m_file_info_dock_widget->setObjectName(QStringLiteral("fileInfoDockWidget"));
+    m_file_info_dock_widget->setTitleBarWidget(
+        DockWidget::create_dock_title_bar(m_file_info_dock_widget));
+    m_file_info_widget = new FileInfoWidget(m_file_info_dock_widget);
+    m_file_info_widget->setObjectName(QStringLiteral("fileInfoWidget"));
+    m_file_info_dock_widget->setWidget(m_file_info_widget);
+    addDockWidget(Qt::RightDockWidgetArea, m_file_info_dock_widget);
+}
+
 /**
  * @brief Sets up the filter bar widget.
  */
@@ -355,6 +380,7 @@ auto MainWindow::initialize_dock_controller() -> void
     m_dock_controller = new DockController(this, this);
     m_dock_controller->register_dock(m_log_file_explorer_dock_widget);
     m_dock_controller->register_dock(m_log_details_dock_widget);
+    m_dock_controller->register_dock(m_file_info_dock_widget);
     m_dock_controller->register_dock(m_log_level_pie_chart_dock_widget);
 }
 
@@ -571,7 +597,9 @@ auto MainWindow::changeEvent(QEvent* event) -> void
         }
         m_log_file_explorer_dock_widget->setWindowTitle(tr("Log File Explorer"));
         m_log_details_dock_widget->setWindowTitle(tr("Log Details"));
+        m_file_info_dock_widget->setWindowTitle(tr("File Info"));
         m_workspace_presenter->refresh_active_view();
+        m_file_info_presenter->refresh();
     }
 
     AppMainWindow::changeEvent(event);

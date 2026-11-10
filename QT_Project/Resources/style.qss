@@ -524,6 +524,7 @@
     @custom-tab-widget-tool-button-bg-color-pressed: @Neutral-4;
 
     /* DockWidget */
+    @dock-widget-content-bg-color: @Neutral-3;
     @dock-widget-title-bar-bg-color: @Neutral-3;
     @dock-widget-title-bar-border-color: @border-color-primary;
     @dock-widget-title-label-text-color: @text-color-secondary;
@@ -811,6 +812,7 @@
     @custom-tab-widget-tool-button-bg-color-pressed: @Neutral-21;
 
     /* DockWidget */
+    @dock-widget-content-bg-color: #f3f4f5;
     @dock-widget-title-bar-bg-color: #eceef0;
     @dock-widget-title-label-text-color: @text-color-secondary;
     @dock-widget-close-button-bg-color: transparent;
@@ -1908,6 +1910,10 @@ QWidget#LogDataStatusWidget QLabel#labelCacheStatus[cacheState="updating"] {
 }
 
 /* --- DockWidget ----------------------------------------------------------- */
+DockWidget > QWidget {
+    background-color: @dock-widget-content-bg-color;
+}
+
 DockWidget QWidget#dock_title_bar {
     border-bottom: @dock-widget-title-bar-border-bottom-width solid @dock-widget-title-bar-border-color;
     border-top-left-radius: @dock-widget-title-bar-border-radius-top;
@@ -2858,6 +2864,82 @@ LogDetailsWidget QToolButton[copyConfirmed="true"] {
 
 LogDetailsWidget QToolButton#toolButtonCopyAll[headerAction="true"][copyConfirmed="true"] {
     border: 1px solid @status-success-color;
+}
+
+/* --- File inspector ------------------------------------------------------- */
+FileInfoWidget {
+    background-color: @dock-widget-content-bg-color;
+}
+
+FileInfoWidget QScrollArea#fileInfoScrollArea,
+FileInfoWidget QScrollArea#fileInfoScrollArea QWidget#qt_scrollarea_viewport,
+FileInfoWidget QWidget#fileInfoContent,
+FileInfoWidget QWidget#fileInfoPathContainer {
+    background-color: @dock-widget-content-bg-color;
+}
+
+FileInfoWidget QWidget#fileInfoHeader,
+FileInfoWidget QGroupBox[fileInfoSection="true"] {
+    border: 1px solid @table-section-border-color;
+    border-radius: @log-import-group-box-border-radius;
+    background-color: @log-import-group-box-bg-color;
+}
+
+FileInfoWidget QWidget#fileInfoHeader {
+    border-left: 3px solid @Brand-Accent-500;
+}
+
+FileInfoWidget QLabel#fileInfoTitle {
+    color: @label-text-color;
+    font-size: 10pt;
+    font-weight: 600;
+}
+
+FileInfoWidget QLabel#fileInfoSubtitle,
+FileInfoWidget QLabel#fileInfoEmptyState {
+    color: @text-color-disabled;
+}
+
+FileInfoWidget QGroupBox[fileInfoSection="true"] {
+    margin-top: 8px;
+    padding: 8px;
+}
+
+FileInfoWidget QGroupBox[fileInfoSection="true"]::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top left;
+    left: 8px;
+    padding: 0px 4px;
+    color: @label-text-color;
+    font-weight: 600;
+}
+
+FileInfoWidget QLineEdit[fileInfoField="true"] {
+    min-height: 22px;
+    padding: 3px 6px;
+    background-color: @line-edit-bg-color;
+    color: @line-edit-text-color;
+}
+
+FileInfoWidget QToolButton[fileInfoAction="true"] {
+    min-width: 28px;
+    max-width: 28px;
+    min-height: 28px;
+    max-height: 28px;
+    padding: 0px;
+    border: 1px solid transparent;
+    background-color: transparent;
+}
+
+FileInfoWidget QToolButton[fileInfoAction="true"]:hover,
+FileInfoWidget QToolButton[fileInfoAction="true"]:focus {
+    border-color: @tool-button-border-color-hover;
+    background-color: @tool-button-inline-bg-color-hover;
+}
+
+FileInfoWidget QToolButton[fileInfoAction="true"][copyConfirmed="true"] {
+    border-color: @status-success-color;
+    background-color: @status-success-color;
 }
 
 LogDetailsWidget QToolButton[externalLocationAction="true"] {
