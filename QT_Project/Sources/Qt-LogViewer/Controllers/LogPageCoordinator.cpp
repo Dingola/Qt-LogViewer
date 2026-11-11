@@ -413,6 +413,7 @@ auto LogPageCoordinator::load_regex_page_async(const QUuid& view_id, bool notify
                                             emit result_set_changed(view_id);
                                         }
                                     }
+                                    emit regex_query_finished(view_id, false);
                                 }
                                 else
                                 {
@@ -424,6 +425,7 @@ auto LogPageCoordinator::load_regex_page_async(const QUuid& view_id, bool notify
                         worker->deleteLater();
                     });
             worker->start();
+            emit regex_query_started(view_id);
             started = true;
         }
     }
@@ -433,16 +435,32 @@ auto LogPageCoordinator::load_regex_page_async(const QUuid& view_id, bool notify
 /**
  * @brief Cooperatively cancels the active regular-expression query for a view.
  * @param view_id Target view.
+ * @return True when an active query was cancelled.
  */
-auto LogPageCoordinator::cancel_regex_query(const QUuid& view_id) -> void
+auto LogPageCoordinator::cancel_regex_query(const QUuid& view_id) -> bool
 {
+    bool cancelled = false;
     const auto cancellation = m_regex_cancellations.find(view_id);
     if (cancellation != m_regex_cancellations.end())
     {
         cancellation.value()->store(true);
         m_regex_cancellations.erase(cancellation);
+        emit regex_query_finished(view_id, true);
+        cancelled = true;
     }
     m_request_revisions.insert(view_id, m_request_revisions.value(view_id, 0) + 1);
+    return cancelled;
+}
+
+/**
+ * @brief Reports whether a regular-expression query is active for a view.
+ * @param view_id Target view.
+ * @return True while a replaceable background query is active.
+ */
+auto LogPageCoordinator::is_regex_query_running(const QUuid& view_id) const -> bool
+{
+    const bool running = m_regex_cancellations.contains(view_id);
+    return running;
 }
 
 /**

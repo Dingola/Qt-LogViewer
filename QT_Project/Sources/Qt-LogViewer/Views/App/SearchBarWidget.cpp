@@ -63,8 +63,16 @@ SearchBarWidget::SearchBarWidget(QWidget* parent): QWidget(parent), ui(new Ui::S
     init_clear_button();
     update_clear_button_visibility(ui->lineEditSearch->text());
 
-    connect(ui->pushButtonSearch, &QPushButton::clicked, this,
-            &SearchBarWidget::request_search_if_valid);
+    connect(ui->pushButtonSearch, &QPushButton::clicked, this, [this] {
+        if (m_search_in_progress)
+        {
+            emit cancel_search_requested();
+        }
+        else
+        {
+            request_search_if_valid();
+        }
+    });
     connect(ui->lineEditSearch, &QLineEdit::returnPressed, this,
             &SearchBarWidget::request_search_if_valid);
     connect(ui->lineEditSearch, &QLineEdit::textChanged, this, [this](const QString& new_text) {
@@ -112,6 +120,30 @@ SearchBarWidget::SearchBarWidget(QWidget* parent): QWidget(parent), ui(new Ui::S
 SearchBarWidget::~SearchBarWidget()
 {
     delete ui;
+}
+
+/**
+ * @brief Presents an active background search and turns the search action into cancel.
+ * @param in_progress True while the active view is scanning.
+ */
+auto SearchBarWidget::set_search_in_progress(bool in_progress) -> void
+{
+    m_search_in_progress = in_progress;
+    ui->pushButtonSearch->setText(in_progress ? tr("Cancel") : tr("Search"));
+    ui->pushButtonSearch->setProperty("actionRole", in_progress ? "danger" : "primary");
+    ui->pushButtonSearch->style()->unpolish(ui->pushButtonSearch);
+    ui->pushButtonSearch->style()->polish(ui->pushButtonSearch);
+    if (in_progress)
+    {
+        ui->labelRegexError->setProperty("validationState", "progress");
+        ui->labelRegexError->setText(tr("Searching…"));
+        ui->labelRegexError->setVisible(true);
+    }
+    else
+    {
+        ui->labelRegexError->setProperty("validationState", QVariant());
+        validate_search_pattern();
+    }
 }
 
 /**
@@ -505,6 +537,7 @@ auto SearchBarWidget::changeEvent(QEvent* event) -> void
     if (event != nullptr && event->type() == QEvent::LanguageChange)
     {
         ui->retranslateUi(this);
+        set_search_in_progress(m_search_in_progress);
         ui->lineEditSearch->setPlaceholderText(tr(k_search_placeholder_text));
 
         if (m_use_default_search_fields)

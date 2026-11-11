@@ -70,3 +70,29 @@ TEST_F(SearchBarWidgetTest, AcceptsCorrectedRegularExpression)
                                         std::chrono::seconds(1)));
     EXPECT_EQ(search_spy.takeFirst().at(0).toString(), QStringLiteral("error.*"));
 }
+
+/** @test Verifies that an active background search exposes one explicit cancel action. */
+TEST_F(SearchBarWidgetTest, PresentsAndCancelsBackgroundSearch)
+{
+    SearchBarWidget widget;
+    auto* search_button = widget.findChild<QPushButton*>(QStringLiteral("pushButtonSearch"));
+    auto* progress_label = widget.findChild<QLabel*>(QStringLiteral("labelRegexError"));
+    QSignalSpy cancel_spy(&widget, &SearchBarWidget::cancel_search_requested);
+
+    ASSERT_NE(search_button, nullptr);
+    ASSERT_NE(progress_label, nullptr);
+
+    widget.set_search_in_progress(true);
+
+    EXPECT_EQ(search_button->text(), QStringLiteral("Cancel"));
+    EXPECT_FALSE(progress_label->isHidden());
+    EXPECT_FALSE(progress_label->text().isEmpty());
+
+    search_button->click();
+
+    EXPECT_EQ(cancel_spy.count(), 1);
+
+    widget.set_search_in_progress(false);
+
+    EXPECT_EQ(search_button->text(), QStringLiteral("Search"));
+}

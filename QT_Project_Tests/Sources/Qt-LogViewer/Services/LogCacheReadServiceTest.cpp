@@ -131,6 +131,17 @@ TEST_F(LogCacheReadServiceTest, FiltersAndSearchesReboundCacheEntries)
     ASSERT_EQ(context->get_model()->rowCount(), 1);
     EXPECT_EQ(context->get_model()->get_entry(0).get_message(), QStringLiteral("Second"));
 
+    QSignalSpy started_spy(&m_runtime->pages(), &LogPageCoordinator::regex_query_started);
+    QSignalSpy finished_spy(&m_runtime->pages(), &LogPageCoordinator::regex_query_finished);
+    ASSERT_TRUE(m_runtime->queries().set_search(view_id, QStringLiteral("^F\\w+$"),
+                                                SearchField::Message, true));
+    EXPECT_EQ(started_spy.count(), 1);
+    EXPECT_TRUE(m_runtime->pages().is_regex_query_running(view_id));
+    EXPECT_TRUE(m_runtime->pages().cancel_regex_query(view_id));
+    EXPECT_FALSE(m_runtime->pages().is_regex_query_running(view_id));
+    ASSERT_EQ(finished_spy.count(), 1);
+    EXPECT_TRUE(finished_spy.constFirst().at(1).toBool());
+
     ASSERT_TRUE(m_runtime->queries().set_search(view_id, QStringLiteral("^F\\w+$"),
                                                 SearchField::Message, true));
     ASSERT_TRUE(QtTestAwait::wait_until([context]() {

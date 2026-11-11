@@ -111,6 +111,20 @@ class LogPageCoordinator final: public QObject
         auto refresh_total_entries(const QUuid& view_id) -> bool;
 
         /**
+         * @brief Cooperatively cancels the active regular-expression query for a view.
+         * @param view_id Target view.
+         * @return True when an active query was cancelled.
+         */
+        auto cancel_regex_query(const QUuid& view_id) -> bool;
+
+        /**
+         * @brief Reports whether a regular-expression query is active for a view.
+         * @param view_id Target view.
+         * @return True while a replaceable background query is active.
+         */
+        [[nodiscard]] auto is_regex_query_running(const QUuid& view_id) const -> bool;
+
+        /**
          * @brief Returns the page state belonging to a view.
          * @param view_id Target view.
          * @return Page state, or nullptr when no query has been assigned.
@@ -148,6 +162,19 @@ class LogPageCoordinator final: public QObject
          */
         void result_set_changed(const QUuid& view_id);
 
+        /**
+         * @brief Emitted when a background regular-expression query starts.
+         * @param view_id View whose query started.
+         */
+        void regex_query_started(const QUuid& view_id);
+
+        /**
+         * @brief Emitted when a background regular-expression query completes or is cancelled.
+         * @param view_id View whose query stopped.
+         * @param cancelled True when the query was cooperatively cancelled.
+         */
+        void regex_query_finished(const QUuid& view_id, bool cancelled);
+
     private:
         /**
          * @brief Loads the selected page while preserving the known result count.
@@ -165,12 +192,6 @@ class LogPageCoordinator final: public QObject
          */
         auto load_regex_page_async(const QUuid& view_id, bool notify_result_set_changed,
                                    bool preserve_visible_entries) -> bool;
-
-        /**
-         * @brief Cooperatively cancels the active regular-expression query for a view.
-         * @param view_id Target view.
-         */
-        auto cancel_regex_query(const QUuid& view_id) -> void;
 
         LogHistoryService* m_history_service;
         ViewRegistry* m_views;

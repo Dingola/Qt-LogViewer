@@ -34,6 +34,8 @@ LogFilterBarWidget::LogFilterBarWidget(QWidget* parent)
             &LogFilterBarWidget::regex_toggled);
     connect(ui->searchBarWidget, &SearchBarWidget::live_search_toggled, this,
             &LogFilterBarWidget::live_search_toggled);
+    connect(ui->searchBarWidget, &SearchBarWidget::cancel_search_requested, this,
+            &LogFilterBarWidget::cancel_search_requested);
 }
 
 /**
@@ -161,6 +163,15 @@ auto LogFilterBarWidget::set_search_bar_enabled(bool enabled) -> void
     {
         search->setEnabled(enabled);
     }
+}
+
+/**
+ * @brief Presents whether the active view is executing a background search.
+ * @param in_progress True while the active view is scanning.
+ */
+auto LogFilterBarWidget::set_search_in_progress(bool in_progress) -> void
+{
+    ui->searchBarWidget->set_search_in_progress(in_progress);
 }
 
 /**

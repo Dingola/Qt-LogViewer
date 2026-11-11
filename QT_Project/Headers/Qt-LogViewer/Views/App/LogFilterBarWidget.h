@@ -117,6 +117,12 @@ class LogFilterBarWidget: public QWidget
         auto set_search_bar_enabled(bool enabled) -> void;
 
         /**
+         * @brief Presents whether the active view is executing a background search.
+         * @param in_progress True while the active view is scanning.
+         */
+        auto set_search_in_progress(bool in_progress) -> void;
+
+        /**
          * @brief Returns the currently selected application name.
          *
          * @return The selected application name.
@@ -225,6 +231,9 @@ class LogFilterBarWidget: public QWidget
          * @param enabled True if live search is enabled.
          */
         void live_search_toggled(bool enabled);
+
+        /** @brief Emitted when the active background search should be cancelled. */
+        void cancel_search_requested();
 
     protected:
         /**

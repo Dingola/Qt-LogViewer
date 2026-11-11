@@ -136,6 +136,12 @@ class SearchBarWidget: public QWidget
         auto clear_search() -> void;
 
         /**
+         * @brief Presents an active background search and turns the search action into cancel.
+         * @param in_progress True while the active view is scanning.
+         */
+        auto set_search_in_progress(bool in_progress) -> void;
+
+        /**
          * @brief Gets the normal (non-hover) clear icon color.
          * @return The current color.
          */
@@ -215,6 +221,9 @@ class SearchBarWidget: public QWidget
          * @param enabled True if live search is enabled.
          */
         void live_search_toggled(bool enabled);
+
+        /** @brief Emitted when the user requests cancellation of the active search. */
+        void cancel_search_requested();
 
     protected:
         /**
@@ -302,6 +311,8 @@ class SearchBarWidget: public QWidget
         QVector<QPair<QString, SearchField>> m_search_fields;
         bool m_use_default_search_fields = true;
         bool m_search_pattern_valid = true;
+        /** @brief Whether the primary action currently cancels an active background search. */
+        bool m_search_in_progress = false;
         /** @brief Delays live searches until the user pauses typing. */
         QTimer* m_live_search_timer = nullptr;
 };

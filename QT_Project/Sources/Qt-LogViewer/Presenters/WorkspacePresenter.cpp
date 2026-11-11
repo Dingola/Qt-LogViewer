@@ -149,6 +149,7 @@ auto WorkspacePresenter::refresh_active_view() -> void
     {
         const QSignalBlocker blocker(m_filter_bar);
         m_filter_bar->set_search_bar_enabled(true);
+        m_filter_bar->set_search_in_progress(m_pages->is_regex_query_running(view_id));
         m_filter_bar->set_app_names(m_history->get_distinct_values(view_id, LogField::AppName));
         m_filter_bar->set_current_app_name_filter(m_filters->get_app_name(view_id));
         m_filter_bar->set_available_log_levels(FilterCoordinator::get_available_log_levels());
@@ -271,6 +272,7 @@ auto WorkspacePresenter::reset_presentation() -> void
     {
         const QSignalBlocker blocker(m_filter_bar);
         m_filter_bar->set_search_bar_enabled(false);
+        m_filter_bar->set_search_in_progress(false);
         m_filter_bar->set_app_names({});
         m_filter_bar->set_log_levels({});
         m_filter_bar->set_log_level_counts({});
@@ -392,6 +394,13 @@ auto WorkspacePresenter::connect_workspace_actions() -> void
                 [this](const QString& text, SearchField field, bool use_regex) {
                     apply_search(get_active_view_id(), text, field, use_regex);
                 });
+        connect(m_filter_bar, &LogFilterBarWidget::cancel_search_requested, this, [this] {
+            const QUuid view_id = get_active_view_id();
+            if (!view_id.isNull() && m_pages != nullptr)
+            {
+                m_pages->cancel_regex_query(view_id);
+            }
+        });
         connect(m_filter_bar, &LogFilterBarWidget::search_field_changed, this, [this](SearchField) {
             if (m_filter_bar->has_valid_search_pattern())
             {
@@ -464,6 +473,20 @@ auto WorkspacePresenter::connect_workspace_updates() -> void
                     if (view_id == get_active_view_id())
                     {
                         refresh_active_view();
+                    }
+                });
+        connect(m_pages, &LogPageCoordinator::regex_query_started, this,
+                [this](const QUuid& view_id) {
+                    if (view_id == get_active_view_id() && m_filter_bar != nullptr)
+                    {
+                        m_filter_bar->set_search_in_progress(true);
+                    }
+                });
+        connect(m_pages, &LogPageCoordinator::regex_query_finished, this,
+                [this](const QUuid& view_id, bool) {
+                    if (view_id == get_active_view_id() && m_filter_bar != nullptr)
+                    {
+                        m_filter_bar->set_search_in_progress(false);
                     }
                 });
         connect(m_imports, &LogImportCoordinator::finished, this,
