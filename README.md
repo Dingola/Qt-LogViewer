@@ -191,6 +191,16 @@ Once you have generated the required tokens, add them as secrets in your GitHub 
   - **`$USERPROFILE/ThirdParty`** on Windows
   - **`$HOME/ThirdParty`** on Unix-based systems.
 
+* **`<DEPENDENCY_TARGET>_SOURCE_DIR`:** Optional local source directory for one dependency. A local
+  source override has priority over installed packages and Git downloads and must contain a
+  `CMakeLists.txt` that defines the expected dependency target. Keep machine-specific values in the
+  CMake cache, IDE configuration, or the ignored `CMakeUserPresets.json` rather than committing
+  absolute paths.
+
+* **`<DEPENDENCY_TARGET>_USE_LOCAL_SOURCE`:** Enables the corresponding local source directory and
+  defaults to **On**. Set it to **Off** in CMake GUI to use the normal package and Git fallback while
+  preserving the configured local path for later reuse.
+
 * **SANITIZER_TYPE:** Specifies the type of sanitizer to use for the build process. Supported values are:
   - `none`
   - `address`

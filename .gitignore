@@ -41,6 +41,9 @@
 **/install*/*
 **/ThirdPartyDir*/*
 
+# Developer-specific CMake presets and local dependency paths
+CMakeUserPresets.json
+
 # Ignore compiled translation files
 *.qm
 

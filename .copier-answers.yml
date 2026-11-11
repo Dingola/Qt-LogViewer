@@ -1,5 +1,5 @@
 # This file is managed by Copier. Do not edit it manually.
-_commit: 1.1.1
+_commit: 1.1.1-3-gccfe23a
 _src_path: https://github.com/Dingola/QtWidgetsTemplate.git
 display_name: Qt-LogViewer
 docker_name: qt-logviewer

@@ -6,7 +6,72 @@
 #       GIT_TAG           <Git Tag/Branch>
 #       LINK_TYPE         <PUBLIC/PRIVATE/INTERFACE>
 #   )
+# Optional local development override:
+#   -D<TARGET_NAME>_SOURCE_DIR=<path-to-local-source>
+#   -D<TARGET_NAME>_USE_LOCAL_SOURCE=<ON/OFF>
 macro(include_third_party_library TARGET_NAME GIT_URL GIT_TAG LINK_TYPE)
+
+    # An explicitly supplied local source directory has highest priority. This supports
+    # cross-repository development without requiring an intermediate commit, push, or install.
+    set(
+        ${TARGET_NAME}_SOURCE_DIR
+        ""
+        CACHE PATH
+        "Optional local source directory for ${TARGET_NAME}"
+    )
+    set(
+        ${TARGET_NAME}_USE_LOCAL_SOURCE
+        ON
+        CACHE BOOL
+        "Use ${TARGET_NAME}_SOURCE_DIR when it is configured"
+    )
+    set(_LOCAL_SOURCE_DIR "${${TARGET_NAME}_SOURCE_DIR}")
+
+    if(${TARGET_NAME}_USE_LOCAL_SOURCE AND NOT _LOCAL_SOURCE_DIR STREQUAL "")
+        get_filename_component(
+            _LOCAL_SOURCE_DIR
+            "${_LOCAL_SOURCE_DIR}"
+            ABSOLUTE
+            BASE_DIR "${CMAKE_SOURCE_DIR}"
+        )
+
+        if(NOT EXISTS "${_LOCAL_SOURCE_DIR}/CMakeLists.txt")
+            message(FATAL_ERROR
+                "[${TARGET_NAME}] Local source directory does not contain CMakeLists.txt: "
+                "${_LOCAL_SOURCE_DIR}"
+            )
+        endif()
+
+        if(TARGET ${TARGET_NAME})
+            message(STATUS
+                "[${TARGET_NAME}] Target already exists; reusing it for the local source override."
+            )
+        else()
+            message(STATUS
+                "[${TARGET_NAME}] Using local source directory: ${_LOCAL_SOURCE_DIR}"
+            )
+
+            set(BACKUP_MAIN_PROJECT_NAME ${MAIN_PROJECT_NAME})
+            set(MAIN_PROJECT_NAME ${TARGET_NAME})
+            set(${TARGET_NAME}_BUILD_TARGET_TYPE "static_library" CACHE STRING
+                "Force library target type for local dependency development" FORCE)
+
+            add_subdirectory(
+                "${_LOCAL_SOURCE_DIR}"
+                "${CMAKE_BINARY_DIR}/ThirdParty/${TARGET_NAME}_Local"
+                EXCLUDE_FROM_ALL
+            )
+
+            set(MAIN_PROJECT_NAME ${BACKUP_MAIN_PROJECT_NAME})
+        endif()
+
+        if(NOT TARGET ${TARGET_NAME})
+            message(FATAL_ERROR
+                "[${TARGET_NAME}] LOCAL_SOURCE_TARGET_MISSING: local source directory did not "
+                "define the expected target '${TARGET_NAME}': ${_LOCAL_SOURCE_DIR}"
+            )
+        endif()
+    else()
 
     # 1. Setup Paths & Variables
     set(PROJECT_DIR_NAME "${TARGET_NAME}_${GIT_TAG}")
@@ -108,7 +173,11 @@ macro(include_third_party_library TARGET_NAME GIT_URL GIT_TAG LINK_TYPE)
         endif()
     endif()
 
+    endif()
+
     # 7. Link Library
     target_link_libraries(${PROJECT_NAME} ${LINK_TYPE} ${TARGET_NAME})
+
+    unset(_LOCAL_SOURCE_DIR)
 
 endmacro()
